@@ -1,0 +1,321 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "OpenDeepSearch/077.json",
+    "gold": false,
+    "gold_step": null,
+    "prediction": false,
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "responsible_step": null,
+    "elapsed_seconds": 1227.587,
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "OpenDeepSearch/077.json",
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "occurrence_state": "verified_clean",
+      "proof": {
+        "state": "verified_clean",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": null,
+        "responsible_step": null,
+        "incident_occurred": false,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.",
+            "correct_result": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza."
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.",
+          "correct_result": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.",
+          "basis": "observation",
+          "confidence": "medium",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The name of the 2017 Erdős–Rényi Prize recipient"
+            }
+          ]
+        },
+        "recall_candidates": [
+          {
+            "candidate_id": "c1",
+            "claim": "the agent answered that Vittoria Colizza was the recipient of the 2017 Erdős–Rényi Prize instead of the correct recipient Danielle Bassett",
+            "locus_event_id": "event_006",
+            "evidence_refs": [
+              "event_005",
+              "event_006"
+            ],
+            "evidence_citations": [],
+            "quote": "The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza."
+          },
+          {
+            "candidate_id": "c2",
+            "claim": "the agent submitted the final answer as established instead of reconciling the direct conflict with its own event_005 observation, which named Danielle Bassett as the 2017 prize recipient",
+            "locus_event_id": "event_006",
+            "evidence_refs": [
+              "event_003",
+              "event_005",
+              "event_006"
+            ],
+            "evidence_citations": [],
+            "quote": "The 2017 Erdős–Rényi Prize was awarded to Danielle Bassett for her contributions to network science."
+          },
+          {
+            "candidate_id": "c3",
+            "claim": "the trajectory's search observation misreported the 2017 winner as Vittoria Colizza instead of the real-world recipient Danielle Bassett, seeding the wrong final answer",
+            "locus_event_id": "event_002",
+            "evidence_refs": [
+              "event_002",
+              "event_003"
+            ],
+            "evidence_citations": [],
+            "quote": "2017: Vittoria Colizza"
+          }
+        ],
+        "causal_upgrade": null,
+        "causal_upgrades": [],
+        "causal_upgrade_rows": [
+          {
+            "candidate_id": "c1",
+            "content_error": false,
+            "causal": false,
+            "corrected_step": null,
+            "reason": "Under the conflicted-observations rule, a final answer that agrees with one of the trajectory's own conflicting observations (event_002/event_003: Colizza) cannot be convicted from general knowledge alone, and with no external snapshot settling the conflict the point stays undecided rather than material.",
+            "evidence_refs": [],
+            "conflict_note": "The trajectory's own observations conflict on the same point: event_002 and event_003 report Vittoria Colizza while event_005 reports Danielle Bassett; no external evidence snapshot is provided, so the conflict is unresolved and the point is undecided.",
+            "coverage": "answered"
+          },
+          {
+            "candidate_id": "c2",
+            "content_error": false,
+            "causal": false,
+            "corrected_step": null,
+            "reason": "The task imposes no contract requiring the agent to reconcile conflicting tool observations, and since the recipient point is left undecided by the unresolved observation conflict, submitting Colizza at event_006 is neither a deliverable breach nor a result error.",
+            "evidence_refs": [],
+            "conflict_note": "The candidate rests on the unresolved internal conflict between event_002/event_003 (Colizza) and event_005 (Bassett); absent an applicable external snapshot the conflict cannot be resolved, so no decisive finding can be grounded on either value.",
+            "coverage": "answered"
+          },
+          {
+            "candidate_id": "c3",
+            "content_error": false,
+            "causal": false,
+            "corrected_step": null,
+            "reason": "The cited locus is a tool observation, which the localization law expressly excludes as an assistant error, and without external evidence the record's internal conflict leaves the alleged misreport undecided; moreover, correcting only event_002 would leave event_003's Colizza report intact, so the causal test also fails.",
+            "evidence_refs": [],
+            "conflict_note": "The claim that event_002 misreported the winner relies on real-world knowledge set against a record that itself conflicts (event_002/003 vs event_005) with no external snapshot to settle it, so the misreport is unestablished.",
+            "coverage": "answered"
+          }
+        ],
+        "step_tracer": null,
+        "defense": null,
+        "causal_upgrade_coverage": {
+          "expected": 3,
+          "answered": 3,
+          "missing": []
+        },
+        "hearings": [],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 5,
+          "view": "complete",
+          "warnings": [
+            {
+              "attempt": "vote",
+              "error": "provider returned non-JSON body: b'<html>\\r\\n<head><title>502 Bad Gateway</title></head>\\r\\n<body>\\r\\n<center><h1>502 Bad Gateway</h1></center>\\r\\n<hr><center>nginx</center>\\r\\n</body>\\r\\n</html>\\r\\n'"
+            }
+          ]
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "causal_upgrade": {
+          "stage": "causal_upgrade",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2702,
+            "completion_tokens": 6065,
+            "total_tokens": 8767,
+            "prompt_tokens_details": {
+              "cached_tokens": 1472
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 5846
+            },
+            "input_tokens_details": {
+              "cached_tokens": 1472
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 5846
+            },
+            "input_tokens": 2702,
+            "output_tokens": 6065
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"is_hallucination\":false,\"hallucination_step\":null,\"hallucination_reason\":null,\"delivered_result\":\"The recipient of the 2017 Erdős–Rényi Prize was Vittoria Colizza.\",\"correct_result\":\"Not settled by the shown record: the trajectory's own tool observations conflict on this same point (event_002 and ",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false,
+            "topups": 1
+          }
+        },
+        "recall_scanner": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 1986,
+            "completion_tokens": 5135,
+            "total_tokens": 7121,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4776
+            },
+            "input_tokens_details": {
+              "cached_tokens": 0
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 4776
+            },
+            "input_tokens": 1986,
+            "output_tokens": 5135
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "recall_scanner",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"candidates\": [\n    {\n      \"candidate_id\": \"c1\",\n      \"claim\": \"the agent answered that Vittoria Colizza was the recipient of the 2017 Erdős–Rényi Prize instead of the correct recipient Danielle Bassett\",\n      \"locus_event_id\": \"event_006\",\n      \"evidence_refs\": [\"event_005\", \"event_006\"],\n "
+        },
+        "causal_upgrade": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2977,
+            "completion_tokens": 6316,
+            "total_tokens": 9293,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 5883
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 5883
+            },
+            "input_tokens": 2977,
+            "output_tokens": 6316
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "causal_upgrade",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\"upgrades\":[{\"candidate_id\":\"c1\",\"content_error\":false,\"causal\":false,\"corrected_step\":null,\"evidence_refs\":[],\"conflict_note\":\"Trajectory observations conflict on the 2017 recipient: event_002 and event_003 name Vittoria Colizza while event_005 names Danielle Bassett; no external evidence snapshot",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "per_candidate": {
+              "c1": {
+                "cast": 3,
+                "positives": 0,
+                "winner": false,
+                "tie": false
+              },
+              "c2": {
+                "cast": 3,
+                "positives": 0,
+                "winner": false,
+                "tie": false
+              },
+              "c3": {
+                "cast": 3,
+                "positives": 0,
+                "winner": false,
+                "tie": false
+              }
+            }
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": "complete",
+        "upgrade_view": "complete",
+        "tracer_view": null,
+        "defense_view": null
+      },
+      "provenance": {
+        "packet_hash": "36ea11200f9869a90b9a8ba41c65791896b50377222bd67df92afc3b8c1c8acc",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 6
+    },
+    "backend": "detector"
+  },
+  "row_hash": "c28df5e976ad"
+}

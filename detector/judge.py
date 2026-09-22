@@ -17,6 +17,7 @@ from detector.packet import (
 )
 from detector.provider import (
     ProviderError,
+    accumulate_usage,
     majority_vote,
     provider_call,
     required_quorum,
@@ -225,6 +226,10 @@ def run_judge(
     topup_budget = max(0, int(route.get("vote_topup", 0) or 0))
     ballots: list[dict[str, Any]] = []
     sample_meta: dict[str, Any] = {}
+    # ``sample_meta`` follows the last ballot, so its usage is one ballot's.
+    # The total is what the stage actually cost and is the only honest input
+    # for sizing a run (see ``accumulate_usage``).
+    ballots_usage: dict[str, Any] = {}
     total_attempts = 0
     warnings: list[dict[str, str]] = []
     fatal_error = ""
@@ -248,6 +253,7 @@ def run_judge(
         if parsed is not None:
             ballots.append(parsed)
             sample_meta = dict(meta or {})
+            accumulate_usage(ballots_usage, (meta or {}).get("usage") or {})
         return True
 
     for _ in range(votes):
@@ -332,6 +338,11 @@ def run_judge(
     if topups_used:
         vote_meta["topups"] = topups_used
     sample_meta["vote"] = vote_meta
+    if ballots_usage:
+        # Keep the last ballot's own usage under ``usage`` (existing readers and
+        # the truncation message depend on it) and add the stage total beside
+        # it, so the undercount is corrected without changing the old field.
+        sample_meta["usage_total"] = ballots_usage
     return {
         "ok": True,
         "parsed": result,

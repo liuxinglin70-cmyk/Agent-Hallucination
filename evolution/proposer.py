@@ -54,17 +54,17 @@ Do not explain your answer, use Markdown, case ids, labels, or case text.
 Every intervention must use exactly ONE of these mutually exclusive schemas.
 
 Text-boundary schema (changes one existing LLM stage prompt):
-{"type":"text_boundary","hook":"judge.system|scanner.system|upgrade.system|tracer.system|defense.system","trigger":{"packet_features":["has_tool_calls"],"facts":[]},"body":{"directive":"nonempty behavior instruction","not_when":"nonempty hard exclusion"},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary"},"provenance":{"failure_family":"<one supplied family>"}}
+{"type":"text_boundary","hook":"judge.system|scanner.system|upgrade.system|tracer.system|defense.system","trigger":{"packet_features":["has_tool_calls"],"facts":[]},"body":{"directive":"nonempty behavior instruction","not_when":"nonempty hard exclusion"},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary","target_kind":"detection|localization|joint"},"provenance":{"failure_family":"<one supplied family>"}}
 
 Evidence schema (writes one mechanical evidence row):
-{"type":"evidence_check","hook":"judge.post|upgrade.pre|defense.pre","trigger":{"packet_features":["has_tool_calls"],"facts":[]},"body":{"predicate":"<one predicate from the predicate list>","runner":"deterministic","output_verdicts":["<all verdicts listed for that predicate>"]},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary"},"provenance":{"failure_family":"<one supplied family>"}}
+{"type":"evidence_check","hook":"judge.post|upgrade.pre|defense.pre","trigger":{"packet_features":["has_tool_calls"],"facts":[]},"body":{"predicate":"<one predicate from the predicate list>","runner":"deterministic","output_verdicts":["<all verdicts listed for that predicate>"]},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary","target_kind":"detection|localization|joint"},"provenance":{"failure_family":"<one supplied family>"}}
 
 Evolved-evidence schema (defines one NEW typed predicate program and writes its row):
-{"type":"evidence_check","hook":"judge.post|upgrade.pre|defense.pre","trigger":{"packet_features":["has_tool_calls"],"facts":[]},"body":{"predicate":"evo_<short_name>","runner":"typed_dsl","output_verdicts":["satisfied","violated","not_applicable"],"predicate_definition":{"schema_version":"detector.predicate_program.v1","name":"evo_<same_short_name>","description":"what this observation detects","verdicts":["satisfied","violated","not_applicable"],"conviction_verdicts":["violated"],"default_verdict":"not_applicable","rules":[{"field":"<one typed field below>","operator":"<valid operator for that field>","value":"<literal>","verdict":"violated","detail":"what the rule found"}]}},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary"},"provenance":{"failure_family":"<one supplied family>"}}
+{"type":"evidence_check","hook":"judge.post|upgrade.pre|defense.pre","trigger":{"packet_features":["has_tool_calls"],"facts":[]},"body":{"predicate":"evo_<short_name>","runner":"typed_dsl","output_verdicts":["satisfied","violated","not_applicable"],"predicate_definition":{"schema_version":"detector.predicate_program.v1","name":"evo_<same_short_name>","description":"what this observation detects","verdicts":["satisfied","violated","not_applicable"],"conviction_verdicts":["violated"],"default_verdict":"not_applicable","rules":[{"field":"<one typed field below>","operator":"<valid operator for that field>","value":"<literal>","verdict":"violated","detail":"what the rule found"}]}},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary","target_kind":"detection|localization|joint"},"provenance":{"failure_family":"<one supplied family>"}}
 A rule may instead use "conditions":[{"field":...,"operator":...,"value":...}, ...] (2..4 conditions, ALL must match, AND semantics). Never put field/operator/value alongside conditions.
 
 Recall-trigger schema (forces the recall net for matching judge-negative cases):
-{"type":"recall_trigger","hook":"recall.trigger","trigger":{"packet_features":["has_tool_calls"],"facts":["judge_positive=false"]},"body":{"predicate":"evo_<short_name>","runner":"typed_dsl","output_verdicts":["satisfied","violated","not_applicable"],"trigger_verdicts":["violated"],"require_judge_negative":true,"predicate_definition":{"schema_version":"detector.predicate_program.v1","name":"evo_<same_short_name>","description":"when the recall net must hear this case","verdicts":["satisfied","violated","not_applicable"],"conviction_verdicts":["violated"],"default_verdict":"not_applicable","rules":[{"field":"<one typed field below>","operator":"<valid operator for that field>","value":"<literal>","verdict":"violated","detail":"what the rule found"}]}},"claim":{"expected_behavior":"nonempty","target_polarity":"recall"},"provenance":{"failure_family":"<one supplied family>"}}
+{"type":"recall_trigger","hook":"recall.trigger","trigger":{"packet_features":["has_tool_calls"],"facts":["judge_positive=false"]},"body":{"predicate":"evo_<short_name>","runner":"typed_dsl","output_verdicts":["satisfied","violated","not_applicable"],"trigger_verdicts":["violated"],"require_judge_negative":true,"predicate_definition":{"schema_version":"detector.predicate_program.v1","name":"evo_<same_short_name>","description":"when the recall net must hear this case","verdicts":["satisfied","violated","not_applicable"],"conviction_verdicts":["violated"],"default_verdict":"not_applicable","rules":[{"field":"<one typed field below>","operator":"<valid operator for that field>","value":"<literal>","verdict":"violated","detail":"what the rule found"}]}},"claim":{"expected_behavior":"nonempty","target_polarity":"recall","target_kind":"detection"},"provenance":{"failure_family":"<one supplied family>"}}
 Recall-trigger is the correct route for an FN family whose recall_path is not_run or not_needed: it spends the LLM recall net only on cases the trigger names. A recall_trigger never turns a judge-positive case and never changes the verdict by itself; a recall upgrade still needs defense substantiation.
 This route is available, not mandatory. Re-reading the same packet cannot
 supply an absent tool specification, hidden benchmark requirement, or external
@@ -82,7 +82,7 @@ packet evidence of a violated task requirement. Shared fields across failure
 members do not establish that the same fields distinguish clean controls.
 
 Guard schema (emits one closed adjudication action):
-{"type":"decision_guard","hook":"adjudicate.guard","trigger":{"packet_features":["has_tool_calls"],"facts":["name=value from the fact list"]},"body":{"action":"withhold_conviction|restore_judge_conviction|require_full_view_defense|convict_mechanical_violation","evidence_predicate":"<required only for convict_mechanical_violation>","action_not_when":"nonempty explanation","action_not_when_facts":["name=value from the fact list"]},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary"},"provenance":{"failure_family":"<one supplied family>"}}
+{"type":"decision_guard","hook":"adjudicate.guard","trigger":{"packet_features":["has_tool_calls"],"facts":["name=value from the fact list"]},"body":{"action":"withhold_conviction|restore_judge_conviction|require_full_view_defense|convict_mechanical_violation","evidence_predicate":"<required only for convict_mechanical_violation>","action_not_when":"nonempty explanation","action_not_when_facts":["name=value from the fact list"]},"claim":{"expected_behavior":"nonempty","target_polarity":"recall|precision|boundary","target_kind":"detection|localization|joint"},"provenance":{"failure_family":"<one supplied family>"}}
 
 Predicates and their verdicts:
 {predicate_block}
@@ -167,12 +167,65 @@ Guidance:
   evidence partner can never fire and is rejected before the gate. Do not
   emit a guard-only candidate when the only discriminative signal is a
   predicate fact.
-- target_polarity must match the family kind: recall for FN, precision for FP.
+- Every claim must carry BOTH target fields, and they must agree with the
+  family you drew it from. Each family in the block states its kind and its
+  required_target_kind; copy that value.
+  target_polarity: recall for FN, precision for FP. A LOCALIZATION family is
+  neither: it is a case the detector already convicts correctly but whose
+  named responsible step is wrong, so its claim treats the step, not the
+  binary verdict.
+  target_kind: detection for FN and FP, localization or joint for
+  LOCALIZATION. A claim on a LOCALIZATION family that declares detection is
+  refused by STRUCTURAL before any objective-specific gate can score it, so
+  the intervention is never measured. When the treatment must both convict and
+  name the right step, declare joint.
+- A LOCALIZATION family's only route is the tracer (tracer.system text
+  boundary): the conviction is already correct, so the stage that must move is
+  the one that names the step. Do not force recall or add a conviction for
+  such a family.
 - Every guard needs action_not_when_facts. They are ANDed executable exclusions;
   use [] only when no exclusion is required.
  - Never re-propose a mechanism equivalent to an active intervention or a
    rejected candidate listed in the feedback.
 """
+
+
+# The objective a family's mechanism belongs to, and the target_kind a claim
+# drawn from it must declare. STRUCTURAL enforces this agreement, so the
+# proposer has to be told it: a localization family treated as a detection
+# family is refused before any objective-specific gate can score it.
+FAMILY_KINDS = {
+    "FAM-fn-": ("FN", "detection"),
+    "FAM-fp-": ("FP", "detection"),
+    "FAM-loc-": ("LOCALIZATION", "localization"),
+    "FAM-unresolved-": ("UNRESOLVED", "detection"),
+}
+
+
+def _family_kind(family_id: Any) -> str:
+    """Readable kind for one family id; never guesses between objective kinds.
+
+    A localization family is *not* an FP family. The earlier ``"FN" if
+    startswith("FAM-fn") else "FP"`` collapsed every non-FN family into FP,
+    which told the model to answer with precision polarity for a localization
+    family — and since every schema then omitted ``target_kind``, the claim
+    defaulted to detection and STRUCTURAL rejected it. Two of the three
+    objectives were therefore unmeasurable by construction.
+    """
+    text = str(family_id or "")
+    for prefix, (kind, _target) in FAMILY_KINDS.items():
+        if text.startswith(prefix):
+            return kind
+    return "UNKNOWN"
+
+
+def family_target_kind(family_id: Any) -> str:
+    """The ``target_kind`` a claim drawn from this family must declare."""
+    text = str(family_id or "")
+    for prefix, (_kind, target) in FAMILY_KINDS.items():
+        if text.startswith(prefix):
+            return target
+    return "detection"
 
 
 def _draft_system_prompt() -> str:
@@ -406,7 +459,10 @@ class LLMProposer:
             [
                 {
                     "failure_family": f.get("failure_family"),
-                    "kind": "FN" if str(f.get("failure_family") or "").startswith("FAM-fn") else "FP",
+                    "kind": _family_kind(f.get("failure_family")),
+                    "required_target_kind": family_target_kind(
+                        f.get("failure_family")
+                    ),
                     "count": f.get("count"),
                     "sources": f.get("sources"),
                     "mechanism_summary": f.get("mechanism_summary"),
@@ -498,12 +554,24 @@ class LLMProposer:
                 purpose="evolution_proposer",
             )
         except ProviderError as exc:
+            # ``rejected`` puts a retryable transport failure into the same
+            # vocabulary the repair loop already scans, so the configured
+            # repair call is actually available to a truncated reply. Without
+            # it the note carried no ``rejected`` key, ``mechanical_rejections``
+            # stayed empty, and a stochastic truncation silently downgraded the
+            # cycle to the deterministic templates.
+            #
+            # A missing credential is deliberately excluded: re-asking cannot
+            # mint one, so a repair call would only spend budget.
+            retryable = str(exc.error_type or "") != "missing_credential"
             return ProposalBatch(notes=[{
                 "generator": "llm",
                 "provider_called": True,
                 "provider_ok": False,
                 "error_type": exc.error_type,
                 "attempts": exc.attempts,
+                **({"rejected": "provider_failure"} if retryable else {}),
+                "reason": str(exc.message or ""),
             }])
         generation_note = {
             "generator": "llm",
@@ -731,6 +799,11 @@ class LLMProposer:
                 "echo_of_active", "duplicate_in_batch", "echo_of_rejected",
                 "missing_evidence_partner", "missing_terminal_partner",
                 "echo_of_rejected_combination",
+                # A provider failure is not a contract rejection, but it does
+                # mean no candidate was drafted. The repair call re-asks with
+                # the failure in context, which is the only configured remedy
+                # for a stochastic truncation.
+                "provider_failure",
             }
         ]
         repairs = self.repairs_by_cycle.get(int(cycle), 0)
@@ -1019,6 +1092,11 @@ class HybridProposer:
                     )
             elif family_id.startswith("FAM-fp-") and len(candidates) < max_proposals:
                 candidates.extend(self._fp_candidates(family, cycle))
+            elif family_id.startswith("FAM-loc-") and len(candidates) < max_proposals:
+                # Without this branch a localization family produced nothing in
+                # the fallback at all, so when the LLM proposer truncated the
+                # entire localization objective fell through silently.
+                candidates.extend(self._localization_candidates(family, cycle))
         return candidates[:max_proposals]
 
     @staticmethod
@@ -1103,6 +1181,7 @@ class HybridProposer:
             "claim": {
                 "expected_behavior": f"force recall for {feature}",
                 "target_polarity": "recall",
+                "target_kind": "detection",
             },
             "provenance": cls._base_provenance(family, cycle),
         }
@@ -1153,6 +1232,7 @@ class HybridProposer:
             "claim": {
                 "expected_behavior": "detect required search without search-like tool",
                 "target_polarity": "recall",
+                "target_kind": "detection",
             },
             "provenance": dict(provenance),
         }
@@ -1178,6 +1258,7 @@ class HybridProposer:
             "claim": {
                 "expected_behavior": "convict mechanically missing required search",
                 "target_polarity": "recall",
+                "target_kind": "detection",
             },
             "provenance": dict(provenance),
         }
@@ -1220,6 +1301,7 @@ class HybridProposer:
                 "claim": {
                     "expected_behavior": f"write {predicate} evidence",
                     "target_polarity": "precision",
+                    "target_kind": "detection",
                 },
                 "provenance": dict(provenance),
             }
@@ -1247,11 +1329,65 @@ class HybridProposer:
                 "claim": {
                     "expected_behavior": f"withhold {predicate} conviction",
                     "target_polarity": "precision",
+                    "target_kind": "detection",
                 },
                 "provenance": dict(provenance),
             }
             return [evidence, guard]
         return []
+
+    @classmethod
+    def _localization_candidates(
+        cls,
+        family: Mapping[str, Any],
+        cycle: int,
+    ) -> list[dict[str, Any]]:
+        """Deterministic tracer directive for a localization family.
+
+        The conviction is already correct on these cases, so the only stage
+        that can change the outcome is the one that names the step. The
+        directive is deliberately mechanism-level rather than case-level: it
+        states the property the shared members exhibit (a delivery whose named
+        step is not the first assistant-authored event that fixes the claim),
+        which a tracer can apply without knowing the case.
+        """
+        shared = cls._shared_packet_features(family) or ["has_tool_calls"]
+        provenance = cls._base_provenance(family, cycle)
+        return [{
+            "schema_version": "detector.intervention.v1",
+            "intervention_id": f"IV-{cycle}-T-locate_delivered_claim",
+            "type": "text_boundary",
+            "hook": "tracer.system",
+            "trigger": {
+                "packet_features": sorted(shared),
+                "facts": [],
+            },
+            "body": {
+                "directive": (
+                    "Name the step at which the delivered claim first becomes "
+                    "unsupported, not the step at which the unsupported claim "
+                    "is finally restated. When several steps repeat a wrong "
+                    "value, the responsible step is the earliest "
+                    "assistant-authored event that introduces it and would "
+                    "have to change for the delivery to be correct."
+                ),
+                "not_when": (
+                    "do not move the named step away from an event the packet "
+                    "itself identifies as the delivery; do not use benchmark "
+                    "annotations"
+                ),
+            },
+            "claim": {
+                "expected_behavior": (
+                    "the tracer reports the earliest assistant-authored event "
+                    "that fixes the delivered claim, so localization matches "
+                    "the introduction of the error rather than its repetition"
+                ),
+                "target_polarity": "precision",
+                "target_kind": "localization",
+            },
+            "provenance": dict(provenance),
+        }]
 
 
 def make_proposer(

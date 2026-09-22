@@ -36,6 +36,7 @@ from evolution.metrics import (
     evidence_increment_rows,
     fired_rate,
     paired_delta,
+    paired_localization_delta,
 )
 
 SEMANTICS_KEYS = (
@@ -287,6 +288,7 @@ def structural_gate(
                 f"{outside_family}"
             )
     polarity = str((candidate.get("claim") or {}).get("target_polarity") or "")
+    target_kind = candidate_target_kind(candidate)
     if family.startswith("FAM-fn-") and polarity != "recall":
         return _policy_fail(
             f"FN failure family requires recall polarity, got {polarity!r}"
@@ -294,6 +296,25 @@ def structural_gate(
     if family.startswith("FAM-fp-") and polarity != "precision":
         return _policy_fail(
             f"FP failure family requires precision polarity, got {polarity!r}"
+        )
+    # The family's mechanism and the claim's objective must agree. A
+    # localization family treats a case the detector already convicts
+    # correctly, so a candidate declaring the binary objective (or the
+    # reverse) would be scored by a gate that cannot see its mechanism at all.
+    if family.startswith("FAM-loc-") and target_kind not in {
+        "localization", "joint",
+    }:
+        return _policy_fail(
+            "localization failure family requires target_kind localization or "
+            f"joint, got {target_kind!r}"
+        )
+    if (
+        family.startswith(("FAM-fn-", "FAM-fp-"))
+        and target_kind != "detection"
+    ):
+        return _policy_fail(
+            f"detection failure family {family!r} cannot claim target_kind "
+            f"{target_kind!r}"
         )
     body = candidate.get("body") or {}
     if (
@@ -714,6 +735,131 @@ def behavior_gate(
     )
 
 
+def candidate_target_kind(candidate: Mapping[str, Any]) -> str:
+    """What objective the candidate claims: detection, localization or joint.
+
+    Absent means detection, matching ``validate_intervention``: a registry
+    entry written before the field existed is a detection claim.
+    """
+    return str((candidate.get("claim") or {}).get("target_kind") or "detection")
+
+
+def localization_behavior_gate(
+    candidate: Mapping[str, Any],
+    *,
+    baseline_rows: Sequence[Mapping[str, Any]],
+    candidate_rows: Sequence[Mapping[str, Any]],
+    config: Mapping[str, Any],
+    gold_steps: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Whether a localization claim actually moved responsible-step output.
+
+    Mirrors ``behavior_gate``'s discipline for the localization objective:
+    the claimed direction must show up as a real change in the recorded
+    responsible step, on cases the frozen batch can score, without breaking
+    a localization the control arm already had right. Firing alone is not
+    enough, and a binary-only gain cannot satisfy this gate.
+
+    Sides are rescaled before scoring so the batch can carry both polarities:
+    every gold-positive annotated case that the control arm convicted correctly
+    but localized wrongly counts against the candidate; every one the control
+    localized correctly must be preserved.
+    """
+    gate_cfg = config.get("gates") or {}
+    intervention_id = str(candidate.get("intervention_id") or "")
+    delta = paired_localization_delta(
+        list(baseline_rows), list(candidate_rows), gold_steps=gold_steps,
+    )
+    if bool(gate_cfg.get("behavior_require_fired", True)):
+        rate = fired_rate(candidate_rows, intervention_id)
+        if rate <= 0.0:
+            return _policy_fail(
+                "claim behavior mismatch: intervention never fired on the "
+                "localization batch",
+                fired_rate=rate,
+                delta=delta,
+            )
+    if int(delta["localizable_n"]) == 0:
+        return _policy_fail(
+            "localization batch carries no gold-positive annotated case, so "
+            "the claim cannot be scored",
+            delta=delta,
+            evaluable=False,
+            status="not_evaluated",
+        )
+    if int(delta["joint_improved"]) <= 0:
+        return _policy_fail(
+            "localization claim but no responsible step was corrected "
+            f"(joint_improved={delta['joint_improved']}, "
+            f"joint_broken={delta['joint_broken']})",
+            delta=delta,
+        )
+    allowed_broken = int(gate_cfg.get("localization_joint_broken_allowed", 0))
+    if int(delta["joint_broken"]) > allowed_broken:
+        return _policy_fail(
+            "localization claim broke existing correct localizations: "
+            f"joint_broken={delta['joint_broken']} > {allowed_broken}",
+            delta=delta,
+        )
+    return _policy_pass(delta=delta)
+
+
+def meets_localization(
+    delta: Mapping[str, Any],
+    *,
+    config: Mapping[str, Any],
+    detection_delta: Mapping[str, Any] | None = None,
+    target_kind: str = "localization",
+) -> tuple[bool, list[str]]:
+    """Localization benefit rule over a precomputed joint paired delta.
+
+    The joint success delta is measured against the frozen batch, so a case
+    that stops being convicted cannot leave the denominator and a miss cannot
+    be laundered into a localization gain. Detection health is protected
+    separately rather than folded into one weighted score.
+    """
+    gate_cfg = config.get("gates") or {}
+    failures: list[str] = []
+    minimum = max(0, int(gate_cfg.get("localization_min_joint_cases", 1)))
+    joint_delta = int(delta.get("joint_delta") or 0)
+    detection_delta_value = int(
+        (detection_delta or {}).get("marginal_cases") or 0
+    )
+    if target_kind == "joint":
+        # At least one objective improves; neither regresses.
+        if joint_delta <= 0 and detection_delta_value <= 0:
+            failures.append(
+                "joint claim improved neither objective "
+                f"(joint_delta={joint_delta}, detection_marginal="
+                f"{detection_delta_value})"
+            )
+    elif joint_delta < minimum:
+        failures.append(f"joint_delta={joint_delta} < {minimum}")
+    allowed_broken = int(gate_cfg.get("localization_joint_broken_allowed", 0))
+    if int(delta.get("joint_broken") or 0) > allowed_broken:
+        failures.append(
+            f"joint_broken={delta['joint_broken']} > {allowed_broken}"
+        )
+    allowed_new_errors = int(gate_cfg.get("m_new_errors_allowed", 0))
+    if detection_delta is not None:
+        if int(detection_delta.get("new_errors") or 0) > allowed_new_errors:
+            failures.append(
+                f"detection new_errors={detection_delta['new_errors']} > "
+                f"{allowed_new_errors}"
+            )
+        if int(detection_delta.get("unresolved_added") or 0) > 0:
+            failures.append(
+                f"unresolved_added={detection_delta['unresolved_added']}"
+            )
+        if int(detection_delta.get("health_regressed") or 0) > 0:
+            failures.append(
+                f"health_regressed={detection_delta['health_regressed']}"
+            )
+    if int(delta.get("n") or 0) and not int(delta.get("localizable_n") or 0):
+        failures.append("localization batch has no annotated positive case")
+    return (not failures), failures
+
+
 def meets_m(
     delta: Mapping[str, Any],
     *,
@@ -795,7 +941,10 @@ def defect_candidates() -> list[dict[str, Any]]:
 __all__ = [
     "INFRASTRUCTURE_STATE_PREFIXES",
     "arm_has_infrastructure_failure",
+    "candidate_target_kind",
     "defect_candidates",
+    "localization_behavior_gate",
+    "meets_localization",
     "meets_m",
     "structural_gate",
     "harmlessness_gate",

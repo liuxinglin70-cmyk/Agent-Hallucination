@@ -198,15 +198,32 @@ def test_shipped_case_budget_fits_a_measured_long_trajectory():
     # unable to score its arm, which freezes the cycle by design. The case
     # deadline is a runtime envelope, not an admission threshold: it must fit
     # the trajectories the corpus actually contains.
+    #
+    # Re-measured on 2026-09-21, and the 300s per-attempt cap turned out to be
+    # the binding constraint rather than the case deadline. Reasoning length on
+    # one identical prompt ranged from 36 to 13,437 tokens (median 2,113) at
+    # 20-46 tok/s, so a legitimate deliberation routinely needs more than 300s;
+    # every call that did was killed mid-flight and retried from scratch,
+    # paying the first attempt's tokens and wall clock twice. Across the run's
+    # cache, judge needed 44 extra attempts over 25 cases, defense 17 over 9,
+    # and the causal upgrade 20 over 7 -- and two of 18 rows were cut at
+    # exactly 3600s while still working. A cut call returns nothing and burns
+    # its whole budget, and because the two arms run at different times a cut
+    # can land on one arm alone, which HARMLESSNESS (new_unresolved_allowed=0)
+    # then reads as a regression the candidate caused. The ceilings below are
+    # the floors that measurement justifies.
     raw = json.loads(
         (ROOT / "detector" / "configs" / "autodl.json").read_text(encoding="utf-8")
     )
-    assert raw["case_timeout_seconds"] >= 3600
-    # A single vote on this trajectory averages ~210 seconds in isolation and
-    # slows under parallel workers, so the per-attempt and per-call ceilings
-    # must leave room above that rather than retry-churning into the deadline.
-    assert raw["provider"]["timeout_seconds"] >= 300
-    assert raw["provider"]["total_timeout_seconds"] >= 900
+    assert raw["case_timeout_seconds"] >= 10800
+    assert raw["provider"]["timeout_seconds"] >= 900
+    assert raw["provider"]["total_timeout_seconds"] >= 2400
+    # The judge route deliberately carries no max_tokens. Measured completions
+    # reached 14,090 tokens on one call and the length is heavy-tailed (36 to
+    # 13,437 on one identical prompt), so imposing a ceiling here would add a
+    # truncation mode the route does not currently have: a truncated reply is
+    # a provider error, which resolves the case to unresolved.
+    assert "max_tokens" not in raw["judge_route"]
 
 
 def test_experiment_cli_preserves_optional_cycle_default(tmp_path, monkeypatch):

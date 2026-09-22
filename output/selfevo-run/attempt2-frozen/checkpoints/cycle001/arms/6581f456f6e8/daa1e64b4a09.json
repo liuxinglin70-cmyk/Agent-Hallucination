@@ -1,0 +1,498 @@
+{
+  "arm": "6581f456f6e8",
+  "row": {
+    "case": "BFCL/038.json",
+    "gold": false,
+    "gold_step": null,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "responsible_step": 3,
+    "elapsed_seconds": 0.416,
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "BFCL/038.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_003",
+      "responsible_step": 3,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_003",
+        "responsible_step": 3,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "recall_upgrade",
+            "judge_step": null,
+            "traced_step": 3,
+            "defense": "substantiated",
+            "confirmed_step": 3,
+            "delivered_result": "",
+            "correct_result": "",
+            "judge_basis": "observation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "recall_upgrade",
+                "candidate_id": "c1",
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "Listed directory contents with ls(a=True) showing [file1.txt, file2.txt, file3.txt]; sorted the third file (file3.txt) and displayed the last 10 lines returned by tail; counted 20 lines via wc(mode='l'); computed base-10 logarithm of 20 with precision 2 via the logarithm tool, which returned 1.3027.",
+          "correct_result": "The same deliverables: a listing including hidden files with no directories/files created, an alphabetical sort of file3.txt with its last 10 lines shown, a total line count (20), and log10(20) computed to precision 2 (~1.30), all obtained via correctly-argued tool calls.",
+          "basis": "observation",
+          "confidence": "medium",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "required_action",
+              "requirement": "List all current files in the temp directory including hidden files, without creating any additional directories or files"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Take the third file displayed (file3.txt), sort its contents alphabetically, and display only the last 10 lines"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Determine the total number of lines in file3.txt"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "Compute the base-10 logarithm of the line count with precision 2"
+            }
+          ]
+        },
+        "recall_candidates": [
+          {
+            "candidate_id": "c1",
+            "claim": "the agent displayed the last 10 lines of the unsorted file3.txt instead of the last 10 lines of the alphabetically sorted contents (sorted content ends with Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra, but the tail returned Kiwi, Plum, Pear, Fig, Date, Coconut, Pineapple, Papaya, Guava, Lychee)",
+            "locus_event_id": "event_003",
+            "evidence_refs": [
+              "event_003"
+            ],
+            "evidence_citations": [],
+            "quote": "TOOL name=tail arguments={'file_name': 'file3.txt', 'lines': 10} -> observation: {\"last_lines\": \"Kiwi\\nPlum\\nPear\\nFig\\nDate\\nCoconut\\nPineapple\\nPapaya\\nGuava\\nLychee\"}"
+          },
+          {
+            "candidate_id": "c2",
+            "claim": "the agent claimed the last 10 lines of the sorted file were displayed, instead of acknowledging the tail output did not match the sorted content",
+            "locus_event_id": "event_004",
+            "evidence_refs": [
+              "event_003",
+              "event_004"
+            ],
+            "evidence_citations": [],
+            "quote": "This will sort the contents of the third file (\"file3.txt\") alphabetically and then display the last 10 lines of the sorted file."
+          }
+        ],
+        "causal_upgrade": {
+          "candidate_id": "c1",
+          "content_error": true,
+          "causal": true,
+          "corrected_step": 3,
+          "reason": "The tail call at event_003 displayed the last 10 lines of the still-unsorted file3.txt instead of the required last 10 lines of the alphabetically sorted content, breaching the turn-2 display deliverable, and correcting that display would make every deliverable (turns 1-4) correct.",
+          "evidence_refs": [
+            "event_003"
+          ],
+          "conflict_note": "The sort and tail observations describe different objects (the sorted output vs. the file's current tail), so there is no same-point conflict: the sort observation directly fixes the sorted tail (Lime, Lychee, Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra), which differs from the displayed tail.",
+          "coverage": "answered",
+          "locus_event_id": "event_003",
+          "claim": "the agent displayed the last 10 lines of the unsorted file3.txt instead of the last 10 lines of the alphabetically sorted contents (sorted content ends with Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra, but the tail returned Kiwi, Plum, Pear, Fig, Date, Coconut, Pineapple, Papaya, Guava, Lychee)",
+          "quote": "TOOL name=tail arguments={'file_name': 'file3.txt', 'lines': 10} -> observation: {\"last_lines\": \"Kiwi\\nPlum\\nPear\\nFig\\nDate\\nCoconut\\nPineapple\\nPapaya\\nGuava\\nLychee\"}"
+        },
+        "causal_upgrades": [
+          {
+            "candidate_id": "c1",
+            "content_error": true,
+            "causal": true,
+            "corrected_step": 3,
+            "reason": "The tail call at event_003 displayed the last 10 lines of the still-unsorted file3.txt instead of the required last 10 lines of the alphabetically sorted content, breaching the turn-2 display deliverable, and correcting that display would make every deliverable (turns 1-4) correct.",
+            "evidence_refs": [
+              "event_003"
+            ],
+            "conflict_note": "The sort and tail observations describe different objects (the sorted output vs. the file's current tail), so there is no same-point conflict: the sort observation directly fixes the sorted tail (Lime, Lychee, Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra), which differs from the displayed tail.",
+            "coverage": "answered",
+            "locus_event_id": "event_003",
+            "evidence_citations": [],
+            "claim": "the agent displayed the last 10 lines of the unsorted file3.txt instead of the last 10 lines of the alphabetically sorted contents (sorted content ends with Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra, but the tail returned Kiwi, Plum, Pear, Fig, Date, Coconut, Pineapple, Papaya, Guava, Lychee)",
+            "quote": "TOOL name=tail arguments={'file_name': 'file3.txt', 'lines': 10} -> observation: {\"last_lines\": \"Kiwi\\nPlum\\nPear\\nFig\\nDate\\nCoconut\\nPineapple\\nPapaya\\nGuava\\nLychee\"}"
+          }
+        ],
+        "causal_upgrade_rows": [
+          {
+            "candidate_id": "c1",
+            "content_error": true,
+            "causal": true,
+            "corrected_step": 3,
+            "reason": "The tail call at event_003 displayed the last 10 lines of the still-unsorted file3.txt instead of the required last 10 lines of the alphabetically sorted content, breaching the turn-2 display deliverable, and correcting that display would make every deliverable (turns 1-4) correct.",
+            "evidence_refs": [],
+            "conflict_note": "The sort and tail observations describe different objects (the sorted output vs. the file's current tail), so there is no same-point conflict: the sort observation directly fixes the sorted tail (Lime, Lychee, Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra), which differs from the displayed tail.",
+            "coverage": "answered"
+          },
+          {
+            "candidate_id": "c2",
+            "content_error": true,
+            "causal": false,
+            "corrected_step": null,
+            "reason": "The event_004 claim that the sorted file's tail was displayed is factually false, but it only repeats and delivers the earlier uncorrected event_003 display error, and correcting the claim alone would still leave the wrong displayed content, so not every deliverable would become correct.",
+            "evidence_refs": [],
+            "conflict_note": "",
+            "coverage": "answered"
+          }
+        ],
+        "step_tracer": null,
+        "defense": null,
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "recall_upgrade",
+            "candidate_id": "c1",
+            "positive": {
+              "source": "recall_upgrade",
+              "step": 3,
+              "reason": "the agent displayed the last 10 lines of the unsorted file3.txt instead of the last 10 lines of the alphabetically sorted contents (sorted content ends with Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra, but the tail returned Kiwi, Plum, Pear, Fig, Date, Coconut, Pineapple, Papaya, Guava, Lychee)",
+              "evidence_refs": [
+                "event_003"
+              ],
+              "quote": "TOOL name=tail arguments={'file_name': 'file3.txt', 'lines': 10} -> observation: {\"last_lines\": \"Kiwi\\nPlum\\nPear\\nFig\\nDate\\nCoconut\\nPineapple\\nPapaya\\nGuava\\nLychee\"}",
+              "delivered_result": "",
+              "correct_result": ""
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 3,
+                "quote": "TOOL name=tail arguments={'file_name': 'file3.txt', 'lines': 10} -> observation: {\"last_lines\": \"Kiwi\\nPlum\\nPear\\nFig\\nDate\\nCoconut\\nPineapple\\nPapaya\\nGuava\\nLychee\"}",
+                "referent": "tail should have been applied to the alphabetically sorted contents of file3.txt (whose last 10 lines are Lime, Lychee, Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra), not to the unsorted file3.txt",
+                "evidence_refs": [
+                  "event_003"
+                ],
+                "reason": "At step 3 the agent called tail on the raw file3.txt instead of the sorted content returned by the preceding sort call, so the displayed last 10 lines came from the unsorted file, which is the first introduction of the deviation."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 1364,
+                  "completion_tokens": 1183,
+                  "total_tokens": 2547,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 967
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 967
+                  },
+                  "input_tokens": 1364,
+                  "output_tokens": 1183
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "\n{\n  \"step\": 3,\n  \"quote\": \"TOOL name=tail arguments={'file_name': 'file3.txt', 'lines': 10} -> observation: {\\\"last_lines\\\": \\\"Kiwi\\\\nPlum\\\\nPear\\\\nFig\\\\nDate\\\\nCoconut\\\\nPineapple\\\\nPapaya\\\\nGuava\\\\nLychee\\\"}\",\n  \"referent\": \"tail should have been applied to the alphabetically sorted contents of f"
+              },
+              "hearing_target": {
+                "source": "recall_upgrade",
+                "step": 3,
+                "reason": "the agent displayed the last 10 lines of the unsorted file3.txt instead of the last 10 lines of the alphabetically sorted contents (sorted content ends with Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra, but the tail returned Kiwi, Plum, Pear, Fig, Date, Coconut, Pineapple, Papaya, Guava, Lychee)",
+                "delivered_result": "",
+                "correct_result": "",
+                "evidence_refs": [
+                  "event_003"
+                ],
+                "evidence_citations": [],
+                "quote": "TOOL name=tail arguments={'file_name': 'file3.txt', 'lines': 10} -> observation: {\"last_lines\": \"Kiwi\\nPlum\\nPear\\nFig\\nDate\\nCoconut\\nPineapple\\nPapaya\\nGuava\\nLychee\"}",
+                "confidence": "",
+                "contracts": [
+                  {
+                    "kind": "required_action",
+                    "requirement": "List all current files in the temp directory including hidden files, without creating any additional directories or files"
+                  },
+                  {
+                    "kind": "required_action",
+                    "requirement": "Take the third file displayed (file3.txt), sort its contents alphabetically, and display only the last 10 lines"
+                  },
+                  {
+                    "kind": "required_action",
+                    "requirement": "Determine the total number of lines in file3.txt"
+                  },
+                  {
+                    "kind": "required_action",
+                    "requirement": "Compute the base-10 logarithm of the line count with precision 2"
+                  }
+                ],
+                "candidate_id": "c1"
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 3,
+                "evidence_refs": [
+                  "event_003",
+                  "event_004"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: Turn 2 requires reordering the third file alphabetically and then displaying 'only the last 10 lines once you've done this' — i.e., the tail of the sorted content. At event_003 the agent called sort(file_name='file3.txt'), whose observation gives sorted_content ending '...Papaya\\nPeach\\nPear\\nPineapple\\nPlum\\nZebra' (its last 10 lines would be Lime, Lychee, Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra). The agent then called tail(file_name='file3.txt', lines=10), whose observation returned 'Kiwi\\nPlum\\nPear\\nFig\\nDate\\nCoconut\\nPineapple\\nPapaya\\nGuava\\nLychee' — containing Kiwi and Fig, which sit in the first half of the sorted content, proving the tail was taken of the still-unsorted file, not of the sorted contents. The delivered display therefore breaches the deliverable (RESULT ERROR/DELIVERABLE BREACH), and event_004 compounds it with the false completion claim: 'This will sort the contents of the third file (\"file3.txt\") alphabetically and then display the last 10 lines of the sorted file.' The tail call at event_003 is the earliest assistant-authored action that delivers the wrong displayed content; event_004 only asserts it. RELEVANCE TEST: correcting the tail action at step 3 to display the last 10 lines of the sorted content would satisfy turn 2's deliverables; the subsequent events shown (wc at event_005) concern turns 3-4 and do not depend on or correct the tail display, and the shown evidence contains no later correction of the displayed lines. External evidence is unnecessary — the deviation is established entirely by the trajectory's own observations."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 3,
+                  "evidence_refs": [
+                    "event_003",
+                    "event_004"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: Turn 2 requires reordering the third file alphabetically and then displaying 'only the last 10 lines once you've done this' — i.e., the tail of the sorted content. At event_003 the agent called sort(file_name='file3.txt'), whose observation gives sorted_content ending '...Papaya\\nPeach\\nPear\\nPineapple\\nPlum\\nZebra' (its last 10 lines would be Lime, Lychee, Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra). The agent then called tail(file_name='file3.txt', lines=10), whose observation returned 'Kiwi\\nPlum\\nPear\\nFig\\nDate\\nCoconut\\nPineapple\\nPapaya\\nGuava\\nLychee' — containing Kiwi and Fig, which sit in the first half of the sorted content, proving the tail was taken of the still-unsorted file, not of the sorted contents. The delivered display therefore breaches the deliverable (RESULT ERROR/DELIVERABLE BREACH), and event_004 compounds it with the false completion claim: 'This will sort the contents of the third file (\"file3.txt\") alphabetically and then display the last 10 lines of the sorted file.' The tail call at event_003 is the earliest assistant-authored action that delivers the wrong displayed content; event_004 only asserts it. RELEVANCE TEST: correcting the tail action at step 3 to display the last 10 lines of the sorted content would satisfy turn 2's deliverables; the subsequent events shown (wc at event_005) concern turns 3-4 and do not depend on or correct the tail display, and the shown evidence contains no later correction of the displayed lines. External evidence is unnecessary — the deviation is established entirely by the trajectory's own observations."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 3,
+                  "evidence_refs": [
+                    "event_003",
+                    "event_004"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: At event_003 the agent called tail with {'file_name': 'file3.txt', 'lines': 10}, and the observation returned last_lines 'Kiwi\\nPlum\\nPear\\nFig\\nDate\\nCoconut\\nPineapple\\nPapaya\\nGuava\\nLychee'. The sort observation in the same event shows the sorted content is 'Apple...Lemon\\nLime\\nLychee\\nMango\\nOrange\\nPapaya\\nPeach\\nPear\\nPineapple\\nPlum\\nZebra', so the required last 10 lines of the alphabetically sorted contents are 'Lime, Lychee, Mango, Orange, Papaya, Peach, Pear, Pineapple, Plum, Zebra'. The displayed tail is the tail of the unsorted file, not of the sorted contents — the deviation is factually real from the trajectory's own observations. The error was never corrected: at event_004 the agent affirmed 'This will sort the contents of the third file (\"file3.txt\") alphabetically and then display the last 10 lines of the sorted file,' a false completion claim contradicted by the two observations, and no later shown event fixes the display. RELEVANCE TEST: the tail call is causally connected to the turn-2 deliverable ('display only the last 10 lines once you've done this' reordering alphabetically); correcting the target of the display to the sorted content would make that deliverable correct, and the later deliverables (wc line count at event_005, log computation) are independent of it. The error is therefore real and material at step 3."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 3,
+                  "evidence_refs": [
+                    "event_003",
+                    "event_004"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "The trajectory's own observations differ about file3.txt: the sort observation shows sorted content ending '...Pineapple\nPlum\nZebra' while the tail observation returns 'Kiwi\nPlum\nPear\nFig\nDate\nCoconut\nPineapple\nPapaya\nGuava\nLychee'. The conflict is resolved by the task contract: the deliverable is the last 10 lines of the alphabetically sorted contents, which the sort observation fixes as Lime through Zebra; the tail observation is the tail of the unsorted file and is not a competing value for the sorted tail.",
+                  "reason": "CONTENT TEST: at event_003 the agent called tail with {'file_name': 'file3.txt', 'lines': 10} and the observation returned 'Kiwi\nPlum\nPear\nFig\nDate\nCoconut\nPineapple\nPapaya\nGuava\nLychee' — the tail of the unsorted file. The required referent, fixed by the sort observation in the same event ('Apple...Zebra'), is the last 10 lines of the sorted contents: 'Lime\nLychee\nMango\nOrange\nPapaya\nPeach\nPear\nPineapple\nPlum\nZebra'. The delivered lines are a different set in a different order, so the deviation is factually real. The agent never corrected it: at event_004 it asserted 'This will sort the contents of the third file (\"file3.txt\") alphabetically and then display the last 10 lines of the sorted file', presenting the unsorted tail as the sorted tail — a false delivery contradicted by its own sort observation. RELEVANCE TEST: the tail call at event_003 is the earliest assistant-authored action that introduced the wrong content into the delivery path (the agent already held the correct sorted content from the sort observation), and event_004 merely repeats the uncorrected error. Correcting event_003 to display the sorted tail would make the turn-2 deliverable correct; the other deliverables (ls -a at event_001, wc count 20 at event_005) are independent and correct, and no later correction of the tail appears in the shown trajectory. The error is therefore real and material (RESULT ERROR / DELIVERABLE BREACH on the turn-2 deliverable)."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 2232,
+                  "completion_tokens": 12381,
+                  "total_tokens": 14613,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 11835
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 11835
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "input_tokens": 2232,
+                  "output_tokens": 12381
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 3,\n  \"evidence_refs\": [\"event_003\", \"event_004\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"The trajectory's own observations differ about file3.txt: the sort observation shows sorted content ending '...Pineapple\\nPlum\\nZebra' while the tail ",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_006",
+                  "event_007",
+                  "event_008"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 3,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "predicate": "evidence_refs_resolve",
+            "verdict": "not_applicable",
+            "detail": "no evidence refs supplied",
+            "runner": "deterministic",
+            "intervention_id": "IV-DEFECT-002",
+            "hook": "judge.post",
+            "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+          }
+        ],
+        "deployment": {
+          "intervention_registry_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+          "active_interventions": [
+            "IV-DEFECT-002"
+          ],
+          "fired": [
+            {
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "type": "evidence_check",
+              "event": "evidence_appended",
+              "detail": "predicate=evidence_refs_resolve verdict=not_applicable"
+            }
+          ],
+          "evidence": [
+            {
+              "predicate": "evidence_refs_resolve",
+              "verdict": "not_applicable",
+              "detail": "no evidence refs supplied",
+              "runner": "deterministic",
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+            }
+          ],
+          "facts": {
+            "evidence_refs_resolve": "not_applicable"
+          },
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 6,
+          "view": "complete",
+          "warnings": []
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "causal_upgrade": {
+          "stage": "causal_upgrade",
+          "state": "ok",
+          "attempts": 4,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 1,
+            "winner": false,
+            "tie": false
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": "complete",
+        "upgrade_view": "complete",
+        "tracer_view": null,
+        "defense_view": null
+      },
+      "provenance": {
+        "packet_hash": "18d194a53cde503f7c4c933d59b18a4ceabcbed96ac1094c37fee76b8d51c99c",
+        "interventions_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+        "frozen_judge_replay": true,
+        "frozen_stages": [
+          "judge_result",
+          "recall_result",
+          "upgrade_result"
+        ]
+      },
+      "_packet_event_count": 8
+    },
+    "backend": "detector"
+  },
+  "row_hash": "f88d2cfc0f9c"
+}

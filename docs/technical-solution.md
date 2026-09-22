@@ -22,7 +22,8 @@
 | 进化编排 | `evolution/engine.py`、`config.py` | cycle、预检、巡检、准入、组合选择与治理 |
 | 诊断与提案 | `evolution/worksheet.py`、`proposer.py` | 失败分族、谓词画像、提案和反馈消费 |
 | 研究通道 | `evolution/research.py` | 冻结机制下的草拟、有限修订、筛查及 seed 复用 |
-| 门控 | `evolution/gates.py`、`metrics.py` | 结构、无害、行为和边际收益判定 |
+| 晋升桥接 | `evolution/promotion.py` | 统一候选对象、冻结晋升协议、四门复用、版本发布与账本记录 |
+| 门控 | `evolution/gates.py`、`metrics.py` | 结构、无害、行为、边际收益与定位目标判定 |
 | 执行与划分 | `evolution/backends.py`、`splits.py` | live/mock/回放、数据角色和正式协议 |
 | 版本与恢复 | `evolution/registry.py`、`ledger.py`、`checkpoint.py` | 活跃库、快照、哈希账本、检查点和恢复 |
 | 系统状态与经验 | `evolution/harness.py`、`gaps.py`、`memory.py` | H_t 清单、能力缺口、三类经验和有界检索 |
@@ -126,6 +127,14 @@ flowchart TD
 
 Judge、Recall、Upgrade、Tracer、Defense 使用共享规则。Step Tracer 接收当前指控及轨迹证据，Defense 对该指控复核。责任事件、责任步和各场听证写入 proof；依据不足时可保留定位不确定性。gold 步骤由评估侧读取，不输入定位阶段。详见 [localization.md](localization.md)。
 
+定位同时也是一种可被优化的目标，而不只是一个报告字段。检测行携带评估侧的 `gold_step`（由 `load_gold_step` 读取，与 gold 走同一条评估通道，不进入 `question/history`），由此可计算：
+
+- **`paired_localization_delta`**：在冻结批次上比较两臂的"权威检出且责任步正确"（联合成功）。分母是冻结批次本身，不是两臂都能判定的子集——漏报不能从分母消失，否则候选可以靠少检出显得定位更好。
+- **`localization_opportunity`**：控制臂已权威检出但责任步错误的案例数（`improvable`），以及已正确的案例数（`preserved`）。这是仪器属性，不是候选属性：`improvable=0` 时该定位声明在本批次上不可测量。
+- **`joint_broken`**：控制臂已定位正确而候选不再正确的案例数。它直接计为代价，不被新增收益抵消。
+
+定位声明的 BEHAVIOR 检查为 `localization_behavior_gate`：干预必须实际触发，且必须**确有一个责任步被改对**（只翻转标签不算），同时不得破坏控制臂已有的正确定位。定位收益门为 `meets_localization`；`joint` 目标要求至少一个目标改善且另一个不退化。检测目标仍由 `meets_m` 判定，其规则未变。
+
 ### 3.4 运行故障与裁决
 
 模型失败、输出合同错误、视图退化和未决听证通过 stage status 与 authority 字段表达。故障不自动成为有效反证，也不自动恢复为权威正常。Judge 无有效结果时进入 unresolved；其他阶段的故障由 adjudication 依据实际可用证据确定降级或未决结果。
@@ -149,7 +158,7 @@ Judge、Recall、Upgrade、Tracer、Defense 使用共享规则。Step Tracer 接
 | `recall_trigger` | `recall.trigger` | 在条件匹配时开启召回 |
 | `decision_guard` | `adjudicate.guard` | 根据已注册事实执行受限裁决动作 |
 
-每个干预包含 schema、ID、type、hook、trigger、body、claim 和 provenance。`validate_intervention/validate_registry` 校验类型与 hook、字段、谓词和动作组合。registry 与干预均带 schema 与内容哈希；手改已生成的 registry 后不得继续复用原哈希。编译后的 `InterventionPlan` 执行匹配、提示注入、证据检查和 guard，并记录 `proof.deployment`。
+每个干预包含 schema、ID、type、hook、trigger、body、claim 和 provenance。`validate_intervention/validate_registry` 校验类型与 hook、字段、谓词和动作组合。`claim` 还带可选 `target_kind`（`detection`/`localization`/`joint`，缺省即 `detection`），声明该候选要改善的目标；它不改变执行，只决定晋升时由哪一套收益门评分。registry 与干预均带 schema 与内容哈希；手改已生成的 registry 后不得继续复用原哈希。编译后的 `InterventionPlan` 执行匹配、提示注入、证据检查和 guard，并记录 `proof.deployment`。
 
 当前 hook 共 10 个，分为两层（`detector/interventions.py` 的 `HOOKS`）：
 
@@ -224,6 +233,20 @@ route C 的 research packet 包含投影后的完整训练/近邻轨迹、基线
 `seed_candidate` 钉住历史候选内容 hash，检查合同和新运行身份后重新筛查，不调用 proposer 重新草拟。联合候选的多个条目作为同一版本部署评估。所有版本、parent、identity、结果和 selection 持久化。
 
 `run_frozen_repeats` 完成同候选的重复配对测量。`output/rsi-planning/run_round.py` 按 manifest 调用研究入口及阶段门；其 panel gate 支持逐次条件、计数容差或 `no_significant_degradation` 的 Fisher 规则。研究通过不会自动写入部署 active registry。
+
+## 🚀 7.1 晋升桥接
+
+`evolution/promotion.py` 把研究通道的成果接到部署底座上。研究通道的 PASS 只是开发证据：准入仍由 `structural_gate`/`harmlessness_gate`/`behavior_gate`/`meets_m`（或定位目标的 `meets_localization`）在同一批冻结案例上判定。
+
+**统一候选对象**（`build_candidate`，schema `evolution.candidate.v1`）字段为 `candidate_id/parent_id/target_kind/change_kind/base_revision/artifacts/artifact_refs/dependencies/development_results/status/content_hash`。生命周期为 `draft → developing → frozen → promotion_pending → active/retired`。内容 hash 排除 `status` 与 `development_results`，因此同一份可部署改动的身份不随生命周期或开发记录变化，跨轮按内容识别而非按运行内版本名识别。研究版本（`candidate_from_research`）与手写补丁（`candidate_from_registry_patch`）包装成同一对象，交付同一个晋升入口。
+
+**冻结晋升协议**（`freeze_protocol`/`load_protocol`，schema `evolution.promotion_protocol.v1`）声明收益集（`benefit`）与保护集（`protection`）的案例、角色、gold 步、检测配置、并发数与代码基线。协议在运行前冻结且不可改写；加载时重新校验批次 hash、检测配置 hash、源码摘要和角色覆盖，数据集标注与冻结值不一致即拒绝。批次与候选的开发案例重叠时 STRUCTURAL 直接拒绝——晋升批次必须是候选未用的。`localization_min_joint_cases` 与 `localization_joint_broken_allowed` 控制定位目标的收益与保持要求。
+
+**`PromotionRun` 执行**：先跑免费的 STRUCTURAL，再并发运行对照臂与候选臂（各臂内部按协议声明的 `workers` 并发），随后依次判 HARMLESSNESS（保护集）、BEHAVIOR（每个 artifact 各自给出语义判定）、M 或定位收益门。终态为 `promoted`/`promotion_rejected`/`promotion_unmeasurable`/`promotion_blocked_preflight`/`promotion_unresolved`。**只有 `promoted` 会写 active registry**；其余终态部署保持不变，`unmeasurable` 明确表示该机制在本批次上没有可计分机会，不是已被证伪。每次尝试都写入账本（`promotion_attempt`），准入写入 `candidate_promoted`，版本记录同时落盘 `version.json`。
+
+**定位目标**（`target_kind`，见第 5 节）在候选层面声明。缺省为 `detection`，与既有 registry 语义逐字相同；`localization` 与 `joint` 走定位判定，不用二分类门冒充定位支持。
+
+命令入口：`python -m evolution freeze-protocol` 冻结协议，`python -m evolution promote --from-research/--from-patch` 一次完成"装载→门评估→发布检查→版本记录"。
 
 ## 💾 8. 状态、经验、缓存与恢复
 

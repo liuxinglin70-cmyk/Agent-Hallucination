@@ -1,0 +1,166 @@
+{
+  "arm": "6581f456f6e8",
+  "row": {
+    "case": "OpenDeepSearch/050.json",
+    "gold": false,
+    "gold_step": null,
+    "prediction": false,
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "responsible_step": null,
+    "elapsed_seconds": 0.414,
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "OpenDeepSearch/050.json",
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "occurrence_state": "verified_clean",
+      "proof": {
+        "state": "verified_clean",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": null,
+        "responsible_step": null,
+        "incident_occurred": false,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "Taeniolabis taoensis — the multituberculate mammal of early Paleocene (Puercan 3) age whose significant new skull material (one nearly complete cranium, two partial crania, one nearly complete dentary) was discovered in 2021 in the Denver Basin, Colorado",
+            "correct_result": "Taeniolabis taoensis"
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "Taeniolabis taoensis — the multituberculate mammal of early Paleocene (Puercan 3) age whose significant new skull material (one nearly complete cranium, two partial crania, one nearly complete dentary) was discovered in 2021 in the Denver Basin, Colorado",
+          "correct_result": "Taeniolabis taoensis",
+          "basis": "observation",
+          "confidence": "high",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The name of the multituberculate mammal of early Paleocene (Puercan 3) age from the Western Interior of North America, discovered in 2021 in Denver Basin, Colorado"
+            }
+          ]
+        },
+        "recall_candidates": [],
+        "causal_upgrade": null,
+        "causal_upgrades": [],
+        "causal_upgrade_rows": [],
+        "step_tracer": null,
+        "defense": null,
+        "causal_upgrade_coverage": null,
+        "hearings": [],
+        "evidence": [
+          {
+            "predicate": "evidence_refs_resolve",
+            "verdict": "not_applicable",
+            "detail": "no evidence refs supplied",
+            "runner": "deterministic",
+            "intervention_id": "IV-DEFECT-002",
+            "hook": "judge.post",
+            "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+          }
+        ],
+        "deployment": {
+          "intervention_registry_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+          "active_interventions": [
+            "IV-DEFECT-002"
+          ],
+          "fired": [
+            {
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "type": "evidence_check",
+              "event": "evidence_appended",
+              "detail": "predicate=evidence_refs_resolve verdict=not_applicable"
+            }
+          ],
+          "evidence": [
+            {
+              "predicate": "evidence_refs_resolve",
+              "verdict": "not_applicable",
+              "detail": "no evidence refs supplied",
+              "runner": "deterministic",
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+            }
+          ],
+          "facts": {
+            "evidence_refs_resolve": "not_applicable"
+          },
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        },
+        "causal_upgrade": {
+          "stage": "causal_upgrade",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": "not_rendered",
+        "upgrade_view": "not_rendered",
+        "tracer_view": null,
+        "defense_view": null
+      },
+      "provenance": {
+        "packet_hash": "dd3ecdd2fa9228634eb2b5189bc779a3db2b497e2e52a1f95f804c10b71a7856",
+        "interventions_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+        "frozen_judge_replay": true,
+        "frozen_stages": [
+          "judge_result"
+        ]
+      },
+      "_packet_event_count": 3
+    },
+    "backend": "detector"
+  },
+  "row_hash": "f1fce0a338b0"
+}

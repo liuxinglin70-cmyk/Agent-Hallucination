@@ -15,6 +15,7 @@
 
 - [框架技术方案](docs/technical-solution.md)：只描述当前已实现的模块、接口、执行逻辑和运行方式。
 - [自我改进框架优化方案](docs/optimization-plan.md)：后续如何增强改进循环、定位优化、可修改能力、版本继承和自动发布；验证作为配套。
+- [下一轮方案：定位目标的首次真实闭环](docs/optimization-round2.md)：当前这一轮的规划——定位任务集的可用性判定、路径钉定协议、批次构造规则、判据与证伪条件。
 
 其余长期有效的约定与口径：
 
@@ -34,6 +35,7 @@ evolution/                 自进化框架、开发配置、离线闭环、回�
   harness.py               H_t = (G, C, T, M, R) 清单、哈希与代际差异
   gaps.py                  能力缺口后备清单（不可执行失败族）
   memory.py                三类经验存储与有界检索（情景/程序性/改进）
+  promotion.py             统一候选对象、冻结晋升协议、四门复用与版本发布
 datasets/raw/              原始完整数据集，保持原文件不变
 datasets/protocols/        开发划分与保守的数据使用边界
 datasets/integrity.json    原始目录逐文件 SHA-256
@@ -82,10 +84,10 @@ python -m evolution verify-ledger
 
 1. [框架技术方案](docs/technical-solution.md)——当前实现、接口与运行方式
 2. [自我改进框架优化方案](docs/optimization-plan.md)——后续改造路线与实施顺序
-3. [判错对象口径决定](docs/error-scope.md)、[根因定位与答案提交步](docs/localization.md)——判定与定位口径
-4. [命名与维护约定](docs/maintenance.md)——命名、迁移与输出规范
-5. [最新验证结果](reports/latest/README.md)——当前源码的离线验证状态
-
+3. [下一轮方案](docs/optimization-round2.md)——本轮做什么、判据与证伪条件
+4. [判错对象口径决定](docs/error-scope.md)、[根因定位与答案提交步](docs/localization.md)——判定与定位口径
+5. [命名与维护约定](docs/maintenance.md)——命名、迁移与输出规范
+6. [最新验证结果](reports/latest/README.md)——当前源码的离线验证状态
 历史记录按主题查阅（结论只对当时代码有效）：
 
 6. [实验报告归档说明](reports/README.md)——目录结构、归档约定与各报告的证据等级
@@ -93,6 +95,7 @@ python -m evolution verify-ledger
 8. [真实服务联调结果](reports/live/README.md)、[真实数据集小规模路径检查](reports/real/README.md)、[真实两轮自进化实验结果](reports/evolution_real/README.md)
 9. [证据覆盖优化与预检记录](reports/optimization_20260918/README.md)、[判错对象口径与固定预检复跑记录](reports/error_scope_20260918/README.md)
 10. [RSI 试点 P1/P2 与第 2–6 轮记录](reports/rsi_pilot_20260919/README.md)
+11. [晋升桥接首次真实运行](reports/promotion_20260921/README.md)——P1/P2 落地、三个运行缺陷与仪器缺口
 
 `artifacts/` 是自动生成的运行时目录（缓存、registry、账本、检查点），不进入 Git 也不长期保存；**需要保留的实验结果一律归档到 `reports/`**，归档约定见 [reports/README.md](reports/README.md)。
 
@@ -115,3 +118,23 @@ python -m evolution verify-ledger
 2026-09-18 完成判错对象口径决定与固定预检复跑，测试由 385 增至 **392 passed**。上一轮预检被 `protected_tn=1 < 2` 阻断，逐例复核发现三例哨兵的判定取决于「检测器被要求定罪什么」，因此先把它写成版本化决定（[判错对象口径](docs/error-scope.md)），再做唯一一处定罪相关改动——观测互相冲突时不得用世界知识挑边定罪。据此冻结新协议复跑同一预检，真实复跑又暴露两个运行缺陷（召回扫描器输出在 8192 上限被截断；证据标签把缓存文件名推到 268 字符、越过 Windows 路径上限），第三个运行限制由实测确定（`SmolAgents/019` 端到端需 1480 秒而原案例时限为 900 秒）。四次尝试逐次冻结、逐次复跑：预检由 2 TP + 1 TN 变为 **2 TP + 2 TN 通过**，缺陷注入审计通过且两个注入缺陷均为实质性拒绝，随后在预检第二道检查按协议停止——增益集 4 例全部判对，诊断出的召回族无任何可计分机会。**本轮未产生候选或准入，门限、划分、种子与标签一律未动**；完整记录与独立验收见 [本轮报告](reports/error_scope_20260918/README.md)。
 
 2026-09-19 启动 RSI 试点并完成 P0/P1/P2（[早期优化方案](docs/optimization-directions.md) §6–8）：P0 修复 HybridProposer 未转发 active_entries 与拒绝反馈的缺口；P1 以 19 次 case-evaluation 冻结训练机制 `quoted_content_vs_delivered`（两条无口径争议的真实漏判 `BFCL/002`、`BFCL/153`）；P2 的最小研究入口（`evolution/research.py`，离线 15 项测试先行）跑通「草拟→修订→筛查→冻结配对复核→候选未用开发验证」：两条路线修订后均修复训练失败，但未用开发验证未通过（v002 把边界例 013 的合法重编号定罪——增益与代价同走 judge→defense 链；v005 第 2 轮丢失 024 既有检出——temperature 0 下边界案例轮间方差），部署保持不变。测试增至 **414 passed**。同日冻结第 2 轮（v006）协议：机制监督带 P2 两条失败反馈下修 not_when，单路线 C，复核与未用验证各 3 次重复，预算另立。详见 [RSI 试点报告](reports/rsi_pilot_20260919/README.md)。
+
+2026-09-21 按优化方案 §4/§5 实现前两个工作包（P1 闭环接通、P2 双目标），并完成首次真实晋升运行，测试由 425 增至 **472 passed**，`scripts/verify.py` 九项全 PASS（exit 0）。
+
+**P1**：新增 `evolution/promotion.py` 与 `freeze-protocol`/`promote` 两个命令——统一候选对象（schema `evolution.candidate.v1`，内容 hash 不含 `status`/`development_results`，跨轮按内容识别）把研究版本与手写补丁包装成同一生命周期对象；冻结晋升协议（`evolution.promotion_protocol.v1`）在运行前固定收益集/保护集、角色、gold 与 gold 步、检测配置 hash、并发数、批级墙钟与覆盖下限，加载时重新校验批次 hash、配置 hash、源码摘要、gold 一致性与角色覆盖；`PromotionRun` 先跑免费的 STRUCTURAL，再以协议并发数**并行运行对照臂与候选臂**，复用既有四门，只有 `promoted` 写 active registry，全部尝试写入账本。
+
+**P2**：`target_kind`（`detection`/`localization`/`joint`，缺省 `detection`，既有 registry 语义逐字不变）使定位成为可优化目标——`paired_localization_delta` 在冻结批次上计联合成功且**漏报不能离开分母**，`joint_broken` 把破坏既有正确定位直接计为代价，`localization_opportunity` 报告该批次可计分的定位机会数（`improvable=0` 即为不可测量而非失败），定位声明的 BEHAVIOR 检查要求确有责任步被改对、只翻转标签不算。
+
+**首次真实晋升运行**（62 分钟，12 workers/臂）终态 `promotion_unmeasurable`、**active registry 未写**、部署保持不变。候选为 R4–R6 冻结联合候选，批次 20 例（收益 14/保护 6）全部候选未用。运行暴露并修复三处代码缺陷：**(1) 保护集单极性使批次由构造即不可评估**——批次规则把保护案例全设为 gold 阴性，而覆盖下限要求 `protected_tp≥2`，任何候选都不可能通过；现在冻结时校验极性可满足性并拒绝。**(2) 基础设施故障会被计为候选收益**——对照臂 unresolved 不计 correct、候选 correct 则 `marginal_cases` +1，服务中断会伪装成修好一例；现在任一臂存在基础设施失败即 `promotion_unresolved`、不判分、不写 registry，且该臂不落盘以免被 resume 固化。**(3) 缺少批级墙钟**——单例可独占满 3600 秒案例时限；现协议新增 `timeout_seconds`。三处均配非平凡回归测试。
+
+两处值得记录的实测读数：运行前预测"批次不含该机制机会"**被证伪**（`recall` 机会实测 6 例）；候选在同一批上**双向改变判定**（消除 `BFCL/001`、`BFCL/009` 两个保护集误报，丢失 `BFCL/032` 一个收益集真阳），但 2 处误报消除落在保护集、**不被任何门计量**，而 1 处丢失计入 M 门净收益，**门读到的净效果（−1）比真实效果更差**——这是仪器设计缺口，已记入报告下一步。本轮未产生准入，不构成准确率或泛化结论。详见 [晋升桥接报告](reports/promotion_20260921/README.md)（含只读复核脚本，18 项读数可独立重算）。
+
+2026-09-21（同日续）完成三项修复与一次结论更正，测试 472 → **488 passed**，`verify.py` 七项全 PASS（exit 0）。
+
+**更正**：对上述报告的归因做了只读复核并写入 [analysis.md](reports/promotion_20260921/analysis.md)。穷举 2717 个可满足的保护集划分（`replay_gates_exhaustive.py`，纯离线）后，**0 个能准入**：1397 个停在 HARMLESSNESS（`new_fn=1`）、1320 个停在 BEHAVIOR（recall 主张无 `F->T`）。原报告"判定在冻结那一刻就注定"的说法不完整——**批次缺陷损害的是 BEHAVIOR/M 的读数质量，不是终态本身；重跑同一候选没有信息量**。
+
+**修仪器**：新增 `evolution/metrics.py::protection_repair` 并接入晋升报告，把"保护集上的改善"与"退化"**分开记录且永不相加**（`net` 恒为 `null`，遵守方案 §5.2 禁止加权抵消）。只认**决定性翻转**为修复，`unresolved→correct` 属校准、单独计数。归档两臂重读后候选的真实形状首次可复核：保护集 `repaired_fp=2`、收益集 `regressed_fn=1`。另补每例 `elapsed_seconds`，使长尾成本可见（上次 62 分钟中约 50 分钟耗于单例）。
+
+**接定位目标进开发闭环**：此前定位只是最终指标——`stable_failure_families` 只保留 `prediction != gold`，判对但步骤错的案例在任何 family 形成前就被丢弃，**没有任何候选会被要求修它**。现在 `worksheet.py` 产出 `FAM-loc-*` 家族（步骤"错"与"缺"分为不同家族），`engine._all_families` 统一两条来源，`gates.structural_gate` 强制家族类型与 `target_kind` 一致。
+
+**关键发现（改变了下一轮计划）**：新增 `localization_repair_viability` 后逐例实测，37/135 的定位错误率**几乎全部来自标注歧义而非定位能力缺陷**——`BFCL/148` 的 step 15 是虚假升级声明、`BFCL/082` 的 step 9 有单位错，都是"轨迹含多个真错误、标注只取其一"；只有 `BFCL/008`（召回路径 16/21 次报出无文本的 `ls` 调用）是结构上可自动修复的。**按可修复案例计只有 1 例，不足以宣称机制成立**，故下一轮的机制收益部分当前不具备开展条件。下一步方案见 [下一轮方案](docs/optimization-round2.md)。

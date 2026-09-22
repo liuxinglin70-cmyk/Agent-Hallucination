@@ -16,7 +16,7 @@ import argparse
 import copy
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from evolution.config import load_config, resolve_path
 from evolution.capability_surface import capability_surface_report
@@ -146,6 +146,155 @@ def cmd_registry(args: argparse.Namespace) -> int:
     _print_json({
         "active": registry.registry,
         "state": registry.state,
+    })
+    return 0
+
+
+def cmd_promote(args: argparse.Namespace) -> int:
+    """Carry a frozen candidate through the deployment gates.
+
+    One command does the whole chain from the plan's first work package:
+    load the frozen promotion protocol, wrap the candidate into the unified
+    candidate object, run STRUCTURAL/HARMLESSNESS/BEHAVIOR/M (plus the
+    localization objective when claimed), publish only on success, and record
+    every attempt in the version ledger.
+    """
+    from evolution.promotion import (
+        PromotionProtocolError,
+        candidate_from_registry_patch,
+        candidate_from_research,
+        promote,
+    )
+
+    config = load_config(args.config)
+    if args.backend == "mock":
+        config["proposer"]["mode"] = "offline"
+    backend = _mock_backend(config) if args.backend == "mock" else None
+    try:
+        if args.from_research:
+            candidate = candidate_from_research(args.from_research)
+        elif args.from_patch:
+            candidate = candidate_from_registry_patch(args.from_patch)
+        else:
+            raise SystemExit("promote needs --from-research or --from-patch")
+        stages = [item for item in str(args.stages).split(",") if item]
+        report = promote(
+            candidate=candidate,
+            protocol_path=args.protocol,
+            output_dir=resolve_path(args.output_dir),
+            config=config,
+            backend=backend,
+            stages=stages or ("structural", "harmlessness", "behavior", "m"),
+        )
+    except PromotionProtocolError as exc:
+        _print_json({"state": "promotion_blocked_preflight", "reason": str(exc)})
+        return 3
+    _print_json(report)
+    if report.get("state") == "promoted":
+        return 0
+    if report.get("state") == "promotion_unmeasurable":
+        return 4
+    return 2
+
+
+def cmd_freeze_protocol(args: argparse.Namespace) -> int:
+    """Freeze a candidate-unused promotion batch before any model call."""
+    from evolution.promotion import PromotionProtocolError, freeze_protocol
+    from evolution.splits import load_gold, load_gold_step
+
+    config = load_config(args.config)
+    batch = json.loads(Path(args.batch).read_text(encoding="utf-8-sig"))
+    if isinstance(batch, Mapping):
+        batch_cases = [str(item) for item in batch.get("cases") or ()]
+        roles = {
+            str(key): str(value)
+            for key, value in (batch.get("roles") or {}).items()
+        }
+    else:
+        batch_cases = [str(item) for item in batch]
+        roles = {}
+    if not roles:
+        if not args.benefit and not args.protection:
+            raise SystemExit(
+                "the batch file declares no roles and no --benefit/--protection "
+                "was given; every case needs a role"
+            )
+        benefit = [item for item in str(args.benefit or "").split(",") if item]
+        protection = [
+            item for item in str(args.protection or "").split(",") if item
+        ]
+        roles = {
+            **{case: "benefit" for case in benefit},
+            **{case: "protection" for case in protection},
+        }
+        missing = sorted(set(batch_cases) - set(roles))
+        if missing:
+            raise SystemExit(f"cases without a role: {missing}")
+    development = [
+        item for item in str(args.development_cases or "").split(",") if item
+    ]
+    dataset_root = config["dataset_root"]
+    gold_steps = {
+        case: load_gold_step(dataset_root, case) for case in batch_cases
+    }
+    gold = {case: load_gold(dataset_root, case) for case in batch_cases}
+    if any(value is None for value in gold.values()):
+        raise SystemExit("promotion batch contains a case without a boolean gold label")
+    annotated = sum(1 for value in gold_steps.values() if value is not None)
+    gates_cfg = config.get("gates") or {}
+    baseline_roll = None
+    if getattr(args, "baseline_roll", None):
+        baseline_roll = {
+            "path": str(args.baseline_roll),
+            "declared_path": getattr(args, "baseline_roll_declared_path", None),
+            "source_run": getattr(args, "baseline_roll_source_run", None),
+        }
+    try:
+        protocol = freeze_protocol(
+            resolve_path(args.protocol_out),
+            batch_path=resolve_path(args.batch),
+            roles=roles,
+            gold=gold,
+            gold_steps=gold_steps,
+            development_cases=development,
+            detector_config=config["detector_config"],
+            workers=int(args.workers),
+            timeout_seconds=(
+                float(args.timeout_seconds) if args.timeout_seconds else None
+            ),
+            min_protected_tp=int(
+                gates_cfg.get("harmlessness_min_protected_tp", 2)
+            ),
+            min_protected_tn=int(
+                gates_cfg.get("harmlessness_min_protected_tn", 2)
+            ),
+            reason=str(args.reason or ""),
+            baseline_roll=baseline_roll,
+            require_fresh=bool(getattr(args, "require_fresh", False)),
+        )
+    except PromotionProtocolError as exc:
+        _print_json({"state": "freeze_rejected", "reason": str(exc)})
+        return 3
+    _print_json({
+        "protocol": protocol["schema_version"],
+        "frozen_at": protocol["frozen_at"],
+        "cases": len(protocol["cases"]),
+        "benefit": sum(1 for r in roles.values() if r == "benefit"),
+        "benefit_positives": sum(
+            1 for case, r in roles.items() if r == "benefit" and gold[case] is True
+        ),
+        "protection": sum(1 for r in roles.values() if r == "protection"),
+        "protection_positives": sum(
+            1 for case, r in roles.items() if r == "protection" and gold[case] is True
+        ),
+        "protection_negatives": sum(
+            1 for case, r in roles.items() if r == "protection" and gold[case] is False
+        ),
+        "gold_positive": sum(1 for value in gold.values() if value is True),
+        "annotated_gold_steps": annotated,
+        "workers": protocol["workers"],
+        "timeout_seconds": protocol["timeout_seconds"],
+        "path": resolve_path(args.protocol_out).as_posix(),
     })
     return 0
 
@@ -413,6 +562,56 @@ def build_parser() -> argparse.ArgumentParser:
         help="report the executable evolution surface and its hard limits",
     )
     p.set_defaults(func=cmd_capability_audit)
+
+    p = sub.add_parser(
+        "freeze-protocol",
+        help="freeze a candidate-unused promotion batch before any model call",
+    )
+    p.add_argument("--batch", required=True, help="JSON list of case ids, or an object with a cases list and optional roles")
+    p.add_argument("--protocol-out", required=True, help="where the frozen protocol is written")
+    p.add_argument("--benefit", help="comma-separated benefit cases (when the batch declares no roles)")
+    p.add_argument("--protection", help="comma-separated protection cases (when the batch declares no roles)")
+    p.add_argument("--development-cases", help="comma-separated cases the candidate was developed on; a batch overlapping them is rejected")
+    p.add_argument("--workers", type=int, default=8, help="concurrency the frozen protocol authorises")
+    p.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=None,
+        help="batch-level wall-clock budget; expiry fail-closes remaining cases",
+    )
+    p.add_argument(
+        "--baseline-roll",
+        help="JSON of case_id -> archived control result to pin as the control arm",
+    )
+    p.add_argument(
+        "--baseline-roll-declared-path",
+        help="the positive_source the pinned roll must reproduce (e.g. recall_upgrade)",
+    )
+    p.add_argument(
+        "--baseline-roll-source-run",
+        help="free-text provenance for the pinned roll (which run it came from)",
+    )
+    p.add_argument(
+        "--require-fresh",
+        action="store_true",
+        help="re-run every stage on both arms instead of replaying any stage",
+    )
+    p.add_argument("--reason")
+    p.add_argument("--config")
+    p.set_defaults(func=cmd_freeze_protocol)
+
+    p = sub.add_parser(
+        "promote",
+        help="carry a frozen candidate through the deployment gates",
+    )
+    p.add_argument("--protocol", required=True, help="frozen promotion protocol")
+    p.add_argument("--from-research", help="research run directory; the selected version becomes the candidate")
+    p.add_argument("--from-patch", help="intervention/registry JSON to promote directly")
+    p.add_argument("--stages", default="structural,harmlessness,behavior,m")
+    p.add_argument("--output-dir", required=True, help="where the promotion report and version record go")
+    p.add_argument("--backend", choices=["detector", "mock"], default=None)
+    p.add_argument("--config")
+    p.set_defaults(func=cmd_promote)
 
     p = sub.add_parser("smoke", help="offline one-cycle gate validation")
     p.add_argument("--config")

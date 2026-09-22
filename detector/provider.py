@@ -206,6 +206,32 @@ def required_quorum(votes: int) -> int:
     return max(1, int(votes) // 2 + 1)
 
 
+def accumulate_usage(total: dict[str, Any], usage: Mapping[str, Any]) -> None:
+    """Fold one ballot's token usage into a running total, in place.
+
+    A voting stage reports the *last* ballot's provider meta as its sample, so
+    ``usage`` alone undercounts the stage's real burn by the ballot
+    multiplicity. That undercount is what made the 2026-09-21 run look like it
+    spent 120k completion tokens when its three-ballot judge and defense had
+    actually spent several times that, and it is the number a run's cost has to
+    be sized from. Adding the ballots up needs no schema for the details
+    blocks, so every numeric leaf is summed by its own path: a provider that
+    reports a new counter gets it totalled without a code change.
+    """
+    for key, value in usage.items():
+        if isinstance(value, Mapping):
+            bucket = total.get(key)
+            if not isinstance(bucket, dict):
+                bucket = {}
+                total[key] = bucket
+            accumulate_usage(bucket, value)
+        elif isinstance(value, bool):
+            # A boolean is an int in Python; summing one would be nonsense.
+            continue
+        elif isinstance(value, (int, float)):
+            total[key] = total.get(key, 0) + value
+
+
 def majority_vote(values, *, on_tie):
     """Strict-majority vote with a deterministic tie law.
 

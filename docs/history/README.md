@@ -11,6 +11,7 @@
 | [directions-assessment.md](directions-assessment.md) | 2026-09-17 | 优化方向主张与代码现状的逐条核对 | 「先修尺子」裁定的依据，含边际集极性下限与 patrol 改动的理由 |
 | [real-verification-feasibility.md](real-verification-feasibility.md) | 2026-09-17 | 真实验证可行性评估：能做什么、不能做什么 | 明确「没有独立终审集」这一阻断项及其论证 |
 | [group-meeting-2026-09-17.md](group-meeting-2026-09-17.md) | 2026-09-17 | 组会汇报：转向 RSI 的理由与目标形态 | 面向外部汇报的叙述版本，与 progress/review 内容重叠 |
+| [group-meeting-2026-09-21.md](group-meeting-2026-09-21.md) | 2026-09-18 至 09-21 | 组会汇报：预检收口、RSI 试点 R2–R6 与晋升桥接 | 面向外部汇报的叙述版本，覆盖该窗口内的进展与边界 |
 | [deck-2026-09-17/](deck-2026-09-17/) | 2026-09-17 | 组会汇报 PPT：生成脚本与成稿 PDF（13 页） | 该汇报的交付物，2026-09-21 由 `artifacts/ppt_build/` 归档至此；渲染中间图已删除 |
 
 实验结果的归档位置见 [reports/README.md](../../reports/README.md)。本目录只放过程性**文档**，不放运行产物。

@@ -1,0 +1,187 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "Octotools/022.json",
+    "gold": true,
+    "gold_step": null,
+    "prediction": null,
+    "state": "verified_clean",
+    "authority": "degraded_judge_only",
+    "responsible_step": null,
+    "elapsed_seconds": 3600.035,
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "Octotools/022.json",
+      "state": "verified_clean",
+      "decision_authority": "degraded_judge_only",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "occurrence_state": "verified_clean",
+      "proof": {
+        "state": "verified_clean",
+        "decision_authority": "degraded_judge_only",
+        "runtime_valid": true,
+        "responsible_event_id": null,
+        "responsible_step": null,
+        "incident_occurred": false,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "1982",
+            "correct_result": "1982"
+          },
+          "blocking_facts": [
+            {
+              "component": "recall",
+              "code": "recall_unavailable",
+              "error_type": "provider_error",
+              "error": "total timeout exceeded"
+            }
+          ]
+        },
+        "authority_failure_reasons": [
+          {
+            "component": "recall",
+            "code": "recall_unavailable",
+            "error_type": "provider_error",
+            "error": "total timeout exceeded"
+          }
+        ],
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "1982",
+          "correct_result": "1982",
+          "basis": "derivation",
+          "confidence": "medium",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "smallest possible value of |⋃ A_i| for 2024 sets of size 45 with pairwise intersections of size 1"
+            }
+          ]
+        },
+        "recall_candidates": [],
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": null,
+        "defense": null,
+        "causal_upgrade_coverage": null,
+        "hearings": [],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": [
+            {
+              "attempt": "vote",
+              "error": "TimeoutError: isolated transport exceeded request deadline"
+            },
+            {
+              "attempt": "vote",
+              "error": "TimeoutError: isolated transport exceeded request deadline"
+            },
+            {
+              "attempt": "vote",
+              "error": "TimeoutError: isolated transport exceeded request deadline"
+            }
+          ]
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "provider_error",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 5262,
+            "completion_tokens": 1034,
+            "total_tokens": 6296,
+            "prompt_tokens_details": {
+              "cached_tokens": 5120
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 905
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 905
+            },
+            "input_tokens_details": {
+              "cached_tokens": 5120
+            },
+            "input_tokens": 5262,
+            "output_tokens": 1034
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"is_hallucination\": false,\n  \"hallucination_step\": null,\n  \"hallucination_reason\": null,\n  \"delivered_result\": \"1982\",\n  \"correct_result\": \"1982\",\n  \"basis\": \"derivation\",\n  \"confidence\": \"medium\",\n  \"evidence_refs\": null,\n  \"root_cause\": null,\n  \"contracts\": [\n    {\"kind\": \"exact_value\", \"requi",
+          "vote": {
+            "votes": 3,
+            "cast": 2,
+            "positives": 1,
+            "winner": false,
+            "tie": true,
+            "topups": 2
+          }
+        }
+      },
+      "authority_failure_reasons": [
+        {
+          "component": "recall",
+          "code": "recall_unavailable",
+          "error_type": "provider_error",
+          "error": "total timeout exceeded"
+        }
+      ],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": "complete",
+        "upgrade_view": null,
+        "tracer_view": null,
+        "defense_view": null
+      },
+      "provenance": {
+        "packet_hash": "932f3b2e97ab52f13df251a5376c96f4a7bfeee7af390417ce60ea55c93dfc7a",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 4
+    },
+    "backend": "detector"
+  },
+  "row_hash": "720227ec577d"
+}

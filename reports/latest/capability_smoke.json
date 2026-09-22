@@ -340,6 +340,255 @@
         }
       }
     ],
+    "detection_families": [
+      {
+        "failure_family": "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f-P70fe7f80fd90",
+        "count": 2,
+        "failure_cases": [
+          "A/012.json",
+          "A/013.json"
+        ],
+        "sources": [
+          "A"
+        ],
+        "mechanism_summary": {
+          "family": "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f",
+          "n": 2,
+          "judge_false_fraction": 1.0
+        },
+        "mechanism_signature": {
+          "judge_positive": false,
+          "stages": {
+            "judge": "not_run",
+            "recall_scanner": "not_run",
+            "causal_upgrade": "not_run",
+            "step_tracer": "not_run",
+            "defense": "not_run"
+          },
+          "recall_path": "not_run",
+          "upgrade_positive": false,
+          "defense_verdict": "none",
+          "positive_source": "none"
+        },
+        "diagnostics": {
+          "n": 2,
+          "member_summaries": [
+            {
+              "member": "member_001",
+              "contracts": [],
+              "stages": {
+                "judge": "not_run",
+                "recall_scanner": "not_run",
+                "causal_upgrade": "not_run",
+                "step_tracer": "not_run",
+                "defense": "not_run"
+              },
+              "judge_positive": false,
+              "recall_path": "not_run",
+              "upgrade_positive": false,
+              "defense_verdict": "none",
+              "predicates": {
+                "required_action_present": "not_applicable",
+                "verbatim_fidelity": "not_applicable",
+                "evidence_refs_resolve": "not_applicable",
+                "contract_coverage": "not_applicable",
+                "delivered_anchor_consistency": "insufficient",
+                "final_delivery_present": "not_applicable"
+              },
+              "typed_samples": {
+                "question_text": "Use search and report F.",
+                "last_prose_text": "working",
+                "last_answer_tool_name": "",
+                "last_answer_tool_arguments": "",
+                "last_answer_tool_observation": "",
+                "answer_anchor_status": "unknown",
+                "event_texts": [
+                  "working\npython\n{}\n"
+                ],
+                "prose_texts": [
+                  "working"
+                ],
+                "tool_names": [
+                  "python"
+                ],
+                "tool_arguments": [
+                  "{}"
+                ],
+                "tool_observations": [
+                  ""
+                ],
+                "interaction_texts": [
+                  "python\n{}\n"
+                ],
+                "event_ids": [
+                  "event_001"
+                ],
+                "interaction_ids": [
+                  "event_001_tool_01"
+                ],
+                "packet_features": [
+                  "has_tool_calls"
+                ],
+                "context_evidence_refs": [],
+                "context_contract_kinds": [],
+                "context_contract_requirements": [],
+                "context_quote": "",
+                "context_judge_delivered_result": "",
+                "context_judge_positive": "",
+                "context_judge_confidence": "",
+                "context_judge_hallucination_reason": "",
+                "event_count": 1,
+                "tool_call_count": 1,
+                "interaction_count": 1,
+                "prose_event_count": 1
+              }
+            },
+            {
+              "member": "member_002",
+              "contracts": [],
+              "stages": {
+                "judge": "not_run",
+                "recall_scanner": "not_run",
+                "causal_upgrade": "not_run",
+                "step_tracer": "not_run",
+                "defense": "not_run"
+              },
+              "judge_positive": false,
+              "recall_path": "not_run",
+              "upgrade_positive": false,
+              "defense_verdict": "none",
+              "predicates": {
+                "required_action_present": "not_applicable",
+                "verbatim_fidelity": "not_applicable",
+                "evidence_refs_resolve": "not_applicable",
+                "contract_coverage": "not_applicable",
+                "delivered_anchor_consistency": "insufficient",
+                "final_delivery_present": "not_applicable"
+              },
+              "typed_samples": {
+                "question_text": "Use search and report G.",
+                "last_prose_text": "working",
+                "last_answer_tool_name": "",
+                "last_answer_tool_arguments": "",
+                "last_answer_tool_observation": "",
+                "answer_anchor_status": "unknown",
+                "event_texts": [
+                  "working\npython\n{}\n"
+                ],
+                "prose_texts": [
+                  "working"
+                ],
+                "tool_names": [
+                  "python"
+                ],
+                "tool_arguments": [
+                  "{}"
+                ],
+                "tool_observations": [
+                  ""
+                ],
+                "interaction_texts": [
+                  "python\n{}\n"
+                ],
+                "event_ids": [
+                  "event_001"
+                ],
+                "interaction_ids": [
+                  "event_001_tool_01"
+                ],
+                "packet_features": [
+                  "has_tool_calls"
+                ],
+                "context_evidence_refs": [],
+                "context_contract_kinds": [],
+                "context_contract_requirements": [],
+                "context_quote": "",
+                "context_judge_delivered_result": "",
+                "context_judge_positive": "",
+                "context_judge_confidence": "",
+                "context_judge_hallucination_reason": "",
+                "event_count": 1,
+                "tool_call_count": 1,
+                "interaction_count": 1,
+                "prose_event_count": 1
+              }
+            }
+          ],
+          "predicate_signals": {
+            "contract_coverage": {
+              "applicable": 0,
+              "violations": 0
+            },
+            "delivered_anchor_consistency": {
+              "applicable": 2,
+              "violations": 0
+            },
+            "evidence_refs_resolve": {
+              "applicable": 0,
+              "violations": 0
+            },
+            "final_delivery_present": {
+              "applicable": 0,
+              "violations": 0
+            },
+            "required_action_present": {
+              "applicable": 0,
+              "violations": 0
+            },
+            "verbatim_fidelity": {
+              "applicable": 0,
+              "violations": 0
+            }
+          },
+          "shared_literals": {
+            "scalar_token_intersection": {
+              "question_text": [
+                "and",
+                "report",
+                "search",
+                "use"
+              ],
+              "last_prose_text": [
+                "working"
+              ],
+              "context_judge_hallucination_reason": [],
+              "context_judge_delivered_result": []
+            },
+            "question_bigram_intersection": [
+              "and report",
+              "search and",
+              "use search"
+            ],
+            "list_item_intersection": {
+              "tool_names": [
+                "python"
+              ],
+              "tool_arguments": [
+                "{}"
+              ],
+              "tool_observations": [],
+              "context_contract_kinds": [],
+              "context_contract_requirements": [],
+              "packet_features": [
+                "has_tool_calls"
+              ]
+            }
+          }
+        },
+        "diagnostic_complete": true,
+        "actionability": {
+          "classification": "actionable",
+          "reason": "at least one action or capability-creation route exists for this family's mechanism",
+          "routes": [
+            "recall_trigger",
+            "recall_directive",
+            "upgrade_directive",
+            "evolved_predicate"
+          ]
+        }
+      }
+    ],
+    "localization_families": [],
     "patrol_registry": "active",
     "failure_contrast": {
       "active_registry_size": 0,
@@ -950,7 +1199,8 @@
               "active_state": "verified_clean"
             }
           ]
-        }
+        },
+        "target_kind": "detection"
       },
       "partner_ids": [
         "IV-1-002"
@@ -1556,7 +1806,8 @@
               "active_state": "verified_clean"
             }
           ]
-        }
+        },
+        "target_kind": "detection"
       },
       "partner_ids": [
         "IV-1-001"
@@ -1841,7 +2092,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "6a18eb27b46a",
+          "digest": "3a0ab1e1c345",
           "payload": {
             "stages": [
               "validate",
@@ -1862,7 +2113,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "7ff861888b0e1abd",
+            "source_digest": "98485e220211b1c2",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -2040,7 +2291,7 @@
         },
         "R": {
           "version": "evolution.policy.v1",
-          "digest": "289b68743992",
+          "digest": "7844659f1222",
           "payload": {
             "patrol_registry": "active",
             "cycles": 2,
@@ -2061,7 +2312,9 @@
               "harmlessness_min_protected_tn": 2,
               "behavior_require_fired": true,
               "m_min_marginal_cases": 1,
-              "m_new_errors_allowed": 0
+              "m_new_errors_allowed": 0,
+              "localization_min_joint_cases": 1,
+              "localization_joint_broken_allowed": 0
             },
             "library": {
               "max_width": 6,
@@ -2099,11 +2352,11 @@
         }
       },
       "registry_hash": "27cb8345a131f281ab40cc20763ef690ffa867acd4bd050111c603b88d338380",
-      "digest": "8ab5abaa0d41"
+      "digest": "ddc78603e59b"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "8ab5abaa0d41",
+      "current_digest": "ddc78603e59b",
       "first_manifest": true,
       "changed": [
         "G",

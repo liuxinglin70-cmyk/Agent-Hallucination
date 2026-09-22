@@ -12,7 +12,7 @@
 
 当前有效文档只有五份，均位于 `docs/` 顶层：[技术方案](technical-solution.md)（实现与运行合同）、[优化方案](optimization-plan.md)（后续改造）、[判错对象口径](error-scope.md)、[根因定位](localization.md)、本文。根 README 的「当前主文档」与「阅读顺序」是唯一入口。
 
-过程性文档集中在 `docs/history/`，由[索引](history/README.md)说明每份的保留理由与适用基线：`progress.md`、`review.md`、`directions-assessment.md`、`real-verification-feasibility.md`、`group-meeting-2026-09-17.md`。[optimization-directions.md](optimization-directions.md) 属历史方案，因冻结的研究 manifest 逐字引用其章节而保留在原路径。
+过程性文档集中在 `docs/history/`，由[索引](history/README.md)说明每份的保留理由与适用基线：`progress.md`、`review.md`、`directions-assessment.md`、`real-verification-feasibility.md`、`group-meeting-2026-09-17.md`、`group-meeting-2026-09-21.md`。[optimization-directions.md](optimization-directions.md) 属历史方案，因冻结的研究 manifest 逐字引用其章节而保留在原路径。
 
 整理原则：描述现状的技术文档不按迭代版本并存——`architecture.md`、`interventions.md`、`evaluation.md` 曾分别描述同一实现的局部，2026-09-21 合并进 `technical-solution.md` 并删除；历史文档只标注状态、不改写正文，其相对链接随移动更新。
 

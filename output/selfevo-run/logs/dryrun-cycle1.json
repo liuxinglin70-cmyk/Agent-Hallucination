@@ -1,0 +1,1088 @@
+{
+  "cycle": 1,
+  "state": "completed",
+  "preflight": {
+    "sentinel": {
+      "protected_tp": 6,
+      "protected_tn": 6,
+      "minimum": {
+        "protected_tp": 2,
+        "protected_tn": 2
+      },
+      "evaluable": true,
+      "reason": ""
+    },
+    "blocked_families": [],
+    "gain_opportunity": {
+      "recall": 0,
+      "precision": 0
+    }
+  },
+  "split": {
+    "name": "mini",
+    "mini": true,
+    "seed": 20260921,
+    "pool_size": 44,
+    "sentinel": [
+      "BFCL/027.json",
+      "BFCL/038.json",
+      "Camel/029.json",
+      "Camel/048.json",
+      "Magentic_One/015.json",
+      "Magentic_One/076.json",
+      "Octotools/008.json",
+      "Octotools/028.json",
+      "OpenDeepSearch/045.json",
+      "OpenDeepSearch/077.json",
+      "OpenManus/006.json",
+      "SmolAgents/069.json"
+    ],
+    "sentinel_size": 12,
+    "sentinel_polarity": {
+      "error": 6,
+      "clean": 6
+    },
+    "gain": [
+      "OpenDeepSearch/050.json",
+      "Octotools/022.json",
+      "BFCL/101.json",
+      "OpenManus/003.json",
+      "Camel/085.json",
+      "SmolAgents/039.json",
+      "SmolAgents/064.json",
+      "OpenManus/074.json"
+    ],
+    "gain_size": 8,
+    "gain_polarity": {
+      "error": 5,
+      "clean": 3
+    },
+    "patrol_pool_size": 24,
+    "validation": [
+      "BFCL/007.json",
+      "BFCL/008.json",
+      "BFCL/009.json",
+      "BFCL/011.json",
+      "BFCL/014.json",
+      "BFCL/017.json",
+      "BFCL/018.json",
+      "BFCL/019.json",
+      "BFCL/032.json",
+      "BFCL/040.json",
+      "BFCL/048.json",
+      "BFCL/050.json"
+    ],
+    "validation_size": 12,
+    "final_size": 0,
+    "final_reads": 0
+  },
+  "audit": {
+    "enabled": true,
+    "passed": true,
+    "frozen": false,
+    "reports": [
+      {
+        "intervention_id": "IV-DEFECT-001",
+        "structural": {
+          "passed": false,
+          "reason": "case id leak in directive/body/claim: BFCL/001.json"
+        },
+        "harmlessness": null,
+        "behavior": null,
+        "m": null,
+        "audit_expected_reject": true,
+        "audit_rejected": true,
+        "audit_passed": false,
+        "audit_inconclusive": false
+      },
+      {
+        "intervention_id": "IV-DEFECT-002",
+        "structural": {
+          "passed": true,
+          "reason": "",
+          "jaccard_base": 0.0092
+        },
+        "harmlessness": {
+          "passed": true,
+          "reason": "",
+          "delta": {
+            "paired_n": 12,
+            "base_all_case_correct": 12,
+            "active_all_case_correct": 12,
+            "marginal_cases": 0,
+            "tp_lost": 0,
+            "fp_added": 0,
+            "new_fn": 0,
+            "new_fp": 0,
+            "new_errors": 0,
+            "unresolved_added": 0,
+            "unresolved_removed": 0,
+            "health_regressed": 0,
+            "health_improved": 0,
+            "flips": {
+              "T->T": 6,
+              "F->F": 6
+            },
+            "transitions_by_gold": {
+              "error": {
+                "T->T": 6
+              },
+              "clean": {
+                "F->F": 6
+              }
+            },
+            "correctness_improved": 0,
+            "correctness_worsened": 0,
+            "baseline_metrics": {
+              "n": 12,
+              "decisive": 12,
+              "unresolved": 0,
+              "decisive_accuracy": 1.0,
+              "all_case_accuracy": 1.0,
+              "tp": 6,
+              "fp": 0,
+              "fn": 0,
+              "tn": 6,
+              "positive_precision": 1.0,
+              "positive_recall": 1.0,
+              "positive_f1": 1.0,
+              "macro_precision": 1.0,
+              "macro_recall": 1.0,
+              "macro_f1": 1.0
+            },
+            "active_metrics": {
+              "n": 12,
+              "decisive": 12,
+              "unresolved": 0,
+              "decisive_accuracy": 1.0,
+              "all_case_accuracy": 1.0,
+              "tp": 6,
+              "fp": 0,
+              "fn": 0,
+              "tn": 6,
+              "positive_precision": 1.0,
+              "positive_recall": 1.0,
+              "positive_f1": 1.0,
+              "macro_precision": 1.0,
+              "macro_recall": 1.0,
+              "macro_f1": 1.0
+            },
+            "rows": [
+              {
+                "case": "BFCL/027.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "BFCL/038.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Camel/029.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Camel/048.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Magentic_One/015.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Magentic_One/076.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Octotools/008.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Octotools/028.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenDeepSearch/045.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenManus/006.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "SmolAgents/069.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              }
+            ]
+          },
+          "reroll_control": null,
+          "sentinel_manifest": {
+            "nominated": 12,
+            "protected": 12,
+            "protected_tp": 6,
+            "protected_tn": 6,
+            "excluded": [],
+            "baseline_rows": [
+              {
+                "case": "BFCL/027.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "BFCL/038.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Camel/029.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "Camel/048.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Magentic_One/015.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Magentic_One/076.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "Octotools/008.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "Octotools/028.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "OpenDeepSearch/045.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "OpenManus/006.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "SmolAgents/069.json",
+                "gold": false,
+                "prediction": false
+              }
+            ],
+            "candidate_rows": [
+              {
+                "case": "BFCL/027.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "BFCL/038.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Camel/029.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "Camel/048.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Magentic_One/015.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "Magentic_One/076.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "Octotools/008.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "Octotools/028.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "OpenDeepSearch/045.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "prediction": false
+              },
+              {
+                "case": "OpenManus/006.json",
+                "gold": true,
+                "prediction": true
+              },
+              {
+                "case": "SmolAgents/069.json",
+                "gold": false,
+                "prediction": false
+              }
+            ]
+          }
+        },
+        "behavior": {
+          "passed": false,
+          "reason": "target polarity mismatch: boundary claim corrected no decisive decision (decisive_fixed=0, decisive_broken=0)",
+          "delta": {
+            "paired_n": 20,
+            "base_all_case_correct": 20,
+            "active_all_case_correct": 20,
+            "marginal_cases": 0,
+            "tp_lost": 0,
+            "fp_added": 0,
+            "new_fn": 0,
+            "new_fp": 0,
+            "new_errors": 0,
+            "unresolved_added": 0,
+            "unresolved_removed": 0,
+            "health_regressed": 0,
+            "health_improved": 0,
+            "flips": {
+              "T->T": 11,
+              "F->F": 9
+            },
+            "transitions_by_gold": {
+              "error": {
+                "T->T": 11
+              },
+              "clean": {
+                "F->F": 9
+              }
+            },
+            "correctness_improved": 0,
+            "correctness_worsened": 0,
+            "baseline_metrics": {
+              "n": 20,
+              "decisive": 20,
+              "unresolved": 0,
+              "decisive_accuracy": 1.0,
+              "all_case_accuracy": 1.0,
+              "tp": 11,
+              "fp": 0,
+              "fn": 0,
+              "tn": 9,
+              "positive_precision": 1.0,
+              "positive_recall": 1.0,
+              "positive_f1": 1.0,
+              "macro_precision": 1.0,
+              "macro_recall": 1.0,
+              "macro_f1": 1.0
+            },
+            "active_metrics": {
+              "n": 20,
+              "decisive": 20,
+              "unresolved": 0,
+              "decisive_accuracy": 1.0,
+              "all_case_accuracy": 1.0,
+              "tp": 11,
+              "fp": 0,
+              "fn": 0,
+              "tn": 9,
+              "positive_precision": 1.0,
+              "positive_recall": 1.0,
+              "positive_f1": 1.0,
+              "macro_precision": 1.0,
+              "macro_recall": 1.0,
+              "macro_f1": 1.0
+            },
+            "rows": [
+              {
+                "case": "BFCL/027.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "BFCL/038.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Camel/029.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Camel/048.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Magentic_One/015.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Magentic_One/076.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Octotools/008.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Octotools/028.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenDeepSearch/045.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenDeepSearch/077.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenManus/006.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "SmolAgents/069.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenDeepSearch/050.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "Octotools/022.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "BFCL/101.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "OpenManus/003.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "Camel/085.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "SmolAgents/039.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              },
+              {
+                "case": "SmolAgents/064.json",
+                "gold": false,
+                "baseline_prediction": false,
+                "active_prediction": false,
+                "baseline_state": "verified_clean",
+                "active_state": "verified_clean"
+              },
+              {
+                "case": "OpenManus/074.json",
+                "gold": true,
+                "baseline_prediction": true,
+                "active_prediction": true,
+                "baseline_state": "verified_error",
+                "active_state": "verified_error"
+              }
+            ]
+          }
+        },
+        "m": null,
+        "audit_expected_reject": true,
+        "audit_rejected": true,
+        "audit_passed": false,
+        "audit_inconclusive": false
+      }
+    ],
+    "cache": "miss"
+  },
+  "patrol": {
+    "patrol_size": 24,
+    "errors": 0,
+    "fn": 0,
+    "fp": 0,
+    "tp": 18,
+    "tn": 6,
+    "unresolved": 0,
+    "metrics": {
+      "n": 24,
+      "decisive": 24,
+      "unresolved": 0,
+      "decisive_accuracy": 1.0,
+      "all_case_accuracy": 1.0,
+      "tp": 18,
+      "fp": 0,
+      "fn": 0,
+      "tn": 6,
+      "positive_precision": 1.0,
+      "positive_recall": 1.0,
+      "positive_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0
+    },
+    "family_evidence": "cross-case co-occurrence; repeated-run stability not measured",
+    "stable_failure_families": [],
+    "detection_families": [],
+    "localization_families": [],
+    "patrol_registry": "active",
+    "failure_contrast": {
+      "active_registry_size": 0,
+      "new_failures": {
+        "count": 0,
+        "cases": []
+      },
+      "persisting_failures": {
+        "count": 0,
+        "cases": []
+      },
+      "resolved_by_active": {
+        "count": 0,
+        "cases": []
+      }
+    },
+    "bootstrap": {
+      "initial_patrol_size": 20,
+      "bootstrap_cases": [
+        "Camel/088.json",
+        "SmolAgents/038.json",
+        "OpenDeepSearch/070.json",
+        "OpenManus/056.json"
+      ],
+      "bootstrap_count": 4,
+      "family_found": false
+    },
+    "capability_gaps": []
+  },
+  "instrument": {
+    "gain_opportunity": {
+      "recall": 0,
+      "precision": 0
+    },
+    "gain_measured": true,
+    "blocked_families": [],
+    "unmeasurable_polarities": [
+      "precision",
+      "recall"
+    ],
+    "replacement_gain_cases": 0,
+    "coverage_responses": {},
+    "coverage_response_counts": {},
+    "terminal_classification": {},
+    "terminal_counts": {},
+    "instrument_limited": false
+  },
+  "evidence": {
+    "active": false
+  },
+  "proposal_summary": {
+    "stable_families": [],
+    "capability_gaps": [],
+    "candidate_count": 0,
+    "joint_groups": [],
+    "empty_proposal_reason": "no stable bare-base failure family (>=2 same-mechanism cases) after initial patrol and bootstrap reruns"
+  },
+  "proposals": [],
+  "gates": [],
+  "fresh_control": null,
+  "combination": {
+    "unit_ids": [],
+    "delta": null,
+    "reason": "no qualified unit"
+  },
+  "marginal_selection": {
+    "selected": [],
+    "library_rejections": []
+  },
+  "active_after_cycle": [],
+  "active_effect_on_g": {
+    "paired_n": 8,
+    "base_all_case_correct": 8,
+    "active_all_case_correct": 8,
+    "marginal_cases": 0,
+    "tp_lost": 0,
+    "fp_added": 0,
+    "new_fn": 0,
+    "new_fp": 0,
+    "new_errors": 0,
+    "unresolved_added": 0,
+    "unresolved_removed": 0,
+    "health_regressed": 0,
+    "health_improved": 0,
+    "flips": {
+      "F->F": 3,
+      "T->T": 5
+    },
+    "transitions_by_gold": {
+      "error": {
+        "T->T": 5
+      },
+      "clean": {
+        "F->F": 3
+      }
+    },
+    "correctness_improved": 0,
+    "correctness_worsened": 0,
+    "baseline_metrics": {
+      "n": 8,
+      "decisive": 8,
+      "unresolved": 0,
+      "decisive_accuracy": 1.0,
+      "all_case_accuracy": 1.0,
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "tn": 3,
+      "positive_precision": 1.0,
+      "positive_recall": 1.0,
+      "positive_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0
+    },
+    "active_metrics": {
+      "n": 8,
+      "decisive": 8,
+      "unresolved": 0,
+      "decisive_accuracy": 1.0,
+      "all_case_accuracy": 1.0,
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "tn": 3,
+      "positive_precision": 1.0,
+      "positive_recall": 1.0,
+      "positive_f1": 1.0,
+      "macro_precision": 1.0,
+      "macro_recall": 1.0,
+      "macro_f1": 1.0
+    },
+    "rows": [
+      {
+        "case": "OpenDeepSearch/050.json",
+        "gold": false,
+        "baseline_prediction": false,
+        "active_prediction": false,
+        "baseline_state": "verified_clean",
+        "active_state": "verified_clean"
+      },
+      {
+        "case": "Octotools/022.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "BFCL/101.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "OpenManus/003.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "Camel/085.json",
+        "gold": false,
+        "baseline_prediction": false,
+        "active_prediction": false,
+        "baseline_state": "verified_clean",
+        "active_state": "verified_clean"
+      },
+      {
+        "case": "SmolAgents/039.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      },
+      {
+        "case": "SmolAgents/064.json",
+        "gold": false,
+        "baseline_prediction": false,
+        "active_prediction": false,
+        "baseline_state": "verified_clean",
+        "active_state": "verified_clean"
+      },
+      {
+        "case": "OpenManus/074.json",
+        "gold": true,
+        "baseline_prediction": true,
+        "active_prediction": true,
+        "baseline_state": "verified_error",
+        "active_state": "verified_error"
+      }
+    ]
+  },
+  "ledger_integrity": {
+    "valid": true,
+    "records": 7,
+    "broken_at": null,
+    "reason": ""
+  },
+  "capability_backlog": {
+    "open": [],
+    "summary": {
+      "schema_version": "evolution.capability_gap.v1",
+      "recorded": 0,
+      "open": 0,
+      "resolved": 0,
+      "by_classification": {},
+      "by_reason": {},
+      "observations": 0
+    }
+  },
+  "harness": {
+    "manifest": {
+      "schema_version": "evolution.harness.v1",
+      "cycle": 1,
+      "parent_digest": null,
+      "components": {
+        "G": {
+          "version": "detector.workflow.v1",
+          "digest": "d353256a0f71",
+          "payload": {
+            "stages": [
+              "validate",
+              "packet",
+              "judge",
+              "recall",
+              "upgrade",
+              "tracer",
+              "defense",
+              "adjudicate"
+            ],
+            "entrypoints": {
+              "packet": "detector.packet.build_packet",
+              "judge": "detector.judge.run_judge",
+              "recall": "detector.recaller.run_recall_scan",
+              "upgrade": "detector.recaller.run_causal_upgrade",
+              "tracer": "detector.step_tracer.run_step_tracer",
+              "defense": "detector.defense.run_defense",
+              "adjudicate": "detector.adjudication.adjudicate"
+            },
+            "source_digest": "37cd627e801464e6",
+            "intervention_types": [
+              "decision_guard",
+              "evidence_check",
+              "recall_trigger",
+              "text_boundary"
+            ],
+            "hooks": [
+              "adjudicate.guard",
+              "defense.pre",
+              "defense.system",
+              "judge.post",
+              "judge.system",
+              "recall.trigger",
+              "scanner.system",
+              "tracer.system",
+              "upgrade.pre",
+              "upgrade.system"
+            ],
+            "execution_graph_rewrite": false
+          }
+        },
+        "C": {
+          "version": "detector.context.v1",
+          "digest": "1f5166fc2878",
+          "payload": {
+            "packet_schema": "detector.packet.v1",
+            "budgets": {
+              "_JUDGE_VIEW_CHARS": 400000,
+              "_JUDGE_EVENT_CHARS": 100000,
+              "_JUDGE_TOOL_CHARS": 100000,
+              "_DEFENSE_VIEW_CHARS": 200000,
+              "_DEFENSE_EVENT_CHARS": 100000,
+              "_INDEX_VIEW_CHARS": 48000
+            },
+            "renderers": [
+              "render_defense_view",
+              "render_full_view",
+              "render_index_tail_view",
+              "render_judge_view"
+            ]
+          }
+        },
+        "T": {
+          "version": "detector.tools.v1",
+          "digest": "afb9a3ddc3d3",
+          "payload": {
+            "intervention_count": 0,
+            "intervention_ids": [],
+            "interventions": []
+          }
+        },
+        "M": {
+          "version": "evolution.memory.v1",
+          "digest": "2b13a04ab9c5",
+          "payload": {
+            "configured": true,
+            "stores": {
+              "episodic": {
+                "records": 0,
+                "falsified": 0,
+                "unevaluable": 0,
+                "admitted": 0
+              },
+              "procedural": {
+                "records": 0
+              },
+              "improvement": {
+                "records": 0
+              }
+            }
+          }
+        },
+        "R": {
+          "version": "evolution.policy.v1",
+          "digest": "3a52a16a1a31",
+          "payload": {
+            "patrol_registry": "active",
+            "cycles": 3,
+            "budget": {
+              "patrol_cases": 20,
+              "stable_failure_rerun_cases": 20,
+              "llm_calls": 2,
+              "max_proposals": 4,
+              "max_admits": 2,
+              "cycle_timeout_seconds": 14400
+            },
+            "gates": {
+              "structural_jaccard_threshold": 0.72,
+              "harmlessness_new_fn_allowed": 0,
+              "harmlessness_new_fp_allowed": 0,
+              "harmlessness_new_unresolved_allowed": 0,
+              "harmlessness_min_protected_tp": 2,
+              "harmlessness_min_protected_tn": 2,
+              "behavior_require_fired": true,
+              "m_min_marginal_cases": 1,
+              "m_new_errors_allowed": 0,
+              "localization_min_joint_cases": 1,
+              "localization_joint_broken_allowed": 0
+            },
+            "library": {
+              "max_width": 6,
+              "max_text_boundary_per_hook": 1,
+              "max_decision_guards": 4,
+              "retire_after_cycles_marginal_le0": 2,
+              "rollback_after_cycles_net_negative": 2
+            },
+            "mini_effect": {
+              "min_marginal_cases": 1,
+              "max_new_errors": 0,
+              "max_unresolved_added": 0
+            },
+            "split": {
+              "seed": 20260921,
+              "sentinel_size": 20,
+              "sentinel_positives": 6,
+              "sentinel_negatives": 6,
+              "gain_set_size": 80,
+              "gain_set_min_positives": 20,
+              "gain_set_min_negatives": 20,
+              "patrol_size": 120,
+              "mini_pool_size": 44,
+              "mini_gain_size": 8,
+              "mini_gain_min_positives": 1,
+              "mini_gain_min_negatives": 1
+            },
+            "proposer": {
+              "mode": "offline",
+              "max_output_tokens": 32768,
+              "thinking_level": "",
+              "max_repair_calls": 1
+            }
+          }
+        }
+      },
+      "registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+      "digest": "6b764f8db909"
+    },
+    "diff": {
+      "previous_digest": null,
+      "current_digest": "6b764f8db909",
+      "first_manifest": true,
+      "changed": [
+        "G",
+        "C",
+        "T",
+        "M",
+        "R"
+      ],
+      "components": {
+        "G": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "C": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "T": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "M": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "R": {
+          "changed": true,
+          "reason": "no previous manifest"
+        }
+      }
+    }
+  }
+}

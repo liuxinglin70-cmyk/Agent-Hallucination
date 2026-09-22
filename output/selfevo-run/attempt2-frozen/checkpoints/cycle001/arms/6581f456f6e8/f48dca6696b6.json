@@ -1,0 +1,172 @@
+{
+  "arm": "6581f456f6e8",
+  "row": {
+    "case": "SmolAgents/069.json",
+    "gold": false,
+    "gold_step": null,
+    "prediction": false,
+    "state": "verified_clean",
+    "authority": "authoritative",
+    "responsible_step": null,
+    "elapsed_seconds": 0.408,
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "SmolAgents/069.json",
+      "state": "verified_clean",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": null,
+      "responsible_step": null,
+      "incident_occurred": false,
+      "occurrence_state": "verified_clean",
+      "proof": {
+        "state": "verified_clean",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": null,
+        "responsible_step": null,
+        "incident_occurred": false,
+        "terminal_basis": {
+          "state": "verified_clean",
+          "decisive_facts": {
+            "judge": "false",
+            "recall_upgrade": "none",
+            "delivered_result": "J. E. H. Benoît, identified as the architect of the old post office at the corner of Jacques-Cartier and Saint-Jacques streets in Saint-Jean-sur-Richelieu, completed in 1909.",
+            "correct_result": "The architect who designed the old post office at the corner of Jacques-Cartier and Saint-Jacques streets in Saint-Jean-sur-Richelieu, completed in 1909 (built 1907-1909), i.e., J. E. H. Benoît."
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": false,
+          "hallucination_step": null,
+          "hallucination_reason": null,
+          "delivered_result": "J. E. H. Benoît, identified as the architect of the old post office at the corner of Jacques-Cartier and Saint-Jacques streets in Saint-Jean-sur-Richelieu, completed in 1909.",
+          "correct_result": "The architect who designed the old post office at the corner of Jacques-Cartier and Saint-Jacques streets in Saint-Jean-sur-Richelieu, completed in 1909 (built 1907-1909), i.e., J. E. H. Benoît.",
+          "basis": "observation",
+          "confidence": "high",
+          "evidence_refs": [],
+          "root_cause": null,
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "Name the architect who designed the old post office at the corner of Jacques-Cartier and Saint-Jacques streets in Saint-Jean-sur-Richelieu, completed in 1909."
+            }
+          ]
+        },
+        "recall_candidates": [],
+        "causal_upgrade": null,
+        "causal_upgrades": [],
+        "causal_upgrade_rows": [],
+        "step_tracer": null,
+        "defense": null,
+        "causal_upgrade_coverage": null,
+        "hearings": [],
+        "evidence": [
+          {
+            "predicate": "evidence_refs_resolve",
+            "verdict": "not_applicable",
+            "detail": "no evidence refs supplied",
+            "runner": "deterministic",
+            "intervention_id": "IV-DEFECT-002",
+            "hook": "judge.post",
+            "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+          }
+        ],
+        "deployment": {
+          "intervention_registry_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+          "active_interventions": [
+            "IV-DEFECT-002"
+          ],
+          "fired": [
+            {
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "type": "evidence_check",
+              "event": "evidence_appended",
+              "detail": "predicate=evidence_refs_resolve verdict=not_applicable"
+            }
+          ],
+          "evidence": [
+            {
+              "predicate": "evidence_refs_resolve",
+              "verdict": "not_applicable",
+              "detail": "no evidence refs supplied",
+              "runner": "deterministic",
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+            }
+          ],
+          "facts": {
+            "evidence_refs_resolve": "not_applicable"
+          },
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": [
+            {
+              "attempt": "vote",
+              "error": "provider returned non-JSON body: b'<!DOCTYPE html>\\r\\n<html>\\r\\n  <header>\\r\\n    <style>\\r\\n      html, body {\\r\\n        padding: 0;\\r\\n        margin: 0;\\r\\n        height: 100%;\\r\\n        width: 100%;\\r\\n    '"
+            }
+          ]
+        },
+        "recall_scanner": {
+          "stage": "recall_scanner",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        },
+        "causal_upgrade": {
+          "stage": "causal_upgrade",
+          "state": "not_needed",
+          "attempts": 0,
+          "view": "not_rendered",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 0,
+            "winner": false,
+            "tie": false,
+            "topups": 1
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": "not_rendered",
+        "upgrade_view": "not_rendered",
+        "tracer_view": null,
+        "defense_view": null
+      },
+      "provenance": {
+        "packet_hash": "4c179092ab60fc975de26970c4badb4985ff12aaf5f544a97abc9c809250ca40",
+        "interventions_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+        "frozen_judge_replay": true,
+        "frozen_stages": [
+          "judge_result"
+        ]
+      },
+      "_packet_event_count": 4
+    },
+    "backend": "detector"
+  },
+  "row_hash": "18322c2b645f"
+}

@@ -34,6 +34,26 @@ def bool_gold(value: Any) -> bool | None:
     raise ValueError(f"invalid is_hallucination label: {value!r}")
 
 
+def _step_gold(value: Any) -> int | None:
+    """The annotated responsible step, or ``None`` when not annotated."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    return int(text) if text.isdigit() else None
+
+
+def load_gold_step(dataset_root: str | Path, case_id: str) -> int | None:
+    """Evaluator-side localization annotation for one case.
+
+    Kept beside ``load_gold`` and read only on the evaluation side: the
+    detector never receives it (``project_record`` drops every gold field).
+    """
+    _record, gold = load_case(dataset_root, case_id)
+    return _step_gold(gold.get("hallucination_step"))
+
+
 def load_gold(dataset_root: str | Path, case_id: str) -> bool | None:
     _record, gold = load_case(dataset_root, case_id)
     return bool_gold(gold.get("is_hallucination"))
@@ -495,6 +515,7 @@ __all__ = [
     "bool_gold",
     "build_split",
     "load_gold",
+    "load_gold_step",
     "load_record",
     "split_manifest_report",
 ]

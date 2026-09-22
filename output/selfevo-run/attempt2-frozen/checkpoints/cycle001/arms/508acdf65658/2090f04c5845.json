@@ -1,0 +1,491 @@
+{
+  "arm": "508acdf65658",
+  "row": {
+    "case": "Octotools/008.json",
+    "gold": true,
+    "gold_step": null,
+    "prediction": null,
+    "state": "verified_error",
+    "authority": "degraded_judge_only",
+    "responsible_step": 4,
+    "elapsed_seconds": 3600.039,
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "Octotools/008.json",
+      "state": "verified_error",
+      "decision_authority": "degraded_judge_only",
+      "runtime_valid": true,
+      "responsible_event_id": "event_004",
+      "responsible_step": 4,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "degraded_judge_only",
+        "runtime_valid": true,
+        "responsible_event_id": "event_004",
+        "responsible_step": 4,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "defense": "unsettled",
+            "judge_basis": "derivation",
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "inconclusive"
+              }
+            ]
+          },
+          "blocking_facts": [
+            {
+              "component": "defense",
+              "candidate_id": "",
+              "code": "inconclusive",
+              "error_type": "",
+              "error": ""
+            }
+          ]
+        },
+        "authority_failure_reasons": [
+          {
+            "component": "defense",
+            "candidate_id": "",
+            "code": "inconclusive",
+            "error_type": "",
+            "error": ""
+          }
+        ],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 4,
+          "hallucination_reason": "The trajectory fabricated weight-index pairs without performing any transposition analysis, delivering (3,0), (9,2), (5,4), (2,5) even though indices 0 and 2 explicitly violate the task's constraint that the transposed columns cannot involve the first three columns, and independent checksum recomputation shows the only (weight, smaller index) pair consistent with all ten numbers is (7, 9).",
+          "delivered_result": "3, 0; 9, 2; 5, 4; 2, 5",
+          "correct_result": "7, 9",
+          "basis": "derivation",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_004",
+            "event_011"
+          ],
+          "root_cause": {
+            "step": 4,
+            "quote": "Identify the unknown weight and smaller index of transposed columns for the given ISBN-like numbers, using valid combinations: [(3, 3), (3, 8), (9, 9), (9, 9), (5, 5), (2, 7), (3, 3), (3, 8), (5, 5), (5, 5)]",
+            "referent": "The correct solution requires actually testing adjacent transpositions (y, y+1) with y in 3..10 against each candidate weight; this yields uniquely weight 7 with smaller transposed index 9 (7, 9), which fixes all ten numbers while (3,0) and (9,2) involve forbidden first-three columns"
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "All potential solutions (x, y) where x is the unknown checksum weight (1-9) and y is the smaller index of the two transposed adjacent columns; the unique pair consistent with all ten numbers is x=7, y=9"
+            },
+            {
+              "kind": "required_action",
+              "requirement": "The transposed columns must not involve the final column (index 12) or any of the first three columns (indices 0-2), so the smaller index y must lie in {3,...,10}; solutions with y=0 or y=2 are inadmissible"
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 4,
+          "quote": "Identify the unknown weight and smaller index of transposed columns for the given ISBN-like numbers, using valid combinations: [(3, 3), (3, 8), (9, 9), (9, 9), (5, 5), (2, 7), (3, 3), (3, 8), (5, 5), (5, 5)]",
+          "referent": "Perform an actual transposition analysis: for each weight 1-9 and each adjacent column pair with smaller index y >= 3 (excluding the first three columns and the final column), swap the digits at positions y and y+1 in every number and keep only the (weight, y) that makes all ten checksums valid; this yields the single solution (7, 9), not the fabricated pairs leading to (3,0), (9,2), (5,4), (2,5).",
+          "evidence_refs": [
+            "event_004",
+            "event_011"
+          ],
+          "reason": "Step 4 is the first assistant-authored step that fabricates weight-index 'valid combinations' without any transposition analysis, and its tool output first produces the wrong pairs (3,0), (9,2), (5,4), (2,5) that are delivered unchanged at event_011, whereas earlier steps only requested but never received the transposition analysis."
+        },
+        "defense": {
+          "verdict": "inconclusive",
+          "confirmed_step": null,
+          "evidence_refs": [],
+          "reason": "defense quorum not reached: 1 valid ballot(s) of 3 (need 2)"
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 4,
+              "reason": "The trajectory fabricated weight-index pairs without performing any transposition analysis, delivering (3,0), (9,2), (5,4), (2,5) even though indices 0 and 2 explicitly violate the task's constraint that the transposed columns cannot involve the first three columns, and independent checksum recomputation shows the only (weight, smaller index) pair consistent with all ten numbers is (7, 9).",
+              "evidence_refs": [
+                "event_004",
+                "event_011"
+              ],
+              "quote": "Identify the unknown weight and smaller index of transposed columns for the given ISBN-like numbers, using valid combinations: [(3, 3), (3, 8), (9, 9), (9, 9), (5, 5), (2, 7), (3, 3), (3, 8), (5, 5), (5, 5)]",
+              "delivered_result": "3, 0; 9, 2; 5, 4; 2, 5",
+              "correct_result": "7, 9"
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 4,
+                "quote": "Identify the unknown weight and smaller index of transposed columns for the given ISBN-like numbers, using valid combinations: [(3, 3), (3, 8), (9, 9), (9, 9), (5, 5), (2, 7), (3, 3), (3, 8), (5, 5), (5, 5)]",
+                "referent": "Perform an actual transposition analysis: for each weight 1-9 and each adjacent column pair with smaller index y >= 3 (excluding the first three columns and the final column), swap the digits at positions y and y+1 in every number and keep only the (weight, y) that makes all ten checksums valid; this yields the single solution (7, 9), not the fabricated pairs leading to (3,0), (9,2), (5,4), (2,5).",
+                "evidence_refs": [
+                  "event_004",
+                  "event_011"
+                ],
+                "reason": "Step 4 is the first assistant-authored step that fabricates weight-index 'valid combinations' without any transposition analysis, and its tool output first produces the wrong pairs (3,0), (9,2), (5,4), (2,5) that are delivered unchanged at event_011, whereas earlier steps only requested but never received the transposition analysis."
+              },
+              "provider": {
+                "attempts": 2,
+                "usage": {
+                  "prompt_tokens": 6980,
+                  "completion_tokens": 8282,
+                  "total_tokens": 15262,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 7968
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 7968
+                  },
+                  "input_tokens": 6980,
+                  "output_tokens": 8282
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "\n{\n  \"step\": 4,\n  \"quote\": \"Identify the unknown weight and smaller index of transposed columns for the given ISBN-like numbers, using valid combinations: [(3, 3), (3, 8), (9, 9), (9, 9), (5, 5), (2, 7), (3, 3), (3, 8), (5, 5), (5, 5)]\",\n  \"referent\": \"Perform an actual transposition analysis: for e"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 4,
+                "reason": "The trajectory fabricated weight-index pairs without performing any transposition analysis, delivering (3,0), (9,2), (5,4), (2,5) even though indices 0 and 2 explicitly violate the task's constraint that the transposed columns cannot involve the first three columns, and independent checksum recomputation shows the only (weight, smaller index) pair consistent with all ten numbers is (7, 9).",
+                "delivered_result": "3, 0; 9, 2; 5, 4; 2, 5",
+                "correct_result": "7, 9",
+                "evidence_refs": [
+                  "event_004",
+                  "event_011"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "All potential solutions (x, y) where x is the unknown checksum weight (1-9) and y is the smaller index of the two transposed adjacent columns; the unique pair consistent with all ten numbers is x=7, y=9"
+                  },
+                  {
+                    "kind": "required_action",
+                    "requirement": "The transposed columns must not involve the final column (index 12) or any of the first three columns (indices 0-2), so the smaller index y must lie in {3,...,10}; solutions with y=0 or y=2 are inadmissible"
+                  }
+                ],
+                "confidence": "high",
+                "quote": "Identify the unknown weight and smaller index of transposed columns for the given ISBN-like numbers, using valid combinations: [(3, 3), (3, 8), (9, 9), (9, 9), (5, 5), (2, 7), (3, 3), (3, 8), (5, 5), (5, 5)]"
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_007",
+                  "event_008",
+                  "event_009",
+                  "event_010",
+                  "event_011"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 2,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "inconclusive",
+                "confirmed_step": null,
+                "evidence_refs": [],
+                "reason": "defense quorum not reached: 1 valid ballot(s) of 3 (need 2)"
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 4,
+                  "evidence_refs": [
+                    "event_004",
+                    "event_011"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "Event_004's observation delivers 'Unknown weight: 3, Smaller index: 0 / Unknown weight: 9, Smaller index: 2 / ...' and event_011 repeats these as the final answer. The task explicitly fixes that the transposed columns 'do not involve the final column or one of the first three columns', so indices 0 and 2 are contractually impossible, making the delivered pairs (3,0) and (9,2) result errors. The trajectory's own event_002 observation shows 9782795866647 is valid at weight 7, yet the delivered list omits (7,9) while including (2,5); no transposition analysis was ever performed to derive the indices. The error introduced at event_004 is carried uncorrected into the final answer at event_011, so it is causally connected to the delivered result and material."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 6010,
+                  "completion_tokens": 399,
+                  "total_tokens": 6409,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 5760
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 146
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 5760
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 146
+                  },
+                  "input_tokens": 6010,
+                  "output_tokens": 399
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_011\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"Event_004's observation delivers 'Unknown weight: 3, Smaller index: 0 / Unknown weight: 9, Smaller index: 2 / ...' and event_011 repea",
+                "vote": {
+                  "votes": 3,
+                  "cast": 1,
+                  "verdicts": [
+                    "substantiated"
+                  ],
+                  "collapsed": "inconclusive",
+                  "tie": true,
+                  "topups": 2,
+                  "quorum": 2,
+                  "quorum_met": false
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006",
+                  "event_011"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001",
+                  "event_007",
+                  "event_008",
+                  "event_009",
+                  "event_010"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 6,
+              "view": "complete",
+              "warnings": [],
+              "escalation_failed": "case_deadline_exceeded"
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+          "active_interventions": [],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 6,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 2,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 6,
+          "view": "complete",
+          "warnings": [],
+          "escalation_failed": "case_deadline_exceeded"
+        }
+      },
+      "providers": {
+        "judge": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 7732,
+            "completion_tokens": 31527,
+            "total_tokens": 39259,
+            "prompt_tokens_details": {
+              "cached_tokens": 7680
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 30852
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 30852
+            },
+            "input_tokens_details": {
+              "cached_tokens": 7680
+            },
+            "input_tokens": 7732,
+            "output_tokens": 31527
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "judge",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"is_hallucination\": true,\n  \"hallucination_step\": 4,\n  \"hallucination_reason\": \"No transposition was ever computed: at step 4 the assistant misframed the valid (number, weight) combinations as (weight, index) pairs and fabricated smaller indices 0, 2, 4, 5 (0 and 2 directly violating the task's",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 2,
+          "usage": {
+            "prompt_tokens": 6980,
+            "completion_tokens": 8282,
+            "total_tokens": 15262,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 7968
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 7968
+            },
+            "input_tokens": 6980,
+            "output_tokens": 8282
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"step\": 4,\n  \"quote\": \"Identify the unknown weight and smaller index of transposed columns for the given ISBN-like numbers, using valid combinations: [(3, 3), (3, 8), (9, 9), (9, 9), (5, 5), (2, 7), (3, 3), (3, 8), (5, 5), (5, 5)]\",\n  \"referent\": \"Perform an actual transposition analysis: for e"
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 6010,
+            "completion_tokens": 399,
+            "total_tokens": 6409,
+            "prompt_tokens_details": {
+              "cached_tokens": 5760
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 146
+            },
+            "input_tokens_details": {
+              "cached_tokens": 5760
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 146
+            },
+            "input_tokens": 6010,
+            "output_tokens": 399
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 4,\n  \"evidence_refs\": [\"event_004\", \"event_011\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"Event_004's observation delivers 'Unknown weight: 3, Smaller index: 0 / Unknown weight: 9, Smaller index: 2 / ...' and event_011 repea",
+          "vote": {
+            "votes": 3,
+            "cast": 1,
+            "verdicts": [
+              "substantiated"
+            ],
+            "collapsed": "inconclusive",
+            "tie": true,
+            "topups": 2,
+            "quorum": 2,
+            "quorum_met": false
+          }
+        }
+      },
+      "authority_failure_reasons": [
+        {
+          "component": "defense",
+          "candidate_id": "",
+          "code": "inconclusive",
+          "error_type": "",
+          "error": ""
+        }
+      ],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "a97d3f3e8b7eb29c2452bc26ad566655cb71684ba17d389f44a155ae82d56db5",
+        "interventions_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+      },
+      "_packet_event_count": 11
+    },
+    "backend": "detector"
+  },
+  "row_hash": "414b074dc001"
+}

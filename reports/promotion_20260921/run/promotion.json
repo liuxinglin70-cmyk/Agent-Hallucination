@@ -1,0 +1,397 @@
+{
+  "schema_version": "evolution.promotion_state.v1",
+  "candidate_id": "research:round4:v001",
+  "candidate_content_hash": "0c0849d1117509c953de17c08222128a284155868c502c8ba5939b6ccf549f90",
+  "target_kind": "detection",
+  "protocol": {
+    "frozen_at": "2026-09-21T14:49:00",
+    "batch_size": 20,
+    "benefit": [
+      "BFCL/000.json",
+      "BFCL/004.json",
+      "BFCL/005.json",
+      "BFCL/014.json",
+      "BFCL/015.json",
+      "BFCL/016.json",
+      "BFCL/023.json",
+      "BFCL/027.json",
+      "BFCL/030.json",
+      "BFCL/031.json",
+      "BFCL/032.json",
+      "BFCL/034.json",
+      "BFCL/035.json",
+      "BFCL/037.json"
+    ],
+    "protection": [
+      "BFCL/001.json",
+      "BFCL/007.json",
+      "BFCL/009.json",
+      "BFCL/010.json",
+      "BFCL/011.json",
+      "BFCL/012.json"
+    ],
+    "workers": 12
+  },
+  "stages_requested": [
+    "structural",
+    "harmlessness",
+    "behavior",
+    "m"
+  ],
+  "started_at": "2026-09-21T14:49:03",
+  "structural": {
+    "passed": true,
+    "reason": ""
+  },
+  "arm_health": {
+    "blocked": ""
+  },
+  "resumed_arms": [],
+  "benefit": {
+    "detection": {
+      "paired_n": 14,
+      "marginal_cases": -1,
+      "new_errors": 1,
+      "new_fn": 1,
+      "new_fp": 0,
+      "tp_lost": 1,
+      "fp_added": 0,
+      "unresolved_added": 0,
+      "health_regressed": 0,
+      "base_all_case_correct": 8,
+      "active_all_case_correct": 7,
+      "flips": {
+        "F->F": 6,
+        "T->T": 7,
+        "T->F": 1
+      },
+      "rows": [
+        {
+          "case": "BFCL/000.json",
+          "gold": true,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_state": "verified_clean",
+          "active_state": "verified_clean"
+        },
+        {
+          "case": "BFCL/004.json",
+          "gold": true,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_state": "verified_clean",
+          "active_state": "verified_clean"
+        },
+        {
+          "case": "BFCL/005.json",
+          "gold": true,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_state": "verified_error",
+          "active_state": "verified_error"
+        },
+        {
+          "case": "BFCL/014.json",
+          "gold": true,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_state": "verified_clean",
+          "active_state": "verified_clean"
+        },
+        {
+          "case": "BFCL/015.json",
+          "gold": true,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_state": "verified_error",
+          "active_state": "verified_error"
+        },
+        {
+          "case": "BFCL/016.json",
+          "gold": true,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_state": "verified_error",
+          "active_state": "verified_error"
+        },
+        {
+          "case": "BFCL/023.json",
+          "gold": true,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_state": "verified_error",
+          "active_state": "verified_error"
+        },
+        {
+          "case": "BFCL/027.json",
+          "gold": true,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_state": "verified_error",
+          "active_state": "verified_error"
+        },
+        {
+          "case": "BFCL/030.json",
+          "gold": true,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_state": "verified_clean",
+          "active_state": "verified_clean"
+        },
+        {
+          "case": "BFCL/031.json",
+          "gold": true,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_state": "verified_error",
+          "active_state": "verified_error"
+        },
+        {
+          "case": "BFCL/032.json",
+          "gold": true,
+          "baseline_prediction": true,
+          "active_prediction": false,
+          "baseline_state": "verified_error",
+          "active_state": "verified_clean"
+        },
+        {
+          "case": "BFCL/034.json",
+          "gold": true,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_state": "verified_clean",
+          "active_state": "verified_clean"
+        },
+        {
+          "case": "BFCL/035.json",
+          "gold": true,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_state": "verified_clean",
+          "active_state": "verified_clean"
+        },
+        {
+          "case": "BFCL/037.json",
+          "gold": true,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_state": "verified_error",
+          "active_state": "verified_error"
+        }
+      ]
+    },
+    "localization": {
+      "localizable_n": 14,
+      "base_joint": 7,
+      "active_joint": 6,
+      "joint_delta": -1,
+      "joint_improved": 0,
+      "joint_broken": 1,
+      "rows": [
+        {
+          "case": "BFCL/000.json",
+          "gold_step": 1,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_step": null,
+          "active_step": null,
+          "baseline_joint": false,
+          "active_joint": false
+        },
+        {
+          "case": "BFCL/004.json",
+          "gold_step": 1,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_step": null,
+          "active_step": null,
+          "baseline_joint": false,
+          "active_joint": false
+        },
+        {
+          "case": "BFCL/005.json",
+          "gold_step": 5,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_step": 5,
+          "active_step": 5,
+          "baseline_joint": true,
+          "active_joint": true
+        },
+        {
+          "case": "BFCL/014.json",
+          "gold_step": 3,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_step": null,
+          "active_step": null,
+          "baseline_joint": false,
+          "active_joint": false
+        },
+        {
+          "case": "BFCL/015.json",
+          "gold_step": 5,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_step": 5,
+          "active_step": 5,
+          "baseline_joint": true,
+          "active_joint": true
+        },
+        {
+          "case": "BFCL/016.json",
+          "gold_step": 4,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_step": 4,
+          "active_step": 4,
+          "baseline_joint": true,
+          "active_joint": true
+        },
+        {
+          "case": "BFCL/023.json",
+          "gold_step": 3,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_step": 5,
+          "active_step": 5,
+          "baseline_joint": false,
+          "active_joint": false
+        },
+        {
+          "case": "BFCL/027.json",
+          "gold_step": 3,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_step": 3,
+          "active_step": 3,
+          "baseline_joint": true,
+          "active_joint": true
+        },
+        {
+          "case": "BFCL/030.json",
+          "gold_step": 12,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_step": null,
+          "active_step": null,
+          "baseline_joint": false,
+          "active_joint": false
+        },
+        {
+          "case": "BFCL/031.json",
+          "gold_step": 3,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_step": 3,
+          "active_step": 3,
+          "baseline_joint": true,
+          "active_joint": true
+        },
+        {
+          "case": "BFCL/032.json",
+          "gold_step": 3,
+          "baseline_prediction": true,
+          "active_prediction": false,
+          "baseline_step": 3,
+          "active_step": null,
+          "baseline_joint": true,
+          "active_joint": false
+        },
+        {
+          "case": "BFCL/034.json",
+          "gold_step": 3,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_step": null,
+          "active_step": null,
+          "baseline_joint": false,
+          "active_joint": false
+        },
+        {
+          "case": "BFCL/035.json",
+          "gold_step": 1,
+          "baseline_prediction": false,
+          "active_prediction": false,
+          "baseline_step": null,
+          "active_step": null,
+          "baseline_joint": false,
+          "active_joint": false
+        },
+        {
+          "case": "BFCL/037.json",
+          "gold_step": 1,
+          "baseline_prediction": true,
+          "active_prediction": true,
+          "baseline_step": 1,
+          "active_step": 1,
+          "baseline_joint": true,
+          "active_joint": true
+        }
+      ]
+    },
+    "control_localization": {
+      "annotated_positive": 14,
+      "authoritative_detected": 8,
+      "joint_hits": 7,
+      "joint_accuracy": 0.5,
+      "step_accuracy_on_detected": 0.875
+    },
+    "candidate_localization": {
+      "annotated_positive": 14,
+      "authoritative_detected": 7,
+      "joint_hits": 6,
+      "joint_accuracy": 0.42857142857142855,
+      "step_accuracy_on_detected": 0.8571428571428571
+    }
+  },
+  "opportunity": {
+    "detection": {
+      "recall": 6,
+      "precision": 0
+    },
+    "localization": {
+      "improvable": 1,
+      "preserved": 7,
+      "unannotated_positive": 0
+    }
+  },
+  "gates": {
+    "structural": {
+      "passed": true,
+      "reason": ""
+    },
+    "harmlessness": {
+      "passed": false,
+      "reason": "promotion protection set lacks baseline-correct coverage: protected_tp=0 < 2",
+      "evaluable": false,
+      "status": "not_evaluated",
+      "coverage": {
+        "protected_tp": 0,
+        "protected_tn": 4,
+        "minimum": {
+          "protected_tp": 2,
+          "protected_tn": 2
+        },
+        "evaluable": false,
+        "reason": "protected_tp=0 < 2"
+      }
+    },
+    "behavior": {
+      "passed": false,
+      "reason": "not reached: harmlessness failed",
+      "evaluable": false,
+      "status": "not_evaluated"
+    },
+    "m": {
+      "passed": false,
+      "reason": "not reached: harmlessness failed",
+      "evaluable": false,
+      "status": "not_evaluated"
+    }
+  },
+  "state": "promotion_unmeasurable",
+  "terminal_reason": "harmlessness: promotion protection set lacks baseline-correct coverage: protected_tp=0 < 2; behavior: not reached: harmlessness failed; m: not reached: harmlessness failed",
+  "admitted": false,
+  "elapsed_seconds": 3728.932
+}

@@ -1,0 +1,472 @@
+{
+  "arm": "6581f456f6e8",
+  "row": {
+    "case": "Magentic_One/076.json",
+    "gold": true,
+    "gold_step": null,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "responsible_step": 3,
+    "elapsed_seconds": 0.415,
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "Magentic_One/076.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_003",
+      "responsible_step": 3,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_003",
+        "responsible_step": 3,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 5,
+            "traced_step": 3,
+            "defense": "substantiated",
+            "confirmed_step": 5,
+            "delivered_result": "5 distinct 13C-NMR signals for compound E (claiming two non-equivalent alkene carbons and a unique extra methylene environment)",
+            "correct_result": "3 distinct 13C-NMR signals: one for the four equivalent CH3 carbons, one for the four equivalent CH2 carbons, and one for the two equivalent alkene carbons of (Et)2C=C(Et)2",
+            "judge_basis": "derivation",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 5,
+          "hallucination_reason": "The Coder concludes compound E gives five 13C-NMR signals, but the correct Wittig product from 3-pentanone and the ylide Ph3P=C(CH2CH3)2 (from 3-bromopentane/BuLi/PPh3) is tetraethylethylene, (Et)2C=C(Et)2 (3,4-diethylhex-3-ene), whose symmetry makes all four ethyl groups equivalent and the two alkene carbons equivalent, yielding only 3 distinct 13C signals.",
+          "delivered_result": "5 distinct 13C-NMR signals for compound E (claiming two non-equivalent alkene carbons and a unique extra methylene environment)",
+          "correct_result": "3 distinct 13C-NMR signals: one for the four equivalent CH3 carbons, one for the four equivalent CH2 carbons, and one for the two equivalent alkene carbons of (Et)2C=C(Et)2",
+          "basis": "derivation",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_005",
+            "event_006"
+          ],
+          "root_cause": {
+            "step": 5,
+            "quote": "compound E is expected to give **five** distinct ¹³C-NMR signals... The central alkene carbons each still provide separate signals (two in total).",
+            "referent": "E = 3,4-diethylhex-3-ene, (CH3CH2)2C=C(CH2CH3)2, which shows exactly 3 distinct 13C-NMR signals because all four ethyl groups and both alkene carbons are symmetry-equivalent"
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "the number of distinct 13C-NMR signals produced by the final product E of the given reaction sequence (dithiane formation, Corey-Seebuch alkylation with bromoethane, hydrolysis to 3-pentanone, Wittig with the ylide from 3-bromopentane)"
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 3,
+          "quote": "Structure E: The product will be a 2-pentylidene-hexane (or similar), possibly yielding a chain with an internal alkene—e.g., 3-pentylhex-2-ene.",
+          "referent": "3-bromopentane + PPh3/BuLi generates the ylide Ph3P=C(CH2CH3)2, which reacts with 3-pentanone (D) to give tetraethylethylene, (Et)2C=C(Et)2 (3,4-diethylhex-3-ene); its symmetry makes all four ethyl groups and both alkene carbons equivalent, yielding only 3 distinct 13C signals.",
+          "evidence_refs": [
+            "event_003"
+          ],
+          "reason": "The material error originates in event_003's Step 5, where the Wittig product E is misidentified as the asymmetric 3-pentylhex-2-ene with 'olefinic carbons likely all unique'; event_005's five-signal conclusion (non-equivalent alkene carbons, unique extra methylene) merely derives from this wrong structure, so correcting event_003 to tetraethylethylene makes the final answer 3."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 5,
+          "evidence_refs": [
+            "event_005",
+            "event_006"
+          ],
+          "evidence_citations": [],
+          "conflict_note": "",
+          "reason": "CONTENT TEST: event_005 states 'compound E is expected to give **five** distinct ¹³C-NMR signals' and grounds the count in a 'remaining central methylene group, between alkene and one chain, offers the fifth unique environment.' From the task's fixed reagents, step 5 is a Wittig reaction: 3-bromopentane + PPh3 gives the phosphonium salt at C3 and BuLi gives the ylide Ph3P=C(CH2CH3)2, which with D = pentan-3-one (correctly identified by the Coder at event_003) yields (Et)2C=C(Et)2 (3,4-diethylhex-3-ene, tetraethylethylene). Its symmetry makes all four ethyl groups equivalent and the two alkene carbons equivalent, so only 3 distinct 13C environments exist (4 CH3, 4 CH2, 2 alkene C). The delivered count of 5 is a real RESULT ERROR; no tool observation in the trajectory conflicts with this. RELEVANCE TEST: event_005 is the first assistant-authored commitment of the final number; event_006 only repeats '5' and is delivery evidence, not a separate root cause. Correcting event_005 to 3 signals makes every required deliverable (the answer to the count question) correct. The verdict's characterization of the correct product and count is chemically sound, so the conviction stands."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 5,
+              "reason": "The Coder concludes compound E gives five 13C-NMR signals, but the correct Wittig product from 3-pentanone and the ylide Ph3P=C(CH2CH3)2 (from 3-bromopentane/BuLi/PPh3) is tetraethylethylene, (Et)2C=C(Et)2 (3,4-diethylhex-3-ene), whose symmetry makes all four ethyl groups equivalent and the two alkene carbons equivalent, yielding only 3 distinct 13C signals.",
+              "evidence_refs": [
+                "event_005",
+                "event_006"
+              ],
+              "quote": "compound E is expected to give **five** distinct ¹³C-NMR signals... The central alkene carbons each still provide separate signals (two in total).",
+              "delivered_result": "5 distinct 13C-NMR signals for compound E (claiming two non-equivalent alkene carbons and a unique extra methylene environment)",
+              "correct_result": "3 distinct 13C-NMR signals: one for the four equivalent CH3 carbons, one for the four equivalent CH2 carbons, and one for the two equivalent alkene carbons of (Et)2C=C(Et)2"
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 3,
+                "quote": "Structure E: The product will be a 2-pentylidene-hexane (or similar), possibly yielding a chain with an internal alkene—e.g., 3-pentylhex-2-ene.",
+                "referent": "3-bromopentane + PPh3/BuLi generates the ylide Ph3P=C(CH2CH3)2, which reacts with 3-pentanone (D) to give tetraethylethylene, (Et)2C=C(Et)2 (3,4-diethylhex-3-ene); its symmetry makes all four ethyl groups and both alkene carbons equivalent, yielding only 3 distinct 13C signals.",
+                "evidence_refs": [
+                  "event_003"
+                ],
+                "reason": "The material error originates in event_003's Step 5, where the Wittig product E is misidentified as the asymmetric 3-pentylhex-2-ene with 'olefinic carbons likely all unique'; event_005's five-signal conclusion (non-equivalent alkene carbons, unique extra methylene) merely derives from this wrong structure, so correcting event_003 to tetraethylethylene makes the final answer 3."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 3011,
+                  "completion_tokens": 4826,
+                  "total_tokens": 7837,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 4544
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 4544
+                  },
+                  "input_tokens": 3011,
+                  "output_tokens": 4826
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "\n{\n  \"step\": 3,\n  \"quote\": \"Structure E: The product will be a 2-pentylidene-hexane (or similar), possibly yielding a chain with an internal alkene—e.g., 3-pentylhex-2-ene.\",\n  \"referent\": \"3-bromopentane + PPh3/BuLi generates the ylide Ph3P=C(CH2CH3)2, which reacts with 3-pentanone (D) to give tetr"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 5,
+                "reason": "The Coder concludes compound E gives five 13C-NMR signals, but the correct Wittig product from 3-pentanone and the ylide Ph3P=C(CH2CH3)2 (from 3-bromopentane/BuLi/PPh3) is tetraethylethylene, (Et)2C=C(Et)2 (3,4-diethylhex-3-ene), whose symmetry makes all four ethyl groups equivalent and the two alkene carbons equivalent, yielding only 3 distinct 13C signals.",
+                "delivered_result": "5 distinct 13C-NMR signals for compound E (claiming two non-equivalent alkene carbons and a unique extra methylene environment)",
+                "correct_result": "3 distinct 13C-NMR signals: one for the four equivalent CH3 carbons, one for the four equivalent CH2 carbons, and one for the two equivalent alkene carbons of (Et)2C=C(Et)2",
+                "evidence_refs": [
+                  "event_005",
+                  "event_006"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "the number of distinct 13C-NMR signals produced by the final product E of the given reaction sequence (dithiane formation, Corey-Seebuch alkylation with bromoethane, hydrolysis to 3-pentanone, Wittig with the ylide from 3-bromopentane)"
+                  }
+                ],
+                "confidence": "high",
+                "quote": "compound E is expected to give **five** distinct ¹³C-NMR signals... The central alkene carbons each still provide separate signals (two in total)."
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 5,
+                "evidence_refs": [
+                  "event_005",
+                  "event_006"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: event_005 states 'compound E is expected to give **five** distinct ¹³C-NMR signals' and grounds the count in a 'remaining central methylene group, between alkene and one chain, offers the fifth unique environment.' From the task's fixed reagents, step 5 is a Wittig reaction: 3-bromopentane + PPh3 gives the phosphonium salt at C3 and BuLi gives the ylide Ph3P=C(CH2CH3)2, which with D = pentan-3-one (correctly identified by the Coder at event_003) yields (Et)2C=C(Et)2 (3,4-diethylhex-3-ene, tetraethylethylene). Its symmetry makes all four ethyl groups equivalent and the two alkene carbons equivalent, so only 3 distinct 13C environments exist (4 CH3, 4 CH2, 2 alkene C). The delivered count of 5 is a real RESULT ERROR; no tool observation in the trajectory conflicts with this. RELEVANCE TEST: event_005 is the first assistant-authored commitment of the final number; event_006 only repeats '5' and is delivery evidence, not a separate root cause. Correcting event_005 to 3 signals makes every required deliverable (the answer to the count question) correct. The verdict's characterization of the correct product and count is chemically sound, so the conviction stands."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 5,
+                  "evidence_refs": [
+                    "event_005",
+                    "event_006"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_005 states 'compound E is expected to give **five** distinct ¹³C-NMR signals' and grounds the count in a 'remaining central methylene group, between alkene and one chain, offers the fifth unique environment.' From the task's fixed reagents, step 5 is a Wittig reaction: 3-bromopentane + PPh3 gives the phosphonium salt at C3 and BuLi gives the ylide Ph3P=C(CH2CH3)2, which with D = pentan-3-one (correctly identified by the Coder at event_003) yields (Et)2C=C(Et)2 (3,4-diethylhex-3-ene, tetraethylethylene). Its symmetry makes all four ethyl groups equivalent and the two alkene carbons equivalent, so only 3 distinct 13C environments exist (4 CH3, 4 CH2, 2 alkene C). The delivered count of 5 is a real RESULT ERROR; no tool observation in the trajectory conflicts with this. RELEVANCE TEST: event_005 is the first assistant-authored commitment of the final number; event_006 only repeats '5' and is delivery evidence, not a separate root cause. Correcting event_005 to 3 signals makes every required deliverable (the answer to the count question) correct. The verdict's characterization of the correct product and count is chemically sound, so the conviction stands."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 5,
+                  "evidence_refs": [
+                    "event_005",
+                    "event_006"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_005 states 'compound E is expected to give **five** distinct ¹³C-NMR signals' and justifies it via non-equivalent alkene carbons ('The central alkene carbons each still provide separate signals') plus a 'remaining central methylene group'. The trajectory itself establishes D = 'pentan-3-one (CH3CH2COCH2CH3)' (event_003), and the ylide from 3-bromopentane/PPh3/BuLi is Ph3P=C(CH2CH3)2, so E = (Et)2C=C(Et)2 (3,4-diethylhex-3-ene). Its symmetry makes both alkene carbons equivalent and all four ethyl groups equivalent, giving only 3 distinct 13C environments (alkene C, CH2, CH3). The claimed alkene-carbon inequivalence and the invented 'remaining central methylene' do not exist in the real product; the delivered count 5 vs correct 3 is a real RESULT ERROR, not a representation difference. RELEVANCE TEST: event_005 is the first assistant-authored statement of the numeric answer; event_006 merely relays '5' and is repetition, not a correction. Correcting event_005 to E = (Et)2C=C(Et)2 with 3 signals would make the final deliverable correct, so the step is causally connected to the delivered wrong answer. No tool observation conflicts with this; the count follows from standard chemistry applied to the trajectory's own stated intermediate."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 5,
+                  "evidence_refs": [
+                    "event_003",
+                    "event_005",
+                    "event_006"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: event_005 states 'compound E is expected to give **five** distinct ¹³C-NMR signals' and justifies it with 'The central alkene carbons each still provide separate signals (two in total)'. The task fixes the reagent sequence: the trajectory itself writes D as pentan-3-one (event_003: 'pentan-3-one (CH₃CH₂COCH₂CH₃)'), and PPh3/3-bromopentane/BuLi generates the ylide Ph3P=C(CH2CH3)2 (deprotonation at the phosphonium-bearing carbon of 3-bromopentane), so the Wittig product E is (Et)2C=C(Et)2 (tetraethylethylene, 3,4-diethylhex-3-ene), not the '3-pentylhex-2-ene' guessed at event_003. (Et)2C=C(Et)2 has an inversion center at the C=C midpoint and a C2 operation swapping the two ethyls on each sp2 carbon, so the two alkene carbons are equivalent and all four ethyl groups are equivalent: exactly 3 distinct 13C signals (four equivalent CH3, four equivalent CH2, two equivalent alkene carbons). The delivered count of 5 is a real RESULT ERROR. LOCALIZATION/RELEVANCE: event_003 gives only a vague 'multiple unique ¹³C environments' with no number; the wrong delivered answer '5' is first introduced at event_005, which is the answer-submission step requested at event_004 ('State the final number'); event_006 merely repeats the Coder's number as delivery, not a separate root cause. Correcting event_005 to 3 with the correct structure of E makes the sole deliverable — the signal count — correct. No external snapshot is needed; the symmetry count follows from the task-fixed reagents and standard chemical analysis, and no tool observation addresses or conflicts with this point."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 3173,
+                  "completion_tokens": 10995,
+                  "total_tokens": 14168,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 10496
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 10496
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "input_tokens": 3173,
+                  "output_tokens": 10995
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 5,\n  \"evidence_refs\": [\"event_003\", \"event_005\", \"event_006\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_005 states 'compound E is expected to give **five** distinct ¹³C-NMR signals' and justifies it with '",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_003",
+                  "event_004",
+                  "event_005",
+                  "event_006"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_001",
+                  "event_002"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 4,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [],
+        "deployment": {
+          "intervention_registry_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+          "active_interventions": [
+            "IV-DEFECT-002"
+          ],
+          "fired": [],
+          "evidence": [],
+          "facts": {},
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 4,
+          "view": "complete",
+          "warnings": [
+            {
+              "attempt": "vote",
+              "error": "provider returned non-JSON body: b'<!DOCTYPE html>\\r\\n<html>\\r\\n  <header>\\r\\n    <style>\\r\\n      html, body {\\r\\n        padding: 0;\\r\\n        margin: 0;\\r\\n        height: 100%;\\r\\n        width: 100%;\\r\\n    '"
+            }
+          ]
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 4,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false,
+            "topups": 1
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 3011,
+            "completion_tokens": 4826,
+            "total_tokens": 7837,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 4544
+            },
+            "input_tokens_details": {
+              "cached_tokens": 0
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 4544
+            },
+            "input_tokens": 3011,
+            "output_tokens": 4826
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"step\": 3,\n  \"quote\": \"Structure E: The product will be a 2-pentylidene-hexane (or similar), possibly yielding a chain with an internal alkene—e.g., 3-pentylhex-2-ene.\",\n  \"referent\": \"3-bromopentane + PPh3/BuLi generates the ylide Ph3P=C(CH2CH3)2, which reacts with 3-pentanone (D) to give tetr"
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 3173,
+            "completion_tokens": 10995,
+            "total_tokens": 14168,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 10496
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 10496
+            },
+            "input_tokens_details": {
+              "cached_tokens": 0
+            },
+            "input_tokens": 3173,
+            "output_tokens": 10995
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 5,\n  \"evidence_refs\": [\"event_003\", \"event_005\", \"event_006\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: event_005 states 'compound E is expected to give **five** distinct ¹³C-NMR signals' and justifies it with '",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "b0c482921b6961832749119c658bb054686801d81b18815d79376fad9c72db5e",
+        "interventions_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+        "frozen_judge_replay": true,
+        "frozen_stages": [
+          "judge_result"
+        ]
+      },
+      "_packet_event_count": 6
+    },
+    "backend": "detector"
+  },
+  "row_hash": "05f140460c22"
+}

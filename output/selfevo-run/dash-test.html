@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh"><head><meta charset="utf-8">
+<title>自进化验证实验进度</title>
+<meta http-equiv="refresh" content="15">
+<style>
+ body{font-family:ui-sans-serif,system-ui,'Segoe UI',Roboto,'Microsoft YaHei',sans-serif;
+   margin:0;background:#0f1115;color:#e6e8eb}
+ header{padding:18px 24px;background:#161a21;border-bottom:1px solid #262c36}
+ h1{font-size:18px;margin:0 0 6px}
+ .sub{color:#8b95a5;font-size:12px}
+ main{padding:18px 24px;display:grid;gap:18px}
+ section{background:#161a21;border:1px solid #262c36;border-radius:8px;padding:14px 16px}
+ h2{font-size:13px;margin:0 0 10px;color:#9aa6b8;text-transform:uppercase;letter-spacing:.06em}
+ .stages{display:flex;flex-wrap:wrap;gap:8px}
+ .stage{background:#1d222b;border:1px solid #2c3441;border-radius:6px;padding:8px 12px;
+   font-size:12px;display:flex;gap:8px;align-items:center}
+ .stage.done{border-color:#2f6f4f;background:#16241c}
+ .stage b{color:#7fd1a6}
+ .counters{display:flex;flex-wrap:wrap;gap:8px}
+ .counter{background:#1d222b;border:1px solid #2c3441;border-radius:6px;padding:6px 10px;font-size:12px}
+ .counter b{margin-left:6px;color:#8fc7ff}
+ table{width:100%;border-collapse:collapse;font-size:12px}
+ th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #232a34}
+ th{color:#8b95a5;font-weight:600}
+ td.ok{color:#7fd1a6} td.clean{color:#8b95a5} td.warn{color:#e0b56a}
+ .ok{color:#7fd1a6} .clean{color:#8b95a5} .warn{color:#e0b56a}
+ .bar{background:#232a34;border-radius:4px;height:8px;width:120px;overflow:hidden}
+ .bar i{display:block;height:100%;background:#4a8fd4}
+ .detail{color:#9aa6b8}
+ .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+ .log{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:#9aa6b8;
+   white-space:pre-wrap;max-height:320px;overflow:auto}
+ .stale{color:#e0b56a}
+</style></head><body>
+<header>
+  <h1>自进化框架验证实验 — 实时进度</h1>
+  <div class="sub">工作目录 artifacts\selfevo-bigrun ·
+    账本事件 1 条 ·
+    最近事件 2026-09-21T09:44:56 ·
+    页面刷新 18:04:24</div>
+</header>
+<main>
+  <section><h2>是否在正常运行</h2>
+    <div class="ok" style="font-size:13px;margin-bottom:8px">2 个 provider 调用在飞，最久 176s（单次调用上限 900s）</div>
+    <div class="sub">驱动 pid=3252 · 已运行 19 分钟</div>
+    <table style="margin-top:10px"><thead><tr><th>评估波次</th><th>已完成</th><th>进度</th><th>状态</th><th>在飞/待办案例</th></tr></thead>
+    <tbody><tr><td>哨兵 sentinel</td><td>10/12</td><td><div class='bar'><i style='width:83%'></i></div></td><td class='warn'>running</td><td class='detail'>Camel/048.json, Octotools/008.json</td></tr><tr><td>收益集 gain</td><td>0/8</td><td><div class='bar'><i style='width:0%'></i></div></td><td class='warn'>queued</td><td class='detail'>OpenDeepSearch/050.json, Octotools/022.json, BFCL/101.json, OpenManus/003.json, Camel/085.json, SmolAgents/039.json (+2)</td></tr></tbody></table>
+    <div class="sub" style="margin-top:8px">说明：引擎按波次依次评估（哨兵 → 收益集 → 巡检），每波并发上限取该波案例数与配置并发数的较小者。所以波次尾部只剩 2 例时显示 2 个 worker 是正常行为，不是并发被压低。</div>
+    <table style="margin-top:10px"><thead><tr><th>在飞调用 pid</th><th>已运行(s)</th><th>CPU(s)</th></tr></thead><tbody><tr><td>2088</td><td>176</td><td>0.2</td></tr><tr><td>6032</td><td>10</td><td>0.2</td></tr></tbody></table>
+  </section>
+  <section><h2>流水线</h2><div class="stages"><div class='stage done'><span>启动</span><b>1</b></div><div class='stage'><span>缺陷注入审计</span><b>0</b></div><div class='stage'><span>巡检与诊断</span><b>0</b></div><div class='stage'><span>评估预检</span><b>0</b></div><div class='stage'><span>候选提案</span><b>0</b></div><div class='stage'><span>门控拒绝</span><b>0</b></div><div class='stage'><span>准入</span><b>0</b></div><div class='stage'><span>写入 registry</span><b>0</b></div><div class='stage'><span>轮次完成</span><b>0</b></div></div></section>
+  <section><h2>事件计数</h2><div class="counters"><div class='counter'><span>轮次启动</span><b>1</b></div></div></section>
+  <section><h2>逐轮读数</h2>
+    <table><thead><tr><th>轮</th><th>状态</th><th>巡检例数</th>
+      <th>TP/FP/FN/TN</th><th>检测族</th><th>定位族</th><th>提案</th><th>轮后 active</th>
+    </tr></thead><tbody><tr><td colspan="8">尚无完成的轮次</td></tr></tbody></table>
+  </section>
+  <section><h2>最近事件</h2>
+    <table><thead><tr><th>时间</th><th>事件</th><th>细节</th></tr></thead>
+    <tbody><tr><td>2026-09-21T09:44:56</td><td>轮次启动</td><td class='detail'></td></tr></tbody></table>
+  </section>
+  <section><h2>已落盘的逐例行（按耗时降序，最多 40 条）</h2>
+    <table><thead><tr><th>臂</th><th>已落盘</th><th>TP/FP/FN/TN</th><th>未决</th></tr></thead>
+    <tbody><tr><td>508acdf65658</td><td>10</td><td>4/1/1/4</td><td>0</td></tr></tbody></table>
+    <div class='sub' style='margin-top:8px'>逐例耗时 n=10 · 最小 0.0s · 中位 0.0s · 最大 0.0s · 合计 0.1s</div>
+  </section>
+  <div class="cols">
+    <section><h2>逐例明细（按耗时降序）</h2>
+      <table><thead><tr><th>案例</th><th>gold</th><th>判定</th><th>对?</th><th>责任步</th><th>耗时(s)</th></tr></thead>
+      <tbody><tr><td>Octotools/028.json</td><td>False</td><td class='clean'>False</td><td class='ok'>✓</td><td></td><td>0.012</td></tr><tr><td>Camel/029.json</td><td>True</td><td class='ok'>True</td><td class='ok'>✓</td><td>7</td><td>0.01</td></tr><tr><td>Magentic_One/015.json</td><td>False</td><td class='clean'>False</td><td class='ok'>✓</td><td></td><td>0.008</td></tr><tr><td>Magentic_One/076.json</td><td>True</td><td class='ok'>True</td><td class='ok'>✓</td><td>3</td><td>0.007</td></tr><tr><td>OpenDeepSearch/077.json</td><td>False</td><td class='clean'>False</td><td class='ok'>✓</td><td></td><td>0.006</td></tr><tr><td>OpenManus/006.json</td><td>True</td><td class='ok'>True</td><td class='ok'>✓</td><td>6</td><td>0.005</td></tr><tr><td>OpenDeepSearch/045.json</td><td>True</td><td class='clean'>False</td><td class='warn'>✗</td><td></td><td>0.005</td></tr><tr><td>BFCL/027.json</td><td>True</td><td class='ok'>True</td><td class='ok'>✓</td><td>3</td><td>0.004</td></tr><tr><td>SmolAgents/069.json</td><td>False</td><td class='clean'>False</td><td class='ok'>✓</td><td></td><td>0.004</td></tr><tr><td>BFCL/038.json</td><td>False</td><td class='ok'>True</td><td class='warn'>✗</td><td>3</td><td>0.001</td></tr></tbody></table>
+    </section>
+    <section><h2>后台输出尾部</h2>
+      <div class="log">暂无</div>
+    </section>
+  </div>
+</main></body></html>

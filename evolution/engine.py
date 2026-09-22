@@ -40,17 +40,27 @@ from evolution.contracts import empty_registry, make_registry, save_json
 from detector.dataset import gold_fields
 from evolution.gates import (
     arm_has_infrastructure_failure,
+    candidate_target_kind,
     defect_candidates,
+    meets_localization,
     meets_m,
     requires_fresh_evaluation,
     structural_gate,
     harmlessness_gate,
+    localization_behavior_gate,
     sentinel_coverage,
     behavior_gate,
 )
 from evolution.ledger import Ledger, load_ledger
 from evolution.meta_eval import write_meta_report
-from evolution.metrics import fired_rate, paired_delta, source_deltas
+from evolution.metrics import (
+    fired_rate,
+    gain_opportunity,
+    localization_opportunity,
+    paired_delta,
+    paired_localization_delta,
+    source_deltas,
+)
 from evolution.proposer import ProposalBatch, infer_joint_groups, make_proposer
 from evolution.registry import ActiveRegistry, load_active_registry
 from evolution.checkpoint import CycleJournal
@@ -82,6 +92,8 @@ from evolution.splits import (
     build_split,
     bool_gold,
     load_gold,
+    load_gold_step,
+    load_record,
     split_manifest_report,
 )
 from evolution.worksheet import (
@@ -89,6 +101,7 @@ from evolution.worksheet import (
     diagnose_failure_families,
     refine_failure_families,
     stable_failure_families,
+    stable_localization_families,
     worksheet_report,
 )
 
@@ -171,25 +184,9 @@ def _failure_contrast(
     }
 
 
-def gain_opportunity(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
-    """How many cases the marginal set can actually reward, per polarity.
-
-    ``marginal_cases`` counts all-case correct predictions gained, so a claim
-    can only be scored where the control arm is *wrong in that direction*. This
-    is a property of the instrument (the gain set together with the baseline's
-    behaviour), not of any candidate, which is why it is reported per round
-    rather than inferred from a rejection.
-    """
-    return {
-        "recall": sum(
-            1 for row in rows
-            if row.get("gold") is True and row.get("prediction") is False
-        ),
-        "precision": sum(
-            1 for row in rows
-            if row.get("gold") is False and row.get("prediction") is True
-        ),
-    }
+def gain_opportunity_for(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    """Alias kept for callers inside this module."""
+    return gain_opportunity(rows)
 
 
 def gate_rejection_is_unevaluable(
@@ -258,6 +255,103 @@ def terminal_classification(
 
 
 COVERAGE_POLICY_MODES = ("strict", "replacement", "replacement_or_skip")
+
+
+def _unmeasurable_cases(rows: Sequence[Mapping[str, Any]]) -> set[str]:
+    """Cases whose rows could not be measured honestly, from either arm."""
+    out: set[str] = set()
+    for row in rows:
+        if arm_has_infrastructure_failure([row]):
+            out.add(str(row.get("case") or ""))
+    return out
+
+
+def _defect_rejection_after_exclusions(
+    *,
+    unit: Mapping[str, Any],
+    baseline_rows: Sequence[Mapping[str, Any]],
+    sentinel_cases: Sequence[str],
+    gain_cases: Sequence[str],
+    config: Mapping[str, Any],
+) -> str:
+    """Whether a defect rejection survives dropping the unmeasurable rows.
+
+    Returns an empty string when the rejection is sound (the audit may certify)
+    and a reason when it is not (the audit is inconclusive and must freeze).
+
+    The defect-injection audit exists to prove the gate *logic* rejects a known
+    bad candidate. A rejection produced by a row nobody could measure proves
+    nothing, so such rows are removed from both arms and the rejection is
+    re-derived on the rest. If it still fails there, the gates were exercised;
+    if the remaining cases are too few to score, the audit stays inconclusive
+    instead of certifying on an empty comparison.
+
+    Only HARMLESSNESS and M are re-derived. BEHAVIOR needs per-row deployment
+    traces, which the audit's row summary does not carry, so re-running it here
+    would report "never fired" for every defect and manufacture a rejection --
+    the exact artifact this function exists to catch.
+    """
+    candidate_rows = list(unit.get("candidate_rows") or ())
+    unusable = _unmeasurable_cases([*baseline_rows, *candidate_rows])
+    if not unusable:
+        # Nothing was excluded, so the verdict already rests on measurable
+        # rows only.
+        return ""
+    healthy_baseline = [
+        row for row in baseline_rows
+        if str(row.get("case") or "") not in unusable
+    ]
+    healthy_candidate = [
+        row for row in candidate_rows
+        if str(row.get("case") or "") not in unusable
+    ]
+    if not healthy_baseline or not healthy_candidate:
+        return (
+            "defect evaluation has no measurable case left after excluding "
+            f"{len(unusable)} unmeasured case(s)"
+        )
+    sentinel = list(sentinel_cases)
+    gain_cases = list(gain_cases)
+    # The unit's rows cover sentinel then gain; split them the same way the
+    # unit itself did so HARMLESSNESS sees the sentinel subset and M the gain
+    # subset. Without the split the whole batch would be treated as the gain
+    # set, which is the stricter reading for M and skips HARMLESSNESS.
+    if sentinel:
+        baseline_sentinel = _subset_rows(healthy_baseline, sentinel)
+        candidate_sentinel = _subset_rows(healthy_candidate, sentinel)
+    else:
+        baseline_sentinel = []
+        candidate_sentinel = []
+    if gain_cases:
+        baseline_gain = _subset_rows(healthy_baseline, gain_cases)
+        candidate_gain = _subset_rows(healthy_candidate, gain_cases)
+    else:
+        baseline_gain = list(healthy_baseline)
+        candidate_gain = list(healthy_candidate)
+
+    if baseline_sentinel and candidate_sentinel:
+        harmlessness = harmlessness_gate(
+            baseline_rows=baseline_sentinel,
+            candidate_rows=candidate_sentinel,
+            config=config,
+        )
+        if harmlessness.get("passed") is False and harmlessness.get("evaluable") is False:
+            return (
+                "defect evaluation has insufficient measurement coverage after "
+                f"excluding {len(unusable)} unmeasured case(s)"
+            )
+        if harmlessness.get("passed") is False:
+            return ""
+
+    delta = paired_delta(list(baseline_gain), list(candidate_gain))
+    passed, _failures = meets_m(delta, config=config)
+    if passed:
+        return (
+            "the defect's rejection does not survive excluding "
+            f"{len(unusable)} unmeasured case(s): it passes M on the "
+            "measurable cases"
+        )
+    return ""
 
 
 def split_actionable_families(
@@ -384,6 +478,16 @@ class EvolutionEngine:
                 self.rejection_feedback.append(dict(payload))
         self.gold_map = {
             case: load_gold(self.config["dataset_root"], case)
+            for case in self.split.pool
+        }
+        # Evaluator-side localization annotation. It rides beside ``gold_map``
+        # and never reaches the detector: the backend copies it onto result
+        # rows for the evolution side to score. Without it every patrol row
+        # carries ``gold_step=None``, and a case the detector convicts
+        # correctly but localizes wrongly stays invisible to the development
+        # loop -- which is the objective plan §5.1 asks to bring into the loop.
+        self.gold_step_map = {
+            case: load_gold_step(self.config["dataset_root"], case)
             for case in self.split.pool
         }
         self.cycle_reports: list[dict[str, Any]] = []
@@ -716,11 +820,56 @@ class EvolutionEngine:
         self, families: Sequence[Mapping[str, Any]],
         baseline_gain: Sequence[Mapping[str, Any]], arms: _ArmRunner,
     ) -> tuple[list[Mapping[str, Any]], list[dict[str, Any]]]:
+        """Split families by whether the gain set can score their direction.
+
+        A localization family is not scored by the detection opportunity: its
+        claim is that the *named step* improves on cases the control arm
+        already convicts correctly. Measuring it against recall/precision
+        counts would report the mechanism unmeasurable for a reason that does
+        not apply to it, so it is checked against the localization opportunity
+        on the same rows.
+        """
         opportunity = gain_opportunity(baseline_gain)
+        localization = localization_opportunity(
+            baseline_gain, gold_steps=self.gold_step_map,
+        )
         replacement = None
+        replacement_localization = None
         ready, blocked = [], []
         for family in families:
             name = str(family.get("failure_family") or "")
+            if name.startswith("FAM-loc-"):
+                count = int(localization.get("improvable") or 0)
+                if (
+                    count == 0
+                    and self._coverage_mode("localization") != "strict"
+                    and self._replacement_gain_cases
+                ):
+                    if replacement_localization is None:
+                        rows = arms.run(
+                            self._replacement_gain_cases,
+                            registry=self.registry.registry,
+                            fresh=requires_fresh_evaluation(self.registry.entries),
+                        )
+                        replacement_localization = localization_opportunity(
+                            rows, gold_steps=self.gold_step_map,
+                        )
+                    count = int(
+                        replacement_localization.get("improvable") or 0
+                    )
+                if count:
+                    ready.append(family)
+                else:
+                    blocked.append({
+                        "failure_family": name,
+                        "target_kind": "localization",
+                        "polarity": "localization",
+                        "status": "not_evaluated",
+                        "reason": (
+                            "no mislocated-but-correctly-convicted case in gain"
+                        ),
+                    })
+                continue
             polarity = "recall" if name.startswith("FAM-fn-") else (
                 "precision" if name.startswith("FAM-fp-") else "boundary")
             count = opportunity.get(polarity, sum(opportunity.values()))
@@ -1029,22 +1178,47 @@ class EvolutionEngine:
                             report["audit_rejected"] = False
                             report["audit_passed"] = True
                 if not report["audit_passed"]:
-                    # A rejection that came from an unresolved/deadline/
-                    # failed-stage arm is not evidence that the gate LOGIC
-                    # rejected the defect. Mark it inconclusive so the audit
-                    # cannot certify itself without exercising the gates.
-                    infrastructure = arm_has_infrastructure_failure(
-                        unit["candidate_rows"],
-                    )
-                    if not infrastructure:
-                        infrastructure = arm_has_infrastructure_failure([*baseline_s, *baseline_g])
+                    # Two independent reasons a rejection proves nothing, and
+                    # they must not be conflated:
+                    #
+                    # 1. The gate could not score the defect at all (its verdict
+                    #    is not evaluable). Insufficient baseline-correct
+                    #    coverage means the gates were never exercised.
+                    # 2. The gate could score it, but only because of rows that
+                    #    could not be measured. Removing those rows and
+                    #    re-deriving the rejection tests exactly that.
+                    #
+                    # The whole-batch sweep this replaces treated *any*
+                    # unmeasurable row anywhere as disqualifying, which froze an
+                    # entire multi-cycle run because one sentinel case hit its
+                    # case deadline -- a case in neither the verdict's evidence
+                    # nor its cause. A genuinely leaking defect still leaks on
+                    # the healthy cases, so excluding the unmeasured ones
+                    # weakens nothing; and an audit that refuses to certify
+                    # whenever any background case degrades is not more honest,
+                    # only more fragile.
                     unmeasured = any(
-                        verdict.get("passed") is False and verdict.get("evaluable") is False
-                        for verdict in (unit.get("harmlessness") or {},
-                                        unit.get("behavior") or {}, unit.get("m") or {})
+                        verdict.get("passed") is False
+                        and verdict.get("evaluable") is False
+                        for verdict in (
+                            unit.get("harmlessness") or {},
+                            unit.get("behavior") or {},
+                            unit.get("m") or {},
+                        )
                     )
                     if unmeasured:
-                        infrastructure = "defect evaluation has insufficient measurement coverage"
+                        infrastructure = (
+                            "defect evaluation has insufficient measurement "
+                            "coverage"
+                        )
+                    else:
+                        infrastructure = _defect_rejection_after_exclusions(
+                            unit=unit,
+                            baseline_rows=[*baseline_s, *baseline_g],
+                            sentinel_cases=list(self.split.sentinel),
+                            gain_cases=list(self.split.gain),
+                            config=self.config,
+                        )
                     if infrastructure:
                         report["audit_inconclusive"] = True
                         report["audit_inconclusive_reason"] = infrastructure
@@ -1190,25 +1364,60 @@ class EvolutionEngine:
         member_behavior: dict[str, dict[str, Any]] = {}
         m = None
         if harmlessness["passed"]:
+            # A localization claim is scored by the objective it declares. The
+            # detection BEHAVIOR/M pair asks whether the binary verdict moved,
+            # which a tracer directive deliberately leaves alone, so scoring a
+            # localization claim there would report "never fired" or "no
+            # marginal gain" for a claim that did exactly what it promised.
+            kind = candidate_target_kind(candidate)
             for member in [*partners, dict(candidate)]:
                 member_id = str(member.get("intervention_id") or "")
-                member_behavior[member_id] = behavior_gate(
-                    member,
-                    baseline_rows=control,
-                    candidate_rows=candidate_rows,
-                    config=self.config,
+                member_behavior[member_id] = (
+                    localization_behavior_gate(
+                        member,
+                        baseline_rows=control,
+                        candidate_rows=candidate_rows,
+                        config=self.config,
+                        gold_steps=self.gold_step_map,
+                    )
+                    if candidate_target_kind(member) in {"localization", "joint"}
+                    else behavior_gate(
+                        member,
+                        baseline_rows=control,
+                        candidate_rows=candidate_rows,
+                        config=self.config,
+                    )
                 )
             behavior = member_behavior[intervention_id]
             if all(verdict["passed"] for verdict in member_behavior.values()):
                 control_g = _subset_rows(control, measurement_gain)
                 candidate_g = _subset_rows(candidate_rows, measurement_gain)
                 delta = paired_delta(control_g, candidate_g)
-                passed, failures = meets_m(delta, config=self.config)
-                m = {
-                    "passed": passed,
-                    "reason": "; ".join(failures),
-                    "delta": delta,
-                }
+                if kind in {"localization", "joint"}:
+                    localization_delta = paired_localization_delta(
+                        control_g, candidate_g, gold_steps=self.gold_step_map,
+                    )
+                    passed, failures = meets_localization(
+                        localization_delta,
+                        config=self.config,
+                        detection_delta=delta,
+                        target_kind=kind,
+                    )
+                    m = {
+                        "passed": passed,
+                        "reason": "; ".join(failures),
+                        "delta": delta,
+                        "localization_delta": localization_delta,
+                        "target_kind": kind,
+                    }
+                else:
+                    passed, failures = meets_m(delta, config=self.config)
+                    m = {
+                        "passed": passed,
+                        "reason": "; ".join(failures),
+                        "delta": delta,
+                        "target_kind": kind,
+                    }
                 if response is not None:
                     response["passed"] = passed
                     response["failure_reason"] = "; ".join(failures)
@@ -1300,6 +1509,59 @@ class EvolutionEngine:
             bare_rows, patrol_rows, active_registry_size=len(active_entries),
         )
 
+    def _localization_records(
+        self, rows: Sequence[Mapping[str, Any]],
+    ) -> dict[str, Any]:
+        """Label-free records for the rows a localization task could form on.
+
+        Reading full records for every patrol row would be wasteful and would
+        touch the corpus for cases that are not localization candidates. Only
+        the convicted-correct rows whose named step may be wrong are loaded.
+        """
+        wanted = {
+            str(row.get("case") or "")
+            for row in rows
+            if row.get("gold") is True
+            and row.get("prediction") is True
+        }
+        records: dict[str, Any] = {}
+        for case in sorted(wanted):
+            try:
+                records[case] = load_record(self.config["dataset_root"], case)
+            except Exception:
+                # A case whose record cannot be read stays out of the
+                # viability evidence; it is then "needs_review" rather than
+                # silently accepted as a repairable mislocation.
+                continue
+        return records
+
+    def _all_families(
+        self, patrol_rows: Sequence[Mapping[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Every targetable family of the patrol: detection and localization.
+
+        Both kinds must come from one place. The localization objective is
+        only useful to the framework if a mislocated case can become a task,
+        and a call site that reads ``stable_failure_families`` alone silently
+        drops those cases -- they are convicted correctly, so no detection
+        family ever contains them.
+
+        Localization families are additionally filtered by
+        ``localization_repair_viability``: a step that differs from the
+        annotation is only a defect when the named step cannot host the error
+        at all. Otherwise naming it may be a defensible answer to a different
+        real error, and "repairing" it would mean teaching the detector to
+        abandon a true detection.
+        """
+        return [
+            *stable_failure_families(patrol_rows),
+            *stable_localization_families(
+                patrol_rows,
+                gold_steps=self.gold_step_map,
+                records=self._localization_records(patrol_rows),
+            ),
+        ]
+
     def _extend_patrol(
         self,
         arms: "_ArmRunner",
@@ -1357,7 +1619,7 @@ class EvolutionEngine:
         patrol_rows, bare_patrol_rows, patrol_contrast = self._patrol_arms(
             arms, patrol_cases,
         )
-        families = stable_failure_families(patrol_rows)
+        families = self._all_families(patrol_rows)
         bootstrap_cases: list[str] = []
         if not families:
             rerun_budget = int(
@@ -1385,7 +1647,7 @@ class EvolutionEngine:
                         bootstrap_cases=bootstrap_cases,
                     )
                 )
-                families = stable_failure_families(patrol_rows)
+                families = self._all_families(patrol_rows)
         diagnosed = diagnose_failure_families(
             families,
             patrol_rows,
@@ -1631,7 +1893,7 @@ class EvolutionEngine:
         patrol_rows, bare_patrol_rows, patrol_contrast = self._patrol_arms(
             arms, patrol_cases,
         )
-        families = stable_failure_families(patrol_rows)
+        families = self._all_families(patrol_rows)
 
         # Source-quality bootstrap: a random patrol sample can legitimately
         # miss the second member of a failure family. The protocol budget has
@@ -1663,7 +1925,7 @@ class EvolutionEngine:
                         bootstrap_cases=bootstrap_cases,
                     )
                 )
-                families = stable_failure_families(patrol_rows)
+                families = self._all_families(patrol_rows)
 
         diagnosed_families = diagnose_failure_families(
             families,
@@ -2373,6 +2635,7 @@ class EvolutionEngine:
             dataset_root=self.config["dataset_root"],
             registry=registry,
             gold_map=self.gold_map,
+            gold_step_map=self.gold_step_map,
             workers=workers,
         )
 
@@ -2594,6 +2857,7 @@ class EvolutionEngine:
             dataset_root=self.config["dataset_root"],
             registry=registry,
             gold_map=self.gold_map,
+            gold_step_map=self.gold_step_map,
             workers=workers,
             deadline=deadline,
         )

@@ -222,6 +222,149 @@ def paired_delta(
     }
 
 
+def gain_opportunity(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    """How many cases the marginal set can actually reward, per polarity.
+
+    ``marginal_cases`` counts all-case correct predictions gained, so a claim
+    can only be scored where the control arm is *wrong in that direction*. This
+    is a property of the instrument (the evaluation set together with the
+    baseline's behaviour), not of any candidate, which is why it is reported
+    per round rather than inferred from a rejection.
+    """
+    return {
+        "recall": sum(
+            1 for row in rows
+            if row.get("gold") is True and row.get("prediction") is False
+        ),
+        "precision": sum(
+            1 for row in rows
+            if row.get("gold") is False and row.get("prediction") is True
+        ),
+    }
+
+
+def localization_opportunity(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    gold_steps: Mapping[str, Any] | None = None,
+) -> dict[str, int]:
+    """How many cases a localization claim can actually reward.
+
+    A localization claim is only scorable where the control arm already
+    convicts authoritatively *and* names the wrong responsible step: those are
+    the cases whose localization can improve. Cases the control localizes
+    correctly are the preservation pool, not opportunities.
+    """
+    gold_steps = dict(gold_steps or {})
+    improvable = preserved = unannotated = 0
+    for row in rows:
+        gold_step = _gold_step(row, gold_steps)
+        if row.get("gold") is not True:
+            continue
+        if gold_step is None:
+            unannotated += 1
+            continue
+        if row.get("prediction") is not True:
+            continue
+        if row_responsible_step(row) == gold_step:
+            preserved += 1
+        else:
+            improvable += 1
+    return {
+        "improvable": improvable,
+        "preserved": preserved,
+        "unannotated_positive": unannotated,
+    }
+
+
+def protection_repair(
+    baseline_rows: Sequence[Mapping[str, Any]],
+    active_rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Direction-agnostic corrections and regressions on the protection set.
+
+    HARMLESSNESS protects only the cases the control arm already has right, so
+    a candidate that *fixes* a control-arm error on the protection set earns
+    nothing anywhere: M reads the benefit set, and the sentinel's protected
+    list excludes baseline-incorrect rows. On the 2026-09-21 run this made a
+    candidate that removed two false positives and lost one true positive read
+    as a net ``-1`` when its true effect was "fixed two, broke one".
+
+    This reading closes that hole by *recording* the repairs and the
+    regressions separately, on the same set, with no weighting and no
+    compensation: the two counts are reported side by side and never summed
+    into a score. Plan §5.2 bans netting new errors against gains inside one
+    weighted number; reporting both directions without combining them is the
+    opposite of that, not an exception to it.
+
+    ``repaired_*`` counts rows the control arm got wrong and the candidate got
+    right, split by gold so an FN repair and an FP repair stay distinguishable.
+    ``regressed_*`` counts the reverse and is the reading a future gate could
+    charge, independently of any benefit-set gain.
+
+    Both counts are over *decisive* flips: resolving a case the control arm left
+    undecided is a calibration change, not a repair, and must not be reported as
+    one (the same discipline ``gates._decisive_correction`` applies to boundary
+    claims). Such rows are counted separately under ``unresolved_*``.
+    """
+    paired = confusion_rows(list(baseline_rows), list(active_rows))
+    repaired_fn = repaired_fp = regressed_fn = regressed_fp = 0
+    unresolved_added = unresolved_removed = 0
+    rows: list[dict[str, Any]] = []
+    for item in paired:
+        case = str(item["case"])
+        gold = item["gold"]
+        base = item["baseline_prediction"]
+        active = item["active_prediction"]
+        base_correct = base is not None and base == gold
+        active_correct = active is not None and active == gold
+        if base is None and active is not None:
+            unresolved_removed += 1
+        elif base is not None and active is None:
+            unresolved_added += 1
+        decisive = base is not None and active is not None
+        direction = "unchanged"
+        if decisive and active_correct and not base_correct:
+            direction = "repaired"
+            if gold is True:
+                repaired_fn += 1
+            else:
+                repaired_fp += 1
+        elif decisive and base_correct and not active_correct:
+            direction = "regressed"
+            if gold is True:
+                regressed_fn += 1
+            else:
+                regressed_fp += 1
+        elif base is None and active is None:
+            direction = "unresolved_both"
+        if direction in {"repaired", "regressed"}:
+            rows.append({
+                "case": case,
+                "gold": gold,
+                "baseline_prediction": base,
+                "active_prediction": active,
+                "direction": direction,
+            })
+    return {
+        "n": len(paired),
+        "repaired": repaired_fn + repaired_fp,
+        "repaired_fn": repaired_fn,
+        "repaired_fp": repaired_fp,
+        "regressed": regressed_fn + regressed_fp,
+        "regressed_fn": regressed_fn,
+        "regressed_fp": regressed_fp,
+        "unresolved_added": unresolved_added,
+        "unresolved_removed": unresolved_removed,
+        "rows": rows,
+        "note": (
+            "repaired and regressed are recorded independently and are not "
+            "combined into a score; a repair here cannot offset a regression "
+            "and earns no admission credit"
+        ),
+    }
+
+
 def _row_health(row: Mapping[str, Any] | None) -> bool:
     if not row:
         return False
@@ -236,6 +379,132 @@ def _row_health(row: Mapping[str, Any] | None) -> bool:
         ):
             return False
     return True
+
+
+def row_responsible_step(row: Mapping[str, Any] | None) -> int | None:
+    """The responsible step a row asserts, from the row or its result."""
+    if not row:
+        return None
+    value = row.get("responsible_step")
+    if value is None:
+        value = (row.get("result") or {}).get("responsible_step")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _gold_step(row: Mapping[str, Any], gold_steps: Mapping[str, Any]) -> int | None:
+    case = str(row.get("case") or "")
+    value = gold_steps.get(case)
+    if value is None:
+        value = gold_steps.get(case.replace("/", "__"))
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def paired_localization_delta(
+    baseline_rows: Sequence[Mapping[str, Any]],
+    active_rows: Sequence[Mapping[str, Any]],
+    *,
+    gold_steps: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Joint detection-and-localization delta over a frozen case batch.
+
+    The denominator is the frozen batch itself, not the set both arms managed
+    to decide: a miss must not be able to leave the denominator, otherwise a
+    candidate could look like it improved localization by detecting less. A
+    case counts toward ``joint_*`` only when the arm both convicts
+    authoritatively and names the annotated responsible step.
+
+    ``joint_broken`` is the localization-preservation guard: cases the control
+    arm already had right and the candidate arm no longer does.
+    """
+    gold_steps = dict(gold_steps or {})
+    paired = confusion_rows(baseline_rows, active_rows)
+    base_by_case = {str(row.get("case") or ""): row for row in baseline_rows}
+    active_by_case = {str(row.get("case") or ""): row for row in active_rows}
+    rows: list[dict[str, Any]] = []
+    base_joint = active_joint = 0
+    joint_improved = joint_broken = 0
+    localizable = 0
+    for item in paired:
+        case = str(item["case"])
+        gold_step = _gold_step(item, gold_steps)
+        if item["gold"] is not True or gold_step is None:
+            # Localization is scored on annotated gold-positive cases only;
+            # such a case is out of the localization batch, not a silent zero.
+            continue
+        localizable += 1
+        base_step = row_responsible_step(base_by_case.get(case))
+        active_step = row_responsible_step(active_by_case.get(case))
+        base_hit = (
+            item["baseline_prediction"] is True and base_step == gold_step
+        )
+        active_hit = (
+            item["active_prediction"] is True and active_step == gold_step
+        )
+        base_joint += int(base_hit)
+        active_joint += int(active_hit)
+        if active_hit and not base_hit:
+            joint_improved += 1
+        elif base_hit and not active_hit:
+            joint_broken += 1
+        rows.append({
+            "case": case,
+            "gold_step": gold_step,
+            "baseline_prediction": item["baseline_prediction"],
+            "active_prediction": item["active_prediction"],
+            "baseline_step": base_step,
+            "active_step": active_step,
+            "baseline_joint": base_hit,
+            "active_joint": active_hit,
+        })
+    return {
+        "n": len(paired),
+        "localizable_n": localizable,
+        "base_joint": base_joint,
+        "active_joint": active_joint,
+        "joint_delta": active_joint - base_joint,
+        "joint_improved": joint_improved,
+        "joint_broken": joint_broken,
+        "rows": rows,
+    }
+
+
+def localization_metrics(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    gold_steps: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Standalone localization read for one arm (reporting, not gating)."""
+    gold_steps = dict(gold_steps or {})
+    annotated = hits = detected = 0
+    for row in rows:
+        gold_step = _gold_step(row, gold_steps)
+        if row.get("gold") is not True or gold_step is None:
+            continue
+        annotated += 1
+        if row.get("prediction") is True:
+            detected += 1
+            if row_responsible_step(row) == gold_step:
+                hits += 1
+    return {
+        "annotated_positive": annotated,
+        "authoritative_detected": detected,
+        "joint_hits": hits,
+        "joint_accuracy": (hits / annotated) if annotated else None,
+        "step_accuracy_on_detected": (
+            (hits / detected) if detected else None
+        ),
+    }
+
 
 
 def fired_rate(
@@ -316,7 +585,13 @@ __all__ = [
     "confusion_rows",
     "evidence_increment_rows",
     "fired_rate",
+    "gain_opportunity",
+    "localization_metrics",
+    "localization_opportunity",
     "paired_delta",
+    "paired_localization_delta",
+    "protection_repair",
+    "row_responsible_step",
     "source_deltas",
     "source_of",
 ]

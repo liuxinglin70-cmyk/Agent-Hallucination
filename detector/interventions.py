@@ -75,6 +75,15 @@ GUARD_ACTIONS = frozenset({
 
 TARGET_POLARITIES = frozenset({"recall", "precision", "boundary"})
 
+# What a candidate claims to improve. ``detection`` is the original binary
+# objective and stays the default when the field is absent, so every existing
+# registry keeps its exact meaning. ``localization`` claims the responsible
+# step improves on cases that are already convicted correctly; ``joint``
+# requires at least one objective to improve while the other does not
+# regress. The two objectives are scored by different gates and their values
+# must not be added into a single weighted number.
+TARGET_KINDS = frozenset({"detection", "localization", "joint"})
+
 FACT_NAMES: dict[str, frozenset[str]] = {
     "judge_confidence": frozenset({"high", "medium", "low"}),
     "judge_positive": frozenset({"true", "false"}),
@@ -668,6 +677,14 @@ def validate_intervention(
             f"{intervention_id}: target_polarity {polarity!r} outside "
             f"{sorted(TARGET_POLARITIES)}"
         )
+    # Absent means "detection": every intervention written before this field
+    # existed claimed the binary objective, and its meaning must not change.
+    target_kind = str(claim.get("target_kind") or "detection")
+    if target_kind not in TARGET_KINDS:
+        raise ValueError(
+            f"{intervention_id}: target_kind {target_kind!r} outside "
+            f"{sorted(TARGET_KINDS)}"
+        )
     provenance = entry.get("provenance")
     provenance = provenance if isinstance(provenance, Mapping) else {}
     if not isinstance(provenance.get("cycle"), int) or isinstance(
@@ -1126,6 +1143,7 @@ __all__ = [
     "InterventionPlan",
     "RECALL_TRIGGER_HOOK",
     "SYSTEM_HOOKS",
+    "TARGET_KINDS",
     "TARGET_POLARITIES",
     "build_intervention_registry",
     "compile_runtime_plan",

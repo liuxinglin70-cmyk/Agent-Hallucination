@@ -1,0 +1,132 @@
+{
+  "run_id": "selfevo_bigrun_20260921",
+  "purpose": "Framework-level validation: does the self-improvement loop produce, gate and (if admitted) deploy a real change on a wider development split?",
+  "started_at": "2026-09-21T16:59:32",
+  "command": "python -m evolution experiment --cycles 3 --mini --config evolution/configs/validation_big_run.json",
+  "config": "evolution/configs/validation_big_run.json",
+  "split_manifest": "output/selfevo-run/split-big.json",
+  "work_root": "artifacts/selfevo-bigrun",
+  "cycles": 3,
+  "workers": 16,
+  "known_boundaries": [
+    "Every case is inside datasets/protocols/development_exposure.json, so no reading is a generalization claim.",
+    "The split is disjoint (pool vs validation) but was not audited by an independent party.",
+    "The mock dry run of the same config produced zero families; that says nothing about the real detector.",
+    "One earlier single-case probe did not finish in 20 minutes, so per-case latency has a long tail and the wall-clock estimate is uncertain.",
+    "The cycle wall-clock cap and worker count were raised after measuring latency; the measurement design (split, gates, thresholds) was not changed."
+  ],
+  "what_counts_as_success": {
+    "engineering": [
+      "three cycles complete or stop for a recorded reason",
+      "ledger hash chain verifies",
+      "no gate is relaxed and no threshold is edited"
+    ],
+    "effect": [
+      "at least one candidate reaches a gate verdict on a real batch",
+      "if a candidate is admitted, the version record is written and the next cycle loads it",
+      "if nothing is admitted, the readings still distinguish 'instrument could not measure' from 'mechanism failed'"
+    ]
+  },
+  "not_success": [
+    "any admission obtained by widening a gate, swapping a batch after seeing output, or dropping failures from the report",
+    "reporting a single-case repair as evidence of a mechanism"
+  ],
+  "attempts": [
+    {
+      "attempt": 1,
+      "started_at": "2026-09-21T16:59:32",
+      "stopped_at": "2026-09-21T17:45",
+      "reason": "operator stopped it: the 4h cycle cap was too small for the measured per-case latency, and a cut-off cycle aborts the whole experiment",
+      "landed_case_evaluations": 10,
+      "evidence": "output/selfevo-run/attempt1-sizing/",
+      "readings": {
+        "per_case_seconds": {
+          "min": 325,
+          "median": 1327,
+          "max": 2419
+        },
+        "sentinel_wave_wall_minutes": 40,
+        "note": "the first 4 rows suggested a 658s median; the full 10-row sample gave 1327s, so the first estimate was biased fast and is recorded rather than quietly replaced"
+      }
+    },
+    {
+      "attempt": 2,
+      "started_at": "2026-09-21T17:44:56",
+      "budget_change": {
+        "cycle_timeout_seconds": "14400 -> 18000 (5h)",
+        "workers": "16 -> 20",
+        "scope_unchanged": "pool 44 / patrol 20 / sentinel 6+6 / gain 8 / 3 cycles / gates untouched"
+      },
+      "note": "only wall-clock budget and concurrency changed; nothing that affects a reading"
+    },
+    {
+      "attempt": 3,
+      "started_at": "2026-09-21T19:51",
+      "stopped_at": "2026-09-21T21:20",
+      "reason_for_restart": "attempt 2 froze after cycle 1 on a defect in the framework itself, not in the candidate: the defect-injection audit swept the whole batch for unmeasurable rows and treated the presence of one as disqualifying. A single sentinel case (Octotools/008) hit its 3600s case deadline, so the audit went inconclusive and the frozen verdict ended the three-cycle run.",
+      "fix": "evolution/engine.py: the audit now re-derives the defect rejection with the unmeasurable rows excluded, instead of refusing to certify whenever any background case degrades. Insufficient-coverage detection is kept as a separate condition. 6 new tests in test_audit_inconclusive_scope.py; full suite 503 passed.",
+      "scope_unchanged": "3 cycles / pool 44 / patrol 20 / sentinel 6+6 / gain 8 / all gates untouched",
+      "cache_invalidated": "source_digest() covers evolution/*.py and detector/*.py, so the engine fix changed the cache namespace and the checkpoint contract source digest (d23c003d6a90791b -> 014fdb6135ef7318). Attempt 3 therefore re-measures the sentinel and gain cases instead of replaying attempt 2's cache. This is the designed fail-safe -- a cached result produced by different gate logic must not be reused -- and it is the honest reason attempt 3 is slower than a pure re-launch.",
+      "known_cost": "The audit re-runs whenever the active registry or the source changes, so each cycle that admits a candidate pays roughly one extra S+G wave for the audit.",
+      "outcome": "operator stopped it after 18 of 40 cycle-1 rows because the audit fix had exposed the next blocker: the per-case measurement envelope was itself cutting cases. One of 18 rows (Octotools/008) was cut at exactly the 3600s case deadline -- its terminal basis is 'case_deadline_exceeded', with 6 defense attempts and one judge vote lost to a transport timeout -- so it returned degraded_judge_only and could not be scored. A second row (Camel/048) completed authoritatively at 3600.139s, i.e. 139ms past the same deadline, because the deadline is only checked before each call. A cut call returns nothing and burns its whole budget, and because the two arms run at different times a cut can land on one arm alone, which HARMLESSNESS (new_unresolved_allowed=0) then reads as a regression the candidate caused.",
+      "correction": "An earlier archive note listed both Octotools/008 and Camel/048 as cut. That was wrong: it was inferred from elapsed >= 3599, and Camel/048's own result is authoritative with every stage 'ok'. The archive's archive.json has been corrected to record only Octotools/008 as cut, with Camel/048 recorded as a near-miss.",
+      "archived_at": "output/selfevo-run/attempt3-deadline-cuts/"
+    },
+    {
+      "attempt": 4,
+      "started_at": "2026-09-21T21:55",
+      "reason_for_restart": "the case-timeout investigation the operator asked for found the cause and it was not the case deadline. Reasoning length is stochastic: one identical prompt produced 36 and 13,437 reasoning tokens on different calls (median 2,113) at 20-46 tok/s, so a legitimate deliberation routinely needs more than the 300s per-attempt cap. Every call that did was killed mid-flight and retried from scratch, paying the first attempt's tokens and wall clock twice over.",
+      "measurement": {
+        "probe": "output/selfevo-run/timeout_probe.py -- same prompt, zero concurrency, 2 calls: 802 completion tokens / 23.4s then 11,365 / 546.5s (attempts=2). The second call exceeded 300s on its first attempt and was retried.",
+        "envelope_probe": "output/selfevo-run/timeout_envelope_probe.py -- under the old cap no single attempt can exceed 300s by construction; under the new envelope single attempts ran 42s (2,746 tokens) and 187.8s.",
+        "thinking_probe": "output/selfevo-run/thinking_probe.py -- 5 thinking controls on one prompt. All were accepted, and disabling thinking cuts a call to 43-90 tokens in 2-14s. It also changes the verdict on a known error case: the reasoning baseline says error, while thinking-disabled, enable_thinking_false and reasoning_effort_none all say clean. So the fast path is not a free speedup -- it would replace the deliberation the detector exists to perform. Not adopted.",
+        "retry_amplification": "Across the run's cache, judge needed 44 extra attempts over 25 cases, defense 17 over 9, and the causal upgrade 20 over 7, beyond their configured ballots.",
+        "token_undercount": "A voting stage reports its LAST ballot's provider meta, so 'usage' records one ballot of three. Judge and defense carried 3 ballots plus up to 2 topups. The reported 120,331 completion tokens for 18 rows is therefore a floor, not the burn. Fixed: detector/provider.py accumulate_usage() folds every ballot into a new 'usage_total' beside the old field, which is left intact for existing readers."
+      },
+      "envelope_change": {
+        "detector/configs/autodl.json": {
+          "case_timeout_seconds": "3600 -> 10800",
+          "provider.timeout_seconds": "300 -> 900",
+          "provider.total_timeout_seconds": "900 -> 2400",
+          "judge_route.max_tokens": "absent -> 32768 (matches the other routes)"
+        },
+        "evolution/configs/validation_big_run.json": {
+          "budget.cycle_timeout_seconds": "18000 -> 43200",
+          "why": "a case may now take up to 3h, and a cycle is about ten serial case evaluations; a 5h cycle cap would fail-close the tail of every cycle to unresolved, which reads as unmeasured rather than as a mechanism failure"
+        },
+        "why_this_is_not_relaxing_a_gate": "These are runtime envelopes and token ceilings, not admission thresholds. No gate, no split, no case set and no metric definition changed. tests/test_repository.py pins the new floors so the envelope cannot silently regress, with the measurement written into the comment."
+      },
+      "scope_unchanged": "3 cycles / pool 44 / patrol 20 / sentinel 6+6 / gain 8 / 12-case validation / all gates untouched / split manifest unchanged",
+      "power_check": "output/selfevo-run/patrol-power.md: the patrol wave reaches all 24 patrol-pool cases (18 gold-positive) because the bootstrap already covers the remainder, and the measured same-signature rate gives ~93% power to see a 2-member family. No pool enlargement was needed and none was made.",
+      "stopped_at": "2026-09-22T10:38",
+      "outcome": "3/3 cycles completed, 0 admissions. Ledger valid (38 records). 8 candidates: 4 rejected at HARMLESSNESS for new_fp, 4 rejected at STRUCTURAL because every LLM-drafted claim defaulted to target_kind=detection while the family required localization -- so the localization objective was never scored. mini_effect on the 12-case validation set: marginal 0, new_errors 0, accuracy 0.583 in both arms (empty registry, so no effect claim).",
+      "exposed_defect": "target_kind appears zero times in evolution/proposer.py, so no localization candidate could ever pass STRUCTURAL; the family block also mislabelled every non-FN family as FP, and the deterministic fallback had no localization branch at all.",
+      "work_root": "artifacts/selfevo-bigrun4"
+    },
+    {
+      "attempt": 5,
+      "started_at": "2026-09-22T10:38",
+      "stopped_at": "2026-09-22T15:40",
+      "work_root": "artifacts/selfevo-bigrun5",
+      "reason_for_restart": "attempt 4's negative result was not final: 4 of its 8 candidates died on a schema mismatch rather than on merit, so the localization objective had never been measured. The inter-run window was the time to fix that.",
+      "fixes": [
+        "every claim schema in the draft prompt now carries target_kind, and the family block states kind and required_target_kind",
+        "the family kind mapping no longer collapses non-FN families into FP",
+        "the deterministic fallback gained a tracer.system localization branch",
+        "engine._run_unit dispatches BEHAVIOR and M by target_kind, so a localization claim is scored by the localization gates",
+        "a truncated proposer reply now reaches the configured repair call via rejected=provider_failure (missing_credential excluded)"
+      ],
+      "scope_unchanged": "3 cycles / pool 44 / patrol 20 / sentinel 6+6 / gain 8 / 12-case validation / all gates untouched / split manifest byte-identical (sha256 b986902c75a16b9d)",
+      "cache_invalidated": "source_digest 34dd12051e73d9d6 -> 98485e220211b1c2, so attempt 5 re-measured rather than replaying attempt 4's cache.",
+      "outcome": "3/3 cycles completed, 0 admissions. Ledger valid (35 records). 5 candidates, all tracer.system, all declaring target_kind=localization: 0 rejected at STRUCTURAL (against 4 in attempt 4 -- the fix worked), all 5 rejected at the localization BEHAVIOR gate with joint_improved=0 and joint_broken=0. The objective was measured for the first time (localizable_n=11). The tracer route fires, the tracer is not frozen, its reasoning demonstrably changes under the injected directive (1,450 -> 29,690 completion tokens on one case), and its named step does not move in either direction. mini_effect: marginal 0, new_errors 0, accuracy 0.583 both arms.",
+      "conclusion": "The localization objective is a capability limitation of the action space on this corpus, not a framework defect: classify_family_actionability offers a FAM-loc- family exactly one route (tracer_directive), the tracer's own TRACER_SYSTEM already commands the procedure a directive would paraphrase, and a directive that contradicts it is overruled by the stage's contract. The framework correctly refused to admit five inert candidates."
+    }
+  ],
+  "concurrency_measurement": {
+    "configured_workers": 20,
+    "observed_workers_during_sentinel_wave": 2,
+    "explanation": "The engine evaluates in waves (sentinel -> gain -> patrol), and each wave's concurrency is bounded by that wave's case count, not by the configured worker setting. During the tail of the 12-case sentinel wave only 2 cases remain, so exactly 2 provider calls are in flight. Observed worker PIDs rotate as calls finish, so this is a wave tail and not a stall.",
+    "why_not_raise_concurrency": "Wave sizes are 12 (sentinel), 8 (gain) and 20 (patrol over 44 pool cases). Concurrency above 20 cannot speed up the first two waves at all and only helps the patrol wave from 20 to 24.",
+    "per_case_call_count": "One case is several sequential provider calls: judge takes 3 votes, then recall/upgrade/tracer, then defense takes 3 votes plus top-ups. That is why a case can occupy 10-25 minutes even though each call is one worker."
+  }
+}

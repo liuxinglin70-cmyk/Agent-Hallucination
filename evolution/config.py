@@ -77,6 +77,13 @@ DEFAULTS: dict[str, Any] = {
         "behavior_require_fired": True,
         "m_min_marginal_cases": 1,
         "m_new_errors_allowed": 0,
+        # Localization objective (target_kind=localization/joint). The joint
+        # delta is counted over the frozen batch, so a case that stops being
+        # convicted cannot leave the denominator. Breaking a localization the
+        # control arm already had right is charged against the candidate
+        # instead of being netted out by new gains.
+        "localization_min_joint_cases": 1,
+        "localization_joint_broken_allowed": 0,
     },
     "library": {
         "max_width": 6,

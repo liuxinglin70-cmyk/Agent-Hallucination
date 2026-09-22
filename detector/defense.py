@@ -23,6 +23,7 @@ from detector.packet import (
 )
 from detector.provider import (
     ProviderError,
+    accumulate_usage,
     majority_vote,
     provider_call,
     required_quorum,
@@ -266,6 +267,9 @@ def _vote_defense(
     topup_budget = max(0, int(route.get("vote_topup", 0) or 0))
     ballots: list[dict[str, Any]] = []
     sample_meta: dict[str, Any] = {}
+    # See ``accumulate_usage``: the sample follows the last ballot, so only the
+    # total reflects what the whole vote cost.
+    ballots_usage: dict[str, Any] = {}
     total_attempts = 0
     warnings: list[dict[str, str]] = []
     last_error = {"error": "every defense vote failed",
@@ -283,6 +287,9 @@ def _vote_defense(
         if result.get("ok") and isinstance(result.get("parsed"), Mapping):
             ballots.append(dict(result["parsed"]))
             sample_meta = dict(result.get("provider") or {})
+            accumulate_usage(
+                ballots_usage, (sample_meta or {}).get("usage") or {},
+            )
         else:
             last_error = {
                 "error": str(result.get("error") or "defense vote failed"),
@@ -370,6 +377,10 @@ def _vote_defense(
         "verdicts": verdicts, "collapsed": collapsed, "tie": tied,
         "topups": topups_used, "quorum": quorum, "quorum_met": True,
     }
+    if ballots_usage:
+        # Last ballot's own usage stays under ``usage``; the vote total rides
+        # beside it so a stage's real burn is readable (see ``accumulate_usage``).
+        sample_meta["usage_total"] = ballots_usage
     return {"ok": True, "parsed": parsed, "raw": ballots,
             "provider": sample_meta}, {
         "stage": "defense", "state": "ok",

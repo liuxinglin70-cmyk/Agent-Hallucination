@@ -1,10 +1,10 @@
 usage: evolution [-h]
-                 {init,cycle,experiment,governance,final,full-self-evolution,meta,verify-ledger,preview,registry,capability-audit,smoke,capability-smoke} ...
+                 {init,cycle,experiment,governance,final,full-self-evolution,meta,verify-ledger,preview,registry,capability-audit,freeze-protocol,promote,smoke,capability-smoke} ...
 
 Intervention-based self-evolution framework for detector.
 
 positional arguments:
-  {init,cycle,experiment,governance,final,full-self-evolution,meta,verify-ledger,preview,registry,capability-audit,smoke,capability-smoke}
+  {init,cycle,experiment,governance,final,full-self-evolution,meta,verify-ledger,preview,registry,capability-audit,freeze-protocol,promote,smoke,capability-smoke}
     cycle               run one evolution cycle
     experiment          run multiple evolution cycles
     governance          post-cycle attribution, retirement and rollback
@@ -20,6 +20,9 @@ positional arguments:
     registry            show active registry
     capability-audit    report the executable evolution surface and its hard
                         limits
+    freeze-protocol     freeze a candidate-unused promotion batch before any
+                        model call
+    promote             carry a frozen candidate through the deployment gates
     smoke               offline one-cycle gate validation
     capability-smoke    offline self-evolution gain validation with a new
                         typed-DSL predicate

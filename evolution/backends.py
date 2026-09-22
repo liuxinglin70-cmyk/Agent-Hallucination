@@ -139,6 +139,7 @@ class DetectionBackend:
         dataset_root: str | Path,
         registry: Mapping[str, Any] | None = None,
         gold_map: Mapping[str, bool | None] | None = None,
+        gold_step_map: Mapping[str, Any] | None = None,
         workers: int = 1,
         deadline: float | None = None,
     ) -> list[dict[str, Any]]:
@@ -147,11 +148,20 @@ class DetectionBackend:
         ``deadline`` is a monotonic wall-clock timestamp for the whole batch.
         A case that cannot start before it fail-closes to an unresolved row:
         bounded runtime never silently drops or invents outcomes.
+
+        ``gold_step_map`` carries the evaluator-side localization annotation so
+        a row can be scored jointly on detection and responsible step. It is
+        gold and therefore never reaches the detector.
         """
         gold_map = dict(gold_map or {})
+        gold_step_map = dict(gold_step_map or {})
 
         def one(case_id: str) -> dict[str, Any]:
+            started = time.monotonic()
             gold = gold_map.get(case_id, gold_map.get(case_id.replace("/", "__")))
+            gold_step = gold_step_map.get(
+                case_id, gold_step_map.get(case_id.replace("/", "__")),
+            )
             if deadline is not None and time.monotonic() >= deadline:
                 result = _unresolved_backend_result(
                     case_id,
@@ -175,9 +185,18 @@ class DetectionBackend:
             return {
                 "case": case_id,
                 "gold": gold,
+                "gold_step": gold_step,
                 "prediction": _prediction_from_result(result),
                 "state": result.get("state"),
                 "authority": result.get("decision_authority"),
+                "responsible_step": result.get("responsible_step"),
+                # Wall time this row actually cost, including a cache hit
+                # (which is near zero) and a deadline skip. Recorded because a
+                # batch's total is dominated by its slowest case: the
+                # 2026-09-21 promotion run spent roughly 50 of its 62 minutes
+                # on one case, and without a per-row reading that tail is only
+                # visible as an unexplained total.
+                "elapsed_seconds": round(time.monotonic() - started, 3),
                 "result": result,
                 "backend": self.name,
             }
@@ -186,6 +205,16 @@ class DetectionBackend:
             rows: list[dict[str, Any]] = []
             total = len(cases)
             progress = bool(os.environ.get("EVOLUTION_PROGRESS"))
+            # An optional machine-readable per-case line for a live dashboard.
+            # It is a log, never an input: nothing downstream reads this file,
+            # so a truncated or missing line changes no measurement.
+            progress_log = os.environ.get("EVOLUTION_PROGRESS_LOG")
+            handle = None
+            if progress_log:
+                try:
+                    handle = open(progress_log, "a", encoding="utf-8")
+                except OSError:
+                    handle = None
             if progress:
                 print(
                     f"[evolution] batch start: {total} cases, workers={workers}, "
@@ -193,18 +222,34 @@ class DetectionBackend:
                     file=sys.stderr,
                     flush=True,
                 )
-            with ThreadPoolExecutor(max_workers=int(workers)) as pool:
-                futures = [pool.submit(one, case) for case in cases]
-                for future in as_completed(futures):
-                    row = future.result()
-                    rows.append(row)
-                    if progress:
-                        print(
-                            f"[evolution] {len(rows)}/{total} {row['case']} -> "
-                            f"{row['prediction']} ({row['state']})",
-                            file=sys.stderr,
-                            flush=True,
-                        )
+            try:
+                with ThreadPoolExecutor(max_workers=int(workers)) as pool:
+                    futures = [pool.submit(one, case) for case in cases]
+                    for future in as_completed(futures):
+                        row = future.result()
+                        rows.append(row)
+                        if progress:
+                            print(
+                                f"[evolution] {len(rows)}/{total} {row['case']} -> "
+                                f"{row['prediction']} ({row['state']})",
+                                file=sys.stderr,
+                                flush=True,
+                            )
+                        if handle is not None:
+                            handle.write(json.dumps({
+                                "done": len(rows),
+                                "total": total,
+                                "case": row.get("case"),
+                                "prediction": row.get("prediction"),
+                                "state": row.get("state"),
+                                "authority": row.get("authority"),
+                                "responsible_step": row.get("responsible_step"),
+                                "elapsed_seconds": row.get("elapsed_seconds"),
+                            }, ensure_ascii=False) + "\n")
+                            handle.flush()
+            finally:
+                if handle is not None:
+                    handle.close()
             return sorted(rows, key=lambda row: str(row["case"]))
         return [one(case) for case in cases]
 
@@ -215,6 +260,7 @@ class DetectionBackend:
         dataset_root: str | Path,
         registry: Mapping[str, Any] | None = None,
         gold_map: Mapping[str, bool | None] | None = None,
+        gold_step_map: Mapping[str, Any] | None = None,
         workers: int = 1,
         deadline: float | None = None,
     ) -> list[dict[str, Any]]:
@@ -223,6 +269,7 @@ class DetectionBackend:
             dataset_root=dataset_root,
             registry=registry,
             gold_map=gold_map,
+            gold_step_map=gold_step_map,
             workers=workers,
             deadline=deadline,
         )
@@ -551,6 +598,7 @@ class LiveDetectorBackend(DetectionBackend):
         dataset_root: str | Path,
         registry: Mapping[str, Any] | None = None,
         gold_map: Mapping[str, bool | None] | None = None,
+        gold_step_map: Mapping[str, Any] | None = None,
         workers: int = 1,
         deadline: float | None = None,
     ) -> list[dict[str, Any]]:
@@ -561,6 +609,7 @@ class LiveDetectorBackend(DetectionBackend):
             dataset_root=dataset_root,
             registry=registry,
             gold_map=gold_map,
+            gold_step_map=gold_step_map,
             workers=workers,
             deadline=deadline,
         )

@@ -1,0 +1,515 @@
+{
+  "arm": "6581f456f6e8",
+  "row": {
+    "case": "OpenManus/074.json",
+    "gold": true,
+    "gold_step": null,
+    "prediction": true,
+    "state": "verified_error",
+    "authority": "authoritative",
+    "responsible_step": 2,
+    "elapsed_seconds": 0.367,
+    "result": {
+      "schema_version": "detector.detection_result.v1",
+      "case_id": "OpenManus/074.json",
+      "state": "verified_error",
+      "decision_authority": "authoritative",
+      "runtime_valid": true,
+      "responsible_event_id": "event_002",
+      "responsible_step": 2,
+      "incident_occurred": true,
+      "occurrence_state": "verified_error",
+      "proof": {
+        "state": "verified_error",
+        "decision_authority": "authoritative",
+        "runtime_valid": true,
+        "responsible_event_id": "event_002",
+        "responsible_step": 2,
+        "incident_occurred": true,
+        "terminal_basis": {
+          "state": "verified_error",
+          "decisive_facts": {
+            "positive_source": "judge",
+            "judge_step": 2,
+            "traced_step": 2,
+            "defense": "substantiated",
+            "confirmed_step": 2,
+            "delivered_result": "0.2 (expectation value of 10σz+5σx computed with the wrong state 0.7|↑⟩+(√5/2)|↓⟩, raw value 0.22623792124926256)",
+            "correct_result": "-0.7 (expectation value of 10σz+5σx for the task-fixed state 0.5|↑⟩+(√3/2)|↓⟩; exact value 10(0.25-0.75)+5·2·(0.5·√3/2) = -5+5√3/2 ≈ -0.6699)",
+            "judge_basis": "task_requirement",
+            "authority": "authoritative",
+            "guard_actions": [],
+            "hearings": [
+              {
+                "source": "judge",
+                "candidate_id": null,
+                "verdict": "substantiated"
+              }
+            ]
+          },
+          "blocking_facts": []
+        },
+        "authority_failure_reasons": [],
+        "judge": {
+          "is_hallucination": true,
+          "hallucination_step": 2,
+          "hallucination_reason": "The assistant abandoned the task-fixed state 0.5|↑⟩+(√3/2)|↓⟩ and adopted the unnormalized human-supplied state 0.7|↑⟩+(√5/2)|↓⟩ (norm² = 0.49+1.25 = 1.74 ≠ 1), computing the expectation value with it and delivering 0.2 instead of the correct -0.7.",
+          "delivered_result": "0.2 (expectation value of 10σz+5σx computed with the wrong state 0.7|↑⟩+(√5/2)|↓⟩, raw value 0.22623792124926256)",
+          "correct_result": "-0.7 (expectation value of 10σz+5σx for the task-fixed state 0.5|↑⟩+(√3/2)|↓⟩; exact value 10(0.25-0.75)+5·2·(0.5·√3/2) = -5+5√3/2 ≈ -0.6699)",
+          "basis": "task_requirement",
+          "confidence": "high",
+          "evidence_refs": [
+            "event_001",
+            "event_002",
+            "event_003",
+            "event_004"
+          ],
+          "root_cause": {
+            "step": 2,
+            "quote": "The updated state is \\( |\\psi\\rangle = 0.7|\\uparrow\\rangle + \\frac{\\sqrt{5}}{2}|\\downarrow\\rangle \\)",
+            "referent": "|ψ⟩ = 0.5|↑⟩ + (√3/2)|↓⟩ as fixed in the question, for which ⟨10σz+5σx⟩ = -5 + 5√3/2 ≈ -0.7"
+          },
+          "contracts": [
+            {
+              "kind": "exact_value",
+              "requirement": "The input state is fixed by the task text as 0.5|↑⟩ + (√3/2)|↓⟩; per grounding rules, no observation or later message (including the ask_human response) can override this task-fixed constant."
+            },
+            {
+              "kind": "exact_value",
+              "requirement": "The expectation value of 10σz + 5σx for that state, reported to one decimal place, is -0.7 (exact -5 + 5√3/2 ≈ -0.6699)."
+            }
+          ]
+        },
+        "recall_candidates": null,
+        "causal_upgrade": null,
+        "causal_upgrades": null,
+        "causal_upgrade_rows": null,
+        "step_tracer": {
+          "step": 2,
+          "quote": "The updated state is \\( |\\psi\\rangle = 0.7|\\uparrow\\rangle + \\frac{\\sqrt{5}}{2}|\\downarrow\\rangle \\)",
+          "referent": "Keep the task-specified normalized state |ψ⟩ = 0.5|↑⟩ + (√3/2)|↓⟩ from the question; the human-supplied 0.7|↑⟩ + (√5/2)|↓⟩ is unnormalized (norm² = 0.49 + 1.25 = 1.74 ≠ 1) and should have been rejected.",
+          "evidence_refs": [
+            "event_001",
+            "event_002"
+          ],
+          "reason": "Event_002 is the first assistant-authored introduction of the material error: the event_001 tool observation (human reply supplying 0.7|↑⟩+(√5/2)|↓⟩) is not itself an assistant error, and event_002 abandons the task-fixed state 0.5|↑⟩+(√3/2)|↓⟩ in favor of that unnormalized state, which events 003–004 merely repeat when computing and delivering 0.2 instead of -0.7."
+        },
+        "defense": {
+          "verdict": "substantiated",
+          "confirmed_step": 2,
+          "evidence_refs": [
+            "event_002",
+            "event_003",
+            "event_004"
+          ],
+          "evidence_citations": [],
+          "conflict_note": "",
+          "reason": "CONTENT TEST: At event_002 the assistant states 'The updated state is |ψ⟩ = 0.7|↑⟩ + √5/2|↓⟩. I will now proceed with the computation' and encodes psi = [[0.7],[√5/2]] in code, abandoning the task-fixed state 0.5|↑⟩+√3/2|↓⟩. The coefficients 0.7 and √5/2 came only from the human reply carried by the ask_human observation (event_001); under the grounding rules the task text fixes the state and no later human message can override it, and a human assertion is not an environment fact. The adopted state is also unnormalized (0.49+1.25=1.74≠1), so even taken at face value it is not a valid spin superposition. Computing 10σz+5σx with the task-fixed state gives ⟨σz⟩=0.25−0.75=−0.5 and ⟨σx⟩=2·0.5·(√3/2)=√3/2, hence −5+5√3/2≈−0.67→−0.7; the trajectory instead computed with the wrong state (event_003 output 0.22623792124926256) and delivered 'approximately 0.2' (event_004). The deviation is factually real: delivered 0.2 vs required −0.7. RELEVANCE TEST: correcting event_002 to use 0.5|↑⟩+√3/2|↓⟩ yields −0.6699→−0.7, satisfying the one-decimal-place deliverable; events 003–004 only re-run and repeat the uncorrected wrong state (0.2262→0.2), so step 2 is the earliest assistant-authored introduction of the error and is causally connected to the delivered wrong answer."
+        },
+        "causal_upgrade_coverage": null,
+        "hearings": [
+          {
+            "source": "judge",
+            "candidate_id": null,
+            "positive": {
+              "source": "judge",
+              "step": 2,
+              "reason": "The assistant abandoned the task-fixed state 0.5|↑⟩+(√3/2)|↓⟩ and adopted the unnormalized human-supplied state 0.7|↑⟩+(√5/2)|↓⟩ (norm² = 0.49+1.25 = 1.74 ≠ 1), computing the expectation value with it and delivering 0.2 instead of the correct -0.7.",
+              "evidence_refs": [
+                "event_001",
+                "event_002",
+                "event_003",
+                "event_004"
+              ],
+              "quote": "The updated state is \\( |\\psi\\rangle = 0.7|\\uparrow\\rangle + \\frac{\\sqrt{5}}{2}|\\downarrow\\rangle \\)",
+              "delivered_result": "0.2 (expectation value of 10σz+5σx computed with the wrong state 0.7|↑⟩+(√5/2)|↓⟩, raw value 0.22623792124926256)",
+              "correct_result": "-0.7 (expectation value of 10σz+5σx for the task-fixed state 0.5|↑⟩+(√3/2)|↓⟩; exact value 10(0.25-0.75)+5·2·(0.5·√3/2) = -5+5√3/2 ≈ -0.6699)"
+            },
+            "evidence_citations": [],
+            "tracer_result": {
+              "ok": true,
+              "parsed": {
+                "step": 2,
+                "quote": "The updated state is \\( |\\psi\\rangle = 0.7|\\uparrow\\rangle + \\frac{\\sqrt{5}}{2}|\\downarrow\\rangle \\)",
+                "referent": "Keep the task-specified normalized state |ψ⟩ = 0.5|↑⟩ + (√3/2)|↓⟩ from the question; the human-supplied 0.7|↑⟩ + (√5/2)|↓⟩ is unnormalized (norm² = 0.49 + 1.25 = 1.74 ≠ 1) and should have been rejected.",
+                "evidence_refs": [
+                  "event_001",
+                  "event_002"
+                ],
+                "reason": "Event_002 is the first assistant-authored introduction of the material error: the event_001 tool observation (human reply supplying 0.7|↑⟩+(√5/2)|↓⟩) is not itself an assistant error, and event_002 abandons the task-fixed state 0.5|↑⟩+(√3/2)|↓⟩ in favor of that unnormalized state, which events 003–004 merely repeat when computing and delivering 0.2 instead of -0.7."
+              },
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 1904,
+                  "completion_tokens": 2996,
+                  "total_tokens": 4900,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 2721
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 64
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 2721
+                  },
+                  "input_tokens": 1904,
+                  "output_tokens": 2996
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "step_tracer",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "\n{\n  \"step\": 2,\n  \"quote\": \"The updated state is \\\\( |\\\\psi\\\\rangle = 0.7|\\\\uparrow\\\\rangle + \\\\frac{\\\\sqrt{5}}{2}|\\\\downarrow\\\\rangle \\\\)\",\n  \"referent\": \"Keep the task-specified normalized state |ψ⟩ = 0.5|↑⟩ + (√3/2)|↓⟩ from the question; the human-supplied 0.7|↑⟩ + (√5/2)|↓⟩ is unnormalized (norm"
+              },
+              "hearing_target": {
+                "source": "judge",
+                "step": 2,
+                "reason": "The assistant abandoned the task-fixed state 0.5|↑⟩+(√3/2)|↓⟩ and adopted the unnormalized human-supplied state 0.7|↑⟩+(√5/2)|↓⟩ (norm² = 0.49+1.25 = 1.74 ≠ 1), computing the expectation value with it and delivering 0.2 instead of the correct -0.7.",
+                "delivered_result": "0.2 (expectation value of 10σz+5σx computed with the wrong state 0.7|↑⟩+(√5/2)|↓⟩, raw value 0.22623792124926256)",
+                "correct_result": "-0.7 (expectation value of 10σz+5σx for the task-fixed state 0.5|↑⟩+(√3/2)|↓⟩; exact value 10(0.25-0.75)+5·2·(0.5·√3/2) = -5+5√3/2 ≈ -0.6699)",
+                "evidence_refs": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "contracts": [
+                  {
+                    "kind": "exact_value",
+                    "requirement": "The input state is fixed by the task text as 0.5|↑⟩ + (√3/2)|↓⟩; per grounding rules, no observation or later message (including the ask_human response) can override this task-fixed constant."
+                  },
+                  {
+                    "kind": "exact_value",
+                    "requirement": "The expectation value of 10σz + 5σx for that state, reported to one decimal place, is -0.7 (exact -5 + 5√3/2 ≈ -0.6699)."
+                  }
+                ],
+                "confidence": "high",
+                "quote": "The updated state is \\( |\\psi\\rangle = 0.7|\\uparrow\\rangle + \\frac{\\sqrt{5}}{2}|\\downarrow\\rangle \\)"
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004",
+                  "event_005"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "degraded": false
+              }
+            },
+            "tracer_status": {
+              "stage": "step_tracer",
+              "state": "ok",
+              "attempts": 1,
+              "view": "complete",
+              "warnings": []
+            },
+            "defense_result": {
+              "ok": true,
+              "parsed": {
+                "verdict": "substantiated",
+                "confirmed_step": 2,
+                "evidence_refs": [
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "evidence_citations": [],
+                "conflict_note": "",
+                "reason": "CONTENT TEST: At event_002 the assistant states 'The updated state is |ψ⟩ = 0.7|↑⟩ + √5/2|↓⟩. I will now proceed with the computation' and encodes psi = [[0.7],[√5/2]] in code, abandoning the task-fixed state 0.5|↑⟩+√3/2|↓⟩. The coefficients 0.7 and √5/2 came only from the human reply carried by the ask_human observation (event_001); under the grounding rules the task text fixes the state and no later human message can override it, and a human assertion is not an environment fact. The adopted state is also unnormalized (0.49+1.25=1.74≠1), so even taken at face value it is not a valid spin superposition. Computing 10σz+5σx with the task-fixed state gives ⟨σz⟩=0.25−0.75=−0.5 and ⟨σx⟩=2·0.5·(√3/2)=√3/2, hence −5+5√3/2≈−0.67→−0.7; the trajectory instead computed with the wrong state (event_003 output 0.22623792124926256) and delivered 'approximately 0.2' (event_004). The deviation is factually real: delivered 0.2 vs required −0.7. RELEVANCE TEST: correcting event_002 to use 0.5|↑⟩+√3/2|↓⟩ yields −0.6699→−0.7, satisfying the one-decimal-place deliverable; events 003–004 only re-run and repeat the uncorrected wrong state (0.2262→0.2), so step 2 is the earliest assistant-authored introduction of the error and is causally connected to the delivered wrong answer."
+              },
+              "raw": [
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 2,
+                  "evidence_refs": [
+                    "event_002",
+                    "event_003",
+                    "event_004"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: At event_002 the assistant states 'The updated state is |ψ⟩ = 0.7|↑⟩ + √5/2|↓⟩. I will now proceed with the computation' and encodes psi = [[0.7],[√5/2]] in code, abandoning the task-fixed state 0.5|↑⟩+√3/2|↓⟩. The coefficients 0.7 and √5/2 came only from the human reply carried by the ask_human observation (event_001); under the grounding rules the task text fixes the state and no later human message can override it, and a human assertion is not an environment fact. The adopted state is also unnormalized (0.49+1.25=1.74≠1), so even taken at face value it is not a valid spin superposition. Computing 10σz+5σx with the task-fixed state gives ⟨σz⟩=0.25−0.75=−0.5 and ⟨σx⟩=2·0.5·(√3/2)=√3/2, hence −5+5√3/2≈−0.67→−0.7; the trajectory instead computed with the wrong state (event_003 output 0.22623792124926256) and delivered 'approximately 0.2' (event_004). The deviation is factually real: delivered 0.2 vs required −0.7. RELEVANCE TEST: correcting event_002 to use 0.5|↑⟩+√3/2|↓⟩ yields −0.6699→−0.7, satisfying the one-decimal-place deliverable; events 003–004 only re-run and repeat the uncorrected wrong state (0.2262→0.2), so step 2 is the earliest assistant-authored introduction of the error and is causally connected to the delivered wrong answer."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 2,
+                  "evidence_refs": [
+                    "event_001",
+                    "event_002",
+                    "event_003",
+                    "event_004"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "The ask_human observation supplies a conflicting state (0.7|up>+sqrt(5)/2|down>), but grounding rule 2 resolves it: the state 0.5|up>+sqrt(3)/2|down> is a constant fixed by the task text, which no observation or later human message can override; the human-supplied state is an unverified assertion (and unnormalized, norm^2=1.74).",
+                  "reason": "CONTENT TEST: The task fixes the state as 0.5|up>+sqrt(3)/2|down>. At event_002 the assistant states 'Thank you for clarifying the state. The updated state is |psi> = 0.7|up> + sqrt(5)/2|down>. I will now proceed with the computation...' and its python_execute call uses psi = [[0.7],[np.sqrt(5)/2]] — adopting the unnormalized human-supplied state in place of the task-fixed one. The observation in event_001 is a human assertion, not an environment fact that can displace a task-fixed constant (grounding rules 2-3). Computing with the wrong state yields raw 0.22623792124926256 (event_003) delivered as 0.2 (event_004), whereas the task state gives 10(0.25-0.75)+5·2·(0.5·sqrt(3)/2) = -5+5sqrt(3)/2 ≈ -0.6699 → -0.7 to one decimal. The deviation is a real RESULT ERROR/DELIVERABLE BREACH, not formatting. RELEVANCE TEST: event_002 is the earliest assistant-authored introduction of the wrong state (event_001's ask_human is only a clarifying question and the observation is not an assistant error); events 003-004 merely repeat the uncorrected error as delivery. Correcting step 2 to use 0.5 and sqrt(3)/2 makes the final delivered answer -0.7, satisfying every deliverable. Both tests pass."
+                },
+                {
+                  "verdict": "substantiated",
+                  "confirmed_step": 2,
+                  "evidence_refs": [
+                    "event_002",
+                    "event_003",
+                    "event_004"
+                  ],
+                  "evidence_citations": [],
+                  "conflict_note": "",
+                  "reason": "CONTENT TEST: At event_002 the assistant states 'The updated state is |ψ⟩ = 0.7|↑⟩ + √5/2|↓⟩. I will now proceed with the computation' and calls python_execute with psi = np.array([[0.7], [np.sqrt(5)/2]]). The task text fixes the state as 0.5|↑⟩+√3/2|↓⟩ (norm² = 0.25+0.75 = 1); per the grounding rules, task-fixed constants cannot be overridden by any observation or later message, and the human's reply in event_001's observation ('|psi> = 0.7 |up=0> + sqrt(5)/2|down=1>') is an unverified human assertion, not an environment fact establishing a new state. The adopted state is even unnormalized (norm² = 0.49+1.25 = 1.74 ≠ 1), a physical red flag the assistant ignored. Computing with it yields 0.22623792124926256 (event_003), delivered as 'approximately **0.2**' (event_004), whereas the task-fixed state gives ⟨O⟩ = 10(0.25−0.75)+10·(0.5·√3/2) = −5+5√3/2 ≈ −0.670 → −0.7 to one decimal. The delivered 0.2 is a RESULT ERROR and the computation used a state breaching the task contract. RELEVANCE TEST: event_002 is the earliest assistant-authored adoption of the wrong state (event_001's ask_human call introduced nothing wrong; the human message is not an assistant error). Had the assistant used the task-fixed state at event_002, the computation would deliver −0.7 and the completion claim would be true, so the step is causally connected to the material error and correcting it repairs every deliverable."
+                }
+              ],
+              "provider": {
+                "attempts": 1,
+                "usage": {
+                  "prompt_tokens": 2890,
+                  "completion_tokens": 3596,
+                  "total_tokens": 6486,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "completion_tokens_details": {
+                    "reasoning_tokens": 3111
+                  },
+                  "input_tokens_details": {
+                    "cached_tokens": 0
+                  },
+                  "output_tokens_details": {
+                    "reasoning_tokens": 3111
+                  },
+                  "input_tokens": 2890,
+                  "output_tokens": 3596
+                },
+                "cache_hit": false,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 0,
+                "prompt_cache_read_tokens": 0,
+                "prompt_cache_write_tokens": 0,
+                "purpose": "defense",
+                "model": "glm-5.3-flash",
+                "finish_reason": "stop",
+                "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 2,\n  \"evidence_refs\": [\"event_002\", \"event_003\", \"event_004\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: At event_002 the assistant states 'The updated state is |ψ⟩ = 0.7|↑⟩ + √5/2|↓⟩. I will now proceed with the",
+                "vote": {
+                  "votes": 3,
+                  "cast": 3,
+                  "verdicts": [
+                    "substantiated",
+                    "substantiated",
+                    "substantiated"
+                  ],
+                  "collapsed": "substantiated",
+                  "tie": false,
+                  "topups": 0,
+                  "quorum": 2,
+                  "quorum_met": true
+                }
+              },
+              "view_meta": {
+                "rendered_event_ids": [
+                  "event_001",
+                  "event_002",
+                  "event_003",
+                  "event_004"
+                ],
+                "truncated_event_ids": [],
+                "packet_truncated": false,
+                "omitted_event_ids": [
+                  "event_005"
+                ]
+              }
+            },
+            "defense_status": {
+              "stage": "defense",
+              "state": "ok",
+              "attempts": 4,
+              "view": "complete",
+              "warnings": []
+            }
+          }
+        ],
+        "evidence": [
+          {
+            "predicate": "evidence_refs_resolve",
+            "verdict": "resolved",
+            "detail": "all 4 evidence refs resolve to packet ids",
+            "runner": "deterministic",
+            "intervention_id": "IV-DEFECT-002",
+            "hook": "judge.post",
+            "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+          }
+        ],
+        "deployment": {
+          "intervention_registry_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+          "active_interventions": [
+            "IV-DEFECT-002"
+          ],
+          "fired": [
+            {
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "type": "evidence_check",
+              "event": "evidence_appended",
+              "detail": "predicate=evidence_refs_resolve verdict=resolved"
+            }
+          ],
+          "evidence": [
+            {
+              "predicate": "evidence_refs_resolve",
+              "verdict": "resolved",
+              "detail": "all 4 evidence refs resolve to packet ids",
+              "runner": "deterministic",
+              "intervention_id": "IV-DEFECT-002",
+              "hook": "judge.post",
+              "failure_family": "AUDIT-NOISE_ZERO_MARGINAL"
+            }
+          ],
+          "facts": {
+            "evidence_refs_resolve": "resolved"
+          },
+          "guard_actions": [],
+          "mechanical_guard_evidence": [],
+          "typed_predicate_programs": [],
+          "policy_conflict": false
+        },
+        "external_evidence": null
+      },
+      "stage_status": {
+        "judge": {
+          "stage": "judge",
+          "state": "ok",
+          "attempts": 3,
+          "view": "complete",
+          "warnings": []
+        },
+        "step_tracer": {
+          "stage": "step_tracer",
+          "state": "ok",
+          "attempts": 1,
+          "view": "complete",
+          "warnings": []
+        },
+        "defense": {
+          "stage": "defense",
+          "state": "ok",
+          "attempts": 4,
+          "view": "complete",
+          "warnings": []
+        }
+      },
+      "providers": {
+        "judge": {
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "positives": 3,
+            "winner": true,
+            "tie": false
+          }
+        },
+        "step_tracer": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 1904,
+            "completion_tokens": 2996,
+            "total_tokens": 4900,
+            "prompt_tokens_details": {
+              "cached_tokens": 64
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 2721
+            },
+            "input_tokens_details": {
+              "cached_tokens": 64
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 2721
+            },
+            "input_tokens": 1904,
+            "output_tokens": 2996
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "step_tracer",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "\n{\n  \"step\": 2,\n  \"quote\": \"The updated state is \\\\( |\\\\psi\\\\rangle = 0.7|\\\\uparrow\\\\rangle + \\\\frac{\\\\sqrt{5}}{2}|\\\\downarrow\\\\rangle \\\\)\",\n  \"referent\": \"Keep the task-specified normalized state |ψ⟩ = 0.5|↑⟩ + (√3/2)|↓⟩ from the question; the human-supplied 0.7|↑⟩ + (√5/2)|↓⟩ is unnormalized (norm"
+        },
+        "defense": {
+          "attempts": 1,
+          "usage": {
+            "prompt_tokens": 2890,
+            "completion_tokens": 3596,
+            "total_tokens": 6486,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 3111
+            },
+            "input_tokens_details": {
+              "cached_tokens": 0
+            },
+            "output_tokens_details": {
+              "reasoning_tokens": 3111
+            },
+            "input_tokens": 2890,
+            "output_tokens": 3596
+          },
+          "cache_hit": false,
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 0,
+          "prompt_cache_read_tokens": 0,
+          "prompt_cache_write_tokens": 0,
+          "purpose": "defense",
+          "model": "glm-5.3-flash",
+          "finish_reason": "stop",
+          "raw_content_preview": "{\n  \"verdict\": \"substantiated\",\n  \"confirmed_step\": 2,\n  \"evidence_refs\": [\"event_002\", \"event_003\", \"event_004\"],\n  \"evidence_citations\": [],\n  \"conflict_note\": \"\",\n  \"reason\": \"CONTENT TEST: At event_002 the assistant states 'The updated state is |ψ⟩ = 0.7|↑⟩ + √5/2|↓⟩. I will now proceed with the",
+          "vote": {
+            "votes": 3,
+            "cast": 3,
+            "verdicts": [
+              "substantiated",
+              "substantiated",
+              "substantiated"
+            ],
+            "collapsed": "substantiated",
+            "tie": false,
+            "topups": 0,
+            "quorum": 2,
+            "quorum_met": true
+          }
+        }
+      },
+      "authority_failure_reasons": [],
+      "evidence_health": {
+        "judge_view": "complete",
+        "recall_view": null,
+        "upgrade_view": null,
+        "tracer_view": "complete",
+        "defense_view": "complete"
+      },
+      "provenance": {
+        "packet_hash": "444684107caa04c776772f1cce27e0d3fcf2f47d2e1ca987d8afbcea7bfbb891",
+        "interventions_hash": "12d89cf441335239800fd82460e8ca6be35b5cb18b2a467bb9759d1774b97aa9",
+        "frozen_judge_replay": true,
+        "frozen_stages": [
+          "judge_result"
+        ]
+      },
+      "_packet_event_count": 5
+    },
+    "backend": "detector"
+  },
+  "row_hash": "07019841c847"
+}

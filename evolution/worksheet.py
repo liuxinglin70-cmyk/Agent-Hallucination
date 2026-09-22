@@ -270,6 +270,343 @@ def stable_failure_families(
     return families
 
 
+def localization_state(
+    row: Mapping[str, Any],
+    gold_steps: Mapping[str, Any] | None = None,
+) -> str:
+    """Where one evaluated row stands on the localization objective.
+
+    A localization failure is not a detection failure: the row convicted the
+    case correctly and named the wrong step. ``stable_failure_families`` skips
+    such rows by construction (it keeps only ``prediction != gold``), so
+    without this reading the objective has no path into the development loop.
+
+    ``gold_steps`` is the evaluator-side annotation. Using it here is the
+    sanctioned development-side use of gold (plan §3.2); the value itself
+    never reaches the detector or the proposer.
+    """
+    from evolution.metrics import row_responsible_step
+
+    gold = row.get("gold")
+    if gold is not True:
+        return "not_positive"
+    if row.get("prediction") is not True:
+        return "not_convicted"
+    gold_step = (gold_steps or {}).get(str(row.get("case") or ""))
+    if gold_step is None:
+        gold_step = (gold_steps or {}).get(
+            str(row.get("case") or "").replace("/", "__")
+        )
+    if gold_step is None:
+        return "unannotated"
+    try:
+        gold_step = int(gold_step)
+    except (TypeError, ValueError):
+        return "unannotated"
+    step = row_responsible_step(row)
+    if step is None:
+        # A conviction with no step is only a localization failure if the
+        # tracer stage actually ran and claimed success. Without a recorded
+        # tracer stage there is no evidence the stage was reached at all --
+        # a synthetic backend, or a result written before the stage existed,
+        # would otherwise be reported as "the tracer named nothing", which is
+        # a claim about a run that may never have happened.
+        result = row.get("result") or {}
+        tracer_state = str(
+            ((result.get("stage_status") or {}).get("step_tracer") or {}).get(
+                "state"
+            ) or ""
+        )
+        if tracer_state != "ok":
+            return "unmeasured"
+        return "step_missing"
+    return "hit" if step == gold_step else "mislocated"
+
+
+def step_can_host_text_error(
+    record: Mapping[str, Any], step: int,
+) -> tuple[bool, str]:
+    """Whether a step carries any text a content deviation could originate in.
+
+    A deviation needs something to deviate *from*: assistant prose, or a tool
+    argument with a string value. ``ls {"a": true}`` carries neither, so it
+    cannot be the origin of a content error no matter what the annotation says.
+    This is the label-free, mechanism-general half of the localization
+    viability check.
+    """
+    events = list(record.get("history") or ())
+    if not (1 <= int(step) <= len(events)):
+        return False, f"step {step} is outside the trajectory"
+    event = events[int(step) - 1]
+    if not isinstance(event, Mapping):
+        return False, f"step {step} is not an event"
+    if str(event.get("role") or "") != "assistant":
+        return (
+            False,
+            f"step {step} is a {event.get('role')!r} event; an error cannot "
+            "originate in an observation",
+        )
+    if str(event.get("content") or "").strip():
+        return True, ""
+    for call in event.get("tool_calls") or ():
+        if not isinstance(call, Mapping):
+            continue
+        arguments = call.get("arguments")
+        if isinstance(arguments, Mapping) and any(
+            isinstance(value, str) and value.strip()
+            for value in arguments.values()
+        ):
+            return True, ""
+        if isinstance(arguments, str) and arguments.strip():
+            return True, ""
+    return (
+        False,
+        f"step {step} carries no text: no assistant content and no string "
+        "tool argument, so it cannot host a content deviation",
+    )
+
+
+# How a mislocated row can be treated by the development loop. Only
+# ``structurally_impossible`` is a defect the framework may auto-repair: the
+# others need a human to decide which of several real errors the task is about.
+LOCALIZATION_VIABILITY = {
+    "structurally_impossible": (
+        "the named step carries no text at all, so the localization is wrong "
+        "regardless of the annotation; usable as a repair task"
+    ),
+    "needs_review": (
+        "the named step carries its own text, so naming it may be a defensible "
+        "answer to a different real error; not usable as a repair task until "
+        "reviewed"
+    ),
+}
+
+
+def localization_repair_viability(
+    row: Mapping[str, Any],
+    record: Mapping[str, Any] | None = None,
+    *,
+    gold_steps: Mapping[str, Any] | None = None,
+) -> tuple[str, str]:
+    """Classify one mislocated row for the development loop.
+
+    A named step that differs from the annotation is not by itself a defect.
+    When a trajectory holds more than one real error the annotation picks one
+    and the detector may legitimately name the other; a task demanding the
+    annotated step there would ask the detector to abandon a true detection,
+    which ``TRACER_SYSTEM`` explicitly forbids ("Never infer a step from a
+    benchmark annotation").
+
+    Only ``structurally_impossible`` is auto-usable, and the reason is
+    mechanical rather than annotation-driven: the named step cannot host a
+    content error at all. ``BFCL/008`` is the cleared example -- the recall
+    path names step 1, an ``ls`` call with only a boolean flag, in 16 of 21
+    convictions, while the deviation is the ``post_tweet`` content at step 3.
+
+    Everything else is ``needs_review``, including the case where the named
+    step sits *after* the annotation carrying its own error (``BFCL/148``
+    names step 15, a false escalation claim, while the annotation is the
+    ``card_id`` at step 6). That is an annotation choice, not a mechanism
+    failure, and the loop must not spend budget "fixing" it.
+
+    ``record`` is the label-free projected record, so this runs on the
+    detector's own inputs and never reads a gold label.
+    """
+    from evolution.metrics import row_responsible_step
+
+    step = row_responsible_step(row)
+    if step is None:
+        return "needs_review", "no responsible step to review"
+    if record is None:
+        return "needs_review", "record not available; viability not checked"
+    hostable, reason = step_can_host_text_error(record, step)
+    if not hostable:
+        return "structurally_impossible", reason
+    gold_step = None
+    if gold_steps:
+        gold_step = (gold_steps or {}).get(str(row.get("case") or ""))
+        if gold_step is None:
+            gold_step = (gold_steps or {}).get(
+                str(row.get("case") or "").replace("/", "__")
+            )
+    if gold_step is not None:
+        try:
+            gold_step = int(gold_step)
+        except (TypeError, ValueError):
+            gold_step = None
+    if gold_step is not None and step > gold_step:
+        return (
+            "needs_review",
+            f"named step {step} is later than the annotated step {gold_step} "
+            "and carries its own text; the annotation chose between two real "
+            "errors",
+        )
+    return (
+        "needs_review",
+        f"named step {step} carries its own text; treating it as wrong would "
+        "require abandoning a possibly true detection",
+    )
+
+
+def localization_repair_viable(
+    row: Mapping[str, Any],
+    record: Mapping[str, Any] | None = None,
+    *,
+    gold_steps: Mapping[str, Any] | None = None,
+) -> tuple[bool, str]:
+    """``localization_repair_viability`` reduced to a yes/no plus its reason."""
+    classification, reason = localization_repair_viability(
+        row, record, gold_steps=gold_steps,
+    )
+    return classification == "structurally_impossible", reason
+
+
+def stable_localization_families(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    gold_steps: Mapping[str, Any] | None = None,
+    min_cases: int = 2,
+    records: Mapping[str, Any] | None = None,
+    require_viable: bool = True,
+) -> list[dict[str, Any]]:
+    """Families of cases the detector convicts correctly but localizes wrongly.
+
+    Same admission rules as ``stable_failure_families`` (boolean gold,
+    authoritative, runtime-valid, no infrastructure-degraded stage), because a
+    mislocation counted during an outage is not a mechanism. Family ids are
+    ``FAM-loc-*`` and carry the same label-free execution signature, so the
+    mechanism that produced the wrong step stays the distinguishing axis and
+    no case id or source enters the identity.
+    """
+    from evolution.metrics import row_responsible_step
+
+    groups: dict[str, list[Mapping[str, Any]]] = {}
+    annotation_choices: list[dict[str, Any]] = []
+    for row in rows:
+        gold = row.get("gold")
+        if gold is not True:
+            continue
+        if str(row.get("authority") or "") != "authoritative":
+            continue
+        result = row.get("result") or {}
+        if result and not bool(result.get("runtime_valid", True)):
+            continue
+        statuses = result.get("stage_status") or {}
+        if any(
+            str((status or {}).get("state") or "").startswith(
+                ("provider_error", "invalid", "contract_error", "degraded")
+            )
+            for status in statuses.values()
+        ):
+            continue
+        state = localization_state(row, gold_steps)
+        if state not in {"mislocated", "step_missing"}:
+            continue
+        if require_viable:
+            viable, reason = localization_repair_viable(
+                row,
+                (records or {}).get(str(row.get("case") or "")),
+                gold_steps=gold_steps,
+            )
+            if not viable:
+                annotation_choices.append({
+                    "case": str(row.get("case") or ""),
+                    "responsible_step": row_responsible_step(row),
+                    "reason": reason,
+                })
+                continue
+        family = localization_family(row, state=state)
+        groups.setdefault(family, []).append(row)
+    families = []
+    for family, members in sorted(groups.items()):
+        if len(members) < min_cases:
+            continue
+        families.append({
+            "failure_family": family,
+            "target_kind": "localization",
+            "count": len(members),
+            "failure_cases": [str(row.get("case") or "") for row in members],
+            "sources": sorted({
+                source_of(str(row.get("case") or "")) for row in members
+            }),
+            "mechanism_summary": _mechanism_summary(family, members),
+            "mechanism_signature": _mechanism_signature(members[0]),
+            "localization_states": sorted({
+                localization_state(row, gold_steps) for row in members
+            }),
+        })
+    families.sort(key=lambda item: (-item["count"], item["failure_family"]))
+    return families
+
+
+def localization_annotation_choices(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    gold_steps: Mapping[str, Any] | None = None,
+    records: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Rows excluded from localization tasks because the annotation is ambiguous.
+
+    Reported separately so the exclusion is visible: these are cases where the
+    detector named a step that differs from the annotation but cannot be called
+    a defect without deciding which of two real errors the task is about.
+    Dropping them silently would make the localization opportunity look larger
+    than the repairable set.
+    """
+    from evolution.metrics import row_responsible_step
+
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if row.get("gold") is not True:
+            continue
+        if localization_state(row, gold_steps) not in {"mislocated", "step_missing"}:
+            continue
+        viable, reason = localization_repair_viable(
+            row,
+            (records or {}).get(str(row.get("case") or "")),
+            gold_steps=gold_steps,
+        )
+        if not viable:
+            out.append({
+                "case": str(row.get("case") or ""),
+                "responsible_step": row_responsible_step(row),
+                "reason": reason,
+            })
+    return out
+
+
+def localization_family(
+    row: Mapping[str, Any],
+    *,
+    gold_steps: Mapping[str, Any] | None = None,
+    state: str | None = None,
+) -> str:
+    """Mechanism family id for a localization failure.
+
+    ``FAM-loc-`` separates the two ways a step can be wrong: the tracer named
+    a step at all (``mislocated``) versus named none (``step_missing``). They
+    need different treatments -- a wrong step is a reasoning error, a missing
+    step is an output-contract error -- so they must not share a family.
+
+    Only those two states are localization failures. Anything else raises
+    instead of minting a family: deriving the state without the annotation
+    would otherwise yield ``FAM-loc-unannotated-*``, a family whose members
+    were never shown to be mislocated.
+    """
+    state = state or localization_state(row, gold_steps)
+    if state not in {"mislocated", "step_missing"}:
+        raise ValueError(
+            f"not a localization failure (state {state!r}); localization "
+            "families exist only for convicted-correct rows whose responsible "
+            "step is wrong or absent"
+        )
+    signature = json.dumps(
+        _mechanism_signature(row), ensure_ascii=False, sort_keys=True,
+        separators=(",", ":"),
+    )
+    return f"FAM-loc-{state}-{_sha(signature)}"
+
+
 def _mechanism_summary(
     family: str,
     members: Sequence[Mapping[str, Any]],
@@ -301,8 +638,23 @@ def worksheet_report(
     patrol_rows: Sequence[Mapping[str, Any]],
     families: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
+    """One patrol's readable summary.
+
+    ``families`` may hold both detection and localization mechanisms. They are
+    reported under separate keys because they are scored by different gates and
+    satisfied by different evidence; keeping them in one list under the
+    detection name made a localization family look like a detection family in
+    every downstream report.
+    """
     errors = [row for row in patrol_rows if row.get("prediction") != row.get("gold")]
     metrics = binary_metrics(patrol_rows)
+    detection = [
+        f for f in families
+        if str(f.get("target_kind") or "detection") == "detection"
+    ]
+    localization = [
+        f for f in families if str(f.get("target_kind") or "") == "localization"
+    ]
     return {
         "patrol_size": len(patrol_rows),
         "errors": len(errors),
@@ -313,7 +665,11 @@ def worksheet_report(
         "unresolved": metrics["unresolved"],
         "metrics": metrics,
         "family_evidence": "cross-case co-occurrence; repeated-run stability not measured",
-        "stable_failure_families": families,
+        # Kept for compatibility with reports written before the split; it is
+        # now the detection families only.
+        "stable_failure_families": detection,
+        "detection_families": detection,
+        "localization_families": localization,
     }
 
 
@@ -352,6 +708,10 @@ TREATMENT_ROUTES = {
     "recall_trigger": (
         "define a recall_trigger intervention (typed-DSL or built-in) that "
         "forces the recall net for judge-negative cases matching the family"
+    ),
+    "tracer_directive": (
+        "tracer.system text boundary that changes which step is named as the "
+        "root cause, leaving the conviction itself alone"
     ),
 }
 
@@ -425,6 +785,14 @@ def classify_family_actionability(
         positive_source = str(signature.get("positive_source") or "none")
         if positive_source in {"judge", "recall_upgrade"}:
             routes.append("withhold_guard")
+    elif family_id.startswith("FAM-loc-"):
+        # The conviction is already right; only the named step is wrong, so the
+        # tracer is the stage that must move. When the step came from an
+        # upgrade candidate rather than the tracer, the upgrade route is the
+        # one that can change it, and both stay open so the proposer can pick.
+        routes.append("tracer_directive")
+        if bool(signature.get("upgrade_positive")):
+            routes.append("upgrade_directive")
 
     if not routes:
         return {
@@ -662,7 +1030,10 @@ def _predicate_signal_counts(
 __all__ = [
     "diagnose_failure_families",
     "failure_family",
+    "localization_family",
+    "localization_state",
     "refine_failure_families",
     "stable_failure_families",
+    "stable_localization_families",
     "worksheet_report",
 ]

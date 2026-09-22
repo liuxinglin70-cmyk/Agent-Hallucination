@@ -1,0 +1,22 @@
+{
+  "attempt": 3,
+  "archived_at": "2026-09-21T21:10:28",
+  "rows_landed": 18,
+  "rows_expected_cycle1": 40,
+  "outcome": "stopped_by_operator_to_fix_the_case-timeout_envelope",
+  "case_deadline_seconds": 3600,
+  "rows_at_the_case_deadline": [
+    "Octotools/008.json"
+  ],
+  "why": "2 of 18 rows were cut mid-deliberation at exactly 3600s. A cut call burns its whole token budget and returns nothing, and because the two arms run at different times a cut can land on one arm only, creating a new_unresolved that HARMLESSNESS (new_unresolved_allowed=0) reads as a regression. The envelope was raised; the split manifest is unchanged.",
+  "baseline_reading_18_rows": {
+    "all_case_correct": 14,
+    "of": 18
+  },
+  "near_miss_at_the_case_deadline": {
+    "case": "Camel/048.json",
+    "elapsed_seconds": 3600.139,
+    "why_not_a_cut": "authoritative verdict with every stage 'ok'; the case deadline is checked before each call, so a call that starts in time may finish after it"
+  },
+  "correction": "The first draft of this file listed both Octotools/008 and Camel/048 as cut, inferred from elapsed >= 3599. Reading Camel/048's row shows an authoritative verified_clean verdict with judge/recall_scanner/causal_upgrade all 'ok' and no case_deadline_exceeded anywhere. Only Octotools/008 was actually cut."
+}
