@@ -37,14 +37,20 @@
 
 真实数据上发现 **2 个机制子组**，两者都被规划为 `actionable`：
 
-| 机制 | 修复操作 | 所需能力 | 目标类型 | 能力路由 |
-|---|---|---|---|---|
-| `M-5a89ab46e81f` | `withhold_conviction` | `guard` | detection | `withhold_guard`（`adjudicate.guard`） |
-| `M-c393f57ff12f` | `constrain_localization` | `prompt` | localization | `tracer_directive`（`tracer.system`） |
+| 机制 | 族 | 成员 | 任务义务 | 观测偏差 | 失败阶段/模式 | 修复操作 | 目标 | 能力路由 |
+|---|---|---|---|---|---|---|---|---|
+| `M-5a89ab46e81f` | `FAM-fp-judge_conviction-117fce1c070d` | 2 | `required_action` | `none` | `adjudication` / `false_conviction` | `withhold_conviction` | detection | `withhold_guard`（`adjudicate.guard`） |
+| `M-c393f57ff12f` | `FAM-loc-mislocated-117fce1c070d` | 2 | `required_action` | `mislocation` | `step_tracer` / `unhostable_step` | `constrain_localization` | localization | `tracer_directive`（`tracer.system`） |
 
-两个机制的攻击面、修复操作、目标类型都不同，说明**"机制识别先于候选搜索"这条设计在真实
-数据上确实区分出了东西**，而不是把一次失败换了个名字。`M-c393f57ff12f` 是
-`FAM-loc-*` 定位族，走的是本地化目标路径。
+报告把三个族列表分开存放（`stable_failure_families` / `detection_families` /
+`localization_families`，各 1 条），因为定位族带有检测族无值的 `localization_states`，
+且两个目标由不同的门评分。
+
+**这张表是本实验最有说服力的一处**：两个机制的**失败阶段不同**（`adjudication` vs
+`step_tracer`）、**偏差不同**（`none` 即"没有任务级偏差，纯误判" vs `mislocation`）、
+**修复操作不同**（收回定罪 vs 约束定位）、**目标类型不同**，但**任务义务相同**
+（都是 `required_action`）——正符合 §4.4 的设计意图："成员关系由什么能修复它决定，而不是由
+路径或任务契约决定"。如果机制建模退化成按任务契约分类，这两个会被错误合并成一个。
 
 ### 3. 收益机会与预检
 

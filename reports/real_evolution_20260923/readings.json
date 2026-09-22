@@ -1,5 +1,5 @@
 {
-  "run_root": "artifacts\\selfevo-real-20260923",
+  "run_root": "artifacts\\_rb",
   "contract": {
     "config_hash": "7d9ff8b47ed2",
     "source_hash": "6b382bd0ac13c675",
@@ -83,7 +83,43 @@
       "fp": 3,
       "unresolved": 0
     },
-    "families": [],
+    "families": [
+      {
+        "failure_family": "FAM-fp-judge_conviction-117fce1c070d",
+        "count": 2,
+        "mechanism_id": "M-5a89ab46e81f",
+        "mechanism_status": "confirmed",
+        "obligation": "required_action",
+        "deviation": "none",
+        "failure_stage": "adjudication",
+        "failure_mode": "false_conviction",
+        "repair_operation": "withhold_conviction",
+        "actionability": "actionable",
+        "target_kind": null,
+        "member_count": 2,
+        "diagnostic_complete": true
+      },
+      {
+        "failure_family": "FAM-loc-mislocated-117fce1c070d",
+        "count": 2,
+        "mechanism_id": "M-c393f57ff12f",
+        "mechanism_status": "ambiguous",
+        "obligation": "required_action",
+        "deviation": "mislocation",
+        "failure_stage": "step_tracer",
+        "failure_mode": "unhostable_step",
+        "repair_operation": "constrain_localization",
+        "actionability": "actionable",
+        "target_kind": "localization",
+        "member_count": 2,
+        "diagnostic_complete": true
+      }
+    ],
+    "family_lists": {
+      "stable": 1,
+      "detection": 1,
+      "localization": 1
+    },
     "capability_plan": {
       "schema_version": "evolution.capability_requirement.v1",
       "requirements": [

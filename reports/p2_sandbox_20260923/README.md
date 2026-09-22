@@ -117,6 +117,33 @@ that did not produce them`）。
   被"探测"复现。平台谎报一个它没有的内存上限，比声明"没有上限"更糟，因为审计引用的是
   声明。
 
+## 关于 §23.7 的前置条件（本包动手前按要求核对）
+
+NEXT_TASK 说 P2.2"动手前先读 §23.7 的前置条件并与我讨论：该能力与'允许生成任意代码'相邻"。
+我读了 §23.7，但**无法与用户对话**（本轮无交互），因此**没有自行扩大范围**，而是把边界
+写死并留证：
+
+`§23.7` 列的五项前置（graph schema、allowed mutation set、static validation、
+execution trace diff、rollback）是 **P3 开放式演化**的门槛——新 hook 生成、图改写、
+权重更新、学习型策略路由。**P2.2 不做这些**：
+
+| §23.7 前置 | P2.2 是否触及 | 说明 |
+|---|---|---|
+| graph schema | **否** | 不生成、不改写执行图 |
+| allowed mutation set | **否** | 组件不能改 hook、guard 动作或路由 |
+| static validation | **是（已实现）** | AST 白名单 + 导入白名单 + 固定 schema，27 条逃逸路径被拒 |
+| execution trace diff | **否** | 组件不产生新执行路径，只在既有 `evidence_check` 钩子上报告 |
+| rollback | **不适用** | 组件无法写入 registry；回滚语义属于晋升路径，非本通道 |
+
+即：**"允许生成任意代码"这件事本身没有被打开**。本通道允许的是"生成一个**纯函数**，
+其参数 schema 在源码读入前固定、导入来自封闭白名单、无文件系统与网络、由 OS 级
+CPU/时间/内存上限约束、且**永不单独定罪**"。`capability_surface` 的自述也按此措辞写成
+`True` + 范围说明，而不是无条件 `True`。
+
+`open_ended_self_evolution` 仍为 **`False`**，`open_ended_evolution_blockers` 报出尚未满足的
+两项（typed execution-graph artifacts、immutable capability artifact store）。这是本包
+**刻意保留**的边界，不是遗漏。
+
 ## 未做
 
 - **未接入真实生成器**：本轮没有"由 LLM 生成组件源码"的路径。沙箱、准入、执行、

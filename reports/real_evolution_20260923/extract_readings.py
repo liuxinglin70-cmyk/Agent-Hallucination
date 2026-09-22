@@ -135,7 +135,23 @@ def cycle_section(root: pathlib.Path) -> dict[str, Any]:
         return {"report": None}
     report = load(cycle_files[-1]) or {}
     patrol = report.get("patrol") or {}
-    families = patrol.get("families") or []
+    # The report keeps detection, localization and "stable" families in three
+    # lists rather than one: a localization family carries a `localization_states`
+    # field that a detection family has no value for, and the two objectives are
+    # scored by different gates. Reading only one list would under-report the
+    # mechanisms a cycle found -- which is what an earlier version of this
+    # extractor did, printing "0 families" for a cycle that diagnosed two.
+    families = (
+        list(patrol.get("stable_failure_families") or ())
+        + [
+            item for item in patrol.get("localization_families") or ()
+            if str(item.get("failure_family") or "")
+            not in {
+                str(other.get("failure_family") or "")
+                for other in patrol.get("stable_failure_families") or ()
+            }
+        ]
+    )
     gates = report.get("gates") or []
     effect = report.get("active_effect_on_g") or {}
     return {
@@ -178,9 +194,16 @@ def cycle_section(root: pathlib.Path) -> dict[str, Any]:
                     item.get("actionability") or {}
                 ).get("classification"),
                 "target_kind": item.get("target_kind"),
+                "member_count": item.get("count"),
+                "diagnostic_complete": item.get("diagnostic_complete"),
             }
             for item in families
         ],
+        "family_lists": {
+            "stable": len(patrol.get("stable_failure_families") or ()),
+            "detection": len(patrol.get("detection_families") or ()),
+            "localization": len(patrol.get("localization_families") or ()),
+        },
         "capability_plan": report.get("capability_plan"),
         "proposals": [
             {
