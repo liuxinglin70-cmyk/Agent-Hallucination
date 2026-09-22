@@ -539,6 +539,22 @@ class EvolutionEngine:
         self.component_prompt_limit = int(
             (self.config.get("proposer") or {}).get("max_components", 4)
         )
+        # §28.6: where the candidate archive is written, and whether this
+        # engine writes it at all. ``on`` is a declared choice rather than an
+        # implicit one -- see the ``archive`` block in ``config.DEFAULTS`` for
+        # what each value claims -- and ``off`` is the default so that adding
+        # the wiring cannot change what an existing run records.
+        archive_cfg = self.config.get("archive") or {}
+        self.archive_on = str(archive_cfg.get("on") or "off")
+        if self.archive_on not in {"off", "development_end", "cycle_end"}:
+            raise ValueError(
+                f"archive.on {self.archive_on!r} is not one of "
+                "off, development_end, cycle_end"
+            )
+        self.archive_root = Path(
+            str(archive_cfg.get("root") or "").strip()
+            or str(Path(self.config["work_root"]) / "candidates")
+        )
 
     # ------------------------------------------------------------------
     def _load_mechanism_binding(self) -> None:
@@ -1165,6 +1181,169 @@ class EvolutionEngine:
         ] + [
             {**dict(row), "arm": "candidate"} for row in candidate_rows
         ]
+
+    def archive_development_run(
+        self,
+        run_dir: str | Path,
+        *,
+        cycle: int,
+        mechanism_id: str = "",
+        family_id: str = "",
+        mechanism: Mapping[str, Any] | None = None,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """Remember one development run's versions, pass or fail (§28.6).
+
+        Called when a development run *ends*, which is the point at which a
+        version has left the loop and its verdicts are final for that run. The
+        versions and their statuses are read from the run's own records rather
+        than restated by the caller -- see ``archive.ingest_development_run``
+        -- so the archive cannot disagree with the loop it remembers.
+
+        ``force`` exists so a caller can archive regardless of the configured
+        policy, which is what a test or a one-off analysis needs. A run that
+        did not opt in gets a refusal rather than a write, and the refusal is
+        reported rather than raised: an unwritable archive must not fail a
+        cycle that has already spent provider budget.
+
+        The components each archived candidate contributes are registered in
+        the same call, and only for versions that **passed L1**. Local
+        usefulness is the claim a component makes, and L1 is the only reading
+        in this framework that establishes it: a version that failed its
+        targeted replay was not shown to be useful, so registering its parts as
+        reusable would launder a rejected candidate into the next round's
+        drafting prompt.
+        """
+        if self.archive_on == "off" and not force:
+            return {
+                "archived": False,
+                "reason": (
+                    "archive.on is 'off'; set it to 'development_end' or "
+                    "'cycle_end' to record development runs"
+                ),
+                "policy": self.archive_on,
+            }
+        from evolution.archive import (
+            ingest_development_run,
+            record_archive_summary,
+            record_component,
+        )
+
+        ingested = ingest_development_run(
+            self.archive_root,
+            run_dir,
+            cycle=int(cycle),
+            mechanism_id=str(mechanism_id or ""),
+            family_id=str(family_id or ""),
+        )
+        registered: list[dict[str, Any]] = []
+        for record in self._components_from_development(
+            run_dir,
+            cycle=int(cycle),
+            mechanism_id=str(mechanism_id or ""),
+            mechanism=mechanism,
+        ):
+            try:
+                registered.append(record_component(self.archive_root, **record))
+            except (ValueError, KeyError) as exc:
+                # A component the store refuses is reported, not fatal: the
+                # candidate archive half has already been written and is the
+                # part the loop needs.
+                registered.append({
+                    "name": record.get("name"),
+                    "registered": False,
+                    "reason": f"{type(exc).__name__}: {exc}",
+                })
+        return {
+            "archived": True,
+            "policy": self.archive_on,
+            "root": str(self.archive_root),
+            "versions": ingested.get("versions"),
+            "recorded": ingested.get("recorded"),
+            "components": registered,
+            "report": record_archive_summary(self.archive_root),
+        }
+
+    def _components_from_development(
+        self,
+        run_dir: str | Path,
+        *,
+        cycle: int,
+        mechanism_id: str,
+        mechanism: Mapping[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """The reusable parts a development run's passing versions contribute.
+
+        Which programs count: an ``evidence_check`` whose body carries an
+        inline typed-DSL ``predicate_definition``. That is the only object in
+        this framework with a stable digest, a closed vocabulary and two
+        consumers, which is the component definition ``archive`` uses; a
+        deterministic built-in predicate is framework code rather than
+        something this run produced, and a prose directive has no digest.
+
+        Which *versions* count: those whose status says they passed L1.
+        ``freeze`` rewrites the sidecar's status to ``frozen`` and is reachable
+        only from ``ready_for_freeze``, so accepting both is accepting exactly
+        the versions the loop certified and not a version that merely stopped
+        iterating -- ``failed_l0`` and ``failed_l1`` are neither.
+        """
+        admissible = {"ready_for_freeze", "frozen"}
+        from evolution.candidate_versions import CandidateVersionGraph
+
+        graph = CandidateVersionGraph(Path(run_dir))
+        graph.load_existing()
+        parts: list[dict[str, Any]] = []
+        for version in graph.versions:
+            version_id = str(version.get("version_id") or "")
+            sidecar = graph.development_status(version_id)
+            if str(sidecar.get("status") or "") not in admissible:
+                continue
+            candidate = version.get("candidate") or {}
+            body = candidate.get("body") or {}
+            program = body.get("predicate_definition")
+            if not isinstance(program, Mapping):
+                continue
+            parts.append({
+                "name": str(program.get("name") or body.get("predicate") or ""),
+                "kind": "parser",
+                "program": dict(program),
+                "cycle": int(cycle),
+                "mechanism_id": str(mechanism_id or ""),
+                "source_candidate_hash": str(version.get("candidate_hash") or ""),
+                "capability": self.component_capability(mechanism),
+                "verdicts": list(program.get("verdicts") or ()),
+                "evidence": {
+                    "version_id": version_id,
+                    "l1": (sidecar.get("l1") or {}).get("delta"),
+                },
+            })
+        return parts
+
+    @staticmethod
+    def component_capability(mechanism: Mapping[str, Any] | None) -> str:
+        """The capability vocabulary value a component is retrieved under.
+
+        Read from the mechanism's own repair requirement, so the key a
+        component is *stored* under and the key retrieval *matches* on are the
+        same vocabulary. Those were once different words in one field and
+        retrieval could never match (see §26.3); deriving both from
+        ``repair_requirements`` is what keeps that from coming back.
+
+        Taking the mechanism rather than looking it up is deliberate. An
+        earlier version searched ``cycle_reports`` for the id and returned
+        ``""`` when the mechanism was not there -- which is the normal case for
+        a ``develop`` run, since that path never populates the attribute. The
+        component was then stored unclassified and ranked below every
+        mechanism-matched part.
+        """
+        if not mechanism:
+            return ""
+        try:
+            required = repair_requirements(mechanism)
+        except (ValueError, KeyError):
+            return ""
+        caps = [str(item) for item in required.get("required_capabilities") or ()]
+        return caps[0] if caps else ""
 
     def record_route_failures(
         self,

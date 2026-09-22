@@ -123,6 +123,29 @@ DEFAULTS: dict[str, Any] = {
     # because the plan's number was written before the development loop charged
     # both arms; at the honest rate, 12 would stop the loop before a single
     # replay whenever a mechanism carries its neighbour set.
+    # §28.6: who archives, and when. The two stores in ``evolution.archive``
+    # are writable from a run path, but nothing wrote them by default, because
+    # "archive at the end of the development loop" and "archive at the end of
+    # the cycle" are different claims about what a run remembers:
+    #
+    #   off               no run-path writes (the default: an existing run's
+    #                     behaviour does not change)
+    #   development_end   every version a development run produced, pass or
+    #                     fail, archived when that run finishes. Chosen by a
+    #                     caller that runs ``develop`` deliberately: that is
+    #                     where a version *exits* the loop, and where "we tried
+    #                     this route before" is asked.
+    #   cycle_end         the same ingestion, run once per cycle, so a cycle
+    #                     that develops several mechanisms remembers all of
+    #                     them in one place.
+    #
+    # ``root`` defaults to ``work_root/candidates``. It is a separate root from
+    # the Active Registry by construction; nothing in the archive can admit a
+    # version.
+    "archive": {
+        "on": "off",
+        "root": "",
+    },
     "development": {
         "enabled": False,
         "max_versions_per_mechanism": 4,

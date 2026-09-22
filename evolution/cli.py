@@ -651,6 +651,23 @@ def cmd_develop(args: argparse.Namespace) -> int:
             "lineage": frozen["lineage"],
             "development_evidence": frozen["development_evidence"],
         }
+    # §28.6: the development loop has now ended, so this is where a version has
+    # left it and its verdicts are final. Archiving happens here rather than
+    # inside ``develop`` because the *caller* owns the run boundary: the loop
+    # can be driven several times for one mechanism, and an archive written per
+    # ``develop`` call would record a mechanism's experiments as separate runs.
+    # The configured policy decides whether anything is written; with the
+    # default ``off`` this call reports a refusal and changes nothing.
+    report["archive"] = engine.archive_development_run(
+        output_dir,
+        cycle=int(args.cycle),
+        mechanism_id=str(mechanism.get("mechanism_id") or ""),
+        family_id=str(target.get("failure_family") or ""),
+        # The mechanism travels with the call: a component is stored under the
+        # capability its mechanism's repair requires, and only the caller that
+        # ran the development loop still has that mechanism.
+        mechanism=mechanism,
+    )
     _print_json(report)
     out = output_dir / "development_report.json"
     save_json(out, report)
@@ -706,6 +723,38 @@ def _select_development_family(
 
 def cmd_capability_audit(args: argparse.Namespace) -> int:
     _print_json(capability_surface_report())
+    return 0
+
+
+def cmd_archive(args: argparse.Namespace) -> int:
+    """Show the candidate archive and component store, or ingest one run.
+
+    Read-only unless ``--ingest`` is given. The report is labelled
+    ``diagnostic-only``: nothing in either store can admit a version, and their
+    numbers describe what was tried rather than what works.
+    """
+    from evolution.archive import (
+        archive_report,
+        ingest_development_run,
+        record_archive_summary,
+    )
+
+    config = load_config(args.config)
+    root = resolve_path(
+        str(getattr(args, "root", "") or "")
+        or str(Path(config["work_root"]) / "candidates")
+    )
+    if getattr(args, "ingest", None):
+        ingested = ingest_development_run(
+            root,
+            resolve_path(str(args.ingest)),
+            cycle=int(getattr(args, "cycle", 0) or 0),
+            mechanism_id=str(getattr(args, "mechanism", "") or ""),
+        )
+        _print_json({**ingested, "root": str(root)})
+        return 0
+    report = record_archive_summary(root)
+    _print_json({**report, "root": str(root)})
     return 0
 
 
@@ -1212,6 +1261,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--config")
     p.set_defaults(func=cmd_capability_smoke)
+
+    p = sub.add_parser(
+        "archive",
+        help=(
+            "show the candidate archive and component store "
+            "(--ingest archives one development run)"
+        ),
+    )
+    p.add_argument("--config")
+    p.add_argument("--root", help="archive root; defaults to work_root/candidates")
+    p.add_argument("--ingest", help="path to a development run directory to archive")
+    p.add_argument("--cycle", type=int, default=0)
+    p.add_argument("--mechanism", default="")
+    p.set_defaults(func=cmd_archive)
 
     p = sub.add_parser(
         "sandbox-check",
