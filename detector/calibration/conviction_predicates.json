@@ -1,0 +1,65 @@
+{
+  "content_digest": "0b011de6c266fb5c13e0dc14e2c87f4083a6e90b02eb9cc389632de2b913f2ef",
+  "corpus": {
+    "cases": 693,
+    "clean_cases": 250,
+    "clean_fingerprint": "c017715ef3a8762ad8a3d3a83008401b7df248cc8d7ce2cf73af0cded6d97890",
+    "error_cases": 443,
+    "fingerprint": "52c339f110a9722bb2273d345025660f7ff78851fd29cf66a4adf9f09a7a32c3",
+    "root": "E:/agent hallucination/agent hallucination/datasets/raw/agenthallu/AgentHallu",
+    "unbuildable_cases": 0,
+    "unlabelled_cases": 0
+  },
+  "generated_at_utc": "2026-09-23T14:17:59.313819+00:00",
+  "metric_role": "conviction-authority-admission",
+  "minimum_clean_cases": 50,
+  "predicates": {
+    "final_delivery_present": {
+      "admitted": true,
+      "clean_cases": 250,
+      "clean_violation_cases": [],
+      "clean_violations": 0,
+      "convicting_verdicts": [
+        "missing"
+      ],
+      "error_cases": 443,
+      "error_hit_cases": [],
+      "error_hits": 0,
+      "source_fingerprint": "0c84035e278a00eece47134e9dbb274c7fad7470138f1734cebaf6399d3492ae",
+      "unbuildable_cases": 0
+    },
+    "required_action_present": {
+      "admitted": true,
+      "clean_cases": 250,
+      "clean_violation_cases": [],
+      "clean_violations": 0,
+      "convicting_verdicts": [
+        "violated"
+      ],
+      "error_cases": 443,
+      "error_hit_cases": [
+        "BFCL/057.json",
+        "BFCL/062.json",
+        "BFCL/077.json"
+      ],
+      "error_hits": 3,
+      "source_fingerprint": "3367921348c8710fe45a9c7da1617f4a90ee5b986fcb0232c265605fcdaa6261",
+      "unbuildable_cases": 0
+    },
+    "verbatim_fidelity": {
+      "admitted": true,
+      "clean_cases": 250,
+      "clean_violation_cases": [],
+      "clean_violations": 0,
+      "convicting_verdicts": [
+        "violated"
+      ],
+      "error_cases": 443,
+      "error_hit_cases": [],
+      "error_hits": 0,
+      "source_fingerprint": "e463045e19be8f2d604e880d1a992bb8364a85bceccd91d599d70d0642983878",
+      "unbuildable_cases": 0
+    }
+  },
+  "schema_version": "detector.conviction_calibration.v1"
+}

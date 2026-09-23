@@ -1,0 +1,86 @@
+{
+  "blockers": 0,
+  "checked_at_utc": "2026-09-23T15:25:59.048687+00:00",
+  "checks": [
+    {
+      "check": "corpus",
+      "detail": "693 case(s) reconcile with AgentHallu",
+      "status": "OK"
+    },
+    {
+      "check": "labels",
+      "detail": "positives=443, negatives=250, with gold step=443",
+      "status": "OK"
+    },
+    {
+      "check": "split",
+      "detail": "pool=30, sentinel=6, gain=6, patrol_pool=18, validation=10",
+      "status": "OK"
+    },
+    {
+      "check": "gates_satisfiable",
+      "detail": "sentinel has 3 positive / 3 negative case(s) for a floor of 2/2",
+      "status": "OK"
+    },
+    {
+      "check": "timeouts",
+      "detail": "one case can take over half the round budget: case_timeout=10800s (3.0h), cycle_timeout=14400s (4.0h), ratio=0.75",
+      "status": "WARN"
+    },
+    {
+      "check": "budget",
+      "detail": "one round bounds ~92 fresh case evaluations inside 14400s",
+      "status": "OK"
+    },
+    {
+      "check": "long_tail",
+      "detail": "slowest observed case takes 108.0 min (23 unique cases sampled) is over 40% of the round budget; batch-level fail-closed is likely",
+      "status": "WARN"
+    },
+    {
+      "check": "credentials",
+      "detail": "AUTODL_API_KEY is available (.env)",
+      "status": "OK"
+    },
+    {
+      "check": "detector_env",
+      "detail": "no DETECTOR_* overrides in the environment",
+      "status": "OK"
+    },
+    {
+      "check": "work_root",
+      "detail": "selfevo-real-dev2-20260923 is clean (no ledger yet)",
+      "status": "OK"
+    },
+    {
+      "check": "path_length",
+      "detail": "longest case 'OpenDeepSearch/000.json' leaves 90 characters for the cache file name (digest floor 21); cache root E:\\agent hallucination\\agent hallucination\\artifacts\\selfevo-real-dev2-20260923\\cache\\0000000000000000000000000000000000000000000000000000000000000000\\unsigned",
+      "status": "OK"
+    },
+    {
+      "check": "calibration",
+      "detail": "3 conviction predicate(s) calibrated: ['final_delivery_present', 'required_action_present', 'verbatim_fidelity']",
+      "status": "OK"
+    },
+    {
+      "check": "runner_admission",
+      "detail": "4 runner(s) admitted by the metamorphic gate",
+      "status": "OK"
+    },
+    {
+      "check": "source_identity",
+      "detail": "source digest faf96c15a8bea412… recorded; a run's own reports cite this to prove the code did not drift while it ran",
+      "status": "OK"
+    },
+    {
+      "check": "cost",
+      "detail": "one full-corpus pass at workers=8: work floor 21.3h, simulated p50 22.2h, efficiency-adjusted 28.0h, tail floor 12.5h; ~18,628,941 tokens",
+      "status": "WARN"
+    }
+  ],
+  "config": "evolution\\configs\\selfevo_real_dev2_20260923.json",
+  "passed": true,
+  "phase": "evolution",
+  "schema_version": "evolution.preflight_real_run.v1",
+  "warnings": 3
+}

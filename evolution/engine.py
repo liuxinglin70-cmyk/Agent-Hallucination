@@ -48,6 +48,8 @@ from evolution.gates import (
     arm_has_infrastructure_failure,
     candidate_target_kind,
     defect_candidates,
+    localization_floor_rests_on_unstable,
+    marginal_floor_rests_on_unstable,
     meets_localization,
     meets_m,
     requires_fresh_evaluation,
@@ -60,12 +62,19 @@ from evolution.gates import (
 from evolution.ledger import Ledger, load_ledger
 from evolution.meta_eval import write_meta_report
 from evolution.metrics import (
+    STEP_KINDS as METRIC_STEP_KINDS,
+    STEP_KIND_UNCLASSIFIED,
+    NOISE_FLOOR_MEASURED,
     fired_rate,
+    flipped_cases,
     gain_opportunity,
     localization_opportunity,
     mechanism_opportunity,
+    noise_floor,
     paired_delta,
     paired_localization_delta,
+    row_responsible_step,
+    row_responsible_step_kind,
     source_deltas,
 )
 from evolution.proposer import ProposalBatch, infer_joint_groups, make_proposer
@@ -222,6 +231,14 @@ def gate_rejection_is_unevaluable(
     # unit that saw those rows, and it wins over the manufactured deltas --
     # otherwise "the provider died" is stored as "the mechanism is falsified".
     if verdict.get("infrastructure_failure"):
+        return True
+    # The same argument for the instrument's own jitter: a rejection whose
+    # entire harm, or whose entire recorded benefit, sits on cases the control
+    # configuration read two ways is not a verdict about the candidate. It must
+    # be checked before the delta counts below, for the same reason the
+    # infrastructure marker is -- those counts are exactly what the marker
+    # exists to override.
+    if verdict.get("stability_limited") or verdict.get("harm_entirely_on_unstable"):
         return True
     delta = verdict.get("delta") or {}
     if delta.get("new_errors") or delta.get("health_regressed") or delta.get("unresolved_added"):
@@ -909,6 +926,7 @@ class EvolutionEngine:
         gate_reports: Sequence[Mapping[str, Any]],
         admitted_ids: set[str],
         blocked_families: Sequence[Mapping[str, Any]] = (),
+        noise: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """What this round's measurement could and could not decide.
 
@@ -918,6 +936,15 @@ class EvolutionEngine:
         with zero opportunities is unmeasurable, not failed, and the report
         states that instead of leaving it to be inferred from a rejection
         reason.
+
+        ``noise`` is the round's own jitter reading (``metrics.noise_floor``):
+        how many cases the *active configuration* moved when it was rolled
+        twice. It is part of the instrument block because it is a property of
+        the instrument, and a reader who cannot see it cannot tell a candidate's
+        one-case gain from the instrument's own one-case drift. A round that
+        took no reroll reports ``not_measured``/``deterministic_replay``
+        instead of a zero, which is the difference between "checked and still"
+        and "not checked".
         """
         opportunity = gain_opportunity(baseline_gain)
         # "Measured" means the round could actually read a gain decision for
@@ -962,6 +989,12 @@ class EvolutionEngine:
         for value in responses.values():
             kind = str(value.get("kind") or "")
             response_counts[kind] = response_counts.get(kind, 0) + 1
+        noise_block = dict(noise) if noise is not None else noise_floor()
+        unstable_ids = sorted(
+            str(key)
+            for key, value in classifications.items()
+            if value == "not_evaluated"
+        )
         return {
             "gain_opportunity": opportunity,
             "gain_measured": gain_measured,
@@ -975,6 +1008,14 @@ class EvolutionEngine:
             "coverage_response_counts": response_counts,
             "terminal_classification": classifications,
             "terminal_counts": counts,
+            # How much the instrument moved on its own this round. Reported
+            # beside the per-candidate readings because without it a reader
+            # cannot tell a candidate's one-case gain from the instrument's own
+            # one-case drift -- and a round that took no reroll says so instead
+            # of publishing a zero.
+            "noise_floor": noise_block,
+            "unstable_cases": list(noise_block.get("flipped_cases") or ()),
+            "stability_limited_units": unstable_ids,
             # A skip is reported as not_evaluated in the terminal vocabulary;
             # both mean the claim was not measured, so one check covers them.
             "instrument_limited": bool(counts.get("not_evaluated") or blocked_families),
@@ -985,10 +1026,17 @@ class EvolutionEngine:
         baseline_gain: Sequence[Mapping[str, Any]] | None = None,
         audit: Mapping[str, Any] | None = None,
         patrol: Mapping[str, Any] | None = None,
+        provider_stage: bool = False,
     ) -> dict[str, Any]:
         instrument = self._instrument_report(
             baseline_gain=baseline_gain or (), gate_reports=(), admitted_ids=set(),
             blocked_families=preflight.get("blocked_families") or (),
+            # A round that stops before drafting never takes the second roll,
+            # so its floor is unmeasured -- unless nothing in the comparison
+            # used a provider stage, in which case every arm is a frozen replay
+            # and the zero is real. Reporting the first case as the second is
+            # how a stopped round would look still when nobody looked.
+            noise=noise_floor(provider_stage=provider_stage),
         )
         if baseline_gain is None:
             instrument.update(gain_measured=False, gain_opportunity=None,
@@ -2429,6 +2477,7 @@ class EvolutionEngine:
         active_entries: Sequence[Mapping[str, Any]],
         active_rows: Sequence[Mapping[str, Any]],
         fresh_control_rows: Sequence[Mapping[str, Any]] | None = None,
+        unstable_cases: Sequence[str] | None = None,
         arms: _ArmRunner,
         audit: bool = False,
     ) -> dict[str, Any]:
@@ -2439,6 +2488,14 @@ class EvolutionEngine:
         arm (any member on an unfreezing hook) pairs with the shared fresh
         control roll produced once per cycle; a deterministic arm pairs with
         the cached active baseline so its delta carries no provider noise.
+
+        ``unstable_cases`` is the case set the control configuration itself
+        read two ways across two rolls, or ``None`` when no reroll was taken
+        this round. It travels to the gates as an annotation: M scores its
+        benefit floor on gain that does not rest on those cases, and a
+        rejection whose whole harm sits on them is marked as an unstable
+        reading rather than as a falsified mechanism. It can only ever make
+        admission stricter.
         """
         intervention_id = str(candidate.get("intervention_id") or "")
         unit_entries = [*partners, dict(candidate)]
@@ -2556,6 +2613,9 @@ class EvolutionEngine:
             baseline_rows=baseline_s,
             candidate_rows=candidate_s,
             config=self.config,
+            unstable_cases=(
+                None if unstable_cases is None else list(unstable_cases)
+            ),
         )
         behavior = None
         member_behavior: dict[str, dict[str, Any]] = {}
@@ -2589,10 +2649,20 @@ class EvolutionEngine:
             if all(verdict["passed"] for verdict in member_behavior.values()):
                 control_g = _subset_rows(control, measurement_gain)
                 candidate_g = _subset_rows(candidate_rows, measurement_gain)
-                delta = paired_delta(control_g, candidate_g)
+                delta = paired_delta(
+                    control_g, candidate_g,
+                    unstable_cases=(
+                        None if unstable_cases is None
+                        else list(unstable_cases)
+                    ),
+                )
                 if kind in {"localization", "joint"}:
                     localization_delta = paired_localization_delta(
                         control_g, candidate_g, gold_steps=self.gold_step_map,
+                        unstable_cases=(
+                            None if unstable_cases is None
+                            else list(unstable_cases)
+                        ),
                     )
                     passed, failures = meets_localization(
                         localization_delta,
@@ -2636,6 +2706,26 @@ class EvolutionEngine:
                             "claim was not measured (admission remains blocked)"
                         ),
                     )
+                # Last, so a verdict that is already unevaluable for a
+                # different reason is not re-labelled: the marker means "this
+                # round could not score the claim", and the first honest reason
+                # for that is the one worth keeping.
+                if not passed and m.get("evaluable") is not False:
+                    floor_from_noise = (
+                        localization_floor_rests_on_unstable(
+                            localization_delta,
+                            config=self.config,
+                            detection_delta=delta,
+                            target_kind=kind,
+                        )
+                        if kind in {"localization", "joint"}
+                        else marginal_floor_rests_on_unstable(
+                            delta, config=self.config,
+                        )
+                    )
+                    if floor_from_noise:
+                        m["evidence_on_unstable_cases"] = True
+                        m["stability_limited"] = True
         def _mark_unmeasured(verdict: Any) -> Any:
             """Mark a failing verdict whose arm could not be measured honestly.
 
@@ -2660,6 +2750,48 @@ class EvolutionEngine:
             marked["reason"] = f"{reason}; {note}" if reason else note
             return marked
 
+        def _mark_unstable(verdict: Any) -> Any:
+            """Mark a failing verdict whose entire evidence is instrument jitter.
+
+            A rejection caused by a case the control configuration itself reads
+            two ways across two rolls says nothing about the candidate, exactly
+            as a rejection caused by an unmeasurable row does. The verdict keeps
+            ``passed=False`` -- admission is blocked, and the gates are not
+            relaxed by one point -- but it stops being stored as a falsified
+            mechanism, which is the difference between "the mechanism is wrong"
+            and "this case cannot be scored in one round".
+            """
+            if not isinstance(verdict, dict):
+                return verdict
+            if verdict.get("passed") is not False:
+                return verdict
+            cases = [str(case) for case in verdict.get("harm_on_unstable_cases") or ()]
+            note = ""
+            if verdict.get("harm_entirely_on_unstable") is True:
+                note = (
+                    "every recorded harm sits on a case the control "
+                    "configuration itself read two ways"
+                    + (f" ({', '.join(cases[:3])})" if cases else "")
+                    + "; the rejection is an unstable reading, not a "
+                    "falsification of the candidate"
+                )
+            elif verdict.get("evidence_on_unstable_cases") is True:
+                note = (
+                    "the benefit this claim recorded rests on case(s) the "
+                    "control configuration read two ways; an unstable gain is "
+                    "not evidence of repair"
+                )
+            if not note:
+                return verdict
+            marked = dict(verdict)
+            marked["evidence_on_unstable_cases"] = True
+            marked["stability_limited"] = True
+            marked["evaluable"] = False
+            marked["status"] = "not_evaluated"
+            reason = str(verdict.get("reason") or "")
+            marked["reason"] = f"{reason}; {note}" if reason else note
+            return marked
+
         return {
             "intervention_id": intervention_id,
             "candidate": dict(candidate),
@@ -2671,13 +2803,13 @@ class EvolutionEngine:
             "coverage_response": response,
             "candidate_rows": _summarise_rows(candidate_rows),
             "unmeasured_cases": unmeasured,
-            "harmlessness": _mark_unmeasured(harmlessness),
+            "harmlessness": _mark_unstable(_mark_unmeasured(harmlessness)),
             "behavior": _mark_unmeasured(behavior),
             "member_behavior": {
                 key: _mark_unmeasured(verdict)
                 for key, verdict in member_behavior.items()
             },
-            "m": _mark_unmeasured(m),
+            "m": _mark_unstable(_mark_unmeasured(m)),
         }
 
     # ------------------------------------------------------------------
@@ -3140,7 +3272,7 @@ class EvolutionEngine:
             return self._stop_preflight(cycle, {
                 "reason": "insufficient baseline-correct sentinel coverage: " + coverage["reason"],
                 "sentinel": coverage,
-            })
+            }, provider_stage=active_fresh)
 
         audit = self._journal.state.get("audit")
         if audit is None:
@@ -3287,6 +3419,11 @@ class EvolutionEngine:
             baseline_gain=baseline_gain,
             gate_reports=(),
             admitted_ids=set(),
+            # The preflight reader gets the honest partial answer: the active
+            # registry has been rolled once and no candidate has been drafted,
+            # so either the run is a frozen replay (a known zero) or a provider
+            # stage is pending with its reroll not yet taken (unknown).
+            noise=noise_floor(provider_stage=active_fresh),
         )
 
         proposal_families, blocked_families = self._measurable_families(
@@ -3308,7 +3445,8 @@ class EvolutionEngine:
                 )
             report = self._stop_preflight(cycle, {
                 **preflight, "reason": reason,
-            }, baseline_gain=baseline_gain, audit=audit, patrol=worksheet)
+            }, baseline_gain=baseline_gain, audit=audit, patrol=worksheet,
+               provider_stage=active_fresh)
             # H_t bookkeeping for the round that stops here. The early return
             # used to skip the calls further down, so a round that found a
             # capability gap *and* an unmeasurable family reported the gap in
@@ -3504,6 +3642,11 @@ class EvolutionEngine:
         ])
         fresh_control_rows = None
         reroll_noise = None
+        # Whether anything this round measured came from a live provider stage
+        # rather than a frozen replay. It decides how the round's own jitter has
+        # to be *reported*: a frozen replay is a known zero, a provider stage
+        # with only one roll is an unknown.
+        provider_stage_round = bool(active_fresh or has_provider_stage)
         if proposals and has_provider_stage:
             # Provider-stage hooks cannot replay a frozen baseline, so their
             # matched control is a fresh roll of the active registry. The
@@ -3519,6 +3662,30 @@ class EvolutionEngine:
                     fresh=True,
                 )
                 reroll_noise = paired_delta(active_rows, fresh_control_rows)
+        # The noise floor is the only reading in the round that says how much
+        # the instrument moved on its own. Two rolls of the same active
+        # configuration give it directly; the cases those rolls disagreed on
+        # are the ones no single-case claim may rest on. Both were already
+        # measured before this point -- they are now carried to the gates and
+        # into the report instead of being computed and dropped.
+        noise = noise_floor(
+            reroll=reroll_noise,
+            flipped=(
+                flipped_cases(active_rows, fresh_control_rows)
+                if reroll_noise is not None and fresh_control_rows is not None
+                else ()
+            ),
+            provider_stage=provider_stage_round,
+        )
+        # ``None`` -- not ``[]`` -- when no reroll was taken. The distinction is
+        # load-bearing at the gates: an empty list means "the instrument was
+        # rolled twice and nothing moved", while ``None`` means "nobody looked".
+        # Only the first licenses scoring a delta as if its cases were stable.
+        unstable_cases: list[str] | None = None
+        if str(noise.get("status") or "") == NOISE_FLOOR_MEASURED:
+            unstable_cases = [
+                str(case) for case in noise.get("flipped_cases") or ()
+            ]
 
         by_id = {
             str(candidate.get("intervention_id") or ""): dict(candidate)
@@ -3575,6 +3742,7 @@ class EvolutionEngine:
                 active_entries=self.registry.entries,
                 active_rows=active_rows,
                 fresh_control_rows=fresh_control_rows,
+                unstable_cases=unstable_cases,
                 arms=arms,
             )
             report.update({
@@ -3636,6 +3804,7 @@ class EvolutionEngine:
             active_entries=self.registry.entries,
             fresh_control_rows=fresh_control_rows,
             active_rows=active_rows,
+            unstable_cases=unstable_cases,
             arms=arms,
         )
         failed_combination = list(combination.get("failed_entries") or ())
@@ -3649,6 +3818,7 @@ class EvolutionEngine:
                 "gate": "COMBINATION_M",
                 "reason": combination["reason"],
                 "delta": _feedback_delta(combination.get("delta")),
+                "not_evaluable": bool(combination.get("stability_limited")),
             }
             self._ledger("rejected", payload)
             self.rejection_feedback.append(payload)
@@ -3783,6 +3953,7 @@ class EvolutionEngine:
                 admitted_ids={
                     str(c.get("intervention_id") or "") for c in selected
                 },
+                noise=noise,
             ),
             "evidence": self._evidence_report(),
             "proposal_summary": {
@@ -3827,13 +3998,22 @@ class EvolutionEngine:
                         "marginal_cases": int(reroll_noise["marginal_cases"]),
                         "new_errors": int(reroll_noise["new_errors"]),
                         "unresolved_added": int(reroll_noise["unresolved_added"]),
+                        "cases_flipped": len(
+                            noise.get("flipped_cases") or ()
+                        ),
                     },
+                    # The same reading the instrument block carries, kept here
+                    # as well so a reader following one block does not have to
+                    # find the other. `status` is what distinguishes a measured
+                    # zero from a round that never took a second roll.
+                    "noise_floor": dict(noise),
                 }
             ),
             "combination": {
                 "unit_ids": combination["unit_ids"],
                 "delta": combination["delta"],
                 "reason": combination["reason"],
+                "stability_limited": bool(combination.get("stability_limited")),
             },
             "marginal_selection": {
                 "selected": [
@@ -3905,6 +4085,7 @@ class EvolutionEngine:
         active_entries: Sequence[Mapping[str, Any]],
         fresh_control_rows: Sequence[Mapping[str, Any]] | None,
         active_rows: Sequence[Mapping[str, Any]],
+        unstable_cases: Sequence[str] | None = None,
         arms: _ArmRunner,
     ) -> dict[str, Any]:
         """Admit every qualified unit; when more than one qualifies, verify
@@ -4015,14 +4196,29 @@ class EvolutionEngine:
             baseline_rows=_subset_rows(control, self.split.sentinel),
             candidate_rows=_subset_rows(combo_rows, self.split.sentinel),
             config=self.config,
+            unstable_cases=(
+                None if unstable_cases is None else list(unstable_cases)
+            ),
         )
         control_g = _subset_rows(control, self.split.gain)
         combo_g = _subset_rows(combo_rows, self.split.gain)
-        delta = paired_delta(control_g, combo_g)
+        delta = paired_delta(
+            control_g, combo_g,
+            unstable_cases=(
+                None if unstable_cases is None else list(unstable_cases)
+            ),
+        )
         passed_m, failures = meets_m(delta, config=self.config)
         passed = combo_harmlessness["passed"] and passed_m
         if not combo_harmlessness["passed"]:
             failures = [combo_harmlessness["reason"], *failures]
+        # A combination that only fails because its whole gain sits on cases
+        # the control configuration reads two ways is not evidence that the
+        # members interfere; it is a round that cannot score them together.
+        stability_limited = bool(
+            not passed_m
+            and marginal_floor_rests_on_unstable(delta, config=self.config)
+        )
         unit_ids = [unit["intervention_id"] for unit in units]
         if passed:
             return {
@@ -4033,6 +4229,7 @@ class EvolutionEngine:
                 "reason": "combination arm met HARMLESSNESS and M",
                 "dropped_entries": [],
                 "failed_entries": [],
+                "stability_limited": False,
             }
         # The earliest units keep their earned admission; the tail units are
         # rejected because their interaction with the earlier ones breaks M.
@@ -4061,6 +4258,7 @@ class EvolutionEngine:
             ),
             "dropped_entries": dropped_entries,
             "failed_entries": [dict(entry) for entry in entries],
+            "stability_limited": stability_limited,
         }
 
     def _evaluate(
@@ -4790,8 +4988,28 @@ def _step_localization_check(
     baseline_rows: Sequence[Mapping[str, Any]],
     active_rows: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
+    """Whether the responsible step survived, reported per step kind.
+
+    ``n``/``baseline_hits``/``active_hits``/``not_regressed`` keep their exact
+    previous definitions and the verdict still reads only those. Added beside
+    them: the same hits split by whether the blamed step is an action step (the
+    event carries only tool calls) or a content step (it carries the
+    assistant's own prose). The kind is read off the arm's own envelope when it
+    recorded ``responsible_step_kind``; for a row written before that field
+    existed it is classified from the same dataset trajectory this function
+    already reads for the gold step -- the same mechanical rule on the same
+    bytes, never a guess about the row's numbers. A step that is neither
+    (unclassifiable) is reported as such rather than folded into either side.
+    """
     base_map = {str(r.get("case") or ""): r for r in baseline_rows}
     hit_base = hit_active = n = errors = 0
+    kinds: dict[str, dict[str, int]] = {
+        side: {"scorable": 0, "hits": 0} for side in ("baseline", "active")
+    }
+    by_kind: dict[str, dict[str, dict[str, int]]] = {
+        kind: {side: {"scorable": 0, "hits": 0} for side in ("baseline", "active")}
+        for kind in METRIC_STEP_KINDS
+    }
     for row in active_rows:
         if not row.get("gold"):
             continue
@@ -4805,27 +5023,85 @@ def _step_localization_check(
                 continue
             gold_step = int(gold_step)
             n += 1
-            if (
+            base = base_map.get(case)
+            active_hit = (
                 row.get("prediction") is True
                 and (row.get("result") or {}).get("responsible_step") == gold_step
-            ):
-                hit_active += 1
-            base = base_map.get(case)
-            if (
+            )
+            base_hit = bool(
                 base
                 and base.get("prediction") is True
                 and (base.get("result") or {}).get("responsible_step") == gold_step
+            )
+            hit_active += int(active_hit)
+            hit_base += int(base_hit)
+            for side, arm, hit in (
+                ("baseline", base, base_hit), ("active", row, active_hit),
             ):
-                hit_base += 1
+                if arm is None:
+                    continue
+                kind = row_responsible_step_kind(arm)
+                if kind == STEP_KIND_UNCLASSIFIED:
+                    kind = _step_kind_from_record(raw, row_responsible_step(arm))
+                if kind not in by_kind:
+                    continue
+                kinds[side]["scorable"] += 1
+                kinds[side]["hits"] += int(hit)
+                by_kind[kind][side]["scorable"] += 1
+                by_kind[kind][side]["hits"] += int(hit)
         except Exception:
             errors += 1
+    split: dict[str, Any] = {}
+    for kind in METRIC_STEP_KINDS:
+        for side in ("baseline", "active"):
+            bucket = by_kind[kind][side]
+            scorable, hits = bucket["scorable"], bucket["hits"]
+            split[f"{side}_{kind}_scorable"] = scorable
+            split[f"{side}_{kind}_hits"] = hits
+            split[f"{side}_{kind}_accuracy"] = (
+                (hits / scorable) if scorable else None
+            )
     return {
         "n": n,
         "errors": errors,
         "baseline_hits": hit_base,
         "active_hits": hit_active,
         "not_regressed": bool(n > 0 and errors == 0 and hit_active >= hit_base),
+        # Reporting only. Nothing below feeds ``not_regressed``.
+        "step_kind_split": split,
+        "baseline_classified": kinds["baseline"]["scorable"],
+        "active_classified": kinds["active"]["scorable"],
+        "note": (
+            "action-step and content-step accuracy answer different "
+            "questions (finding the right tool call vs the right sentence) "
+            "and must not be averaged into one localization number"
+        ),
     }
+
+
+def _step_kind_from_record(
+    raw: Mapping[str, Any], step: int | None,
+) -> str:
+    """Classify a step from the raw dataset record's own event structure.
+
+    Used only when an arm's envelope predates ``responsible_step_kind``. It
+    applies ``detector.packet.step_kind`` to the packet built from the same
+    ``{question, history}`` projection the detector itself ingests, so the
+    answer is the same mechanical rule on the same bytes -- not an inference
+    from the row's numbers and not a string heuristic.
+    """
+    if step is None:
+        return STEP_KIND_UNCLASSIFIED
+    try:
+        from detector.packet import build_packet, step_kind
+        from detector.dataset import project_record
+    except Exception:
+        return STEP_KIND_UNCLASSIFIED
+    try:
+        packet = build_packet(project_record(raw))
+    except Exception:
+        return STEP_KIND_UNCLASSIFIED
+    return step_kind(packet, step) or STEP_KIND_UNCLASSIFIED
 
 
 def run_experiment(

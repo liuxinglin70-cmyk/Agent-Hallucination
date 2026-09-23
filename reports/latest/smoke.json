@@ -176,7 +176,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "Magentic_One/036.json",
@@ -184,7 +186,9 @@
                 "baseline_prediction": false,
                 "active_prediction": false,
                 "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
+                "active_state": "verified_clean",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "Octotools/023.json",
@@ -192,7 +196,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "OpenDeepSearch/077.json",
@@ -200,7 +206,9 @@
                 "baseline_prediction": false,
                 "active_prediction": false,
                 "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
+                "active_state": "verified_clean",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "OpenDeepSearch/088.json",
@@ -208,7 +216,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "SmolAgents/019.json",
@@ -216,9 +226,17 @@
                 "baseline_prediction": false,
                 "active_prediction": false,
                 "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
+                "active_state": "verified_clean",
+                "baseline_health": true,
+                "active_health": true
               }
-            ]
+            ],
+            "stability_applicable": false,
+            "unstable_cases": [],
+            "marginal_cases_on_unstable": 0,
+            "marginal_cases_on_stable": 0,
+            "new_errors_on_unstable": 0,
+            "unresolved_added_on_unstable": 0
           },
           "reroll_control": null,
           "sentinel_manifest": {
@@ -291,7 +309,10 @@
                 "prediction": false
               }
             ]
-          }
+          },
+          "unstable_cases": [],
+          "harm_on_unstable_cases": [],
+          "harm_entirely_on_unstable": false
         },
         "behavior": {
           "passed": false,
@@ -368,7 +389,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "Magentic_One/036.json",
@@ -376,7 +399,9 @@
                 "baseline_prediction": false,
                 "active_prediction": false,
                 "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
+                "active_state": "verified_clean",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "Octotools/023.json",
@@ -384,7 +409,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "OpenDeepSearch/077.json",
@@ -392,7 +419,9 @@
                 "baseline_prediction": false,
                 "active_prediction": false,
                 "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
+                "active_state": "verified_clean",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "OpenDeepSearch/088.json",
@@ -400,7 +429,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "SmolAgents/019.json",
@@ -408,7 +439,9 @@
                 "baseline_prediction": false,
                 "active_prediction": false,
                 "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
+                "active_state": "verified_clean",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "OpenDeepSearch/080.json",
@@ -416,7 +449,9 @@
                 "baseline_prediction": false,
                 "active_prediction": false,
                 "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
+                "active_state": "verified_clean",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "OpenDeepSearch/086.json",
@@ -424,7 +459,9 @@
                 "baseline_prediction": false,
                 "active_prediction": false,
                 "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
+                "active_state": "verified_clean",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "Magentic_One/050.json",
@@ -432,7 +469,9 @@
                 "baseline_prediction": false,
                 "active_prediction": false,
                 "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
+                "active_state": "verified_clean",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "OpenDeepSearch/095.json",
@@ -440,7 +479,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "Magentic_One/093.json",
@@ -448,7 +489,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "Camel/018.json",
@@ -456,7 +499,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "BFCL/017.json",
@@ -464,7 +509,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "Octotools/040.json",
@@ -472,7 +519,9 @@
                 "baseline_prediction": false,
                 "active_prediction": false,
                 "baseline_state": "verified_clean",
-                "active_state": "verified_clean"
+                "active_state": "verified_clean",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "Octotools/030.json",
@@ -480,7 +529,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "OpenManus/064.json",
@@ -488,7 +539,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "SmolAgents/037.json",
@@ -496,7 +549,9 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               },
               {
                 "case": "OpenDeepSearch/067.json",
@@ -504,9 +559,17 @@
                 "baseline_prediction": true,
                 "active_prediction": true,
                 "baseline_state": "verified_error",
-                "active_state": "verified_error"
+                "active_state": "verified_error",
+                "baseline_health": true,
+                "active_health": true
               }
-            ]
+            ],
+            "stability_applicable": false,
+            "unstable_cases": [],
+            "marginal_cases_on_unstable": 0,
+            "marginal_cases_on_stable": 0,
+            "new_errors_on_unstable": 0,
+            "unresolved_added_on_unstable": 0
           },
           "fired_rate": 1.0,
           "behavior_events": 18,
@@ -1747,6 +1810,21 @@
     "terminal_counts": {
       "admitted": 1
     },
+    "noise_floor": {
+      "status": "deterministic_replay",
+      "applicable": false,
+      "rolls": 1,
+      "reason": "every arm of this comparison is a frozen replay, so the instrument's own jitter is zero by construction",
+      "paired_n": null,
+      "marginal_cases": 0,
+      "flips": {},
+      "new_errors": 0,
+      "unresolved_added": 0,
+      "cases_flipped": 0,
+      "flipped_cases": []
+    },
+    "unstable_cases": [],
+    "stability_limited_units": [],
     "instrument_limited": false
   },
   "evidence": {
@@ -1882,7 +1960,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Magentic_One/036.json",
@@ -1890,7 +1970,9 @@
               "baseline_prediction": false,
               "active_prediction": false,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_clean",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Octotools/023.json",
@@ -1898,7 +1980,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenDeepSearch/077.json",
@@ -1906,7 +1990,9 @@
               "baseline_prediction": false,
               "active_prediction": false,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_clean",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenDeepSearch/088.json",
@@ -1914,7 +2000,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "SmolAgents/019.json",
@@ -1922,9 +2010,17 @@
               "baseline_prediction": false,
               "active_prediction": false,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_clean",
+              "baseline_health": true,
+              "active_health": true
             }
-          ]
+          ],
+          "stability_applicable": false,
+          "unstable_cases": [],
+          "marginal_cases_on_unstable": 0,
+          "marginal_cases_on_stable": 0,
+          "new_errors_on_unstable": 0,
+          "unresolved_added_on_unstable": 0
         },
         "reroll_control": null,
         "sentinel_manifest": {
@@ -1997,7 +2093,10 @@
               "prediction": false
             }
           ]
-        }
+        },
+        "unstable_cases": [],
+        "harm_on_unstable_cases": [],
+        "harm_entirely_on_unstable": false
       },
       "behavior": {
         "passed": true,
@@ -2075,7 +2174,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Magentic_One/036.json",
@@ -2083,7 +2184,9 @@
               "baseline_prediction": false,
               "active_prediction": false,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_clean",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Octotools/023.json",
@@ -2091,7 +2194,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenDeepSearch/077.json",
@@ -2099,7 +2204,9 @@
               "baseline_prediction": false,
               "active_prediction": false,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_clean",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenDeepSearch/088.json",
@@ -2107,7 +2214,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "SmolAgents/019.json",
@@ -2115,7 +2224,9 @@
               "baseline_prediction": false,
               "active_prediction": false,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_clean",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenDeepSearch/080.json",
@@ -2123,7 +2234,9 @@
               "baseline_prediction": false,
               "active_prediction": true,
               "baseline_state": "verified_clean",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenDeepSearch/086.json",
@@ -2131,7 +2244,9 @@
               "baseline_prediction": false,
               "active_prediction": true,
               "baseline_state": "verified_clean",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Magentic_One/050.json",
@@ -2139,7 +2254,9 @@
               "baseline_prediction": false,
               "active_prediction": false,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_clean",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenDeepSearch/095.json",
@@ -2147,7 +2264,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Magentic_One/093.json",
@@ -2155,7 +2274,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Camel/018.json",
@@ -2163,7 +2284,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "BFCL/017.json",
@@ -2171,7 +2294,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Octotools/040.json",
@@ -2179,7 +2304,9 @@
               "baseline_prediction": false,
               "active_prediction": false,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_clean",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Octotools/030.json",
@@ -2187,7 +2314,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenManus/064.json",
@@ -2195,7 +2324,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "SmolAgents/037.json",
@@ -2203,7 +2334,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenDeepSearch/067.json",
@@ -2211,9 +2344,17 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             }
-          ]
+          ],
+          "stability_applicable": false,
+          "unstable_cases": [],
+          "marginal_cases_on_unstable": 0,
+          "marginal_cases_on_stable": 0,
+          "new_errors_on_unstable": 0,
+          "unresolved_added_on_unstable": 0
         },
         "fired_rate": 1.0,
         "behavior_note": "text_injected_cases=18",
@@ -2296,7 +2437,9 @@
               "baseline_prediction": false,
               "active_prediction": true,
               "baseline_state": "verified_clean",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenDeepSearch/086.json",
@@ -2304,7 +2447,9 @@
               "baseline_prediction": false,
               "active_prediction": true,
               "baseline_state": "verified_clean",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Magentic_One/050.json",
@@ -2312,7 +2457,9 @@
               "baseline_prediction": false,
               "active_prediction": false,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_clean",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenDeepSearch/095.json",
@@ -2320,7 +2467,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Magentic_One/093.json",
@@ -2328,7 +2477,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Camel/018.json",
@@ -2336,7 +2487,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "BFCL/017.json",
@@ -2344,7 +2497,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Octotools/040.json",
@@ -2352,7 +2507,9 @@
               "baseline_prediction": false,
               "active_prediction": false,
               "baseline_state": "verified_clean",
-              "active_state": "verified_clean"
+              "active_state": "verified_clean",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "Octotools/030.json",
@@ -2360,7 +2517,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenManus/064.json",
@@ -2368,7 +2527,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "SmolAgents/037.json",
@@ -2376,7 +2537,9 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             },
             {
               "case": "OpenDeepSearch/067.json",
@@ -2384,9 +2547,17 @@
               "baseline_prediction": true,
               "active_prediction": true,
               "baseline_state": "verified_error",
-              "active_state": "verified_error"
+              "active_state": "verified_error",
+              "baseline_health": true,
+              "active_health": true
             }
-          ]
+          ],
+          "stability_applicable": false,
+          "unstable_cases": [],
+          "marginal_cases_on_unstable": 0,
+          "marginal_cases_on_stable": 0,
+          "new_errors_on_unstable": 0,
+          "unresolved_added_on_unstable": 0
         },
         "target_kind": "detection"
       },
@@ -2548,7 +2719,8 @@
       "IV-SMOKE-001"
     ],
     "delta": null,
-    "reason": "single qualified unit; no combination arm needed"
+    "reason": "single qualified unit; no combination arm needed",
+    "stability_limited": false
   },
   "marginal_selection": {
     "selected": [
@@ -2632,7 +2804,9 @@
         "baseline_prediction": false,
         "active_prediction": true,
         "baseline_state": "verified_clean",
-        "active_state": "verified_error"
+        "active_state": "verified_error",
+        "baseline_health": true,
+        "active_health": true
       },
       {
         "case": "OpenDeepSearch/086.json",
@@ -2640,7 +2814,9 @@
         "baseline_prediction": false,
         "active_prediction": true,
         "baseline_state": "verified_clean",
-        "active_state": "verified_error"
+        "active_state": "verified_error",
+        "baseline_health": true,
+        "active_health": true
       },
       {
         "case": "Magentic_One/050.json",
@@ -2648,7 +2824,9 @@
         "baseline_prediction": false,
         "active_prediction": false,
         "baseline_state": "verified_clean",
-        "active_state": "verified_clean"
+        "active_state": "verified_clean",
+        "baseline_health": true,
+        "active_health": true
       },
       {
         "case": "OpenDeepSearch/095.json",
@@ -2656,7 +2834,9 @@
         "baseline_prediction": true,
         "active_prediction": true,
         "baseline_state": "verified_error",
-        "active_state": "verified_error"
+        "active_state": "verified_error",
+        "baseline_health": true,
+        "active_health": true
       },
       {
         "case": "Magentic_One/093.json",
@@ -2664,7 +2844,9 @@
         "baseline_prediction": true,
         "active_prediction": true,
         "baseline_state": "verified_error",
-        "active_state": "verified_error"
+        "active_state": "verified_error",
+        "baseline_health": true,
+        "active_health": true
       },
       {
         "case": "Camel/018.json",
@@ -2672,7 +2854,9 @@
         "baseline_prediction": true,
         "active_prediction": true,
         "baseline_state": "verified_error",
-        "active_state": "verified_error"
+        "active_state": "verified_error",
+        "baseline_health": true,
+        "active_health": true
       },
       {
         "case": "BFCL/017.json",
@@ -2680,7 +2864,9 @@
         "baseline_prediction": true,
         "active_prediction": true,
         "baseline_state": "verified_error",
-        "active_state": "verified_error"
+        "active_state": "verified_error",
+        "baseline_health": true,
+        "active_health": true
       },
       {
         "case": "Octotools/040.json",
@@ -2688,7 +2874,9 @@
         "baseline_prediction": false,
         "active_prediction": false,
         "baseline_state": "verified_clean",
-        "active_state": "verified_clean"
+        "active_state": "verified_clean",
+        "baseline_health": true,
+        "active_health": true
       },
       {
         "case": "Octotools/030.json",
@@ -2696,7 +2884,9 @@
         "baseline_prediction": true,
         "active_prediction": true,
         "baseline_state": "verified_error",
-        "active_state": "verified_error"
+        "active_state": "verified_error",
+        "baseline_health": true,
+        "active_health": true
       },
       {
         "case": "OpenManus/064.json",
@@ -2704,7 +2894,9 @@
         "baseline_prediction": true,
         "active_prediction": true,
         "baseline_state": "verified_error",
-        "active_state": "verified_error"
+        "active_state": "verified_error",
+        "baseline_health": true,
+        "active_health": true
       },
       {
         "case": "SmolAgents/037.json",
@@ -2712,7 +2904,9 @@
         "baseline_prediction": true,
         "active_prediction": true,
         "baseline_state": "verified_error",
-        "active_state": "verified_error"
+        "active_state": "verified_error",
+        "baseline_health": true,
+        "active_health": true
       },
       {
         "case": "OpenDeepSearch/067.json",
@@ -2720,9 +2914,17 @@
         "baseline_prediction": true,
         "active_prediction": true,
         "baseline_state": "verified_error",
-        "active_state": "verified_error"
+        "active_state": "verified_error",
+        "baseline_health": true,
+        "active_health": true
       }
-    ]
+    ],
+    "stability_applicable": false,
+    "unstable_cases": [],
+    "marginal_cases_on_unstable": 0,
+    "marginal_cases_on_stable": 0,
+    "new_errors_on_unstable": 0,
+    "unresolved_added_on_unstable": 0
   },
   "ledger_integrity": {
     "valid": true,
@@ -3018,7 +3220,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "0ff847f0dee4",
+          "digest": "394fce770ef1",
           "payload": {
             "stages": [
               "validate",
@@ -3039,7 +3241,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "80c0fec8a9a67ec9",
+            "source_digest": "faf96c15a8bea412",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -3207,11 +3409,11 @@
         }
       },
       "registry_hash": "4ed0ab57b823ff677233bc83dcea127de47aaf093666073ccc8e06bdad1d6773",
-      "digest": "cf92bb12d1d8"
+      "digest": "a1f8fd3cea35"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "cf92bb12d1d8",
+      "current_digest": "a1f8fd3cea35",
       "first_manifest": true,
       "changed": [
         "G",

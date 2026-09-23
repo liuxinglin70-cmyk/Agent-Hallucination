@@ -8,6 +8,30 @@ is registered here.
 
 Every predicate returns ``{"predicate", "verdict", "detail"}`` where ``verdict``
 is from the predicate's own closed vocabulary.
+
+A verdict is the predicate's *opinion*, and three of these opinions can be
+convicting (``PREDICATE_CONVICTION_VERDICTS``): a ``decision_guard`` may bind
+one and convict without the judge, the recall net or the defense hearing. That
+authority is not free -- it is granted only while a calibration record shows the
+predicate has zero false positives on the labelled gold-clean corpus
+(``detector.conviction_calibration``). The extraction rules below are therefore
+written to state what they can actually establish:
+
+* ``required_action_present`` reads an obligation only when the sentence names an
+  explicit tool-semantics object (tool / function / api / command / endpoint)
+  and the name in front of it is identifier-shaped. "Use the complete name with
+  article if any" is an answer-format instruction, not a tool requirement, and
+  "collaborate" is not a tool.
+* A movement requirement is a *destination* ("swing by the nearest tire shop"),
+  not an infinitive directive ("proceed to close the ticket"), and it is
+  satisfied when some tool call refers to the target -- not only when a tool
+  whose name contains a movement verb does.
+* A pending engine start is the trajectory *ending* on a request for
+  permission, in the agent's own unquoted words.
+* ``final_delivery_present`` reads a delivery channel as any of: the last prose
+  event, an answer-like tool call, or a content-bearing tool observation. A
+  terminal success whose observations carry the answer is a delivery on this
+  corpus's agent frameworks, so the absence of prose alone establishes nothing.
 """
 
 from __future__ import annotations
@@ -43,6 +67,11 @@ PREDICATES = frozenset(PREDICATE_VERDICTS)
 # Only these predicate outcomes prove a task-level mechanical violation. Other
 # negative-looking outcomes diagnose evidence quality or judge coverage and may
 # guide proposals, but they cannot authorize a terminal conviction.
+#
+# This table says which *verdicts* are convicting, not that the predicates are
+# entitled to convict: that is decided by the calibration guard
+# (``detector.conviction_calibration``), which refuses the authority outright
+# while a predicate's measured clean-set false-positive count is not zero.
 PREDICATE_CONVICTION_VERDICTS: dict[str, frozenset[str]] = {
     "required_action_present": frozenset({"violated"}),
     "verbatim_fidelity": frozenset({"violated"}),
@@ -55,6 +84,19 @@ _ACTION_MARKERS = (
     "use the", "call the", "run the", "query the", "execute the",
 )
 
+#: What makes an obligation an *action* obligation: the sentence names the kind
+#: of thing to act on. Without this, "use the" inside "Use the complete name
+#: with article if any" (an answer-format instruction) parses as a requirement
+#: to use something called "complete name".
+_TOOL_OBJECT_RE = re.compile(r"\b(tool|function|api|command|endpoint)\b", re.I)
+
+#: The name in front of the tool word, bounded so a sentence fragment cannot
+#: become a "tool name". ``_LEAD_IN_RE`` drops the article: "the search tool"
+#: names ``search``.
+_NAME_SHAPE_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(?:\s+[A-Za-z0-9_]+){0,2}")
+_LEAD_IN_RE = re.compile(r"^(?:the|a|an)\s+", re.I)
+_TOOL_OBJECT_WINDOW = 40
+
 _VERBATIM_MARKERS = (
     "verbatim", "exactly", "exact text", "exact phrase", "literal",
     "word-for-word", "word for word", "must say", "must write",
@@ -64,11 +106,52 @@ _VERBATIM_MARKERS = (
 
 _QUOTE_RE = re.compile(r"[\"'\u201c]([^\"'\u201d\n]{1,400})[\"'\u201d]")
 
+#: Spans the agent is quoting rather than saying. A quoted "Should I take any
+#: action?" inside a posted comment is the agent's content, not the agent
+#: asking the user for permission.
+_QUOTED_SPAN_RE = re.compile(r"\"[^\"]*\"|\u201c[^\u201d]*\u201d|'[^']*'")
+
 _EXACT_VALUE_RE = re.compile(
     r"\b(?:exactly|exact value|must equal|must be|equals?)\s+"
     r"([+-]?\d[\d,]*(?:\.\d+)?)",
     re.IGNORECASE,
 )
+
+#: Phrases that ask the *user* to decide. Read only from the agent's own words.
+_PERMISSION_PHRASES = (
+    "would you like me to", "should i", "do you want me to",
+    "shall i", "may i",
+)
+
+#: Tools whose name reads as moving to a place. The satisfaction test no longer
+#: requires one of these -- a destination may be served by a tool named for the
+#: destination (``find_nearest_tire_shop``) -- but the vocabulary still
+#: documents which names this module regards as movement.
+_MOVEMENT_TOOLS = frozenset({
+    "cd", "chdir", "navigate", "goto", "go", "travel", "drive",
+    "move", "visit", "head", "swing", "walk",
+})
+
+_STOPWORDS = frozenset({"the", "a", "an", "to", "and", "of", "in", "on"})
+
+#: The runtime wraps every tool observation in this envelope; the completion
+#: banner is fixed text every terminating call carries. Neither is delivery.
+_OBSERVATION_ENVELOPE_RE = re.compile(
+    r"Observed output of cmd `[^`]*` executed:"
+)
+_COMPLETION_BANNER_RE = re.compile(
+    r"The interaction has been completed with status: success"
+)
+
+#: How much text a tool observation must still carry, envelope and banner
+#: removed, to count as a delivery channel.
+_MIN_DELIVERY_CHARS = 20
+
+
+def _delivery_payload(observation: Any) -> str:
+    """The observation with its fixed runtime frame removed."""
+    text = _OBSERVATION_ENVELOPE_RE.sub("", str(observation or ""))
+    return _COMPLETION_BANNER_RE.sub("", text).strip()
 
 
 def _clean(value: Any) -> str:
@@ -124,7 +207,17 @@ def _tool_names(packet: Mapping[str, Any]) -> set[str]:
 
 
 def _detect_required_actions(question: str) -> set[str]:
-    """Conservative extraction of explicitly required tool actions."""
+    """Extraction of explicitly required tool actions, under a double condition.
+
+    A marker alone does not state a tool obligation, so two things must hold:
+
+    1. the text right after the marker names a tool-semantics object (``tool``,
+       ``function``, ``api``, ``command``, ``endpoint``), and
+    2. the phrase in front of that object is identifier-shaped and short.
+
+    "Use the complete name with article if any" fails both: there is no tool
+    word, and ``complete name with article if any`` is a sentence, not a name.
+    """
     actions: set[str] = set()
     lowered = question.lower()
     for marker in _ACTION_MARKERS:
@@ -133,27 +226,28 @@ def _detect_required_actions(question: str) -> set[str]:
             pos = lowered.find(marker, start)
             if pos < 0:
                 break
-            tail = question[pos + len(marker): pos + len(marker) + 80]
-            match = re.match(
-                r"[\s:\-]*([A-Za-z_][A-Za-z0-9_ /.-]*?)(?=\s+(?:tool|"
-                r"function|api|command)|\s+(?:to|for|before|when|while|"
-                r"with|and|or|from|by|in|on|\.|,|$))",
-                tail,
-            )
             start = pos + max(1, len(marker))
-            if not match:
+            tail = question[pos + len(marker): pos + len(marker) + 80]
+            obj = _TOOL_OBJECT_RE.search(tail)
+            if obj is None or obj.start() > _TOOL_OBJECT_WINDOW:
                 continue
-            name = match.group(1).strip(" .-")
-            name = re.sub(r"\s+(tool|function|api|command)$", "", name, flags=re.I)
-            name = name.lower().replace(" the ", " ")
-            if name and not any(ch in name for ch in ("?", "!", ";")):
-                actions.add(name.strip())
+            phrase = _LEAD_IN_RE.sub("", tail[:obj.start()].strip(" \t:-"))
+            shape = _NAME_SHAPE_RE.match(phrase)
+            if shape is None:
+                continue
+            name = " ".join(shape.group(0).split()).strip(" .-").lower()
+            if not name or name in {"tool", "function", "api", "command", "endpoint"}:
+                continue
+            if any(ch in name for ch in ("?", "!", ";")):
+                continue
+            actions.add(name)
     # Explicit structured spelling in natural-language questions.
     for match in re.finditer(
         r"required_action\s*[:=]\s*[\"']([^\"']+)[\"']", question, re.I,
     ):
         actions.add(match.group(1).strip().lower())
     return {name for name in actions if name}
+
 
 
 def _detect_verbatim_phrases(question: str) -> list[str]:
@@ -198,35 +292,112 @@ def _delivered_texts(packet: Mapping[str, Any]) -> list[str]:
     return [_clean(row) for row in rows if _clean(row)]
 
 
+#: Markers that introduce a *destination*. ``proceed to`` is deliberately not
+#: one: it takes an infinitive verb phrase ("proceed to close the ticket",
+#: "proceed to display only the last 10 lines", "proceed to start the engine"),
+#: so reading it as a movement marker invents a place to travel to out of an
+#: instruction to act. Measured on the corpus: keeping it adds exactly one
+#: error-set hit, whose extracted target ("juxtapose it") is not a place, and
+#: no clean-set hit -- it is a marker whose matches are all misreads.
+_DESTINATION_MARKERS = (
+    "swing by", "head over to", "head to", "drive to", "walk to", "stop by",
+    "drop by", "travel to", "go to", "visit",
+)
+
+_DESTINATION_RE = re.compile(
+    r"(?:" + "|".join(re.escape(marker) for marker in _DESTINATION_MARKERS)
+    + r")\s+(?:the\s+)?",
+    re.IGNORECASE,
+)
+
+_DESTINATION_TAIL_RE = re.compile(
+    r"([A-Za-z0-9_ .'-]+?)"
+    # ``using`` / ``via`` close a destination the way a conjunction does:
+    # "go to Fire Station 301 DCA ARFF using the metro" names the station, not
+    # the station *and its transport*.
+    r"(?=\s+(?:and|or|to|for|before|while|with|when|using|via|,|\.)|[.?]|$)"
+)
+
+#: A clause that starts with one of these does not name a place; it continues
+#: the sentence ("...visit and need to know the travel distance").
+_DESTINATION_STOPWORDS = frozenset({
+    "and", "or", "but", "then", "also", "so", "because", "if", "when", "while",
+    "as", "that", "to", "for", "with", "without", "in", "on", "at", "by",
+    "from", "need", "needs", "visit", "yet", "nor", "than", "which", "who",
+})
+
+#: A destination inside a question or a hypothetical clause is not an
+#: instruction: "perhaps we could swing by the nearest tire shop?" asks whether
+#: to act, it does not require it.
+_HYPOTHETICAL_RE = re.compile(r"\b(?:if|whether|perhaps|maybe|in case|unless)\b", re.I)
+
+_MIN_DESTINATION_CHARS = 6
+
+
+def _clause_at(text: str, position: int) -> str:
+    """The sentence containing ``position``, approximated by hard punctuation."""
+    start = max(
+        text.rfind(".", 0, position), text.rfind("?", 0, position),
+        text.rfind("!", 0, position), text.rfind("\n", 0, position),
+    ) + 1
+    end = len(text)
+    for stop in ".?!\n":
+        found = text.find(stop, position)
+        if found >= 0:
+            end = min(end, found + 1)
+    return text[start:end]
+
+
 def _movement_requirements(texts: Iterable[str]) -> list[str]:
-    patterns = (
-        r"(?:swing by|head over to|go to|drive to|walk to|visit|stop by|"
-        r"drop by|proceed to|travel to)\s+(?:the\s+)?"
-        r"([A-Za-z0-9_ .'-]+?)"
-        r"(?=\s+(?:and|or|to|for|before|while|with|when|,|\.)|[.?]|$)"
-    )
+    """Destinations the task asks the agent to travel to.
+
+    Three conditions, each aimed at one misread: a destination is long enough to
+    be a place, does not start with a function word ("...plan a visit and need
+    to know" names no place), and does not sit in an interrogative or
+    hypothetical clause.
+    """
     found: list[str] = []
     for text in texts:
-        for match in re.finditer(patterns, text, re.IGNORECASE):
-            target = " ".join(match.group(1).split())
-            if target and target not in found:
+        for match in _DESTINATION_RE.finditer(text):
+            tail = _DESTINATION_TAIL_RE.match(text[match.end(): match.end() + 80])
+            if tail is None:
+                continue
+            target = " ".join(tail.group(1).split())
+            if len(target) < _MIN_DESTINATION_CHARS:
+                continue
+            if target.split()[0].lower().strip(".-'") in _DESTINATION_STOPWORDS:
+                continue
+            clause = _clause_at(text, match.start())
+            if "?" in clause or _HYPOTHETICAL_RE.search(clause):
+                continue
+            if target.lower() not in found:
                 found.append(target.lower())
     return found
 
 
+def _unquoted(text: str) -> str:
+    """The agent's own words, with quoted spans removed."""
+    return _QUOTED_SPAN_RE.sub(" ", str(text or ""))
+
+
 def _permission_pending(packet: Mapping[str, Any]) -> bool:
+    """Whether the trajectory *ends* waiting for the user's permission.
+
+    Two conditions, both needed. The ask has to be in the last event -- an
+    agent that asked permission mid-trajectory and then acted is not pending --
+    and that event must carry no tool call, so a "Would you like me to ...?"
+    quoted inside a posted message is not read as the agent asking.
+    """
     events = list(packet.get("events") or [])
-    for event in events:
-        text = str(event.get("content") or "").lower()
-        if "?" in text and any(
-            phrase in text
-            for phrase in (
-                "would you like me to", "should i", "do you want me to",
-                "shall i", "may i",
-            )
-        ):
-            return True
-    return False
+    if not events:
+        return False
+    last = events[-1]
+    if last.get("tool_interactions"):
+        return False
+    text = _unquoted(last.get("content")).lower()
+    if "?" not in text:
+        return False
+    return any(phrase in text for phrase in _PERMISSION_PHRASES)
 
 
 def predicate_required_action_present(
@@ -252,23 +423,22 @@ def predicate_required_action_present(
     contract_texts = [question, *contracts]
     movements = _movement_requirements(contract_texts)
     movement_violated = []
-    movement_tools = {
-        "cd", "chdir", "navigate", "goto", "go", "travel", "drive",
-        "move", "visit", "head", "swing", "walk",
-    }
     for target in movements:
-        satisfied = False
         tokens = {
             token for token in target.split()
-            if token not in {"the", "a", "an", "to", "and", "of", "in", "on"}
+            if token not in _STOPWORDS
         }
+        # A destination is satisfied when some tool call refers to it. The test
+        # used to require the *tool name* to contain a movement verb, which
+        # encodes "travelling is done by a navigation tool": a destination
+        # served by ``find_nearest_tire_shop`` was read as never reached.
+        satisfied = False
         for event in packet.get("events") or []:
             for interaction in event.get("tool_interactions") or []:
                 name = str(interaction.get("tool_name") or "").lower()
                 args = str(interaction.get("arguments") or "").lower()
-                if any(verb in name for verb in movement_tools) and any(
-                    token in args or token in name for token in tokens
-                ):
+                haystack = f"{name} {args}"
+                if tokens and any(token in haystack for token in tokens):
                     satisfied = True
         if not satisfied:
             movement_violated.append(target)
@@ -462,8 +632,24 @@ def predicate_delivered_anchor_consistency(
 def predicate_final_delivery_present(
     packet: Mapping[str, Any], context: Mapping[str, Any]
 ) -> dict[str, Any]:
-    """Detect a terminal success with no answer/prose delivery anchor."""
-    question = _question_text(packet).lower()
+    """Detect a terminal success with no delivery anchor of any kind.
+
+    Three delivery channels count, not two. A trajectory may deliver its answer
+    as the last prose event, through an answer-like tool call, or **in a tool
+    observation** -- which is how this corpus's OpenManus-style runs deliver:
+    the answer sits in the observation of the final call and the run closes with
+    ``terminate(status=success)``. Reading only prose and answer-tool anchors
+    called three correct runs "no delivery", which is what a false positive
+    looks like when a predicate knows one framework's shape and not another's.
+
+    A content-bearing observation is one whose text, after the runtime envelope
+    ("Observed output of cmd `x` executed:") and the fixed completion banner are
+    removed, still carries at least ``_MIN_DELIVERY_CHARS`` characters. The
+    threshold is loose on purpose: this predicate is not judging whether the
+    answer is *correct*, only whether a channel exists. Its conviction authority
+    comes from the calibration record, which refuses it unless the loose rule
+    still produces zero clean-set false positives.
+    """
     anchors = packet_delivered_result(packet)
     has_prose = bool(anchors.get("last_prose_event_id"))
     answer_tool = anchors.get("last_answer_tool_call") or {}
@@ -477,11 +663,22 @@ def predicate_final_delivery_present(
         for event in packet.get("events") or ()
         for interaction in event.get("tool_interactions") or ()
     )
-    if terminal_success and not has_prose and not has_answer_tool:
+    has_observation = any(
+        len(_delivery_payload(interaction.get("observation")))
+        >= _MIN_DELIVERY_CHARS
+        for event in packet.get("events") or ()
+        for interaction in event.get("tool_interactions") or ()
+    )
+    if terminal_success and not (
+        has_prose or has_answer_tool or has_observation
+    ):
         return {
             "predicate": "final_delivery_present",
             "verdict": "missing",
-            "detail": "trajectory reports success without a prose or answer-tool delivery anchor",
+            "detail": (
+                "trajectory reports success without a prose, answer-tool or "
+                "observation delivery anchor"
+            ),
         }
     if not terminal_success:
         return {
@@ -492,7 +689,7 @@ def predicate_final_delivery_present(
     return {
         "predicate": "final_delivery_present",
         "verdict": "present",
-        "detail": "terminal success has a prose or answer-tool delivery anchor",
+        "detail": "terminal success has a prose, answer-tool or observation anchor",
     }
 
 

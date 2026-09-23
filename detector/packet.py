@@ -32,6 +32,10 @@ _ANSWER_TOOL_HINTS = (
     "respond", "conclude",
 )
 
+STEP_KIND_CONTENT = "content_step"
+STEP_KIND_ACTION = "action_step"
+STEP_KIND_EMPTY = "empty_step"
+
 PACKET_FEATURE_NAMES = frozenset({
     "has_tool_calls",
     "has_retrieval_tool",
@@ -238,6 +242,34 @@ def event_id_for_step(packet: Mapping[str, Any], step: int) -> str | None:
     for event in packet.get("events") or []:
         if int(event.get("position") or 0) == step:
             return str(event.get("event_id") or "") or None
+    return None
+
+
+def step_kind(packet: Mapping[str, Any], step: int) -> str | None:
+    """Classify one packet position by the *structure of its own event*.
+
+    The localization reading needs to say whether the step a verdict blames
+    is a content step (the event carries the assistant's own prose) or an
+    action step (the event carries only tool calls). The distinction is
+    structural on purpose: it is read off the event the packet already built
+    -- whether ``content`` is non-empty, whether ``tool_interactions`` is
+    non-empty -- and never from keywords, lengths or any semantic guess about
+    what the prose says. A step that both speaks and acts is a content step:
+    prose is locally checkable text, and the reader who wants "did it only
+    act here" has ``tool_interactions`` in the same event.
+
+    Returns ``None`` for a position outside ``1..len(events)``, so a caller
+    can tell "unclassifiable" from "classified as empty".
+    """
+    for event in packet.get("events") or []:
+        if int(event.get("position") or 0) != int(step):
+            continue
+        content = event.get("content")
+        if content not in (None, "") and str(content).strip():
+            return STEP_KIND_CONTENT
+        if event.get("tool_interactions"):
+            return STEP_KIND_ACTION
+        return STEP_KIND_EMPTY
     return None
 
 
@@ -606,6 +638,9 @@ __all__ = [
     "PACKET_FEATURE_NAMES",
     "PACKET_SCHEMA",
     "PacketError",
+    "STEP_KIND_ACTION",
+    "STEP_KIND_CONTENT",
+    "STEP_KIND_EMPTY",
     "build_packet",
     "delivered_result",
     "event_id_for_step",
@@ -615,6 +650,7 @@ __all__ = [
     "render_defense_view",
     "render_full_view",
     "render_judge_view",
+    "step_kind",
     "validate_packet",
     "validate_record",
 ]

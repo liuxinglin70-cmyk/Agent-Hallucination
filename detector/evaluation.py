@@ -146,6 +146,15 @@ def evaluate_run(
             "terminal_prediction": terminal_prediction,
             "gold_step": gold_step,
             "responsible_step": result.get("responsible_step"),
+            # What kind of step the verdict blames: the event's own structure
+            # carries either assistant prose or tool calls, and the two are
+            # not comparable. Left None for a row written before the envelope
+            # recorded it, so "unclassified" stays distinguishable from
+            # "classified as empty".
+            "responsible_step_kind": (
+                result.get("responsible_step_kind")
+                or (result.get("proof") or {}).get("responsible_step_kind")
+            ),
             "state": result.get("state"),
             "authority": result.get("decision_authority"),
         })
@@ -212,6 +221,7 @@ def evaluate_run(
     metrics["missing_cases"] = len(missing_cases)
     step_hits = 0
     step_total = 0
+    by_kind: dict[str, dict[str, int]] = {}
     for row in rows:
         if not row["gold"] or row["gold_step"] is None:
             continue
@@ -219,12 +229,36 @@ def evaluate_run(
         # Localization is only credited for an authoritative positive; a
         # responsible step read off a degraded verdict is not the detector's
         # answer any more than the verdict is.
-        if row["prediction"] is True and row["responsible_step"] == row["gold_step"]:
+        hit = (
+            row["prediction"] is True
+            and row["responsible_step"] == row["gold_step"]
+        )
+        if hit:
             step_hits += 1
+        # Split by what the blamed step actually is. The overall rate mixes
+        # two populations that the corpus annotates differently -- a verdict
+        # that blames the tool call the agent made and one that blames the
+        # prose it wrote are not the same claim -- so the reading is broken
+        # out instead of being reported only as one average.
+        kind = str(row.get("responsible_step_kind") or "unclassified")
+        bucket = by_kind.setdefault(kind, {"n": 0, "hits": 0})
+        bucket["n"] += 1
+        bucket["hits"] += int(hit)
+    for bucket in by_kind.values():
+        bucket["accuracy"] = (
+            bucket["hits"] / bucket["n"] if bucket["n"] else None
+        )
     metrics["step_localization"] = {
         "n": step_total,
         "hits": step_hits,
         "accuracy": step_hits / step_total if step_total else None,
+        # Reporting only; the overall rate above is unchanged. Two step kinds
+        # are not comparable, so a reader must not average across them.
+        "by_step_kind": by_kind,
+        "note": (
+            "action-step and content-step accuracy answer different questions; "
+            "read them apart, never as one rate"
+        ),
     }
     return {
         "run_id": run_id,

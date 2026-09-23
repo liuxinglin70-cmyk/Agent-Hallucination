@@ -20,7 +20,11 @@ hallucination-evolution = "evolution.cli:main"
 include = ["detector", "evolution"]
 
 [tool.setuptools.package-data]
-detector = ["configs/*.json"]
+# ``calibration/conviction_predicates.json`` is the record that lets a built-in
+# deterministic predicate authorize a conviction. Without it in the installed
+# distribution the guard fails closed on every predicate, which is safe but
+# silently disables the mechanical conviction route.
+detector = ["configs/*.json", "calibration/*.json"]
 evolution = ["configs/*.json"]
 
 [tool.pytest.ini_options]

@@ -2023,6 +2023,8 @@ python -m evolution experiment --mini --backend mock         # 离线多轮
 | 开发循环真实运行 1 | 见 §31 | 843 passed | 全 PASS（十二项） | [reports/real_dev_20260923/run1_README.md](reports/real_dev_20260923/run1_README.md) |
 | **开发循环真实运行 2（真实数据首次跑通开发阶段）** | 见 §31 | 843 passed | 全 PASS（十二项） | [reports/real_dev_20260923/run2_README.md](reports/real_dev_20260923/run2_README.md) |
 | **底层深度审查：测量完整性（19 个活缺陷）** | 见 §32 | **917 passed** | 全 PASS（十五项） | [reports/deep_audit_20260923](reports/deep_audit_20260923/README.md) |
+| **检测口径修复 + 693 例测量能力 + 开跑前检查器** | 见 §33 | **1043 passed** | 全 PASS（十五项） | [reports/calibration_and_preflight_20260923](reports/calibration_and_preflight_20260923/README.md) |
+| **定位口径两分 + 责任步冲突降级（§32.7 检测口径两条的一半）** | 见 §33 | **951 passed** | 全 PASS | [reports/localization_split_20260923](reports/localization_split_20260923/README.md) |
 | P3 开放式演化 | 未开始（需 P0–P2 成功） | | | |
 
 **P0/P1 状态小结（2026-09-22）**：P0 四项 + P1 五项全部落地，715 项测试通过，`scripts/verify.py` 七项全 PASS。
@@ -2907,3 +2909,167 @@ python -m evolution verify-ledger --config evolution/configs/selfevo_real_202609
 **建议的运行形态**：多轮（≥3）以检验跨代继承，每轮之间用 `verify-ledger` 独立复核账本链；
 首轮之后检查 `route_failures.jsonl` / `gaps.jsonl` 是否终于出现——**这两种记录现在都可写，
 但"能否在真实数据上被触发"仍取决于数据形状，本轮修的是"该写时不会漏写"**。
+
+---
+
+# §33 定位口径两分与责任步冲突降级（2026-09-23）
+
+归档报告（含全部读数、复算脚本与验证矩阵）：[reports/localization_split_20260923](reports/localization_split_20260923/README.md)。
+
+## 33.1 入口
+
+§32.7 记录检测器基座的三条口径问题，并说明"它们改变检测口径，需要先决定口径再动"。本轮处理其中
+**只影响证据强度、不影响判定**的部分：
+
+1. 一行同时报告两个不同责任步却仍记 `authoritative`（142 例中 3 例）；
+2. 117/142 的责任步指向只有工具调用的动作事件，而指标不区分动作步与内容步。
+
+未动第三条（机械定罪谓词 2.8% 干净集误报、`BFCL/008`/`024` 单元级 6/2 分裂）——它们直接改变判定。
+
+## 33.2 冲突：选了"记录 + 降级"，并实测区分了两类"不一致"
+
+采纳规则写成 `LOCALIZATION_STEP_PRIORITY` 并写入行内。降级作用于**新增的
+`localization_authority` 轴**，`decision_authority` 逐字不动——因为
+`prediction_state` / `arm_has_infrastructure_failure` / `_row_health` / 两个 localization 门
+全部读后者，动它会改变已成立的定罪，而任务要求"不影响既有判定"。
+
+**先量后定**：归档显示 `substantiated` hearing 的 `confirmed_step` **284/284 等于指控步**（契约强制），
+tracer 与它不一致时**25/25 报更早的步、0 次更晚**。所以那 25 例是 tracer 正常履职（`LOCALIZATION_LAW`
+要的就是"最早"），采纳的正是 tracer 的步，行内自洽 —— **记录不降级**。真正的矛盾只有一类：envelope
+的 `proof.step_tracer`（镜像首个 hearing）与采纳步不符，142 例中 3 例（`BFCL/153`、`BFCL/008` ×2），
+全部标出并降级。
+
+## 33.3 分列读数与判定规则
+
+`detector/packet.py::step_kind` 只读事件结构（`content` 非空 → 内容步；为空而有 `tool_interactions`
+→ 动作步；都空 → 空步；步号越界 → `None` 不猜）。定罪时写入 `responsible_step_kind` 进 envelope；
+既有归档行由 `engine._step_kind_from_record` 用同一规则在同一份投影上重建。分列读数加在
+`metrics.localization_metrics` / `paired_localization_delta` 与 `engine._step_localization_check`，
+**既有分子分母与 `not_regressed` 判据逐字未变**，72.6% 的含义不变。
+
+## 33.4 实测（142 行归档定罪，只读，零 provider）
+
+| 量 | 修复前 | 修复后 |
+|---|---|---|
+| 定罪行 | 142 | 142 |
+| 动作步 / 内容步 | 117 / 25（隐性） | **117 / 25（显式分列）** |
+| 整体命中 | 98/142 = 69.0% | 98/142 = 69.0%（未变；§32 的 98/135 = 72.6% 分母只含可定位 gold 步） |
+| 动作步命中 | 不可分 | **98/117 = 83.8%** |
+| 内容步命中 | 不可分 | **0/25 = 0.0%** |
+| 冲突行 | 3（仍记 authoritative） | **3（标记 + 降级）** |
+| `decision_authority` / 采纳步被改变的行 | — | **0 / 0** |
+
+分列揭示的实质：整体命中几乎全部由动作步贡献，**内容步在这批数据上 0/25** —— 混读的平均数掩盖了这一点。
+
+## 33.5 验证
+
+新增 `evolution/tests/test_localization_conflict_and_split.py`（17 项）。逐项"回退即失败"已验证：
+冲突检测恒 `None` → 3 项失败；`step_kind` 恒 `None` → 6 项；两个读数去掉分解 → 各 1–2 项失败；
+`localization_conflict_rows` 恒 0 → 1 项失败。`python -m pytest -q` = **951 passed**，
+`scripts/verify.py` 全项 PASS。
+
+## 33.6 未做与不确定
+
+- 未修另两条检测口径（改判定）；**未运行真实服务**（全部读归档 + 离线重放）。
+- 报告中的命中率是 2026-09-19 归档运行在该代码版本下的读数，**不是当前检测器准确率**。
+- 内容步 0/25 样本量小，是描述而非估计。冲突率 3/142 = 2.1% 能否外推需新运行验证。
+- 并行边界遵守：未改 `interventions.py`，未改 `gates.behavior_gate` / `localization_behavior_gate`，
+  未改 `engine` 的 `_run_cycle` / `_run_unit` / `_instrument_report` / `_audit` / `run_governance`。
+
+---
+
+# 33. 检测口径修复与开跑前排查（2026-09-23）
+
+归档：[reports/calibration_and_preflight_20260923](../reports/calibration_and_preflight_20260923/README.md)
+
+## 33.1 用户在本轮定的三件事
+
+1. **693 例本身就是验证数据集**，不必再要独立 holdout（暴露不重要，要先在它上面确定效果）。
+2. 解决 §32.7 留下的**检测口径三条问题**与**预算/运维**问题。
+3. 做一轮**开跑前的排查与问题检测**。
+
+读数：`1043 passed`（上轮 917），`verify.py` 15 项全 PASS；开跑前检查两阶段均 **READY（0 blockers）**。
+
+## 33.2 排查最先查出的一件事：693 例上至今没有任何真实读数
+
+实测：**整个仓库的归档结果只覆盖 10 个唯一案例**（8 个判定幻觉 + 2 个干净）。
+此前所有"142 行定罪""98/142 = 69% 定位准确率"都是同一批案例重复约 30 次的读数
+（`reports/rsi_pilot_20260919/` 的 300 个文件里只有 10 个不同案例）。
+
+**这不是缺陷，是"至今没测过"**——而它把预算问题从次要变成了决定性的：693 例跑一次在
+`workers=8` 下估计 **21–28 小时**，自进化每轮还要评估多次。
+
+**一个由此产生的口径约束**：既然 693 例就是验证集、不存在 holdout，那么**每轮测量都会消耗案例**——
+跑得越多，"从未被任何测量看过"的案例就越少。所以**基线必须在自进化之前做**，
+否则自进化的收益无法与"案例被反复看过"区分。
+
+## 33.3 检测口径三条问题的落地
+
+### 33.3.1 机械定罪：校准护栏 + 抽取修复
+
+误报从 clean 集 **7 → 0**（`required_action_present`）、**3 → 0**（`final_delivery_present`）。
+护栏是通用的：谓词要授权定罪必须先通过**干净集零误报校准**，记录含语料指纹与**可达依赖源码指纹**，
+未通过者**保留 evidence 但吊销定罪权**（不是静默放行也不是删掉谓词）。
+
+**代理主动报出的两件不利于自己的事实，我认可其诚实并保留在归档里**：① 丢失的 29 例 error 命中
+逐例审计后**没有一例是真阳性**（detail 陈述与轨迹不符、movement 目标不是地点）；②
+`final_delivery_present` 在本语料上**已无任何 error 命中**，是否保留作为定罪谓词**需用户决定**。
+
+### 33.3.2 定位：按步的性质分列
+
+**我独立重建了 142 行的 step_kind**，结果与代理一致：**动作步 117 例（gold 命中 98 = 83.8%）、
+内容步 25 例（gold 命中 0 = 0.0%）**。混读的平均数（69%）几乎全由动作步撑起，
+**内容步 0/25** ——这正是"72.6% 不可比"的实质。既有分子分母与判据逐字未变，分列是附加读数。
+
+### 33.3.3 冲突降级与噪声底
+
+- **冲突**：实测 3/142 行报告两个不同责任步却记 authoritative。修法是**只对真正的矛盾降级**——
+  代理先量后定：`tracer` 与 defense 的 `confirmed_step` 不一致的 25 例其实是 tracer 正常履职
+  （要的就是"最早"，25/25 报更早、0 次更晚），行内自洽；真正的矛盾只有 envelope 的
+  `proof.step_tracer` 与采纳步不符那 3 例。降级作用在新增的 `localization_authority` 轴，
+  `decision_authority` 逐字不动。
+- **噪声底**：`_run_cycle` 早就算了 `reroll_noise` 却从未传给任何门。现已接入报告，
+  且**三态可区分**（`measured` / `deterministic_replay` / `not_measured`）；**只在不稳定案例上
+  有增益的候选不放行**，且记为 `not_evaluated` 而非"已证伪"；**伤害类判据仍按全量计数、
+  绝不被噪声折抵**。
+
+## 33.4 693 例测量能力与成本模型
+
+入口 `scripts/run_baseline_693.py`（复用 `run_batch`，断点续跑；离线 dry-run 693 例全跑通、
+原样再跑 1.6 s 真跳过、零 provider 调用）。**顺带修掉一个会污染结果的缺陷**：`run_batch` 的
+跳过逻辑原本不校验 manifest 存在性与信封 schema——`run.json` 被删而结果仍在时，旧结果会被
+当作已完成跳过，**同时新写的 manifest 把当前配置指纹盖上那些它从未产生的行**。
+
+成本（`scripts/cost_model_693.py`）：W=8 时 work 下界 21.3 h / 模拟 p50 22.2 h /
+效率修正 28.0 h / 长尾下界 12.5 h；**W≥4 时决定下界的是总工作量而非那条 94 分钟的尾巴**。
+Token 外推 ≈ 18.6M。**三条诚实的警告**：样本仅 23/693 唯一案例且全来自按难度挑出的 patrol/audit 集；
+四条散文读数占样本总分钟 61%，剔除后 W=8 从 21 h 降到 9.4 h；**限流只能真跑才知道**。
+
+## 33.5 开跑前检查器
+
+`scripts/preflight_real_run.py`：15 项检查，回答"现在开跑，读数会不会等于它声称的东西"。
+两阶段实测均 **READY（0 blockers）**。
+
+**它立刻查出一个真实隐患**：`selfevo_real_20260923.json`（§30 用的那份）里
+**单例超时 3h > 整轮预算 2h**——一个病态案例就能吃光整轮，而这正是 §31.4 运行 1
+"审计吃掉 89.4 分钟、巡逻 16 例里 10 例未决"的成因。检查器现在将其判为 BLOCKER。
+
+## 33.6 本轮未做的事（汇总）
+
+- **未运行真实服务**，零 provider 调用；**未在 693 例上产生任何真实读数**（交付的是"能测"）。
+- **未改任何门限**；未改划分；未创建 holdout（用户已明确不需要）。
+- **未扩充机械谓词覆盖面**：`required_action_present` 仍只覆盖 `Missing Required Call`
+  32 例中的 3 例，整族覆盖需新谓词（口径扩张）。
+- **未修晋升路径的噪声底**（`promotion.py` 的 control 臂来自缓存重放，是否适用需单独判定）。
+- **未实现 8 次重复的 dispersion 面板**：cycle 只取两条 roll，只能发现成对翻转的案例，
+  "八次里只翻一次"的仍可能被当稳定案例计分。
+- **未标定真实 provider 下的噪声底**——代码会测并报告，但那个数字只能真跑产生。
+
+## 33.7 建议的运行顺序
+
+1. **先跑基线**（21–28 h 量级，支持续跑）：
+   `python scripts/run_baseline_693.py --workers 8 --run-id baseline693 --runs-root artifacts/baseline/runs`
+2. **读基线**：TP/FP/FN/TN、定位分列（动作步 vs 内容步）、`degraded` 与未决数、
+   以及**实测噪声底**（首轮第一件事）。
+3. **再跑自进化**，开跑前 `python scripts/preflight_real_run.py --phase evolution` 确认 READY，
+   并遵守"同一 work_root 只允许一个 run"。

@@ -1,0 +1,70 @@
+{
+ "corpus": "reports/rsi_pilot_20260919/**/results/*.json",
+ "convictions": 142,
+ "kind_totals": {
+  "action_step": 117,
+  "content_step": 25
+ },
+ "kind_hits": {
+  "action_step": 98,
+  "content_step": 0
+ },
+ "kind_accuracy": {
+  "action_step": 0.8376068376068376,
+  "content_step": 0.0
+ },
+ "overall_hits": 98,
+ "overall_accuracy": 0.6901408450704225,
+ "gold_step_kinds": {
+  "action_step": 135,
+  "None": 7
+ },
+ "conflict_rows": [
+  {
+   "case": "BFCL/153.json",
+   "mirrored_tracer_step": 14,
+   "adopted_step": 10,
+   "kind": "action_step",
+   "gold_step": 14,
+   "hit": false,
+   "authority_before": "authoritative",
+   "authority_after": "authoritative",
+   "localization_authority_after": "degraded_localization_conflict",
+   "disagreements": [
+    "first_hearing_tracer_vs_adopted"
+   ]
+  },
+  {
+   "case": "BFCL/008.json",
+   "mirrored_tracer_step": 3,
+   "adopted_step": 1,
+   "kind": "action_step",
+   "gold_step": 3,
+   "hit": false,
+   "authority_before": "authoritative",
+   "authority_after": "authoritative",
+   "localization_authority_after": "degraded_localization_conflict",
+   "disagreements": [
+    "first_hearing_tracer_vs_adopted"
+   ]
+  },
+  {
+   "case": "BFCL/008.json",
+   "mirrored_tracer_step": 3,
+   "adopted_step": 1,
+   "kind": "action_step",
+   "gold_step": 3,
+   "hit": false,
+   "authority_before": "authoritative",
+   "authority_after": "authoritative",
+   "localization_authority_after": "degraded_localization_conflict",
+   "disagreements": [
+    "first_hearing_tracer_vs_adopted"
+   ]
+  }
+ ],
+ "conflict_count": 3,
+ "authoritative_rows_after": 139,
+ "decision_authority_changed_by_fix": 0,
+ "adopted_step_changed_by_fix": []
+}

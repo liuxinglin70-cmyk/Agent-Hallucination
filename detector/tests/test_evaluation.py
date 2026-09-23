@@ -211,3 +211,96 @@ def test_evaluate_run_counts_missing_results(tmp_path):
     )
     assert report["metrics"]["completion"] == 0.0
     assert report["missing_cases"] == ["a.json"]
+
+
+def _write_envelope(run_root, case_id, *, state, step, kind, gold_step):
+    """One detection envelope in the layout ``evaluate_run`` reads."""
+    from detector.result import RESULT_SCHEMA
+
+    directory = run_root / "cases" / case_id.replace("/", "__")
+    directory.mkdir(parents=True, exist_ok=True)
+    directory.joinpath("result.json").write_text(json.dumps({
+        "schema_version": RESULT_SCHEMA,
+        "case_id": case_id,
+        "state": state,
+        "occurrence_state": state,
+        "decision_authority": "authoritative",
+        "runtime_valid": True,
+        "responsible_step": step,
+        "responsible_step_kind": kind,
+        "proof": {
+            "decision_authority": "authoritative",
+            "runtime_valid": True,
+            "responsible_step": step,
+            "responsible_step_kind": kind,
+        },
+    }, ensure_ascii=False), encoding="utf-8")
+
+
+def test_step_localization_is_split_by_what_kind_of_step_was_blamed(tmp_path):
+    """A verdict that blames a tool call and one that blames prose are
+    different claims, and the corpus does not annotate them alike.
+
+    Reporting only the pooled rate hides which population a reading comes
+    from. The overall rate is unchanged; the split is additive.
+    """
+    dataset = tmp_path / "data"
+    for case, gold_step in (("A/001.json", 3), ("A/002.json", 5)):
+        path = dataset / case
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            "question": "q", "history": [],
+            "is_hallucination": "true", "hallucination_step": str(gold_step),
+        }), encoding="utf-8")
+    run_root = tmp_path / "runs" / "r1"
+    # One content step blamed correctly, one action step blamed wrongly.
+    _write_envelope(run_root, "A/001.json", state="verified_error",
+                    step=3, kind="content_step", gold_step=3)
+    _write_envelope(run_root, "A/002.json", state="verified_error",
+                    step=7, kind="action_step", gold_step=5)
+
+    report = evaluate_run(
+        runs_root=tmp_path / "runs", run_id="r1",
+        dataset_root=dataset, cases=["A/001.json", "A/002.json"],
+    )
+    localization = report["metrics"]["step_localization"]
+    assert localization["n"] == 2
+    assert localization["hits"] == 1
+    content = localization["by_step_kind"]["content_step"]
+    assert (content["n"], content["hits"], content["accuracy"]) == (1, 1, 1.0)
+    action = localization["by_step_kind"]["action_step"]
+    assert (action["n"], action["hits"], action["accuracy"]) == (1, 0, 0.0)
+    # The pooled rate is still what it was; the split adds, it does not replace.
+    assert localization["accuracy"] == 0.5
+
+
+def test_a_row_without_a_recorded_step_kind_is_unclassified_not_guessed(tmp_path):
+    """An old envelope must not be silently filed under either kind."""
+    from detector.result import RESULT_SCHEMA
+
+    dataset = tmp_path / "data"
+    path = dataset / "A/001.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({
+        "question": "q", "history": [],
+        "is_hallucination": "true", "hallucination_step": "3",
+    }), encoding="utf-8")
+    run_root = tmp_path / "runs" / "r1"
+    directory = run_root / "cases" / "A__001.json"
+    directory.mkdir(parents=True, exist_ok=True)
+    directory.joinpath("result.json").write_text(json.dumps({
+        "schema_version": RESULT_SCHEMA, "case_id": "A/001.json",
+        "state": "verified_error", "occurrence_state": "verified_error",
+        "decision_authority": "authoritative", "runtime_valid": True,
+        "responsible_step": 3,
+        "proof": {"decision_authority": "authoritative",
+                  "runtime_valid": True, "responsible_step": 3},
+    }), encoding="utf-8")
+    report = evaluate_run(
+        runs_root=tmp_path / "runs", run_id="r1",
+        dataset_root=dataset, cases=["A/001.json"],
+    )
+    kinds = report["metrics"]["step_localization"]["by_step_kind"]
+    assert "unclassified" in kinds
+    assert "content_step" not in kinds
+    assert "action_step" not in kinds

@@ -19,12 +19,58 @@ AUTHORITY_AUTHORITATIVE = "authoritative"
 AUTHORITY_DEGRADED_JUDGE_ONLY = "degraded_judge_only"
 AUTHORITY_INVALID = "invalid"
 
+# Localization authority is a *separate* axis from ``decision_authority``.
+# ``decision_authority`` says whether the detection verdict is the detector's
+# own answer; ``localization_authority`` says whether the responsible step in
+# the same envelope was settled without the row contradicting itself. A
+# contradiction degrades the second and leaves the first alone: the detection
+# verdict was reached by the hearing flow and does not depend on which of two
+# candidate loci was adopted, while the locus itself is exactly what a
+# self-contradicting row must not present as authoritative evidence.
+LOCALIZATION_AUTHORITY_AUTHORITATIVE = "authoritative"
+LOCALIZATION_AUTHORITY_DEGRADED_CONFLICT = "degraded_localization_conflict"
+
+# The written, reproducible rule the adopted step follows when the sources
+# disagree. It is the rule the implementation already had -- the step tracer is
+# the dedicated localization authority, the defense-confirmed step is its
+# fallback -- stated explicitly here so a row names the rule it was resolved
+# under instead of silently preferring one source.
+LOCALIZATION_STEP_PRIORITY = (
+    "convicted hearing step tracer > its defense-confirmed step "
+    "(only when the defense convicts with a plain substantiated verdict) "
+    "> the allegation's own step"
+)
+
+# Two shapes of disagreement, kept apart because they mean opposite things.
+#
+# ``FIRST_HEARING_TRACER`` is a genuine contradiction: the envelope reports one
+# step in its ``proof.step_tracer`` slot (mirrored from the first hearing, the
+# judge's) and adopts a different one, so the row names two responsible steps.
+# This is the state the 2026-09-23 audit found reading as ``authoritative``
+# (BFCL/153, BFCL/008 x2). It degrades localization authority.
+#
+# ``TRACER_EARLIER_THAN_ATTESTED`` is not a contradiction, and is *recorded*
+# rather than charged. The defense contract pins ``confirmed_step`` to the
+# alleged step (``detector/defense.py``: "confirmed_step must equal the alleged
+# step"), and the measured archives bear that out -- every substantiated
+# hearing had ``confirmed_step == alleged step`` (284/284), and every tracer
+# that differed from it named an *earlier* step (25/25, never later). So a
+# tracer disagreeing with the confirmation is the tracer doing the one thing
+# ``LOCALIZATION_LAW`` asks of it ("find the EARLIEST step"), and the adopted
+# step then *is* the tracer's: the row reports one step and agrees with itself.
+# Degrading these would make the signal mean "the tracer worked". They are
+# recorded in ``localization_sources`` with the rule that resolved them.
+LOCALIZATION_CONFLICT_FIRST_HEARING_TRACER = "first_hearing_tracer_vs_adopted"
+LOCALIZATION_AGREEMENT_TRACER_EARLIER = "tracer_earlier_than_attested_step"
+LOCALIZATION_AGREEMENT_ALL_SOURCES = "all_sources_agree"
+
 CONVICTING_VERDICTS = frozenset({"substantiated", "substantiated_upgraded"})
 
 
 from detector.packet import (
     delivered_result as packet_delivered_result,
     evidence_refs_support_step,
+    step_kind,
 )
 from detector.interventions import conviction_verdicts_for
 from detector.predicates import PREDICATE_CONVICTION_VERDICTS
@@ -157,6 +203,109 @@ def _convicted_candidate_step(
     return int(step) if isinstance(step, int) else None
 
 
+def _tracer_step(hearing: Mapping[str, Any] | None) -> int | None:
+    """The step one hearing's tracer parsed, or ``None`` when it failed."""
+    parsed = ((hearing or {}).get("tracer_result") or {}).get("parsed")
+    if not isinstance(parsed, Mapping):
+        return None
+    step = parsed.get("step")
+    return int(step) if isinstance(step, int) and not isinstance(step, bool) else None
+
+
+def _localization_record(
+    *,
+    hearings: Sequence[Mapping[str, Any]],
+    convicted: Mapping[str, Any],
+    adopted_step: int | None,
+    defense_step: int | None,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Every claim about the responsible step, and whether the row contradicts.
+
+    A conviction can carry more than one claim about where the error started:
+    the convicted hearing's tracer, the defense that convicted it (its
+    ``confirmed_step``), the allegation the hearing was heard on, and -- when
+    the judge hearing was refuted and a later hearing convicted -- the first
+    hearing's tracer, which is the value the envelope mirrors as
+    ``proof.step_tracer``.
+
+    Returns ``(conflict, sources)``.
+
+    ``conflict`` is non-``None`` only for a real contradiction: the row reports
+    one step in its tracer slot and adopts another, so it names two different
+    responsible steps. Exactly one class qualifies -- the first hearing's
+    tracer differing from the adopted step -- and it is the state the audit
+    found reading as ``authoritative``. The caller degrades localization
+    authority on it.
+
+    ``sources`` is always returned: every recorded claim with the step it
+    named, which one was adopted, and the written rule (``
+    LOCALIZATION_STEP_PRIORITY``) that decided. A disagreement that the rule
+    resolves the intended way -- the tracer naming an *earlier* step than the
+    defense's restated allegation -- is visible here, marked with
+    ``resolution``, and not charged as a contradiction, because the adopted
+    step is then the tracer's own and the row agrees with itself.
+    """
+    convicted_tracer = _tracer_step(convicted)
+    first_tracer = _tracer_step(hearings[0] if hearings else None)
+    allegation = None
+    if isinstance(convicted, Mapping):
+        value = convicted.get("step")
+        if isinstance(value, int) and not isinstance(value, bool):
+            allegation = value
+    claims: list[tuple[str, int | None]] = [
+        ("convicted_hearing_tracer", convicted_tracer),
+        ("convicted_hearing_defense_confirmed", defense_step),
+        ("alleged_step", allegation),
+        ("first_hearing_tracer", first_tracer),
+    ]
+    sources = [
+        {"source": name, "step": step, "adopted": step == adopted_step}
+        for name, step in claims
+        if step is not None
+    ]
+    overridden = [
+        entry["source"] for entry in sources
+        if not entry["adopted"] and entry["step"] != adopted_step
+    ]
+    # The one contradiction: the row's own reported tracer step (mirrored from
+    # the first hearing) is not the step the row adopts.
+    if (
+        first_tracer is not None
+        and adopted_step is not None
+        and first_tracer != adopted_step
+    ):
+        resolution = LOCALIZATION_CONFLICT_FIRST_HEARING_TRACER
+    elif overridden:
+        resolution = LOCALIZATION_AGREEMENT_TRACER_EARLIER
+    else:
+        resolution = LOCALIZATION_AGREEMENT_ALL_SOURCES
+    record = {
+        "schema_version": "detector.localization_sources.v1",
+        "resolution": resolution,
+        "adopted_step": adopted_step,
+        "adopted_rule": LOCALIZATION_STEP_PRIORITY,
+        "overridden_sources": overridden,
+        "tracer_step": convicted_tracer,
+        "defense_step": defense_step,
+        "allegation_step": allegation,
+        "first_hearing_tracer_step": first_tracer,
+        "sources": sources,
+    }
+    if resolution != LOCALIZATION_CONFLICT_FIRST_HEARING_TRACER:
+        return None, record
+    return {
+        "schema_version": "detector.localization_conflict.v1",
+        "disagreements": [LOCALIZATION_CONFLICT_FIRST_HEARING_TRACER],
+        "tracer_step": convicted_tracer,
+        "defense_step": defense_step,
+        "allegation_step": allegation,
+        "first_hearing_tracer_step": first_tracer,
+        "adopted_step": adopted_step,
+        "adopted_rule": LOCALIZATION_STEP_PRIORITY,
+        "sources": sources,
+    }, record
+
+
 def adjudicate(
     *,
     packet: Mapping[str, Any],
@@ -228,6 +377,14 @@ def adjudicate(
         return {
             "state": STATE_ERROR,
             "decision_authority": AUTHORITY_AUTHORITATIVE,
+            # One source decides this anchor (the mechanical delivered-answer
+            # rule), so there is nothing to disagree with; the field is present
+            # so every conviction answers the same question the same way.
+            "localization_authority": LOCALIZATION_AUTHORITY_AUTHORITATIVE,
+            "localization_conflict": None,
+            "responsible_step_kind": (
+                step_kind(packet, anchor_step) if anchor_event else None
+            ),
             "runtime_valid": True,
             "responsible_event_id": anchor_event,
             "responsible_step": anchor_step,
@@ -370,6 +527,8 @@ def adjudicate(
             return {
                 "state": STATE_ERROR,
                 "decision_authority": AUTHORITY_AUTHORITATIVE,
+                "localization_authority": LOCALIZATION_AUTHORITY_AUTHORITATIVE,
+                "localization_conflict": None,
                 "runtime_valid": True,
                 "responsible_event_id": responsible_event_id,
                 "responsible_step": step if responsible_event_id else None,
@@ -453,6 +612,16 @@ def adjudicate(
         return {
             "state": STATE_ERROR,
             "decision_authority": AUTHORITY_DEGRADED_JUDGE_ONLY,
+            # The step here is the preliminary positive's own step and nothing
+            # else was consulted, so the localization the row reports is not a
+            # disagreement -- it is just unconfirmed. It is recorded as
+            # authoritative-localization only in the sense of "no conflict
+            # recorded"; the row's detection authority is already degraded.
+            "localization_authority": LOCALIZATION_AUTHORITY_AUTHORITATIVE,
+            "localization_conflict": None,
+            "responsible_step_kind": (
+                step_kind(packet, step) if responsible_event_id else None
+            ),
             "runtime_valid": True,
             "responsible_event_id": responsible_event_id,
             "responsible_step": step if responsible_event_id else None,
@@ -502,10 +671,19 @@ def adjudicate(
 
     verdict = str(convicted_parsed.get("verdict") or "")
     degraded = verdict == "substantiated_upgraded"
+    defense_step = convicted_parsed.get("confirmed_step")
+    defense_step = (
+        int(defense_step)
+        if isinstance(defense_step, int) and not isinstance(defense_step, bool)
+        else None
+    )
     if traced_step is None and not degraded:
         confirmed = convicted_parsed.get("confirmed_step")
         # The step tracer is the dedicated localization authority; the
         # defense-confirmed step is only a fallback when tracing failed.
+        # ``LOCALIZATION_STEP_PRIORITY`` states this rule in the record a
+        # conflicted row carries, so the choice is reproducible from the row
+        # alone instead of living only in this branch.
         if isinstance(confirmed, int):
             event_count = len(list(packet.get("events") or []))
             if 1 <= confirmed <= event_count:
@@ -514,9 +692,37 @@ def adjudicate(
     step = working_positive.get("step")
     responsible_event_id = _event_id_for_step(packet, step)
     authority = AUTHORITY_DEGRADED_JUDGE_ONLY if degraded else AUTHORITY_AUTHORITATIVE
+    localization_conflict, localization_sources = _localization_record(
+        hearings=hearing_queue,
+        convicted=convicted,
+        adopted_step=step,
+        # A defense that only half-convicts (``substantiated_upgraded``) has no
+        # confirmed step to disagree with: its contract forces the field to
+        # null, so reading it here would invent a disagreement.
+        defense_step=defense_step if not degraded else None,
+    )
+    localization_authority = (
+        LOCALIZATION_AUTHORITY_DEGRADED_CONFLICT if localization_conflict
+        else LOCALIZATION_AUTHORITY_AUTHORITATIVE
+    )
     return {
         "state": STATE_ERROR,
         "decision_authority": authority,
+        "localization_authority": localization_authority,
+        "localization_conflict": localization_conflict,
+        # Every claim that was on the table, always, whether or not any of them
+        # contradicted: a reader can see which sources spoke, what each said,
+        # and which rule picked among them. ``localization_conflict`` above is
+        # the subset that is a real contradiction; this is the whole record.
+        "localization_sources": localization_sources,
+        # Recorded here because this is the last place that still holds the
+        # packet: a reader downstream sees only the responsible step, and
+        # "was it an action step or a content step" must be answerable from
+        # the row itself without re-reading the trajectory. ``None`` when the
+        # step could not be located in the packet, never a guessed kind.
+        "responsible_step_kind": (
+            step_kind(packet, step) if responsible_event_id else None
+        ),
         "runtime_valid": True,
         "responsible_event_id": responsible_event_id,
         "responsible_step": step if responsible_event_id else None,
@@ -533,6 +739,8 @@ def adjudicate(
                 "correct_result": working_positive.get("correct_result") or "",
                 "judge_basis": judge_parsed.get("basis"),
                 "authority": authority,
+                "localization_authority": localization_authority,
+                "localization_resolution": localization_sources["resolution"],
                 "guard_actions": sorted(guards),
                 "hearings": [
                     {
@@ -553,6 +761,12 @@ __all__ = [
     "AUTHORITY_AUTHORITATIVE",
     "AUTHORITY_DEGRADED_JUDGE_ONLY",
     "AUTHORITY_INVALID",
+    "LOCALIZATION_AGREEMENT_ALL_SOURCES",
+    "LOCALIZATION_AGREEMENT_TRACER_EARLIER",
+    "LOCALIZATION_AUTHORITY_AUTHORITATIVE",
+    "LOCALIZATION_AUTHORITY_DEGRADED_CONFLICT",
+    "LOCALIZATION_CONFLICT_FIRST_HEARING_TRACER",
+    "LOCALIZATION_STEP_PRIORITY",
     "STATE_CLEAN",
     "STATE_ERROR",
     "STATE_UNRESOLVED",

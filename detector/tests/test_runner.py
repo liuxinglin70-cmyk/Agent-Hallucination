@@ -4,16 +4,19 @@ import json
 
 import pytest
 
+from detector.result import RESULT_SCHEMA
 from detector.runner import run_batch, safe_case_id
 
 
 class _FakeDetector:
     def __init__(self, config):
         self.config = config
+        self.calls = 0
 
     def detect(self, record, *, case_id, interventions=None):
+        self.calls += 1
         return {
-            "schema_version": "detector.detection_result.v1",
+            "schema_version": RESULT_SCHEMA,
             "case_id": case_id,
             "state": "verified_clean",
             "decision_authority": "authoritative",
@@ -29,6 +32,49 @@ class _FakeDetector:
             "evidence_health": {},
             "provenance": {},
         }
+
+
+class _CountingDetector(_FakeDetector):
+    """Records every construction so a test can prove *who* ran the case."""
+
+    instances: list["_CountingDetector"] = []
+
+    def __init__(self, config):
+        super().__init__(config)
+        _CountingDetector.instances.append(self)
+
+
+def _write_dataset(root, case_ids=("a.json",)):
+    root.mkdir(parents=True, exist_ok=True)
+    for case_id in case_ids:
+        (root / case_id).write_text(
+            json.dumps({"question": "q", "history": [{"content": "a"}]}),
+            encoding="utf-8",
+        )
+    return root
+
+
+def _envelope(case_id, *, state="verified_clean", authority="authoritative"):
+    return {
+        "schema_version": RESULT_SCHEMA,
+        "case_id": case_id,
+        "state": state,
+        "decision_authority": authority,
+        "runtime_valid": True,
+        "responsible_event_id": None,
+        "responsible_step": None,
+        "incident_occurred": state == "verified_error",
+        "occurrence_state": state,
+        "proof": {},
+        "stage_status": {},
+        "providers": {},
+        "authority_failure_reasons": (
+            [{"error_type": "provider_error", "message": "outage"}]
+            if state == "unresolved" else []
+        ),
+        "evidence_health": {},
+        "provenance": {},
+    }
 
 
 def test_safe_case_id():
@@ -95,8 +141,165 @@ def test_run_batch_rejects_manifest_drift(tmp_path, monkeypatch):
         dataset_root=root, cases=["a.json"], run_id="r",
         runs_root=tmp_path / "runs", config={"version": 1}, workers=1,
     )
+    cached = (
+        tmp_path / "runs" / "r" / "cases" / "a.json" / "result.json"
+    )
+    assert cached.exists(), "the refusal must be tested with results on disk"
     with pytest.raises(ValueError, match="different manifest"):
         run_batch(
             dataset_root=root, cases=["a.json"], run_id="r",
             runs_root=tmp_path / "runs", config={"version": 2}, workers=1,
         )
+
+
+def test_run_batch_refuses_results_whose_manifest_is_missing(tmp_path, monkeypatch):
+    """A result file without ``run.json`` is not resumable state.
+
+    The manifest is the only record of *which* configuration produced the rows
+    in a run tree. Deleting it used to turn the run directory into one whose
+    cached results were silently reused under whatever config was passed next,
+    and the freshly written manifest then claimed that config for rows it had
+    never produced. Refusing is the only answer that keeps a measurement
+    attributable to the code that made it.
+    """
+    runs_root = tmp_path / "runs"
+    results = runs_root / "r" / "cases" / safe_case_id("a.json")
+    results.mkdir(parents=True)
+    (results / "result.json").write_text(
+        json.dumps(_envelope("a.json")), encoding="utf-8",
+    )
+    monkeypatch.setattr("detector.runner.Detector", _FakeDetector)
+    with pytest.raises(ValueError, match="no run.json manifest"):
+        run_batch(
+            dataset_root=_write_dataset(tmp_path / "data"), cases=["a.json"],
+            run_id="r", runs_root=runs_root, config={}, workers=1,
+        )
+    assert not (runs_root / "r" / "run.json").exists()
+
+
+def test_run_batch_refuses_a_foreign_envelope(tmp_path, monkeypatch):
+    """A cached row from another schema is not this runner's measurement.
+
+    The manifest can match while the row inside it came from another tool
+    entirely (a hand-written file, another detector build's envelope), so the
+    resume path answers "is this ours?" as well as "is the config the same?".
+    """
+    runs_root = tmp_path / "runs"
+    data = _write_dataset(tmp_path / "data")
+    monkeypatch.setattr("detector.runner.Detector", _CountingDetector)
+    _CountingDetector.instances.clear()
+    kwargs = dict(
+        dataset_root=data, cases=["a.json"], run_id="r",
+        runs_root=runs_root, config={}, workers=1,
+    )
+    run_batch(**kwargs)
+    (runs_root / "r" / "cases" / "a.json" / "result.json").write_text(
+        json.dumps({"schema_version": "someone.else.v1", "case_id": "a.json"}),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="detector.detection_result.v1"):
+        run_batch(**kwargs)
+
+
+def test_run_batch_resume_skips_completed_cases(tmp_path, monkeypatch):
+    monkeypatch.setattr("detector.runner.Detector", _CountingDetector)
+    _CountingDetector.instances.clear()
+    kwargs = dict(
+        dataset_root=_write_dataset(tmp_path / "data", ("a.json", "b.json")),
+        cases=["a.json", "b.json"],
+        run_id="r",
+        runs_root=tmp_path / "runs",
+        config={},
+        workers=1,
+    )
+    first = run_batch(**kwargs)
+    assert first["completed"] == 2
+    assert _CountingDetector.instances[-1].calls == 2
+    second = run_batch(**kwargs)
+    assert second["completed"] == 2
+    assert _CountingDetector.instances[-1].calls == 0, (
+        "a resume inside a verified manifest must not re-run finished cases"
+    )
+
+
+def test_run_batch_resume_retries_unresolved_cases_only_when_asked(
+    tmp_path, monkeypatch,
+):
+    """An unresolved row is an outage, not a verdict -- but retrying is opt-in."""
+    class _OutageDetector(_CountingDetector):
+        def detect(self, record, *, case_id, interventions=None):
+            self.calls += 1
+            return _envelope(case_id, state="unresolved", authority=None)
+
+    runs_root = tmp_path / "runs"
+    data = _write_dataset(tmp_path / "data")
+    monkeypatch.setattr("detector.runner.Detector", _OutageDetector)
+    _CountingDetector.instances.clear()
+    run_batch(
+        dataset_root=data, cases=["a.json"], run_id="r", runs_root=runs_root,
+        config={}, workers=1,
+    )
+    with pytest.raises(ValueError, match="different manifest"):
+        # The manifest is what pins the retry to the same configuration.
+        run_batch(
+            dataset_root=data, cases=["a.json"], run_id="r",
+            runs_root=runs_root, config={"other": 1}, workers=1,
+        )
+    run_batch(
+        dataset_root=data, cases=["a.json"], run_id="r", runs_root=runs_root,
+        config={}, workers=1,
+    )
+    assert _CountingDetector.instances[-1].calls == 0, (
+        "by default an unresolved row is reused: the outage is a reading"
+    )
+    run_batch(
+        dataset_root=data, cases=["a.json"], run_id="r", runs_root=runs_root,
+        config={}, workers=1, retry_unresolved=True,
+    )
+    assert _CountingDetector.instances[-1].calls == 3, (
+        "retry_unresolved must send the case to the detector again, and because"
+        " the cached row names a provider_error the whole-detection transport"
+        " retry runs too (3 attempts)"
+    )
+    monkeypatch.setattr("detector.runner.Detector", _FakeDetector)
+    run_batch(
+        dataset_root=data, cases=["a.json"], run_id="r", runs_root=runs_root,
+        config={}, workers=1,
+    )
+    cached = json.loads(
+        (runs_root / "r" / "cases" / "a.json" / "result.json")
+        .read_text(encoding="utf-8")
+    )
+    assert cached["state"] == "unresolved", (
+        "the retry re-runs the case; the replacement verdict is the detector's,"
+        " so a still-failing provider keeps writing unresolved rows"
+    )
+
+
+def test_run_batch_retry_unresolved_replaces_the_row(tmp_path, monkeypatch):
+    """After a retry under a working provider the row is the new verdict."""
+    class _FlakyDetector(_CountingDetector):
+        def detect(self, record, *, case_id, interventions=None):
+            self.calls += 1
+            if self.calls == 1:
+                return _envelope(case_id, state="unresolved", authority=None)
+            return _envelope(case_id)
+
+    runs_root = tmp_path / "runs"
+    data = _write_dataset(tmp_path / "data")
+    monkeypatch.setattr("detector.runner.Detector", _FlakyDetector)
+    _CountingDetector.instances.clear()
+    run_batch(
+        dataset_root=data, cases=["a.json"], run_id="r", runs_root=runs_root,
+        config={}, workers=1,
+    )
+    run_batch(
+        dataset_root=data, cases=["a.json"], run_id="r", runs_root=runs_root,
+        config={}, workers=1, retry_unresolved=True,
+    )
+    cached = json.loads(
+        (runs_root / "r" / "cases" / "a.json" / "result.json")
+        .read_text(encoding="utf-8")
+    )
+    assert cached["state"] == "verified_clean"
+    assert cached["decision_authority"] == "authoritative"

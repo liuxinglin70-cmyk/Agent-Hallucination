@@ -1,0 +1,871 @@
+{
+  "schema_version": "detector.cost_model.v1",
+  "corpus_size": 693,
+  "provider": {
+    "config": "detector/configs/autodl.json",
+    "model": "GLM-5.3-flash",
+    "endpoint": "https://www.autodl.art/api/v1",
+    "case_timeout_seconds": 10800,
+    "provider_timeout_seconds": 900,
+    "total_timeout_seconds": 2400,
+    "judge_votes": 3,
+    "judge_vote_topup": 2,
+    "defense_votes": 3,
+    "defense_vote_topup": 2
+  },
+  "sample": {
+    "per_case_readings": 38,
+    "unique_cases": 23,
+    "cases": [
+      "BFCL/012.json",
+      "BFCL/017.json",
+      "BFCL/041.json",
+      "Camel/018.json",
+      "Camel/028.json",
+      "Magentic_One/036.json",
+      "Magentic_One/049.json",
+      "Magentic_One/050.json",
+      "Magentic_One/067.json",
+      "Magentic_One/085.json",
+      "Octotools/005.json",
+      "Octotools/030.json",
+      "OpenDeepSearch/002.json",
+      "OpenDeepSearch/063.json",
+      "OpenDeepSearch/067.json",
+      "OpenDeepSearch/076.json",
+      "OpenDeepSearch/077.json",
+      "OpenDeepSearch/078.json",
+      "OpenDeepSearch/086.json",
+      "OpenDeepSearch/088.json",
+      "OpenManus/064.json",
+      "SmolAgents/019.json",
+      "SmolAgents/022.json"
+    ],
+    "mean_minutes": 14.7,
+    "median_minutes": 3.3,
+    "p90_minutes": 37.2,
+    "max_minutes": 108.0,
+    "sum_minutes": 559.4,
+    "zero_second_rows": [],
+    "capped_rows": [
+      {
+        "case": "Magentic_One/036.json",
+        "seconds": 900.02,
+        "reason": "provider.timeout_seconds (900) in detector/configs/autodl.json",
+        "source": "reports\\verification_20260917\\single_mechanism\\Magentic_One__036.json.rep2.json"
+      }
+    ],
+    "prose_only_rows": [
+      {
+        "case": "Magentic_One/049.json",
+        "seconds": 5628.0,
+        "tokens": null,
+        "state": null,
+        "source": "reports/real_dev_20260923/run2_README.md",
+        "note": "audit slowest, run 2; run 1 measured the same case at 36.0 min",
+        "prose_only": true
+      },
+      {
+        "case": "Magentic_One/049.json",
+        "seconds": 2160.0,
+        "tokens": null,
+        "state": null,
+        "source": "reports/real_dev_20260923/run2_README.md",
+        "note": "audit slowest, run 1 -- the spread on one case is 2.6x",
+        "prose_only": true
+      },
+      {
+        "case": "Camel/018.json",
+        "seconds": 6060.0,
+        "tokens": null,
+        "state": null,
+        "source": "reports/real_dev_20260923/run1_README.md",
+        "note": "patrol, run 1",
+        "prose_only": true
+      },
+      {
+        "case": "Magentic_One/050.json",
+        "seconds": 6480.0,
+        "tokens": null,
+        "state": null,
+        "source": "reports/real_dev_20260923/run1_README.md",
+        "note": "patrol, run 1; both ran while 8 workers shared the batch",
+        "prose_only": true
+      }
+    ],
+    "readings": [
+      {
+        "case": "Magentic_One/050.json",
+        "seconds": 6480.0,
+        "tokens": null,
+        "state": null,
+        "source": "reports/real_dev_20260923/run1_README.md",
+        "note": "patrol, run 1; both ran while 8 workers shared the batch",
+        "prose_only": true,
+        "capped_at": null
+      },
+      {
+        "case": "Camel/018.json",
+        "seconds": 6060.0,
+        "tokens": null,
+        "state": null,
+        "source": "reports/real_dev_20260923/run1_README.md",
+        "note": "patrol, run 1",
+        "prose_only": true,
+        "capped_at": null
+      },
+      {
+        "case": "Magentic_One/049.json",
+        "seconds": 5628.0,
+        "tokens": null,
+        "state": null,
+        "source": "reports/real_dev_20260923/run2_README.md",
+        "note": "audit slowest, run 2; run 1 measured the same case at 36.0 min",
+        "prose_only": true,
+        "capped_at": null
+      },
+      {
+        "case": "SmolAgents/019.json",
+        "seconds": 2396.408,
+        "tokens": 146730,
+        "state": "verified_error",
+        "authority": "authoritative",
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\2f0d1f4ff7f1.json",
+        "capped_at": null
+      },
+      {
+        "case": "Magentic_One/049.json",
+        "seconds": 2160.0,
+        "tokens": null,
+        "state": null,
+        "source": "reports/real_dev_20260923/run2_README.md",
+        "note": "audit slowest, run 1 -- the spread on one case is 2.6x",
+        "prose_only": true,
+        "capped_at": null
+      },
+      {
+        "case": "OpenManus/064.json",
+        "seconds": 1593.322,
+        "tokens": 74580,
+        "state": "verified_error",
+        "authority": "authoritative",
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\49683a275045.json",
+        "capped_at": null
+      },
+      {
+        "case": "SmolAgents/019.json",
+        "seconds": 1480.4,
+        "tokens": null,
+        "state": "verified_error",
+        "source": "reports\\error_scope_20260918\\diagnostics\\019_timing.json",
+        "stage_seconds": {
+          "judge": 3,
+          "step_tracer": 1,
+          "defense": 3
+        },
+        "capped_at": null
+      },
+      {
+        "case": "Octotools/030.json",
+        "seconds": 1433.546,
+        "tokens": 93754,
+        "state": "verified_error",
+        "authority": "authoritative",
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\bd198e0c90b3.json",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/067.json",
+        "seconds": 978.5,
+        "tokens": 55799,
+        "state": "verified_error",
+        "authority": "authoritative",
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\25b86ebcdc32.json",
+        "capped_at": null
+      },
+      {
+        "case": "Octotools/005.json",
+        "seconds": 798.956,
+        "tokens": 60471,
+        "state": "verified_error",
+        "authority": "authoritative",
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\9ec0e72cf3c8.json",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/088.json",
+        "seconds": 613.396,
+        "tokens": 43268,
+        "state": "verified_error",
+        "authority": "authoritative",
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\2ba6f44854e5.json",
+        "capped_at": null
+      },
+      {
+        "case": "BFCL/017.json",
+        "seconds": 414.73,
+        "source": "reports\\verification_20260917\\single_mechanism\\BFCL__017.json.rep2.json",
+        "tokens": 9906,
+        "state": null,
+        "study": "single_mechanism",
+        "capped_at": null
+      },
+      {
+        "case": "Magentic_One/036.json",
+        "seconds": 408.39,
+        "source": "reports\\verification_20260917\\single_mechanism\\Magentic_One__036.json.rep1.json",
+        "tokens": 21756,
+        "state": null,
+        "study": "single_mechanism",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/078.json",
+        "seconds": 379.6,
+        "tokens": 21186,
+        "state": "verified_error",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "BFCL/017.json",
+        "seconds": 284.96,
+        "source": "reports\\verification_20260917\\single_mechanism\\BFCL__017.json.rep1.json",
+        "tokens": 15506,
+        "state": null,
+        "study": "single_mechanism",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/086.json",
+        "seconds": 270.6,
+        "source": "reports\\verification_20260917\\single_mechanism\\OpenDeepSearch__086.json.rep1.json",
+        "tokens": 5204,
+        "state": null,
+        "study": "single_mechanism",
+        "capped_at": null
+      },
+      {
+        "case": "BFCL/012.json",
+        "seconds": 226.2,
+        "tokens": 9677,
+        "state": "verified_error",
+        "source": "reports\\real\\summary.json#recall_phase",
+        "capped_at": null
+      },
+      {
+        "case": "SmolAgents/022.json",
+        "seconds": 218.5,
+        "tokens": 41174,
+        "state": "verified_error",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/063.json",
+        "seconds": 201.217,
+        "tokens": 14760,
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\b201f1303c69.json",
+        "capped_at": null
+      },
+      {
+        "case": "SmolAgents/022.json",
+        "seconds": 191.8,
+        "tokens": 40227,
+        "state": "verified_error",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/078.json",
+        "seconds": 184.3,
+        "tokens": 10996,
+        "state": "verified_error",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "BFCL/041.json",
+        "seconds": 180.679,
+        "tokens": 12273,
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\f5f761b6fbf5.json",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/077.json",
+        "seconds": 145.602,
+        "tokens": 13696,
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\403836705db1.json",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/086.json",
+        "seconds": 128.23,
+        "source": "reports\\verification_20260917\\single_mechanism\\OpenDeepSearch__086.json.rep2.json",
+        "tokens": 5681,
+        "state": null,
+        "study": "single_mechanism",
+        "capped_at": null
+      },
+      {
+        "case": "Magentic_One/085.json",
+        "seconds": 113.599,
+        "tokens": 17359,
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\00bfd8430fc7.json",
+        "capped_at": null
+      },
+      {
+        "case": "Magentic_One/067.json",
+        "seconds": 101.6,
+        "tokens": 31145,
+        "state": "verified_clean",
+        "source": "reports\\real\\summary.json#recall_phase",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/002.json",
+        "seconds": 92.094,
+        "tokens": 12619,
+        "state": "verified_clean",
+        "authority": "authoritative",
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\28649dd5e405.json",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/076.json",
+        "seconds": 56.1,
+        "tokens": 6582,
+        "state": "verified_error",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/076.json",
+        "seconds": 53.2,
+        "tokens": 6867,
+        "state": "verified_error",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "BFCL/012.json",
+        "seconds": 43.2,
+        "tokens": 3401,
+        "state": "verified_clean",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "Camel/028.json",
+        "seconds": 42.0,
+        "tokens": 25547,
+        "state": "verified_clean",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "Magentic_One/067.json",
+        "seconds": 40.8,
+        "tokens": 8918,
+        "state": "verified_clean",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "BFCL/012.json",
+        "seconds": 39.3,
+        "tokens": 3234,
+        "state": "verified_clean",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "Camel/028.json",
+        "seconds": 36.0,
+        "tokens": 52150,
+        "state": "verified_clean",
+        "source": "reports\\real\\summary.json#recall_phase",
+        "capped_at": null
+      },
+      {
+        "case": "Magentic_One/067.json",
+        "seconds": 34.2,
+        "tokens": 8691,
+        "state": "verified_clean",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "Camel/028.json",
+        "seconds": 32.3,
+        "tokens": 25603,
+        "state": "verified_clean",
+        "source": "reports\\real\\summary.json",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/002.json",
+        "seconds": 12.58,
+        "source": "reports\\verification_20260917\\single_mechanism\\OpenDeepSearch__002.json.rep1.json",
+        "tokens": 2953,
+        "state": null,
+        "study": "single_mechanism",
+        "capped_at": null
+      },
+      {
+        "case": "OpenDeepSearch/002.json",
+        "seconds": 8.71,
+        "source": "reports\\verification_20260917\\single_mechanism\\OpenDeepSearch__002.json.rep2.json",
+        "tokens": 2423,
+        "state": null,
+        "study": "single_mechanism",
+        "capped_at": null
+      }
+    ]
+  },
+  "estimates": {
+    "W1": {
+      "workers": 1,
+      "work_lower_bound_minutes": 10201.4,
+      "work_lower_bound_hours": 170.0,
+      "simulated_makespan": {
+        "schedulable": true,
+        "draws": 1200,
+        "workers": 1,
+        "p10_minutes": 9328.2,
+        "p50_minutes": 10232.9,
+        "p90_minutes": 11174.6,
+        "max_minutes": 12736.7,
+        "sample_max_minutes": 108.0
+      },
+      "tail": {
+        "workers": 1,
+        "slowest_reading_minutes": 108.0,
+        "single_slow_case_bound_minutes": 93.8,
+        "single_slow_case_bound_note": "one case cannot be split, so no worker count makes a batch that contains it shorter than that case",
+        "observed_tail_rate": {
+          "slow_cases_in_audit_set": 1,
+          "audit_set_size": 12,
+          "rate": 0.0833,
+          "basis": "Magentic_One/049 measured at 93.8 min in run 2 and 36.0 min in run 1; only the slower reading is used here"
+        },
+        "extrapolated_slow_cases_in_693": 58,
+        "tail_bound_minutes": 5440.4,
+        "tail_bound_hours": 90.7,
+        "work_floor_minutes": 10201.4,
+        "binding_bound": "work",
+        "reading": "at this worker count the 94-minute tail does not set the floor; the corpus total does. The tail only binds once the number of ~94-minute cases exceeds the worker count"
+      },
+      "efficiency_adjusted_minutes": 12920.3,
+      "efficiency_adjusted_hours": 215.3,
+      "efficiency_adjusted_note": "simulated p50 / packing efficiency 0.792 measured on the audit batch (93.8 -> 118.37 min vs its own ideal)"
+    },
+    "W4": {
+      "workers": 4,
+      "work_lower_bound_minutes": 2561.4,
+      "work_lower_bound_hours": 42.7,
+      "simulated_makespan": {
+        "schedulable": true,
+        "draws": 1200,
+        "workers": 4,
+        "p10_minutes": 2363.2,
+        "p50_minutes": 2595.8,
+        "p90_minutes": 2834.1,
+        "max_minutes": 3207.2,
+        "sample_max_minutes": 108.0
+      },
+      "tail": {
+        "workers": 4,
+        "slowest_reading_minutes": 108.0,
+        "single_slow_case_bound_minutes": 93.8,
+        "single_slow_case_bound_note": "one case cannot be split, so no worker count makes a batch that contains it shorter than that case",
+        "observed_tail_rate": {
+          "slow_cases_in_audit_set": 1,
+          "audit_set_size": 12,
+          "rate": 0.0833,
+          "basis": "Magentic_One/049 measured at 93.8 min in run 2 and 36.0 min in run 1; only the slower reading is used here"
+        },
+        "extrapolated_slow_cases_in_693": 58,
+        "tail_bound_minutes": 1407.0,
+        "tail_bound_hours": 23.4,
+        "work_floor_minutes": 2561.4,
+        "binding_bound": "work",
+        "reading": "at this worker count the 94-minute tail does not set the floor; the corpus total does. The tail only binds once the number of ~94-minute cases exceeds the worker count"
+      },
+      "efficiency_adjusted_minutes": 3277.5,
+      "efficiency_adjusted_hours": 54.6,
+      "efficiency_adjusted_note": "simulated p50 / packing efficiency 0.792 measured on the audit batch (93.8 -> 118.37 min vs its own ideal)"
+    },
+    "W8": {
+      "workers": 8,
+      "work_lower_bound_minutes": 1280.7,
+      "work_lower_bound_hours": 21.3,
+      "simulated_makespan": {
+        "schedulable": true,
+        "draws": 1200,
+        "workers": 8,
+        "p10_minutes": 1214.4,
+        "p50_minutes": 1331.0,
+        "p90_minutes": 1448.4,
+        "max_minutes": 1648.7,
+        "sample_max_minutes": 108.0
+      },
+      "tail": {
+        "workers": 8,
+        "slowest_reading_minutes": 108.0,
+        "single_slow_case_bound_minutes": 93.8,
+        "single_slow_case_bound_note": "one case cannot be split, so no worker count makes a batch that contains it shorter than that case",
+        "observed_tail_rate": {
+          "slow_cases_in_audit_set": 1,
+          "audit_set_size": 12,
+          "rate": 0.0833,
+          "basis": "Magentic_One/049 measured at 93.8 min in run 2 and 36.0 min in run 1; only the slower reading is used here"
+        },
+        "extrapolated_slow_cases_in_693": 58,
+        "tail_bound_minutes": 750.4,
+        "tail_bound_hours": 12.5,
+        "work_floor_minutes": 1280.7,
+        "binding_bound": "work",
+        "reading": "at this worker count the 94-minute tail does not set the floor; the corpus total does. The tail only binds once the number of ~94-minute cases exceeds the worker count"
+      },
+      "efficiency_adjusted_minutes": 1680.6,
+      "efficiency_adjusted_hours": 28.0,
+      "efficiency_adjusted_note": "simulated p50 / packing efficiency 0.792 measured on the audit batch (93.8 -> 118.37 min vs its own ideal)"
+    },
+    "W16": {
+      "workers": 16,
+      "work_lower_bound_minutes": 647.7,
+      "work_lower_bound_hours": 10.8,
+      "simulated_makespan": {
+        "schedulable": true,
+        "draws": 1200,
+        "workers": 16,
+        "p10_minutes": 643.2,
+        "p50_minutes": 701.0,
+        "p90_minutes": 760.3,
+        "max_minutes": 863.7,
+        "sample_max_minutes": 108.0
+      },
+      "tail": {
+        "workers": 16,
+        "slowest_reading_minutes": 108.0,
+        "single_slow_case_bound_minutes": 93.8,
+        "single_slow_case_bound_note": "one case cannot be split, so no worker count makes a batch that contains it shorter than that case",
+        "observed_tail_rate": {
+          "slow_cases_in_audit_set": 1,
+          "audit_set_size": 12,
+          "rate": 0.0833,
+          "basis": "Magentic_One/049 measured at 93.8 min in run 2 and 36.0 min in run 1; only the slower reading is used here"
+        },
+        "extrapolated_slow_cases_in_693": 58,
+        "tail_bound_minutes": 375.2,
+        "tail_bound_hours": 6.3,
+        "work_floor_minutes": 647.7,
+        "binding_bound": "work",
+        "reading": "at this worker count the 94-minute tail does not set the floor; the corpus total does. The tail only binds once the number of ~94-minute cases exceeds the worker count"
+      },
+      "efficiency_adjusted_minutes": 885.1,
+      "efficiency_adjusted_hours": 14.8,
+      "efficiency_adjusted_note": "simulated p50 / packing efficiency 0.792 measured on the audit batch (93.8 -> 118.37 min vs its own ideal)"
+    }
+  },
+  "observed_batch_throughput": {
+    "audit": {
+      "cases": 12,
+      "wall_minutes": 118.37,
+      "workers": 8,
+      "minutes_per_case_wall": 9.86,
+      "projected_minutes_693": 6835.9,
+      "projected_hours_693": 113.9,
+      "projected_days_693": 4.7,
+      "source": "reports/real_dev_20260923/readings_run2.json",
+      "detail": "sentinel 6 + gain 6, workers=8, the same 12-case set whose per-case rows are archived under reports/real_evolution_20260923/contaminated_attempt/",
+      "naive_projection_caveat": "scaling a batch wall clock by case count assumes every batch has the same shape as this one; read packing_efficiency for the part that does transfer",
+      "per_case_costs_known": 12,
+      "cases_without_a_reading": [],
+      "sum_case_minutes": 236.3,
+      "longest_case_minutes": 93.8,
+      "ideal_wall_minutes": 93.8,
+      "packing_efficiency": 0.792
+    },
+    "patrol": {
+      "cases": 8,
+      "wall_minutes": 52.86,
+      "workers": 8,
+      "minutes_per_case_wall": 6.61,
+      "projected_minutes_693": 4579.0,
+      "projected_hours_693": 76.3,
+      "projected_days_693": 3.2,
+      "source": "reports/real_dev_20260923/readings_run2.json",
+      "detail": "patrol batch, workers=8, unresolved=0 -- the run in which the batch actually fit its budget",
+      "naive_projection_caveat": "scaling a batch wall clock by case count assumes every batch has the same shape as this one; read packing_efficiency for the part that does transfer"
+    }
+  },
+  "sensitivity": {
+    "available": true,
+    "readings": 34,
+    "mean_minutes": 6.5,
+    "median_minutes": 3.0,
+    "max_minutes": 39.9,
+    "sum_minutes": 220.6,
+    "estimates": {
+      "W1": {
+        "work_floor_minutes": 4496.0,
+        "work_floor_hours": 74.9,
+        "simulated_makespan": {
+          "schedulable": true,
+          "draws": 1200,
+          "workers": 1,
+          "p10_minutes": 4186.1,
+          "p50_minutes": 4484.9,
+          "p90_minutes": 4803.1,
+          "max_minutes": 5301.0,
+          "sample_max_minutes": 39.9
+        }
+      },
+      "W4": {
+        "work_floor_minutes": 1128.9,
+        "work_floor_hours": 18.8,
+        "simulated_makespan": {
+          "schedulable": true,
+          "draws": 1200,
+          "workers": 4,
+          "p10_minutes": 1054.6,
+          "p50_minutes": 1132.3,
+          "p90_minutes": 1210.4,
+          "max_minutes": 1346.6,
+          "sample_max_minutes": 39.9
+        }
+      },
+      "W8": {
+        "work_floor_minutes": 564.4,
+        "work_floor_hours": 9.4,
+        "simulated_makespan": {
+          "schedulable": true,
+          "draws": 1200,
+          "workers": 8,
+          "p10_minutes": 538.0,
+          "p50_minutes": 576.8,
+          "p90_minutes": 616.8,
+          "max_minutes": 690.8,
+          "sample_max_minutes": 39.9
+        }
+      },
+      "W16": {
+        "work_floor_minutes": 285.5,
+        "work_floor_hours": 4.8,
+        "simulated_makespan": {
+          "schedulable": true,
+          "draws": 1200,
+          "workers": 16,
+          "p10_minutes": 280.6,
+          "p50_minutes": 300.9,
+          "p90_minutes": 321.9,
+          "max_minutes": 360.8,
+          "sample_max_minutes": 39.9
+        }
+      }
+    }
+  },
+  "tokens": {
+    "measured_cases": 34,
+    "mean_per_case": 26881.6,
+    "p50_per_case": 14228.0,
+    "max_per_case": 146730,
+    "corpus_estimate": 18628941,
+    "corpus_estimate_millions": 18.6,
+    "rows": [
+      {
+        "case": "SmolAgents/019.json",
+        "tokens": 146730,
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\2f0d1f4ff7f1.json"
+      },
+      {
+        "case": "Octotools/030.json",
+        "tokens": 93754,
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\bd198e0c90b3.json"
+      },
+      {
+        "case": "OpenManus/064.json",
+        "tokens": 74580,
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\49683a275045.json"
+      },
+      {
+        "case": "Octotools/005.json",
+        "tokens": 60471,
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\9ec0e72cf3c8.json"
+      },
+      {
+        "case": "OpenDeepSearch/067.json",
+        "tokens": 55799,
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\25b86ebcdc32.json"
+      },
+      {
+        "case": "Camel/028.json",
+        "tokens": 52150,
+        "source": "reports\\real\\summary.json#recall_phase"
+      },
+      {
+        "case": "OpenDeepSearch/088.json",
+        "tokens": 43268,
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\2ba6f44854e5.json"
+      },
+      {
+        "case": "SmolAgents/022.json",
+        "tokens": 41174,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "SmolAgents/022.json",
+        "tokens": 40227,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "Magentic_One/067.json",
+        "tokens": 31145,
+        "source": "reports\\real\\summary.json#recall_phase"
+      },
+      {
+        "case": "Camel/028.json",
+        "tokens": 25603,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "Camel/028.json",
+        "tokens": 25547,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "Magentic_One/036.json",
+        "tokens": 21756,
+        "source": "reports\\verification_20260917\\single_mechanism\\Magentic_One__036.json.rep1.json"
+      },
+      {
+        "case": "OpenDeepSearch/078.json",
+        "tokens": 21186,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "Magentic_One/085.json",
+        "tokens": 17359,
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\00bfd8430fc7.json"
+      },
+      {
+        "case": "BFCL/017.json",
+        "tokens": 15506,
+        "source": "reports\\verification_20260917\\single_mechanism\\BFCL__017.json.rep1.json"
+      },
+      {
+        "case": "OpenDeepSearch/063.json",
+        "tokens": 14760,
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\b201f1303c69.json"
+      },
+      {
+        "case": "OpenDeepSearch/077.json",
+        "tokens": 13696,
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\403836705db1.json"
+      },
+      {
+        "case": "OpenDeepSearch/002.json",
+        "tokens": 12619,
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\28649dd5e405.json"
+      },
+      {
+        "case": "BFCL/041.json",
+        "tokens": 12273,
+        "source": "reports\\real_evolution_20260923\\contaminated_attempt\\checkpoints\\cycle001\\arms\\508acdf65658\\f5f761b6fbf5.json"
+      },
+      {
+        "case": "OpenDeepSearch/078.json",
+        "tokens": 10996,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "BFCL/017.json",
+        "tokens": 9906,
+        "source": "reports\\verification_20260917\\single_mechanism\\BFCL__017.json.rep2.json"
+      },
+      {
+        "case": "Magentic_One/036.json",
+        "tokens": 9838,
+        "source": "reports\\verification_20260917\\single_mechanism\\Magentic_One__036.json.rep2.json"
+      },
+      {
+        "case": "BFCL/012.json",
+        "tokens": 9677,
+        "source": "reports\\real\\summary.json#recall_phase"
+      },
+      {
+        "case": "Magentic_One/067.json",
+        "tokens": 8918,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "Magentic_One/067.json",
+        "tokens": 8691,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "OpenDeepSearch/076.json",
+        "tokens": 6867,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "OpenDeepSearch/076.json",
+        "tokens": 6582,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "OpenDeepSearch/086.json",
+        "tokens": 5681,
+        "source": "reports\\verification_20260917\\single_mechanism\\OpenDeepSearch__086.json.rep2.json"
+      },
+      {
+        "case": "OpenDeepSearch/086.json",
+        "tokens": 5204,
+        "source": "reports\\verification_20260917\\single_mechanism\\OpenDeepSearch__086.json.rep1.json"
+      },
+      {
+        "case": "BFCL/012.json",
+        "tokens": 3401,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "BFCL/012.json",
+        "tokens": 3234,
+        "source": "reports\\real\\summary.json"
+      },
+      {
+        "case": "OpenDeepSearch/002.json",
+        "tokens": 2953,
+        "source": "reports\\verification_20260917\\single_mechanism\\OpenDeepSearch__002.json.rep1.json"
+      },
+      {
+        "case": "OpenDeepSearch/002.json",
+        "tokens": 2423,
+        "source": "reports\\verification_20260917\\single_mechanism\\OpenDeepSearch__002.json.rep2.json"
+      }
+    ]
+  },
+  "notes": [
+    "the 2026-09-17 verification rows ran under study-specific settings (evidence arms, single-mechanism repeats); they are the same model and endpoint, so they witness the per-case cost scale, but a study that changed the route is not a measurement of the shipped route",
+    "run 2 timing phases give audit/patrol wall clock; the case lists come from the same run's contract (sentinel+gain) and ledger (patrol)",
+    "Magentic_One/049, Camel/018 and Magentic_One/050 exist only in prose; the README states them in minutes, so they are recorded as such and flagged instead of being silently mixed into the JSON readings"
+  ],
+  "caveats": [
+    "The per-case sample is 23 unique cases out of 693, and every one of them was pulled from a patrol/audit set that the framework selects for difficulty. The corpus mean is plausibly far below this sample's mean, so read the work floor as a floor on a well-behaved corpus rather than a forecast.",
+    "The four prose-only readings (Magentic_One/049 twice, Camel/018, Magentic_One/050) are the slowest rows in the sample and the only rows whose source is a report sentence rather than a JSON file. They decide most of the tail; see 'sensitivity' for the estimate computed without them.",
+    "One case (Magentic_One/049) was measured at 36.0 and 93.8 minutes under the same config -- a 2.6x spread with no code change. Any single-case point estimate carries that much runway.",
+    "The provider is a shared endpoint with no rate-limit contract. If it throttles, throughput falls below every estimate here and the only correction is to lower the worker count and re-measure.",
+    "The batch anchors each contain one batch. The audit anchor is dominated by its slowest case, which is a property of that case list, not of the corpus.",
+    "Token totals are provider-reported and cover the stages that recorded usage; a case whose envelope lost a stage's usage is excluded rather than counted as cheap."
+  ]
+}

@@ -691,8 +691,45 @@ def custom_conviction_verdicts_for(
 DETERMINISTIC_RUNNER = "deterministic"
 
 
+#: Conviction authority for a *built-in* deterministic predicate is granted by
+#: measurement, not by the table above. The table says which verdict looks like a
+#: violation; ``detector.conviction_calibration`` says whether this predicate's
+#: violations are trustworthy, by requiring a calibration record with zero
+#: false positives on the gold-clean corpus, bound to the predicate's derived
+#: dependency fingerprint and to the corpus digest, and re-measured live.
+#:
+#: An uncalibrated predicate is not refused as *evidence* -- its row still lands
+#: in ``proof.evidence`` and can inform proposals -- it simply cannot authorize
+#: a terminal conviction, so a guard that binds it is suppressed and the case is
+#: decided by the judge/defense path. Refusal therefore degrades to the ordinary
+#: route rather than to a wrong conviction.
+def _calibrated_conviction_verdicts(
+    predicate: str,
+    verdicts: frozenset[str],
+    calibration: Any = None,
+) -> tuple[frozenset[str], str]:
+    """The verdicts a built-in predicate may convict on, with the reason when not.
+
+    ``calibration`` is injectable so a caller (a test, or a run with a pinned
+    corpus) can supply its own view; the default is the process-wide record.
+    """
+    from detector.conviction_calibration import default_calibration
+
+    view = calibration if calibration is not None else default_calibration()
+    try:
+        admitted, reason = view.admits(predicate)
+    except Exception as exc:  # pragma: no cover - a broken view fails closed
+        return frozenset(), f"calibration unavailable: {type(exc).__name__}: {exc}"
+    if not admitted:
+        return frozenset(), str(reason or "uncalibrated")
+    return frozenset(verdicts), ""
+
+
 def conviction_verdict_table(
     programs: Mapping[str, Mapping[str, Any]] | None = None,
+    *,
+    calibration: Any = None,
+    uncalibrated: dict[str, str] | None = None,
 ) -> dict[tuple[str, str], frozenset[str]]:
     """Which verdicts may authorize a terminal conviction, per ``(predicate, runner)``.
 
@@ -702,12 +739,29 @@ def conviction_verdict_table(
     that also calls itself ``P`` (evidence only), and a table keyed by name
     alone let the semantic row collect the program's authority. The pair is
     what the guard reads when it binds mechanical evidence.
+
+    Built-in rows are additionally filtered through the calibration guard: a
+    predicate whose record is missing, stale, or nonzero-false-positive keeps no
+    convicting verdict here at all, so the guard's binding cannot find one. The
+    refusal is recorded in ``uncalibrated`` (predicate -> reason) when a caller
+    passes a mapping, because "the guard stayed silent" and "the guard was not
+    allowed to speak" are different facts and only one of them belongs in a
+    report about detection quality.
     """
-    table: dict[tuple[str, str], frozenset[str]] = {
-        (str(predicate), DETERMINISTIC_RUNNER): frozenset(verdicts)
-        for predicate, verdicts in PREDICATE_CONVICTION_VERDICTS.items()
-    }
+    table: dict[tuple[str, str], frozenset[str]] = {}
+    for predicate, verdicts in PREDICATE_CONVICTION_VERDICTS.items():
+        allowed, reason = _calibrated_conviction_verdicts(
+            str(predicate), frozenset(verdicts), calibration,
+        )
+        table[(str(predicate), DETERMINISTIC_RUNNER)] = allowed
+        if not allowed and uncalibrated is not None:
+            uncalibrated[str(predicate)] = reason
     for name, verdicts in custom_conviction_verdicts_for(programs or {}).items():
+        # A typed-DSL program is not covered by this record: its authority comes
+        # from the design contract that a program which observes the packet may
+        # convict (``terminal_authority``), and its admissions are governed by
+        # the metamorphic gate. The calibration record is about the *built-in*
+        # parsers, whose authority was never measured.
         table[(name, PROGRAM_RUNNER)] = frozenset(verdicts)
     return table
 
@@ -716,6 +770,8 @@ def conviction_verdicts_for(
     conviction_verdicts: Mapping[Any, Any] | None,
     predicate: str,
     runner: str = "",
+    *,
+    calibration: Any = None,
 ) -> frozenset[str]:
     """The verdicts one evidence row may convict on; empty means "none".
 
@@ -723,7 +779,7 @@ def conviction_verdicts_for(
     predicate-only key as well so a legacy call that hands over
     :data:`detector.predicates.PREDICATE_CONVICTION_VERDICTS` keeps working.
 
-    Two rules decide the answer:
+    Three rules decide the answer:
 
     1. A row that names a runner is governed by that runner's declaration. A
        runner whose ``terminal_authority`` is not ``conviction`` may report
@@ -736,22 +792,38 @@ def conviction_verdicts_for(
        ``typed_semantic`` entry that reuses a typed-DSL program's predicate
        name therefore never collects that program's conviction verdicts: the
        pair is what the plan's guard binds against.
+    3. A *built-in* predicate additionally needs a calibration record proving
+       zero false positives on the gold-clean corpus
+       (``detector.conviction_calibration``). This holds whatever table the
+       caller passes -- including
+       :data:`detector.predicates.PREDICATE_CONVICTION_VERDICTS` itself -- so a
+       hand-built ``adjudicate`` call cannot restore an authority the plan
+       refused. The filter is applied here, at the binding, because "which table
+       did the caller hand over" is not a question the design table can answer.
 
     A row that names no runner -- the shape a hand-built ``adjudicate`` call
-    uses -- falls back to the predicate-only key alone.
+    uses -- falls back to the predicate-only key alone, still under rule 3.
     """
     table = conviction_verdicts or {}
     predicate = str(predicate or "")
     runner = str(runner or "")
+    allowed: frozenset[str]
     if not runner:
-        return frozenset(table.get(predicate) or ())
-    spec = runner_spec(runner)
-    if spec is None or spec.terminal_authority != TERMINAL_CONVICTION:
-        return frozenset()
-    allowed = table.get((predicate, runner))
-    if allowed is None:
-        allowed = table.get(predicate)
-    return frozenset(allowed or ())
+        allowed = frozenset(table.get(predicate) or ())
+    else:
+        spec = runner_spec(runner)
+        if spec is None or spec.terminal_authority != TERMINAL_CONVICTION:
+            return frozenset()
+        candidate = table.get((predicate, runner))
+        if candidate is None:
+            candidate = table.get(predicate)
+        allowed = frozenset(candidate or ())
+    if predicate in PREDICATE_CONVICTION_VERDICTS:
+        admitted, _reason = _calibrated_conviction_verdicts(
+            predicate, allowed, calibration,
+        )
+        return admitted
+    return allowed
 
 
 def validate_intervention_batch(
@@ -1405,6 +1477,7 @@ class InterventionPlan:
         *,
         semantic_executor: "SemanticExecutor | None" = None,
         component_executors: Mapping[str, "ComponentExecutor"] | None = None,
+        conviction_calibration: Any = None,
     ) -> None:
         self.entries = [dict(entry) for entry in entries]
         self.fired: list[dict[str, Any]] = []
@@ -1416,13 +1489,21 @@ class InterventionPlan:
         self.registry_hash = ""
         self.predicate_programs = inline_predicate_programs(self.entries)
         self.recall_trigger_programs = inline_trigger_programs(self.entries)
+        self.conviction_calibration = conviction_calibration
         # ``(predicate, runner) -> conviction verdicts``. The runner is part of
         # the key so an entry that shares a predicate name with a
         # conviction-authorized program cannot inherit its authority: a
         # ``typed_semantic`` / ``sandboxed_component`` row reports evidence and
         # may never be the thing that convicts.
+        #
+        # A built-in row is also filtered by calibration: a predicate whose
+        # measured clean-set false-positive count is not zero holds no
+        # convicting verdict here, whatever the design table says.
+        self.uncalibrated_convictions: dict[str, str] = {}
         self.predicate_conviction_verdicts = conviction_verdict_table(
             self.predicate_programs,
+            calibration=conviction_calibration,
+            uncalibrated=self.uncalibrated_convictions,
         )
         self.semantic_executor = semantic_executor
         # Keyed by predicate, not a single executor: each component entry
@@ -1494,22 +1575,24 @@ class InterventionPlan:
         *,
         semantic_executor: "SemanticExecutor | None" = None,
         component_executors: Mapping[str, "ComponentExecutor"] | None = None,
+        conviction_calibration: Any = None,
     ) -> "InterventionPlan":
         if payload is None:
             return cls(
                 [],
                 semantic_executor=semantic_executor,
                 component_executors=component_executors,
+                conviction_calibration=conviction_calibration,
             )
         entries = validate_registry(payload, require_executable_bounds=True)
         plan = cls(
             entries,
             semantic_executor=semantic_executor,
             component_executors=component_executors,
+            conviction_calibration=conviction_calibration,
         )
         plan.registry_hash = str(payload.get("content_hash") or "")
         return plan
-
     def _facts_map(self, facts: Mapping[str, Any] | Sequence[str] | None) -> dict[str, str]:
         if facts is None:
             return {}
@@ -1811,11 +1894,26 @@ class InterventionPlan:
                 )
                 if evidence is None:
                     if record:
+                        # Two different silences. A built-in predicate whose
+                        # calibration record is missing, stale or
+                        # nonzero-false-positive was never allowed to convict
+                        # here (``uncalibrated_convictions`` says why); any
+                        # other case is a binding that found no matching row.
+                        # Keeping them apart is what lets a reader tell "the
+                        # guard found nothing" from "the guard was not allowed
+                        # to speak".
+                        reason = self.uncalibrated_convictions.get(predicate)
                         self._record(
                             entry,
                             "guard_suppressed",
-                            "mechanical evidence binding missing, non-violating, "
-                            "or produced by an evidence-only runner",
+                            (
+                                f"predicate {predicate!r} is not conviction-"
+                                f"calibrated: {reason}"
+                                if reason else
+                                "mechanical evidence binding missing, "
+                                "non-violating, or produced by an "
+                                "evidence-only runner"
+                            ),
                         )
                     continue
                 if record:
@@ -1914,6 +2012,13 @@ class InterventionPlan:
             "facts": dict(self.facts),
             "guard_actions": list(self.guard_actions_applied),
             "mechanical_guard_evidence": list(self.mechanical_guard_evidence),
+            # Built-in predicates that hold the design's convicting verdict but
+            # are refused the authority by the calibration guard, with the
+            # reason. Reported rather than merely enforced: a conviction route
+            # that silently does nothing is indistinguishable from one that
+            # found nothing, and the difference matters to every precision
+            # claim made downstream of this run.
+            "uncalibrated_convictions": dict(self.uncalibrated_convictions),
             "typed_predicate_programs": [
                 {
                     "name": str(program.get("name") or ""),
@@ -1931,11 +2036,13 @@ def compile_runtime_plan(
     *,
     semantic_executor: "SemanticExecutor | None" = None,
     component_executors: Mapping[str, "ComponentExecutor"] | None = None,
+    conviction_calibration: Any = None,
 ) -> InterventionPlan:
     return InterventionPlan.from_registry(
         intervention_registry,
         semantic_executor=semantic_executor,
         component_executors=component_executors,
+        conviction_calibration=conviction_calibration,
     )
 
 

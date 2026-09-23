@@ -14,6 +14,7 @@ from typing import Any, Mapping, Sequence
 from detector.api import Detector
 from detector.config import load_config
 from detector.dataset import load_case
+from detector.result import RESULT_SCHEMA
 
 DEFAULT_RUNS_ROOT = Path("artifacts/detector/runs")
 
@@ -60,6 +61,38 @@ def _is_transport_unresolved(result: Mapping[str, Any]) -> bool:
         for reason in reasons
         if isinstance(reason, Mapping)
     )
+
+
+def _cached_envelope_is_reusable(
+    result: Mapping[str, Any], *, retry_unresolved: bool,
+) -> bool:
+    """Whether an already-written ``result.json`` may stand in for a fresh run.
+
+    Two questions, and the old code asked neither. *Is this envelope ours?* --
+    a file whose schema is not this runner's result schema is some other tool's
+    output, and reusing it would silently mix two measurements in one run tree.
+    *Is it a decision about the case?* -- an ``unresolved`` row records what
+    the provider did during an outage, not what the detector says about the
+    case, so a resume that treats it as finished freezes the batch at whatever
+    the network happened to be doing in that hour. That is the difference
+    between a resumable long run and a permanently contaminated one, and it is
+    why re-running those rows is opt-in rather than assumed: a caller who wants
+    the outage recorded keeps the default.
+
+    The third question -- *was it produced by this configuration?* -- is
+    answered by the run manifest, which is why a run directory that holds case
+    results without one is refused rather than resumed: the fingerprint that
+    would answer it is exactly what is missing.
+    """
+    if str(result.get("schema_version") or "") != RESULT_SCHEMA:
+        raise ValueError(
+            "cached result is not a "
+            f"{RESULT_SCHEMA} envelope: found "
+            f"{result.get('schema_version')!r}; refusing to reuse it"
+        )
+    if retry_unresolved and str(result.get("state") or "") == "unresolved":
+        return False
+    return True
 
 
 def detect_with_transport_retry(
@@ -109,8 +142,21 @@ def run_batch(
     config: Mapping[str, Any] | None = None,
     interventions: Mapping[str, Any] | None = None,
     workers: int = 8,
+    retry_unresolved: bool = False,
 ) -> dict[str, Any]:
-    """Run *cases* concurrently; skip cases whose result already exists."""
+    """Run *cases* concurrently; skip cases whose result already exists.
+
+    Resuming is only safe against a verified manifest, so the run directory's
+    ``run.json`` is checked first: it carries the config, intervention and case
+    fingerprints, and a mismatch is refused rather than partially reused. A run
+    directory that holds case results but no manifest cannot be resumed at all
+    (see ``_cached_envelope_is_reusable``).
+
+    ``retry_unresolved`` re-runs cases whose cached row is ``unresolved``
+    instead of accepting it as a finished case. A long batch that hit a
+    provider outage should be resumable to a full-coverage measurement, and
+    only the caller knows whether this resume is that one.
+    """
     if len(cases) != len(set(map(str, cases))):
         raise ValueError("batch cases must be unique")
     normalized_paths = {}
@@ -143,6 +189,19 @@ def run_batch(
                 f"run {run_id!r} already exists with a different manifest"
             )
     else:
+        # Results without a manifest are results whose configuration cannot be
+        # verified: the fingerprint that would say which config produced them
+        # is the file that is missing. Writing a fresh manifest over them would
+        # then *claim* the current config for rows it never produced, so this
+        # is refused instead.
+        orphaned = sorted(case_root.glob("*/result.json"))
+        if orphaned:
+            raise ValueError(
+                f"run {run_id!r} holds {len(orphaned)} case result(s) but no "
+                "run.json manifest; refusing to reuse results whose "
+                "configuration cannot be verified. Restore run.json, or point "
+                "the run at a new run_id."
+            )
         _write_json(manifest_path, run_manifest)
     summaries: list[dict[str, Any]] = []
 
@@ -155,8 +214,13 @@ def run_batch(
                     f"cached result at {out_path} belongs to "
                     f"{result.get('case_id')!r}, not {case_id!r}"
                 )
-            summaries.append(result)
-            return result
+            if _cached_envelope_is_reusable(
+                result, retry_unresolved=retry_unresolved,
+            ):
+                summaries.append(result)
+                return result
+            print(f"  [{case_id}] re-running cached {result.get('state')} row",
+                  flush=True)
         record, _gold = load_case(dataset_root, case_id)
         started = time.monotonic()
         result = detect_with_transport_retry(

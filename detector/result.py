@@ -25,6 +25,15 @@ def build_detection_output(
         "case_id": case_id,
         "state": state,
         "decision_authority": proof.get("decision_authority"),
+        # Localization authority travels beside the detection authority, never
+        # inside it: a conflicted responsible step degrades this one field and
+        # leaves the verdict's own authority exactly as the hearing flow set
+        # it. Rows written before this field existed report ``None`` rather
+        # than a default, so an old envelope cannot be read as a settled
+        # localization it never recorded.
+        "localization_authority": proof.get("localization_authority"),
+        "localization_conflict": proof.get("localization_conflict"),
+        "responsible_step_kind": proof.get("responsible_step_kind"),
         "runtime_valid": bool(proof.get("runtime_valid")),
         "responsible_event_id": proof.get("responsible_event_id"),
         "responsible_step": proof.get("responsible_step"),

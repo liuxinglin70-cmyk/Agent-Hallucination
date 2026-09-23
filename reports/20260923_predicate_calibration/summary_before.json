@@ -1,0 +1,141 @@
+{
+  "cases": 693,
+  "clean": 250,
+  "error": 443,
+  "predicates": {
+    "final_delivery_present": {
+      "clean": {
+        "convicting_cases": [
+          "OpenManus/048.json",
+          "OpenManus/062.json",
+          "OpenManus/069.json"
+        ],
+        "convicting_hits": 3,
+        "verdict_counts": {
+          "missing": 3,
+          "not_applicable": 180,
+          "present": 67
+        }
+      },
+      "convicting_verdicts": [
+        "missing"
+      ],
+      "error": {
+        "convicting_cases": [
+          "OpenManus/007.json",
+          "OpenManus/009.json",
+          "OpenManus/025.json",
+          "OpenManus/026.json",
+          "OpenManus/027.json",
+          "OpenManus/031.json",
+          "OpenManus/033.json",
+          "OpenManus/047.json",
+          "OpenManus/050.json",
+          "OpenManus/057.json",
+          "OpenManus/059.json",
+          "OpenManus/060.json",
+          "OpenManus/063.json",
+          "OpenManus/065.json",
+          "OpenManus/067.json",
+          "OpenManus/070.json",
+          "OpenManus/071.json",
+          "OpenManus/072.json",
+          "OpenManus/073.json",
+          "OpenManus/078.json",
+          "OpenManus/079.json",
+          "OpenManus/084.json",
+          "OpenManus/100.json",
+          "OpenManus/101.json"
+        ],
+        "convicting_hits": 24,
+        "verdict_counts": {
+          "missing": 24,
+          "not_applicable": 277,
+          "present": 142
+        }
+      }
+    },
+    "required_action_present": {
+      "clean": {
+        "convicting_cases": [
+          "BFCL/019.json",
+          "BFCL/022.json",
+          "BFCL/038.json",
+          "BFCL/092.json",
+          "BFCL/128.json",
+          "BFCL/152.json",
+          "Camel/023.json"
+        ],
+        "convicting_hits": 7,
+        "verdict_counts": {
+          "not_applicable": 243,
+          "violated": 7
+        }
+      },
+      "convicting_verdicts": [
+        "violated"
+      ],
+      "error": {
+        "convicting_cases": [
+          "BFCL/000.json",
+          "BFCL/039.json",
+          "BFCL/041.json",
+          "BFCL/042.json",
+          "BFCL/044.json",
+          "BFCL/047.json",
+          "BFCL/048.json",
+          "BFCL/052.json",
+          "BFCL/056.json",
+          "BFCL/057.json",
+          "BFCL/058.json",
+          "BFCL/059.json",
+          "BFCL/062.json",
+          "BFCL/063.json",
+          "BFCL/066.json",
+          "BFCL/071.json",
+          "BFCL/074.json",
+          "BFCL/077.json",
+          "BFCL/078.json",
+          "BFCL/080.json",
+          "BFCL/081.json",
+          "BFCL/085.json",
+          "BFCL/122.json",
+          "BFCL/123.json",
+          "Camel/022.json",
+          "Camel/090.json",
+          "Magentic_One/020.json",
+          "Magentic_One/052.json",
+          "Magentic_One/054.json",
+          "Octotools/019.json",
+          "OpenDeepSearch/006.json",
+          "SmolAgents/032.json"
+        ],
+        "convicting_hits": 32,
+        "verdict_counts": {
+          "not_applicable": 411,
+          "violated": 32
+        }
+      }
+    },
+    "verbatim_fidelity": {
+      "clean": {
+        "convicting_cases": [],
+        "convicting_hits": 0,
+        "verdict_counts": {
+          "not_applicable": 250
+        }
+      },
+      "convicting_verdicts": [
+        "violated"
+      ],
+      "error": {
+        "convicting_cases": [],
+        "convicting_hits": 0,
+        "verdict_counts": {
+          "not_applicable": 443
+        }
+      }
+    }
+  },
+  "unlabelled_or_failed": 0
+}

@@ -6,7 +6,7 @@ external gold labels joined to the two detection arms.
 
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from typing import Any, Collection, Mapping, Sequence
 
 
 def _bool_prediction(value: bool | None) -> bool | None:
@@ -131,11 +131,31 @@ def binary_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 def paired_delta(
     baseline_rows: Sequence[Mapping[str, Any]],
     active_rows: Sequence[Mapping[str, Any]],
+    *,
+    unstable_cases: Collection[str] | None = None,
 ) -> dict[str, Any]:
     """Paired confusion delta for the same case set.
 
     ``marginal_cases`` is the number of all-case correct predictions gained;
     ``new_errors`` is correct-or-decisive -> wrong-or-unresolved transitions.
+
+    ``unstable_cases`` names cases the *baseline configuration itself* read
+    differently when it was rolled twice (``flipped_cases``). Supplying it adds
+    annotations only -- it never changes a field defined above, and it never
+    subtracts a harm. A gain measured on a case the same configuration reads two
+    ways is not evidence about the candidate, so the counts are reported
+    separately for the gate to weigh:
+
+    * ``marginal_cases_on_unstable`` / ``marginal_cases_on_stable`` split the
+      benefit, and the gates score the benefit floor on the stable part;
+    * ``new_errors_on_unstable`` / ``unresolved_added_on_unstable`` say how much
+      of the recorded harm sits on those same cases. They are never subtracted:
+      "the candidate broke it, so the adjudicator gave up on it" being removed
+      would let a candidate launder a regression as instrument noise.
+
+    Without ``unstable_cases`` (``None``, the default) every annotation is zero
+    and ``stability_applicable`` is false, so callers that have no reroll --
+    frozen replays, promotion's cached arms -- keep their exact meaning.
     """
     paired = confusion_rows(baseline_rows, active_rows)
     base_correct = sum(
@@ -226,10 +246,17 @@ def paired_delta(
     for row in paired:
         baseline_health = _row_health(baseline_by_case.get(row["case"]))
         active_health = _row_health(active_by_case.get(row["case"]))
+        # Stamped per case, not only summed: "which case lost its health" is
+        # what an attribution question asks, and a count cannot answer it.
+        row["baseline_health"] = baseline_health
+        row["active_health"] = active_health
         if baseline_health and not active_health:
             health_regressed += 1
         elif not baseline_health and active_health:
             health_improved += 1
+    stability = _stability_annotation(
+        paired, unstable_cases, marginal=active_correct - base_correct,
+    )
     return {
         "paired_n": len(paired),
         "base_all_case_correct": base_correct,
@@ -253,6 +280,261 @@ def paired_delta(
         "baseline_metrics": metrics_base,
         "active_metrics": metrics_active,
         "rows": paired,
+        **stability,
+    }
+
+
+def _stability_annotation(
+    paired: Sequence[Mapping[str, Any]],
+    unstable_cases: Collection[str] | None,
+    *,
+    marginal: int,
+) -> dict[str, Any]:
+    """The unstable-case reading of one paired delta, as extra fields.
+
+    Kept in one place so ``paired_delta`` and ``paired_localization_delta``
+    cannot disagree about which cases were unstable or about what a "gain on an
+    unstable case" counts.
+    """
+    if unstable_cases is None:
+        return {
+            "stability_applicable": False,
+            "unstable_cases": [],
+            "marginal_cases_on_unstable": 0,
+            "marginal_cases_on_stable": 0,
+            "new_errors_on_unstable": 0,
+            "unresolved_added_on_unstable": 0,
+        }
+    wanted = {str(case) for case in unstable_cases}
+    in_scope = sorted(
+        str(row["case"]) for row in paired if str(row["case"]) in wanted
+    )
+    on_unstable = 0
+    new_errors_on_unstable = 0
+    unresolved_added_on_unstable = 0
+    for row in paired:
+        if str(row["case"]) not in wanted:
+            continue
+        gold = row["gold"]
+        base = row["baseline_prediction"]
+        active = row["active_prediction"]
+        base_correct = base is not None and base == gold
+        active_correct = active is not None and active == gold
+        if active_correct and not base_correct:
+            on_unstable += 1
+        if gold:
+            if (base is True and active is not True) or (
+                base is None and active is False
+            ):
+                new_errors_on_unstable += 1
+        elif base is not True and active is True:
+            new_errors_on_unstable += 1
+        if base is not None and active is None:
+            unresolved_added_on_unstable += 1
+    return {
+        "stability_applicable": True,
+        "unstable_cases": in_scope,
+        "marginal_cases_on_unstable": on_unstable,
+        "marginal_cases_on_stable": marginal - on_unstable,
+        "new_errors_on_unstable": new_errors_on_unstable,
+        "unresolved_added_on_unstable": unresolved_added_on_unstable,
+    }
+
+
+# How much of the instrument's own jitter a round managed to read. The three
+# states are deliberately distinct in the report, because "the instrument
+# cannot move" and "nobody looked" are different facts and only one of them
+# licenses reading a delta as if it were exact.
+NOISE_FLOOR_MEASURED = "measured"
+NOISE_FLOOR_DETERMINISTIC = "deterministic_replay"
+NOISE_FLOOR_NOT_MEASURED = "not_measured"
+
+
+def flipped_cases(
+    baseline_rows: Sequence[Mapping[str, Any]],
+    active_rows: Sequence[Mapping[str, Any]],
+) -> list[str]:
+    """Cases one configuration read differently on two independent rolls.
+
+    The two arms are the *same* registry rolled twice, so any difference here
+    is the instrument's own jitter -- not the effect of anything. A case counts
+    as flipped when its terminal reading moved: the decision
+    (``True``/``False``/``None``), the state, or the row's health (authority,
+    runtime validity, a failed stage). Health is compared as well as the
+    decision because a row that reads "provider_error on causal_upgrade" on one
+    roll and decides on the other is not a stable measurement either, even when
+    both rolls happen to end in the same verdict.
+
+    A case read on one roll only counts as flipped: it is not a pair, and the
+    conservative direction for every caller of this function is "unstable".
+    """
+    baseline = {str(row.get("case") or ""): row for row in baseline_rows}
+    out: set[str] = set()
+    seen: set[str] = set()
+    for row in active_rows:
+        case = str(row.get("case") or "")
+        seen.add(case)
+        other = baseline.get(case)
+        if other is None:
+            out.add(case)
+            continue
+        if _bool_prediction(row.get("prediction")) != _bool_prediction(
+            other.get("prediction")
+        ):
+            out.add(case)
+        elif str(row.get("state") or "") != str(other.get("state") or ""):
+            out.add(case)
+        elif _row_health(row) != _row_health(other):
+            out.add(case)
+    out.update(case for case in baseline if case not in seen)
+    out.discard("")
+    return sorted(out)
+
+
+def noise_floor(
+    *,
+    reroll: Mapping[str, Any] | None = None,
+    flipped: Sequence[str] = (),
+    provider_stage: bool = False,
+    reason: str = "",
+) -> dict[str, Any]:
+    """The instrument's own jitter for one round, as a report block.
+
+    ``reroll`` is the paired delta between two independent rolls of the *same*
+    active configuration, and ``flipped`` the cases those two rolls disagreed
+    on. The three possible readings are kept apart on purpose:
+
+    * ``measured`` -- two rolls were paired, so the round has a number;
+    * ``deterministic_replay`` -- no provider stage ran, so every arm was a
+      frozen replay and the floor is a *known* zero, not an unmeasured one;
+    * ``not_measured`` -- a provider stage ran but the round took only one roll
+      of the active configuration, so the floor is unknown. The quantities are
+      ``None`` rather than 0: reporting an unlooked-at floor as zero would say
+      the instrument was checked and found still.
+
+    A reader must be able to tell a measured zero from either of the other two,
+    which is what ``status`` and ``applicable`` are for.
+    """
+    if reroll is not None:
+        note = (
+            reason
+            or "two independent rolls of the active configuration were paired "
+            "this round (S+G)"
+        )
+        return {
+            "status": NOISE_FLOOR_MEASURED,
+            "applicable": True,
+            "rolls": 2,
+            "reason": note,
+            "paired_n": int(reroll.get("paired_n") or 0),
+            "marginal_cases": int(reroll.get("marginal_cases") or 0),
+            "flips": dict(reroll.get("flips") or {}),
+            "new_errors": int(reroll.get("new_errors") or 0),
+            "unresolved_added": int(reroll.get("unresolved_added") or 0),
+            "cases_flipped": len(flipped),
+            "flipped_cases": sorted(str(case) for case in flipped),
+        }
+    if provider_stage:
+        return {
+            "status": NOISE_FLOOR_NOT_MEASURED,
+            "applicable": False,
+            "rolls": 1,
+            "reason": reason or (
+                "a provider stage ran this round but only one roll of the "
+                "active configuration was taken, so the instrument's own "
+                "jitter is unknown"
+            ),
+            "paired_n": None,
+            "marginal_cases": None,
+            "flips": None,
+            "new_errors": None,
+            "unresolved_added": None,
+            "cases_flipped": None,
+            "flipped_cases": [],
+        }
+    return {
+        "status": NOISE_FLOOR_DETERMINISTIC,
+        "applicable": False,
+        "rolls": 1,
+        "reason": reason or (
+            "every arm of this comparison is a frozen replay, so the "
+            "instrument's own jitter is zero by construction"
+        ),
+        "paired_n": None,
+        "marginal_cases": 0,
+        "flips": {},
+        "new_errors": 0,
+        "unresolved_added": 0,
+        "cases_flipped": 0,
+        "flipped_cases": [],
+    }
+
+
+def noise_floor_flipped_cases(block: Mapping[str, Any] | None) -> list[str]:
+    """The flipped cases a noise-floor block licenses as unstable.
+
+    Only a *measured* block names cases: an unmeasured floor has no flip set,
+    and treating "no reroll was taken" as "nothing flipped" would hand a
+    provider-stage round the same confidence as a frozen replay.
+    """
+    if not block or str(block.get("status") or "") != NOISE_FLOOR_MEASURED:
+        return []
+    return [str(case) for case in block.get("flipped_cases") or ()]
+
+
+def repeated_roll_disagreement(
+    rolls: Sequence[Sequence[Mapping[str, Any]]],
+) -> dict[str, Any]:
+    """Which cases one configuration read differently across N independent rolls.
+
+    The cycle can afford two rolls, so its noise floor is a single paired
+    reading, and a case that disagrees only rarely can pass it unremarked. A
+    repeat probe answers the same question with a dispersion estimate instead:
+    in the RSI pilot, ``BFCL/008`` and ``BFCL/024`` read 6/2 across 8 repeats of
+    one configuration, which no single-case claim can survive. That reading
+    belongs in the metrics, not in a paragraph of a report, because the
+    decision it feeds -- "this case may not be scored alone" -- is the same one
+    ``flipped_cases`` feeds from two rolls.
+
+    ``rolls`` is one sequence of rows per independent roll of the same
+    configuration, all covering the same case set.
+    """
+    tallies: dict[str, dict[str, int]] = {}
+    order: list[str] = []
+    for roll in rolls:
+        for row in roll:
+            case = str(row.get("case") or "")
+            if not case:
+                continue
+            if case not in tallies:
+                tallies[case] = {}
+                order.append(case)
+            state = str(row.get("state") or "")
+            if not state:
+                prediction = _bool_prediction(row.get("prediction"))
+                state = (
+                    "verified_error" if prediction is True
+                    else "verified_clean" if prediction is False
+                    else "unresolved"
+                )
+            tallies[case][state] = tallies[case].get(state, 0) + 1
+    cases = [
+        {
+            "case": case,
+            "reads": sum(tallies[case].values()),
+            "tallies": dict(sorted(tallies[case].items())),
+            "unstable": len(tallies[case]) > 1,
+        }
+        for case in sorted(order)
+    ]
+    unstable = [item["case"] for item in cases if item["unstable"]]
+    return {
+        "rolls": len(rolls),
+        "cases": cases,
+        "unstable_cases": unstable,
+        "unstable_case_count": len(unstable),
+        "stable_case_count": len(cases) - len(unstable),
+        "unstable_share": (len(unstable) / len(cases)) if cases else None,
     }
 
 
@@ -566,6 +848,124 @@ def row_responsible_step(row: Mapping[str, Any] | None) -> int | None:
         return None
 
 
+STEP_KIND_CONTENT = "content_step"
+STEP_KIND_ACTION = "action_step"
+STEP_KIND_EMPTY = "empty_step"
+STEP_KIND_UNCLASSIFIED = "unclassified"
+
+STEP_KINDS = (
+    STEP_KIND_CONTENT, STEP_KIND_ACTION, STEP_KIND_EMPTY, STEP_KIND_UNCLASSIFIED,
+)
+
+
+def row_responsible_step_kind(row: Mapping[str, Any] | None) -> str:
+    """Whether a row's responsible step is a content step or an action step.
+
+    Read, never guessed. The detector holds the packet at adjudication time and
+    records ``responsible_step_kind`` on the envelope
+    (``detector.packet.step_kind``: prose in the blamed event -> content step;
+    only tool calls -> action step). A row carrying no such field -- an older
+    archive, a synthetic test row, a third-party backend -- is reported as
+    ``unclassified`` instead of being inferred from anything about the row's
+    numbers. Inferring would place a fabricated decomposition next to a
+    measured one, which is the failure this reading exists to prevent.
+    """
+    if not row:
+        return STEP_KIND_UNCLASSIFIED
+    value = row.get("responsible_step_kind")
+    if value is None:
+        result = row.get("result") or {}
+        value = result.get("responsible_step_kind")
+    if value is None:
+        value = ((row.get("result") or {}).get("proof") or {}).get(
+            "responsible_step_kind"
+        )
+    text = str(value or "")
+    return text if text in STEP_KINDS else STEP_KIND_UNCLASSIFIED
+
+
+def row_localization_conflicting(row: Mapping[str, Any] | None) -> bool:
+    """Whether the row recorded a disagreement about its responsible step.
+
+    False for a row with no conflict object, which is also what a row written
+    before the field existed reports: that is absence of evidence, not a claim
+    that the sources agreed.
+    """
+    if not row:
+        return False
+    value = row.get("localization_conflict")
+    if value is None:
+        value = ((row.get("result") or {}).get("proof") or {}).get(
+            "localization_conflict"
+        )
+    return isinstance(value, Mapping) and bool(value.get("disagreements"))
+
+
+def _step_kind_split(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    hit_of: Any,
+) -> dict[str, Any]:
+    """Per-step-kind hit counts beside one localization reading.
+
+    ``hit_of`` maps a row to ``(scorable, hit)`` so the same decomposition can
+    ride beside several readings without redefining any of them.
+
+    The point of splitting: a hit rate over action steps and one over content
+    steps answer different questions -- the first says "it found the right
+    tool call", the second "it found the right sentence" -- and one averaged
+    number hides which question an arm actually improved. The two are reported
+    side by side and never combined into a score.
+    """
+    by_kind: dict[str, dict[str, int]] = {
+        kind: {"scorable": 0, "hits": 0} for kind in STEP_KINDS
+    }
+    for row in rows:
+        scorable, hit = hit_of(row)
+        if not scorable:
+            continue
+        bucket = by_kind[row_responsible_step_kind(row)]
+        bucket["scorable"] += 1
+        bucket["hits"] += int(bool(hit))
+    result: dict[str, Any] = {}
+    for kind, bucket in by_kind.items():
+        scorable, hits = bucket["scorable"], bucket["hits"]
+        result[f"{kind}_scorable"] = scorable
+        result[f"{kind}_hits"] = hits
+        result[f"{kind}_accuracy"] = (hits / scorable) if scorable else None
+    return result
+
+
+def _step_kind_split(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    hit_of: Any,
+) -> dict[str, Any]:
+    """Deprecated shim: unused, kept out of ``__all__``.
+
+    Superseded by ``_joint_kind_split``, which reads the per-arm kind recorded
+    on the paired rows. Retained only so an in-flight caller that imported the
+    private name is not broken by the change.
+    """
+    by_kind: dict[str, dict[str, int]] = {
+        kind: {"scorable": 0, "hits": 0} for kind in STEP_KINDS
+    }
+    for row in rows:
+        scorable, hit = hit_of(row)
+        if not scorable:
+            continue
+        bucket = by_kind[row_responsible_step_kind(row)]
+        bucket["scorable"] += 1
+        bucket["hits"] += int(bool(hit))
+    result: dict[str, Any] = {}
+    for kind, bucket in by_kind.items():
+        scorable, hits = bucket["scorable"], bucket["hits"]
+        result[f"{kind}_scorable"] = scorable
+        result[f"{kind}_hits"] = hits
+        result[f"{kind}_accuracy"] = (hits / scorable) if scorable else None
+    return result
+
+
 def _gold_step(row: Mapping[str, Any], gold_steps: Mapping[str, Any]) -> int | None:
     case = str(row.get("case") or "")
     value = gold_steps.get(case)
@@ -584,6 +984,7 @@ def paired_localization_delta(
     active_rows: Sequence[Mapping[str, Any]],
     *,
     gold_steps: Mapping[str, Any] | None = None,
+    unstable_cases: Collection[str] | None = None,
 ) -> dict[str, Any]:
     """Joint detection-and-localization delta over a frozen case batch.
 
@@ -595,6 +996,12 @@ def paired_localization_delta(
 
     ``joint_broken`` is the localization-preservation guard: cases the control
     arm already had right and the candidate arm no longer does.
+
+    ``unstable_cases`` carries the same meaning as in ``paired_delta``: cases
+    the control configuration read two ways when it was rolled twice. It adds
+    ``joint_improved_on_unstable`` and ``joint_improved_on_stable`` so a
+    localization gain that only exists on cases the instrument cannot read
+    twice does not have to be counted as a gain. Nothing is subtracted.
     """
     gold_steps = dict(gold_steps or {})
     paired = confusion_rows(baseline_rows, active_rows)
@@ -603,7 +1010,9 @@ def paired_localization_delta(
     rows: list[dict[str, Any]] = []
     base_joint = active_joint = 0
     joint_improved = joint_broken = 0
+    joint_improved_on_unstable = 0
     localizable = 0
+    unstable_set = {str(case) for case in unstable_cases or ()}
     for item in paired:
         case = str(item["case"])
         gold_step = _gold_step(item, gold_steps)
@@ -624,6 +1033,8 @@ def paired_localization_delta(
         active_joint += int(active_hit)
         if active_hit and not base_hit:
             joint_improved += 1
+            if unstable_cases is not None and case in unstable_set:
+                joint_improved_on_unstable += 1
         elif base_hit and not active_hit:
             joint_broken += 1
         rows.append({
@@ -633,6 +1044,19 @@ def paired_localization_delta(
             "active_prediction": item["active_prediction"],
             "baseline_step": base_step,
             "active_step": active_step,
+            # Kind and conflict ride along per arm so the decomposition below
+            # classifies each arm by the step *that arm* blamed. Both are read
+            # off the envelope the arm wrote, never re-derived here.
+            "baseline_step_kind": row_responsible_step_kind(
+                base_by_case.get(case)
+            ),
+            "active_step_kind": row_responsible_step_kind(
+                active_by_case.get(case)
+            ),
+            "localization_conflict": (
+                row_localization_conflicting(base_by_case.get(case))
+                or row_localization_conflicting(active_by_case.get(case))
+            ),
             "baseline_joint": base_hit,
             "active_joint": active_hit,
         })
@@ -644,8 +1068,65 @@ def paired_localization_delta(
         "joint_delta": active_joint - base_joint,
         "joint_improved": joint_improved,
         "joint_broken": joint_broken,
+        "stability_applicable": unstable_cases is not None,
+        "joint_improved_on_unstable": joint_improved_on_unstable,
+        "joint_improved_on_stable": joint_improved - joint_improved_on_unstable,
         "rows": rows,
+        # Decomposition only. Every count above keeps its exact previous
+        # meaning; these two blocks are a second view of the same hits, split
+        # by whether the arm's adopted step was an action step or a content
+        # step. Nothing here feeds a threshold, and the two are never summed.
+        "baseline_step_kinds": _joint_kind_split(rows, side="baseline"),
+        "active_step_kinds": _joint_kind_split(rows, side="active"),
+        "localization_conflict_rows": sum(
+            1 for row in rows if row["localization_conflict"]
+        ),
     }
+
+
+def _joint_kind_split(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    side: str,
+) -> dict[str, Any]:
+    """Per-step-kind joint hits for one arm of a paired localization delta.
+
+    The joint reading credits a case only when the arm convicts authoritatively
+    *and* names the annotated step. This splits those credits by the kind of
+    step the arm named, over the same scorable set, so a reader can see whether
+    an arm's joint hits come from action steps or from content steps. The
+    totals above stay the only scored quantity; these are the same hits,
+    sorted, and are never combined into one number.
+    """
+    by_kind: dict[str, dict[str, int]] = {
+        kind: {"scorable": 0, "hits": 0} for kind in STEP_KINDS
+    }
+    prefix = "baseline" if side == "baseline" else "active"
+    step_key = f"{prefix}_step"
+    pred_key = f"{prefix}_prediction"
+    for row in rows:
+        # A conflicted localization is excluded rather than counted either
+        # way: the row reported two different steps, so scoring the adopted
+        # one as a hit or as a miss would both be a claim the row cannot
+        # support. Those rows are counted by ``localization_conflict_rows``.
+        if row.get("localization_conflict"):
+            continue
+        bucket_kind = row.get(f"{step_key}_kind")
+        if bucket_kind not in STEP_KINDS:
+            bucket_kind = STEP_KIND_UNCLASSIFIED
+        bucket = by_kind[bucket_kind]
+        bucket["scorable"] += 1
+        bucket["hits"] += int(
+            row.get(pred_key) is True
+            and row.get(step_key) == row.get("gold_step")
+        )
+    result: dict[str, Any] = {}
+    for kind, bucket in by_kind.items():
+        scorable, hits = bucket["scorable"], bucket["hits"]
+        result[f"{kind}_scorable"] = scorable
+        result[f"{kind}_hits"] = hits
+        result[f"{kind}_accuracy"] = (hits / scorable) if scorable else None
+    return result
 
 
 def localization_metrics(
@@ -653,18 +1134,46 @@ def localization_metrics(
     *,
     gold_steps: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Standalone localization read for one arm (reporting, not gating)."""
+    """Standalone localization read for one arm (reporting, not gating).
+
+    The five headline numbers keep their exact previous definitions. Beside
+    them, ``step_kinds`` decomposes the same ``joint_hits`` by whether the step
+    this arm blamed was an action step or a content step, and
+    ``localization_conflict_rows`` counts the rows whose adopted step carried a
+    recorded disagreement -- those rows are excluded from the decomposition
+    rather than scored under a step the row itself contradicts.
+    """
     gold_steps = dict(gold_steps or {})
     annotated = hits = detected = 0
+    by_kind: dict[str, dict[str, int]] = {
+        kind: {"scorable": 0, "hits": 0} for kind in STEP_KINDS
+    }
+    conflicted = 0
     for row in rows:
         gold_step = _gold_step(row, gold_steps)
         if row.get("gold") is not True or gold_step is None:
             continue
         annotated += 1
-        if row.get("prediction") is True:
+        predicted = row.get("prediction") is True
+        hit = predicted and row_responsible_step(row) == gold_step
+        if predicted:
             detected += 1
-            if row_responsible_step(row) == gold_step:
+            if hit:
                 hits += 1
+        if row_localization_conflicting(row):
+            conflicted += 1
+            continue
+        bucket = by_kind[row_responsible_step_kind(row)]
+        bucket["scorable"] += 1
+        bucket["hits"] += int(bool(hit))
+    step_kinds: dict[str, Any] = {}
+    for kind, bucket in by_kind.items():
+        scorable, kind_hits = bucket["scorable"], bucket["hits"]
+        step_kinds[f"{kind}_scorable"] = scorable
+        step_kinds[f"{kind}_hits"] = kind_hits
+        step_kinds[f"{kind}_accuracy"] = (
+            (kind_hits / scorable) if scorable else None
+        )
     return {
         "annotated_positive": annotated,
         "authoritative_detected": detected,
@@ -673,6 +1182,8 @@ def localization_metrics(
         "step_accuracy_on_detected": (
             (hits / detected) if detected else None
         ),
+        "step_kinds": step_kinds,
+        "localization_conflict_rows": conflicted,
     }
 
 
@@ -797,12 +1308,16 @@ __all__ = [
     "confusion_rows",
     "evidence_increment_rows",
     "fired_rate",
+    "flipped_cases",
     "gain_opportunity",
     "localization_metrics",
     "localization_opportunity",
+    "noise_floor",
+    "noise_floor_flipped_cases",
     "paired_delta",
     "paired_localization_delta",
     "protection_repair",
+    "repeated_roll_disagreement",
     "row_responsible_step",
     "source_deltas",
     "source_of",
