@@ -1,0 +1,218 @@
+{
+  "version_id": "v002",
+  "route": "tracer_directive",
+  "kind": "revision",
+  "candidate": {
+    "type": "text_boundary",
+    "hook": "tracer.system",
+    "trigger": {
+      "packet_features": [
+        "has_tool_calls",
+        "has_long_prose",
+        "has_numeric_content",
+        "question_has_numbers"
+      ],
+      "facts": []
+    },
+    "body": {
+      "directive": "Localize the error only on a step that can host it: before naming the responsible step, verify that the specific erroneous value or claim that reaches the final delivery (a fabricated number, a wrong computed result, or an unsupported assertion) actually appears in that step's own tool arguments, tool observation, or prose text; if the currently named step's content does not contain that erroneous value, trace upstream through the event texts and name the earliest interaction whose own content produces or introduces it, quoting the erroneous content as the localization anchor.",
+      "not_when": "Do not move or withhold the localization when the currently named step's own tool arguments, tool observation, or prose text already contain the erroneous value that reaches the final delivery; never select, reject, or rank steps using case identifiers, gold labels, gold steps, or dataset annotations instead of the packet's own event content."
+    },
+    "claim": {
+      "expected_behavior": "The step tracer names, as the error-hosting step, only an interaction whose own tool arguments, tool observation, or prose text contain the erroneous value or claim that reaches the final delivery, quoting that content as the anchor, so the named step can host the error instead of an unhostable one.",
+      "target_polarity": "boundary",
+      "target_kind": "localization"
+    },
+    "provenance": {
+      "cycle": 1,
+      "failure_family": "FAM-loc-mislocated-117fce1c070d",
+      "failure_cases": [
+        "Camel/018.json",
+        "OpenDeepSearch/095.json"
+      ]
+    },
+    "schema_version": "detector.intervention.v1",
+    "intervention_id": "IV-1-D001"
+  },
+  "candidate_hash": "68a9f3f82ecdc56398023318ba2456f587ed25648d884d8b79466c5cecf3a18c",
+  "parent_hash": "afa597ba1139c55a57809f04f929ea1ae5e7ddd9b11b2289f18bb78a329f6b8b",
+  "notes": [
+    {
+      "mechanism_id": "M-c393f57ff12f",
+      "capability_plan": "actionable",
+      "route": "tracer_directive"
+    }
+  ],
+  "evaluation": null,
+  "verdict": {
+    "l0": {
+      "level": "L0",
+      "passed": true,
+      "checks": [
+        {
+          "check": "schema",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "check": "no_case_id",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "check": "metamorphic_runner",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "check": "structured_identity",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "check": "targets_mechanism",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "check": "localization_annotation",
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "failed": [],
+      "checks_run": 6
+    },
+    "l1": {
+      "level": "L1",
+      "passed": false,
+      "target_improved": [],
+      "target_unchanged": [
+        "Camel/018.json",
+        "OpenDeepSearch/095.json"
+      ],
+      "neighbor_regressed": [],
+      "fired_cases": [
+        "Camel/018.json",
+        "OpenDeepSearch/095.json",
+        "Octotools/023.json"
+      ],
+      "delta": {
+        "paired_n": 6,
+        "base_all_case_correct": 6,
+        "active_all_case_correct": 6,
+        "marginal_cases": 0,
+        "tp_lost": 0,
+        "fp_added": 0,
+        "new_fn": 0,
+        "new_fp": 0,
+        "new_errors": 0,
+        "unresolved_added": 0,
+        "unresolved_removed": 0,
+        "health_regressed": 0,
+        "health_improved": 0,
+        "flips": {
+          "T->T": 3,
+          "F->F": 3
+        },
+        "transitions_by_gold": {
+          "error": {
+            "T->T": 3
+          },
+          "clean": {
+            "F->F": 3
+          }
+        },
+        "correctness_improved": 0,
+        "correctness_worsened": 0,
+        "baseline_metrics": {
+          "n": 6,
+          "decisive": 6,
+          "unresolved": 0,
+          "decisive_accuracy": 1.0,
+          "all_case_accuracy": 1.0,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0,
+          "tn": 3,
+          "positive_precision": 1.0,
+          "positive_recall": 1.0,
+          "positive_f1": 1.0,
+          "macro_precision": 1.0,
+          "macro_recall": 1.0,
+          "macro_f1": 1.0
+        },
+        "active_metrics": {
+          "n": 6,
+          "decisive": 6,
+          "unresolved": 0,
+          "decisive_accuracy": 1.0,
+          "all_case_accuracy": 1.0,
+          "tp": 3,
+          "fp": 0,
+          "fn": 0,
+          "tn": 3,
+          "positive_precision": 1.0,
+          "positive_recall": 1.0,
+          "positive_f1": 1.0,
+          "macro_precision": 1.0,
+          "macro_recall": 1.0,
+          "macro_f1": 1.0
+        },
+        "rows": [
+          {
+            "case": "Camel/018.json",
+            "gold": true,
+            "baseline_prediction": true,
+            "active_prediction": true,
+            "baseline_state": "verified_error",
+            "active_state": "verified_error"
+          },
+          {
+            "case": "OpenDeepSearch/095.json",
+            "gold": true,
+            "baseline_prediction": true,
+            "active_prediction": true,
+            "baseline_state": "verified_error",
+            "active_state": "verified_error"
+          },
+          {
+            "case": "Camel/048.json",
+            "gold": false,
+            "baseline_prediction": false,
+            "active_prediction": false,
+            "baseline_state": "verified_clean",
+            "active_state": "verified_clean"
+          },
+          {
+            "case": "Magentic_One/036.json",
+            "gold": false,
+            "baseline_prediction": false,
+            "active_prediction": false,
+            "baseline_state": "verified_clean",
+            "active_state": "verified_clean"
+          },
+          {
+            "case": "Magentic_One/050.json",
+            "gold": false,
+            "baseline_prediction": false,
+            "active_prediction": false,
+            "baseline_state": "verified_clean",
+            "active_state": "verified_clean"
+          },
+          {
+            "case": "Octotools/023.json",
+            "gold": true,
+            "baseline_prediction": true,
+            "active_prediction": true,
+            "baseline_state": "verified_error",
+            "active_state": "verified_error"
+          }
+        ]
+      },
+      "reasons": [
+        "no target case improved on the development replay"
+      ]
+    }
+  }
+}

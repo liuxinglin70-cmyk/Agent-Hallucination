@@ -68,15 +68,23 @@
 | **patrol** | +197.4 min | **108.0 min** |
 
 配置的 `cycle_timeout_seconds` 是 **7200 秒（120 分钟）**，实际用了 **197.4 分钟**。
-`_ArmRunner` 的 deadline 是**按批**生效的：它只在"这个案例还没开始"时跳过，已经开始的不受
-影响。审计 22 例新鲜评估跑掉了 89 分钟，巡逻批次**开始得太晚**，于是 16 例里 **10 例**
-（`unresolved=10`、`errors=11`）以 `batch_deadline_exceeded` fail-closed。
+`_ArmRunner` 的 deadline **按批生效**：它只在"这个案例还没开始"时跳过，已经在跑的不受影响。
+审计 12 例新鲜评估（sentinel+gain）跑掉 89 分钟；巡逻随后开始，于是：
 
-巡逻混淆矩阵：`tp=3, tn=2, fn=0, fp=1, unresolved=10`。
+| 批 | 例数 | 结果 |
+|---|---|---|
+| 初始巡逻 | 8 | 全部真跑，但**两例各自吃掉约 100 分钟**（`Camel/018` 101 min、`Magentic_One/050` 108 min） |
+| **bootstrap 补抽** | 8 | **8/8 全部 `batch_deadline_exceeded`、0.0 秒**——一批都没开始 |
+
+巡逻混淆矩阵：`tp=3, tn=2, fn=0, fp=1, unresolved=10`。10 例未决的构成：
+**8 例是上面那批被整体跳过的 bootstrap**，另 2 例是 `recall_unavailable` 与 `provider_error`
+各 1。报告自己的 `bootstrap.family_found=false` 因此**不表示"补抽没找到家族"**，
+而表示"补抽根本没测"——这两个读数的语义差别，正是靠逐例的
+`elapsed_seconds=0.0` 与 `authority_failure_reasons=[batch_deadline_exceeded]` 区分出来的。
 
 **这不是开发阶段的缺陷，也不是检测器质量读数**：10 例未决是基础设施耗尽墙钟的结果。
 **此前不知道这一点**：2026-09-21 的晋升运行只报过单例长尾（`BFCL/032` 约 50 分钟），
-没有报过"审计先耗尽共享预算、巡逻随后 fail-closed"这条链。
+没有报过"审计先耗尽共享预算、随后整批 fail-closed"这条链，也没有量化过审计的开销。
 
 ### 4. 提案与四门：本轮无候选
 

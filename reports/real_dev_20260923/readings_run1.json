@@ -1,0 +1,499 @@
+{
+  "run_root": "artifacts\\selfevo-real-dev-20260923",
+  "exists": true,
+  "state": "completed",
+  "state_is_final": true,
+  "contract": {
+    "config_hash": "c6b11d197cd9",
+    "source_hash": "9c27b514b1613c5c",
+    "detector_config_hash": "da3131e671c5d981",
+    "split": {
+      "name": "mini",
+      "seed": 20260923,
+      "pool_size": 30,
+      "sentinel_size": 6,
+      "gain_size": 6,
+      "gain_polarity": {
+        "error": 4,
+        "clean": 2
+      },
+      "patrol_pool_size": 18,
+      "validation_size": 10,
+      "final_size": 0,
+      "final_reads": 0
+    },
+    "sentinel": [
+      "BFCL/041.json",
+      "Magentic_One/085.json",
+      "Octotools/005.json",
+      "OpenDeepSearch/067.json",
+      "OpenDeepSearch/077.json",
+      "SmolAgents/019.json"
+    ],
+    "gain": [
+      "OpenDeepSearch/088.json",
+      "Magentic_One/049.json",
+      "OpenManus/064.json",
+      "Octotools/030.json",
+      "OpenDeepSearch/002.json",
+      "OpenDeepSearch/063.json"
+    ],
+    "registry_before": {
+      "schema_version": "detector.intervention_registry.v1",
+      "interventions": [],
+      "content_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37"
+    }
+  },
+  "ledger": {
+    "events": [
+      {
+        "timestamp": "2026-09-23T03:51:47.729432+00:00",
+        "event": "cycle_started"
+      },
+      {
+        "timestamp": "2026-09-23T05:21:11.958226+00:00",
+        "event": "audit"
+      },
+      {
+        "timestamp": "2026-09-23T07:09:13.339446+00:00",
+        "event": "patrol"
+      },
+      {
+        "timestamp": "2026-09-23T07:09:13.355332+00:00",
+        "event": "evaluation_preflight"
+      },
+      {
+        "timestamp": "2026-09-23T07:09:13.391721+00:00",
+        "event": "proposal_memory"
+      },
+      {
+        "timestamp": "2026-09-23T07:09:13.417998+00:00",
+        "event": "proposal_memory_used"
+      },
+      {
+        "timestamp": "2026-09-23T07:09:13.444646+00:00",
+        "event": "proposed"
+      },
+      {
+        "timestamp": "2026-09-23T07:09:13.487945+00:00",
+        "event": "capability_gaps"
+      },
+      {
+        "timestamp": "2026-09-23T07:09:13.596863+00:00",
+        "event": "harness"
+      },
+      {
+        "timestamp": "2026-09-23T07:09:13.636342+00:00",
+        "event": "cycle_completed"
+      }
+    ],
+    "count": 10,
+    "has_development_event": false
+  },
+  "timing": {
+    "available": true,
+    "start_utc": "2026-09-23T03:51:47.729432+00:00",
+    "end_utc": "2026-09-23T07:09:13.636342+00:00",
+    "total_minutes": 197.43,
+    "phases": [
+      {
+        "event": "cycle_started",
+        "at": "2026-09-23T03:51:47.729432+00:00",
+        "minutes_since_start": 0.0,
+        "gap_minutes": 0.0
+      },
+      {
+        "event": "audit",
+        "at": "2026-09-23T05:21:11.958226+00:00",
+        "minutes_since_start": 89.4,
+        "gap_minutes": 89.4
+      },
+      {
+        "event": "patrol",
+        "at": "2026-09-23T07:09:13.339446+00:00",
+        "minutes_since_start": 197.43,
+        "gap_minutes": 108.02
+      },
+      {
+        "event": "evaluation_preflight",
+        "at": "2026-09-23T07:09:13.355332+00:00",
+        "minutes_since_start": 197.43,
+        "gap_minutes": 0.0
+      },
+      {
+        "event": "proposal_memory",
+        "at": "2026-09-23T07:09:13.391721+00:00",
+        "minutes_since_start": 197.43,
+        "gap_minutes": 0.0
+      },
+      {
+        "event": "proposal_memory_used",
+        "at": "2026-09-23T07:09:13.417998+00:00",
+        "minutes_since_start": 197.43,
+        "gap_minutes": 0.0
+      },
+      {
+        "event": "proposed",
+        "at": "2026-09-23T07:09:13.444646+00:00",
+        "minutes_since_start": 197.43,
+        "gap_minutes": 0.0
+      },
+      {
+        "event": "capability_gaps",
+        "at": "2026-09-23T07:09:13.487945+00:00",
+        "minutes_since_start": 197.43,
+        "gap_minutes": 0.0
+      },
+      {
+        "event": "harness",
+        "at": "2026-09-23T07:09:13.596863+00:00",
+        "minutes_since_start": 197.43,
+        "gap_minutes": 0.0
+      },
+      {
+        "event": "cycle_completed",
+        "at": "2026-09-23T07:09:13.636342+00:00",
+        "minutes_since_start": 197.43,
+        "gap_minutes": 0.0
+      }
+    ]
+  },
+  "development_event": null,
+  "round_path": "development",
+  "development": {
+    "round_path": "development",
+    "present": true,
+    "schema_version": "evolution.cycle_development.v1",
+    "targets": 0,
+    "candidate_count": 0,
+    "frozen_versions": [],
+    "skipped": [],
+    "reason": "no mechanism was eligible for development this cycle",
+    "metric_role": "diagnostic-only",
+    "runs": [],
+    "version_total": 0,
+    "versions_failed_l0": 0,
+    "versions_failed_l1": 0,
+    "versions_passed": 0
+  },
+  "gates": {
+    "candidates_reaching_the_gates": 0,
+    "entries": [],
+    "admitted": [],
+    "active_after_cycle": []
+  },
+  "stage_effect": {
+    "versions_produced": 0,
+    "versions_passed": 0,
+    "candidates_reaching_the_gates": 0,
+    "versions_falsified": 0,
+    "gates_saw_nothing_when_nothing_passed": true,
+    "proposals_in_cycle": 0
+  },
+  "patrol": {
+    "confusion": {
+      "tp": 3,
+      "tn": 2,
+      "fn": 0,
+      "fp": 1,
+      "unresolved": 10
+    },
+    "patrol_size": 16,
+    "error_rows": 11,
+    "bootstrap": {
+      "initial_patrol_size": 8,
+      "bootstrap_cases": [
+        "OpenDeepSearch/084.json",
+        "Camel/054.json",
+        "OpenManus/073.json",
+        "BFCL/017.json",
+        "OpenDeepSearch/086.json",
+        "SmolAgents/037.json",
+        "BFCL/062.json",
+        "Magentic_One/093.json"
+      ],
+      "bootstrap_count": 8,
+      "family_found": false
+    },
+    "family_evidence": "cross-case co-occurrence; repeated-run stability not measured",
+    "stable_failure_families": [],
+    "mechanisms": 0,
+    "capability_gaps": 0
+  },
+  "instrument": {
+    "gain_opportunity": {
+      "recall": 1,
+      "precision": 0
+    },
+    "unmeasurable_polarities": [
+      "precision"
+    ],
+    "instrument_limited": false
+  },
+  "effect_on_gain_set": {
+    "paired_n": 6,
+    "base_all_case_correct": 4,
+    "active_all_case_correct": 4,
+    "marginal_cases": 0,
+    "new_errors": 0,
+    "unresolved_added": 0,
+    "health_regressed": 0
+  },
+  "stores": {
+    "route_failures": {
+      "present": false,
+      "records": null,
+      "path": "artifacts\\selfevo-real-dev-20260923\\harness\\route_failures.jsonl"
+    },
+    "gaps": {
+      "present": false,
+      "records": null,
+      "path": "artifacts\\selfevo-real-dev-20260923\\harness\\gaps.jsonl"
+    },
+    "candidates": {
+      "root_exists": false,
+      "files": []
+    },
+    "components": {
+      "root_exists": false,
+      "files": []
+    },
+    "memory_episodic": {
+      "present": false,
+      "records": null,
+      "path": "artifacts\\selfevo-real-dev-20260923\\memory\\episodic.jsonl"
+    },
+    "development_runs": []
+  },
+  "capability_backlog": {
+    "open": [],
+    "summary": {
+      "schema_version": "evolution.capability_gap.v1",
+      "recorded": 0,
+      "open": 0,
+      "resolved": 0,
+      "by_classification": {},
+      "by_reason": {},
+      "observations": 0
+    }
+  },
+  "route_failures_report": {
+    "observed": 0,
+    "appended": 0,
+    "state": {
+      "records": 0,
+      "pairs": 0,
+      "insufficient": [],
+      "observed_only": []
+    }
+  },
+  "harness": {
+    "manifest": {
+      "schema_version": "evolution.harness.v1",
+      "cycle": 1,
+      "parent_digest": null,
+      "components": {
+        "G": {
+          "version": "detector.workflow.v1",
+          "digest": "37b05a13a014",
+          "payload": {
+            "stages": [
+              "validate",
+              "packet",
+              "judge",
+              "recall",
+              "upgrade",
+              "tracer",
+              "defense",
+              "adjudicate"
+            ],
+            "entrypoints": {
+              "packet": "detector.packet.build_packet",
+              "judge": "detector.judge.run_judge",
+              "recall": "detector.recaller.run_recall_scan",
+              "upgrade": "detector.recaller.run_causal_upgrade",
+              "tracer": "detector.step_tracer.run_step_tracer",
+              "defense": "detector.defense.run_defense",
+              "adjudicate": "detector.adjudication.adjudicate"
+            },
+            "source_digest": "266997f49331fcee",
+            "intervention_types": [
+              "decision_guard",
+              "evidence_check",
+              "recall_trigger",
+              "text_boundary"
+            ],
+            "hooks": [
+              "adjudicate.guard",
+              "defense.pre",
+              "defense.system",
+              "judge.post",
+              "judge.system",
+              "recall.trigger",
+              "scanner.system",
+              "tracer.system",
+              "upgrade.pre",
+              "upgrade.system"
+            ],
+            "execution_graph_rewrite": false
+          }
+        },
+        "C": {
+          "version": "detector.context.v1",
+          "digest": "1f5166fc2878",
+          "payload": {
+            "packet_schema": "detector.packet.v1",
+            "budgets": {
+              "_JUDGE_VIEW_CHARS": 400000,
+              "_JUDGE_EVENT_CHARS": 100000,
+              "_JUDGE_TOOL_CHARS": 100000,
+              "_DEFENSE_VIEW_CHARS": 200000,
+              "_DEFENSE_EVENT_CHARS": 100000,
+              "_INDEX_VIEW_CHARS": 48000
+            },
+            "renderers": [
+              "render_defense_view",
+              "render_full_view",
+              "render_index_tail_view",
+              "render_judge_view"
+            ]
+          }
+        },
+        "T": {
+          "version": "detector.tools.v1",
+          "digest": "afb9a3ddc3d3",
+          "payload": {
+            "intervention_count": 0,
+            "intervention_ids": [],
+            "interventions": []
+          }
+        },
+        "M": {
+          "version": "evolution.memory.v1",
+          "digest": "2b13a04ab9c5",
+          "payload": {
+            "configured": true,
+            "stores": {
+              "episodic": {
+                "records": 0,
+                "falsified": 0,
+                "unevaluable": 0,
+                "admitted": 0
+              },
+              "procedural": {
+                "records": 0
+              },
+              "improvement": {
+                "records": 0
+              }
+            }
+          }
+        },
+        "R": {
+          "version": "evolution.policy.v1",
+          "digest": "1bf250d94be2",
+          "payload": {
+            "patrol_registry": "active",
+            "cycles": 3,
+            "budget": {
+              "patrol_cases": 8,
+              "stable_failure_rerun_cases": 8,
+              "llm_calls": 3,
+              "max_proposals": 3,
+              "max_admits": 2,
+              "cycle_timeout_seconds": 7200
+            },
+            "gates": {
+              "structural_jaccard_threshold": 0.72,
+              "harmlessness_new_fn_allowed": 0,
+              "harmlessness_new_fp_allowed": 0,
+              "harmlessness_new_unresolved_allowed": 0,
+              "harmlessness_min_protected_tp": 2,
+              "harmlessness_min_protected_tn": 2,
+              "behavior_require_fired": true,
+              "m_min_marginal_cases": 1,
+              "m_new_errors_allowed": 0,
+              "localization_min_joint_cases": 1,
+              "localization_joint_broken_allowed": 0
+            },
+            "library": {
+              "max_width": 6,
+              "max_text_boundary_per_hook": 1,
+              "max_decision_guards": 4,
+              "retire_after_cycles_marginal_le0": 2,
+              "rollback_after_cycles_net_negative": 2
+            },
+            "mini_effect": {
+              "min_marginal_cases": 1,
+              "max_new_errors": 0,
+              "max_unresolved_added": 0
+            },
+            "split": {
+              "seed": 20260923,
+              "sentinel_size": 20,
+              "sentinel_positives": 3,
+              "sentinel_negatives": 3,
+              "gain_set_size": 80,
+              "gain_set_min_positives": 20,
+              "gain_set_min_negatives": 20,
+              "patrol_size": 120,
+              "mini_pool_size": 30,
+              "mini_gain_size": 6,
+              "mini_gain_min_positives": 2,
+              "mini_gain_min_negatives": 2
+            },
+            "proposer": {
+              "mode": "llm",
+              "max_output_tokens": 32768,
+              "thinking_level": "",
+              "max_repair_calls": 1
+            }
+          }
+        }
+      },
+      "registry_hash": "1a4fe1d7958f4019af15871d26f5451c22a88e6a74db54fa43b11e0aeedfbd37",
+      "digest": "37d9ff66beb2"
+    },
+    "diff": {
+      "previous_digest": null,
+      "current_digest": "37d9ff66beb2",
+      "first_manifest": true,
+      "changed": [
+        "G",
+        "C",
+        "T",
+        "M",
+        "R"
+      ],
+      "components": {
+        "G": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "C": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "T": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "M": {
+          "changed": true,
+          "reason": "no previous manifest"
+        },
+        "R": {
+          "changed": true,
+          "reason": "no previous manifest"
+        }
+      }
+    }
+  },
+  "provider_usage": {},
+  "ledger_integrity": {
+    "valid": true,
+    "records": 7,
+    "broken_at": null,
+    "reason": ""
+  }
+}

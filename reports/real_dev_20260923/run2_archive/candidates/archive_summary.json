@@ -1,0 +1,25 @@
+{
+  "schema_version": "evolution.candidate_archive.v1",
+  "metric_role": "diagnostic-only",
+  "candidates": {
+    "total": 2,
+    "by_status": {
+      "failed_l1": 2
+    },
+    "mechanisms": [
+      "M-c393f57ff12f"
+    ]
+  },
+  "components": {
+    "total": 0,
+    "by_kind": {},
+    "kinds_available": [
+      "extractor",
+      "evidence_formatter",
+      "parser",
+      "semantic_executor",
+      "localization_helper"
+    ]
+  },
+  "note": "Candidate history and reusable parts. Neither store can admit a version: only the promotion protocol writes the Active Registry, and a component records local usefulness, not correctness."
+}

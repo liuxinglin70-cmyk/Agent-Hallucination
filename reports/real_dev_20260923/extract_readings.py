@@ -304,11 +304,17 @@ def main(argv: list[str]) -> int:
             "versions_produced": development.get("version_total"),
             "versions_passed": development.get("versions_passed"),
             "candidates_reaching_the_gates": gate["candidates_reaching_the_gates"],
-            "proposals_in_cycle": len(report.get("proposals") or ()),
-            "not_redrafted_behind_the_loop": (
-                development.get("version_total") == len(report.get("proposals") or ())
+            # The claim the stage makes, as two readings that must move
+            # together: versions it falsified, and candidates the gates then
+            # saw. A run where the first is above zero and the second is zero
+            # is the stage doing its job.
+            "versions_falsified": development.get("versions_failed_l1"),
+            "gates_saw_nothing_when_nothing_passed": (
+                development.get("versions_passed") == 0
+                and gate["candidates_reaching_the_gates"] == 0
                 if development.get("present") else None
             ),
+            "proposals_in_cycle": len(report.get("proposals") or ()),
         },
         "patrol": {
             # The worksheet keeps the confusion counts at the top level, not
