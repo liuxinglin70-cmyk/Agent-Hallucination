@@ -34,6 +34,7 @@ from evolution.contracts import (
     structured_key,
 )
 from evolution.metrics import (
+    deployment_events,
     evidence_increment_rows,
     fired_rate,
     paired_delta,
@@ -834,6 +835,16 @@ def localization_behavior_gate(
     delta = paired_localization_delta(
         list(baseline_rows), list(candidate_rows), gold_steps=gold_steps,
     )
+    # Route-insufficiency evidence is a claim about numbers: "the hook fired,
+    # moved what it promised, and the outcome did not follow". The detection
+    # gate reports that count; without it here, a localization route can never
+    # be recorded as insufficient no matter how many times it fails, so the
+    # next round re-proposes it. The count is read from the same deployment
+    # traces the detection gate reads.
+    behavior_events, behavior_event_kind = deployment_events(
+        candidate_rows, intervention_id,
+        str(candidate.get("type") or candidate.get("intervention_type") or ""),
+    )
     if bool(gate_cfg.get("behavior_require_fired", True)):
         rate = fired_rate(candidate_rows, intervention_id)
         if rate <= 0.0:
@@ -841,6 +852,8 @@ def localization_behavior_gate(
                 "claim behavior mismatch: intervention never fired on the "
                 "localization batch",
                 fired_rate=rate,
+                behavior_events=behavior_events,
+                behavior_event_kind=behavior_event_kind,
                 delta=delta,
             )
     if int(delta["localizable_n"]) == 0:
@@ -848,6 +861,9 @@ def localization_behavior_gate(
             "localization batch carries no gold-positive annotated case, so "
             "the claim cannot be scored",
             delta=delta,
+            fired_rate=fired_rate(candidate_rows, intervention_id),
+            behavior_events=behavior_events,
+            behavior_event_kind=behavior_event_kind,
             evaluable=False,
             status="not_evaluated",
         )
@@ -857,6 +873,9 @@ def localization_behavior_gate(
             f"(joint_improved={delta['joint_improved']}, "
             f"joint_broken={delta['joint_broken']})",
             delta=delta,
+            fired_rate=fired_rate(candidate_rows, intervention_id),
+            behavior_events=behavior_events,
+            behavior_event_kind=behavior_event_kind,
         )
     allowed_broken = int(gate_cfg.get("localization_joint_broken_allowed", 0))
     if int(delta["joint_broken"]) > allowed_broken:
@@ -864,8 +883,16 @@ def localization_behavior_gate(
             "localization claim broke existing correct localizations: "
             f"joint_broken={delta['joint_broken']} > {allowed_broken}",
             delta=delta,
+            fired_rate=fired_rate(candidate_rows, intervention_id),
+            behavior_events=behavior_events,
+            behavior_event_kind=behavior_event_kind,
         )
-    return _policy_pass(delta=delta)
+    return _policy_pass(
+        delta=delta,
+        fired_rate=fired_rate(candidate_rows, intervention_id),
+        behavior_events=behavior_events,
+        behavior_event_kind=behavior_event_kind,
+    )
 
 
 def meets_localization(

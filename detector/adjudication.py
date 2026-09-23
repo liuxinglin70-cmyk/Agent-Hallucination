@@ -26,6 +26,7 @@ from detector.packet import (
     delivered_result as packet_delivered_result,
     evidence_refs_support_step,
 )
+from detector.interventions import conviction_verdicts_for
 from detector.predicates import PREDICATE_CONVICTION_VERDICTS
 
 
@@ -210,9 +211,15 @@ def adjudicate(
         and bool(str(item.get("intervention_id") or ""))
         and bool(str(item.get("evidence_intervention_id") or ""))
         and bool(str(item.get("failure_family") or ""))
+        # Re-checked here against ``(predicate, runner)``: this is the second
+        # gate on the same rule the plan enforces, so a caller that hands over
+        # a mechanical evidence row directly cannot convict with a row an
+        # evidence-only runner produced.
         and str(item.get("verdict") or "")
-        in conviction_verdicts.get(
-            str(item.get("predicate") or ""), frozenset(),
+        in conviction_verdicts_for(
+            conviction_verdicts,
+            str(item.get("predicate") or ""),
+            str(item.get("runner") or ""),
         )
         for item in mechanical_evidence or ()
     )

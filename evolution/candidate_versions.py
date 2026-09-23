@@ -30,6 +30,13 @@ VERSION_STATUSES = (
     "draft",
     "failed_l0",
     "failed_l1",
+    # The replay could not score this version: a provider failure, a deadline
+    # skip, a non-authoritative terminal. Deliberately not ``failed_l1`` --
+    # "the loop measured this and it did not work" and "the loop could not
+    # measure this" are different claims about a candidate, and only the first
+    # is a falsification. The archive, the episodic memory and the next
+    # drafting prompt all read the difference.
+    "unmeasured",
     "ready_for_freeze",
     "frozen",
     "discarded",

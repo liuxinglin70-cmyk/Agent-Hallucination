@@ -235,6 +235,17 @@ def load_config(path: str | os.PathLike[str] | None = None) -> dict[str, Any]:
         str(resolve_path(item))
         for item in merged.get("historical_development_manifests") or ()
     ]
+    # ``archive.root`` is written, not read, and it was the one configured path
+    # left unresolved -- so a relative value was interpreted against whatever
+    # cwd the cycle happened to run from. Two cycles launched from different
+    # directories then archived the same run into two different trees, and the
+    # cycle report echoed a relative string beside absolute ``run_dir`` values.
+    # An empty root keeps its meaning ("use work_root/candidates", decided by
+    # the engine); resolving it here would freeze that default against this
+    # config load.
+    archive_block = merged.get("archive")
+    if isinstance(archive_block, dict) and archive_block.get("root"):
+        archive_block["root"] = str(resolve_path(archive_block["root"]))
     merged["config_path"] = str(config_path)
     return merged
 

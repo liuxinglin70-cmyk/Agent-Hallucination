@@ -4,22 +4,47 @@ The ledger lives at ``artifacts/evolution/ledger.jsonl``. It is append-only:
 the framework never rewrites an existing line. Every record carries its own
 content hash and the previous record hash, so ``verify`` can prove integrity
 without trusting the framework that wrote it.
+
+Appends take a file lock in addition to the in-process thread lock. Two
+processes sharing a work root previously both read the same ``last_hash`` and
+appended from it, which lost records and broke the chain -- and every later
+run refuses to start on a broken chain. The framework assumes the caller runs
+one cycle at a time (``reports/real_evolution_20260923`` records an incident
+where that assumption was violated); the lock turns that assumption from an
+unrecoverable data loss into a serialized wait.
 """
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
+import os
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 from evolution.config import resolve_path
+
+try:  # POSIX
+    import fcntl
+except ImportError:  # pragma: no cover - Windows
+    fcntl = None  # type: ignore[assignment]
+
+try:  # Windows
+    import msvcrt
+except ImportError:  # pragma: no cover - POSIX
+    msvcrt = None  # type: ignore[assignment]
 
 
 def _digest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+LOCK_WAIT_SECONDS = 900.0
+LOCK_POLL_SECONDS = 0.05
 
 
 class Ledger:
@@ -27,6 +52,43 @@ class Ledger:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+
+    @contextlib.contextmanager
+    def _file_lock(self) -> Iterator[None]:
+        """Exclusive cross-process lock around read-last-hash + append."""
+        handle = open(self.lock_path, "a+b")
+        try:
+            deadline = time.monotonic() + LOCK_WAIT_SECONDS
+            while True:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    elif msvcrt is not None:
+                        handle.seek(0)
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError:
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError(
+                            f"could not lock the ledger at {self.lock_path} "
+                            f"within {LOCK_WAIT_SECONDS:.0f}s; another process "
+                            "may be writing to the same work root"
+                        )
+                    time.sleep(LOCK_POLL_SECONDS)
+            try:
+                yield
+            finally:
+                try:
+                    if fcntl is not None:
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                    elif msvcrt is not None:
+                        handle.seek(0)
+                        msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                except OSError:
+                    pass
+        finally:
+            handle.close()
 
     def last_hash(self) -> str:
         if not self.path.exists():
@@ -41,7 +103,7 @@ class Ledger:
         return str(json.loads(last).get("entry_hash") or "0" * 64)
 
     def append(self, event: str, payload: Mapping[str, Any]) -> dict[str, Any]:
-        with self._lock:
+        with self._lock, self._file_lock():
             record: dict[str, Any] = {
                 "event": str(event),
                 "payload": dict(payload),
@@ -58,6 +120,8 @@ class Ledger:
                 handle.write(
                     json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
                 )
+                handle.flush()
+                os.fsync(handle.fileno())
         return record
 
     def read(self) -> list[dict[str, Any]]:

@@ -3,14 +3,20 @@
 The backlog exists so an unexecutable failure family is a durable work item
 rather than a line in one cycle report. These tests pin the properties that
 make it usable: identity is stable across cycle and profile split, repeats do
-not multiply entries, new information about the same gap is kept, and
-resolution is history rather than deletion.
+not multiply entries but do advance ``occurrences``, new information about the
+same gap is kept, and resolution is history rather than deletion.
 """
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
+from evolution.backends import MockDetectorBackend
+from evolution.config import load_config
+from evolution.engine import EvolutionEngine
 from evolution.gaps import (
     GAP_SCHEMA,
     gap_identity,
@@ -20,6 +26,7 @@ from evolution.gaps import (
     record_gaps,
     resolve_gap,
 )
+from evolution.splits import EvolutionSplit
 
 
 def _gap(family, classification="capability_gap", reason="no route", count=2,
@@ -56,15 +63,123 @@ def test_recording_a_gap_makes_it_a_backlog_item(tmp_path):
     assert item["resolved_cycle"] is None
 
 
-def test_unchanged_repeat_does_not_multiply_entries(tmp_path):
+def test_repeat_does_not_multiply_entries_but_counts_occurrences(tmp_path):
     store = tmp_path / "gaps.jsonl"
     for cycle in (1, 2, 3):
         backlog = record_gaps(store, cycle=cycle, gaps=[_gap("FAM-fn-foo")])
+    # One backlog entry, three sightings: identity dedups the entries, and the
+    # repeated sighting is what ``occurrences`` counts. The count is the point
+    # -- ``recurring_capability_gaps`` gates on ``occurrences >= 2``, so a
+    # gap that is re-observed unchanged must not stay at 1.
     assert len(backlog) == 1
-    assert backlog[0]["occurrences"] == 1
+    assert backlog[0]["occurrences"] == 3
     assert backlog[0]["first_seen_cycle"] == 1
-    # An identical repeat is not new information, so it is not appended at all.
-    assert len(load_gap_observations(store)) == 1
+    assert backlog[0]["last_seen_cycle"] == 3
+    assert len(load_gap_observations(store)) == 3
+
+
+def test_same_gap_across_two_cycles_reaches_the_recurring_threshold(tmp_path):
+    """The proposer's recurring signal needs a real second sighting.
+
+    ``EvolutionEngine._proposal_memory_context`` offers a gap as a
+    ``recurring_capability_gap`` only when the stored entry has
+    ``occurrences >= 2``. While the store appended an observation only when
+    the *content* changed, the same unchanged gap reported in ten rounds still
+    read as ``occurrences == 1`` and the signal never fired.
+    """
+    store = tmp_path / "gaps.jsonl"
+    record_gaps(store, cycle=1, gaps=[_gap("FAM-fp-judge_conviction-abc")])
+    backlog = record_gaps(
+        store, cycle=2, gaps=[_gap("FAM-fp-judge_conviction-abc")],
+    )
+    assert len(backlog) == 1
+    assert backlog[0]["occurrences"] == 2
+
+
+def test_ten_identical_rounds_make_the_gap_recurring(tmp_path):
+    """The audit's shape: ten rounds of one unchanged gap.
+
+    Measured before the fix: ``occurrences == 1`` after ten cycles, so the
+    engine's ``recurring_capability_gaps`` (gated on ``occurrences >= 2``)
+    never fired; the count only moved when some *other* field changed.
+    """
+    store = tmp_path / "gaps.jsonl"
+    for cycle in range(1, 11):
+        record_gaps(store, cycle=cycle, gaps=[_gap("FAM-fp-mech-abc")])
+    entry = open_gaps(store)[0]
+    assert entry["occurrences"] == 10
+    assert entry["first_seen_cycle"] == 1
+    assert entry["last_seen_cycle"] == 10
+
+
+def _engine(tmp_path):
+    import json as _json
+
+    data = tmp_path / "data"
+    cases = []
+    for index in range(20):
+        case = f"A/{index:03d}.json"
+        cases.append(case)
+        path = data / case
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(_json.dumps({
+            "question": "task",
+            "history": [{"step": 1, "role": "assistant", "content": "answer"}],
+            "is_hallucination": bool(index % 2 == 0),
+            "hallucination_step": 1,
+            "true_answer": "gold",
+        }), encoding="utf-8")
+    config = load_config()
+    config.update({
+        "dataset_root": str(data),
+        "work_root": str(tmp_path / "work"),
+        "registry_dir": str(tmp_path / "registry"),
+        "ledger_path": str(tmp_path / "ledger.jsonl"),
+        "harness_dir": str(tmp_path / "harness"),
+        "memory_root": str(tmp_path / "memory"),
+    })
+    config["backend"].update({"name": "mock", "cache": False})
+    split = EvolutionSplit(
+        name="synthetic", pool=cases, sentinel=cases[:4], gain=cases[4:12],
+        patrol_pool=cases[12:], mini=True,
+    )
+    return EvolutionEngine(
+        config, backend=MockDetectorBackend(), split=split, mini=True,
+    )
+
+
+def test_engine_offers_a_twice_seen_gap_as_recurring(tmp_path):
+    """End to end: two rounds of the same gap reach the proposer's memory.
+
+    The store's counting and the engine's reader are pinned together here,
+    because either half alone leaves the signal silent: ``occurrences`` has to
+    advance, and the reader compares the stored family id with this round's
+    verbatim.
+    """
+    engine = _engine(tmp_path)
+    family = "FAM-fp-judge_conviction-63529fd9afbf-P70fe7f80fd90"
+    for cycle in (1, 2):
+        record_gaps(engine.gap_store, cycle=cycle, gaps=[_gap(family)])
+
+    context = engine._proposal_memory_context(
+        [{
+            "failure_family": family,
+            "count": 2,
+            "actionability": {"routes": []},
+        }],
+        [],
+    )
+    recurring = context["recurring_capability_gaps"]
+    assert [item["failure_family"] for item in recurring] == [family]
+    assert recurring[0]["occurrences"] == 2
+    # One sighting is not recurring.
+    fresh = "FAM-fp-judge_conviction-other"
+    record_gaps(engine.gap_store, cycle=3, gaps=[_gap(fresh)])
+    context = engine._proposal_memory_context(
+        [{"failure_family": fresh, "count": 2, "actionability": {"routes": []}}],
+        [],
+    )
+    assert context["recurring_capability_gaps"] == []
 
 
 def test_new_information_about_the_same_gap_is_kept(tmp_path):

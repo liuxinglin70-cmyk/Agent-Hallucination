@@ -310,8 +310,16 @@ class ActiveRegistry:
         )
         if target is None:
             return None
-        path = self.dir / SNAPSHOTS_DIR / str(target.get("file") or "")
-        if not path.exists():
+        # A snapshot recorded without a file (the resume path records the
+        # state it restored) has nothing to restore from. An empty name must
+        # not resolve to the snapshots directory itself: `exists()` is true
+        # for a directory and reading it raises instead of reporting "no
+        # snapshot".
+        name = str(target.get("file") or "")
+        if not name:
+            return None
+        path = self.dir / SNAPSHOTS_DIR / name
+        if not path.is_file():
             return None
         payload = json.loads(path.read_text(encoding="utf-8-sig"))
         validate_registry(payload, require_executable_bounds=True)

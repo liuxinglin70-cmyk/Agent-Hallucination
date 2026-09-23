@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import sys
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -605,11 +606,18 @@ def cmd_develop(args: argparse.Namespace) -> int:
     })
     seed.pop("content_hash", None)
 
+    # The development replay runs under the same wall-clock budget a cycle's
+    # gate arms do. Without one it ran unbounded, and a stalled provider
+    # produced unresolved rows that scored as "no target improvement" -- an
+    # outage recorded as a falsified candidate.
+    development_deadline = engine._development_deadline()
+
     def l1_runner(cases_to_run, *, candidate, plan):
         rows = engine.develop_rows(
             cases_to_run,
             candidate=candidate,
             split=split,
+            deadline=development_deadline,
         )
         return rows
 
@@ -722,7 +730,27 @@ def _select_development_family(
 
 
 def cmd_capability_audit(args: argparse.Namespace) -> int:
-    _print_json(capability_surface_report())
+    """Report the executable capability surface, and fail when it is not admissible.
+
+    The report's own content is the verdict: ``runner_admission.all_admitted``
+    and ``sandbox.admission_blockers`` say whether an executor may run at all.
+    Returning 0 whatever they said made this a check that could only fail by
+    crashing -- ``scripts/verify.py`` recorded PASS for a report whose text says
+    the runner space is not admitted. The exit code is now the report's verdict,
+    as it is for ``metamorphic-gate`` and ``sandbox-check``.
+    """
+    report = capability_surface_report()
+    _print_json(report)
+    inventory = report.get("executable_inventory") or {}
+    admitted = bool((inventory.get("runner_admission") or {}).get("all_admitted"))
+    blockers = list((inventory.get("sandbox") or {}).get("admission_blockers") or ())
+    if not admitted or blockers:
+        print(
+            "\ncapability-audit verdict: not admissible; "
+            f"all_admitted={admitted}, sandbox_blockers={blockers}",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 

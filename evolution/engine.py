@@ -36,7 +36,13 @@ from evolution.backends import (
     source_digest,
 )
 from evolution.config import ensure_dirs, load_config, resolve_path
-from evolution.contracts import empty_registry, make_registry, save_json
+from evolution.contracts import (
+    empty_registry,
+    make_registry,
+    redact_case_ids,
+    save_json,
+)
+from detector.config import detector_env_fingerprint
 from detector.dataset import gold_fields
 from evolution.gates import (
     arm_has_infrastructure_failure,
@@ -87,6 +93,7 @@ from evolution.memory import (
     recall as recall_experience,
     write_recall,
 )
+from evolution.development import DevelopmentUnmeasurable
 from evolution.capability_planning import plan_capabilities
 from evolution.mechanisms import mechanism_prompt_view, repair_requirements
 from evolution.archive import retrieve_components
@@ -210,6 +217,12 @@ def gate_rejection_is_unevaluable(
     Missing measurement capacity is distinct from an observed regression,
     including insufficient protected sentinel coverage.
     """
+    # An arm that could not be measured honestly makes its own regressions:
+    # fail-closed rows read as lost true positives. The marker is set by the
+    # unit that saw those rows, and it wins over the manufactured deltas --
+    # otherwise "the provider died" is stored as "the mechanism is falsified".
+    if verdict.get("infrastructure_failure"):
+        return True
     delta = verdict.get("delta") or {}
     if delta.get("new_errors") or delta.get("health_regressed") or delta.get("unresolved_added"):
         return False
@@ -352,8 +365,22 @@ def _defect_rejection_after_exclusions(
         if harmlessness.get("passed") is False:
             return ""
 
-    delta = paired_delta(list(baseline_gain), list(candidate_gain))
-    passed, _failures = meets_m(delta, config=config)
+    # The benefit-set comparison must be non-empty on both arms. `meets_m`
+    # reports marginal_cases=0 < 1 on an empty pairing, which reads exactly
+    # like "the gate rejected the defect" -- so an outage that fail-closed the
+    # whole gain set would certify the audit without exercising anything. The
+    # whole-batch emptiness check above cannot catch it: it runs before the
+    # sentinel/gain split, and here the exclusions can land entirely in gain.
+    if baseline_gain and candidate_gain:
+        delta = paired_delta(list(baseline_gain), list(candidate_gain))
+        passed, _failures = meets_m(delta, config=config)
+    elif gain_cases:
+        return (
+            "defect evaluation has no measurable gain case left after "
+            f"excluding {len(unusable)} unmeasured case(s)"
+        )
+    else:
+        passed = False
     if passed:
         return (
             "the defect's rejection does not survive excluding "
@@ -432,12 +459,19 @@ class _ArmRunner:
                                 evaluate=evaluate, kwargs=kwargs)
         # Restored baseline observations must seed the replay backend, even
         # after restarting the process with an empty in-memory baseline map.
+        # Only authoritative rows may seed it: a fail-closed row carries an
+        # empty envelope, and seeding it makes the frozen replay of that case
+        # raise for every later deployment arm in the cycle, which resurfaces
+        # as an unexplained "unresolved" row far from its cause.
         if not (registry or {}).get("interventions") and not fresh:
             backend = self.engine.backend
             while hasattr(backend, "backend"):
                 backend = backend.backend
             if hasattr(backend, "_base_results"):
-                backend._base_results.update({r["case"]: r["result"] for r in rows})
+                backend._base_results.update({
+                    r["case"]: r["result"] for r in rows
+                    if arm_has_infrastructure_failure([r]) == ""
+                })
         return rows
 
 
@@ -530,15 +564,6 @@ class EvolutionEngine:
         # Optional, explicitly installed replacement evaluation set.
         self._replacement_gain_cases: list[str] = []
         self._previous_manifest = self._load_previous_manifest()
-        # Layer 2 of §9.1: reusable parts. Separate from the registry by
-        # construction -- nothing this store holds has passed a promotion gate.
-        self.component_store = Path(
-            (self.config.get("component_root") or "").strip()
-            or str(Path(self.config["work_root"]) / "components")
-        )
-        self.component_prompt_limit = int(
-            (self.config.get("proposer") or {}).get("max_components", 4)
-        )
         # §28.6: where the candidate archive is written, and whether this
         # engine writes it at all. ``on`` is a declared choice rather than an
         # implicit one -- see the ``archive`` block in ``config.DEFAULTS`` for
@@ -563,6 +588,42 @@ class EvolutionEngine:
         self.archive_root = Path(
             str(archive_cfg.get("root") or "").strip()
             or str(Path(self.config["work_root"]) / "candidates")
+        )
+        # Layer 2 of §9.1: reusable parts. Separate from the registry by
+        # construction -- nothing this store holds has passed a promotion gate.
+        #
+        # This path is where components are both *written* (see
+        # ``archive_development_run``) and *read* (``_reusable_components``).
+        # The two used to disagree: the archive registered components under
+        # ``archive.root`` while retrieval read this attribute, so with the
+        # default configuration no component a run produced could ever reach a
+        # drafting prompt -- the archive reported a row and the prompt saw an
+        # empty store. One path now, named here and used by both sides.
+        self.component_store = Path(
+            (self.config.get("component_root") or "").strip()
+            or str(Path(self.config["work_root"]) / "components")
+        )
+        # The two stores normally live in two directories -- ``work_root/
+        # components`` for parts, ``work_root/candidates`` for candidate
+        # history, so a run's components are *not* under its archive root. That
+        # asymmetry is exactly what made the archive look empty: reading
+        # ``load_components(archive_root)`` finds nothing while the run did
+        # register a part. It is stated here rather than left to be discovered
+        # by an empty prompt, and it is silent only when the two paths really
+        # are the same directory.
+        self.component_store_warning = (
+            ""
+            if self.component_store == self.archive_root
+            else (
+                f"components are written to and read from "
+                f"{str(self.component_store)}, not from archive.root "
+                f"{str(self.archive_root)}, which holds candidate records "
+                "only; configure component_root to place the component store "
+                "somewhere else"
+            )
+        )
+        self.component_prompt_limit = int(
+            (self.config.get("proposer") or {}).get("max_components", 4)
         )
 
     # ------------------------------------------------------------------
@@ -859,6 +920,15 @@ class EvolutionEngine:
         reason.
         """
         opportunity = gain_opportunity(baseline_gain)
+        # "Measured" means the round could actually read a gain decision for
+        # the directions it reports. A gain arm that fail-closed to unresolved
+        # rows scores zero opportunities for every polarity, which is
+        # indistinguishable from a genuinely exhausted repair space unless the
+        # unmeasured rows are counted here.
+        unmeasured_gain = sorted(_unmeasurable_cases(baseline_gain))
+        gain_measured = (
+            bool(baseline_gain) and len(unmeasured_gain) < len(list(baseline_gain))
+        )
         classifications = {
             str(item.get("intervention_id") or ""): terminal_classification(
                 item,
@@ -894,7 +964,8 @@ class EvolutionEngine:
             response_counts[kind] = response_counts.get(kind, 0) + 1
         return {
             "gain_opportunity": opportunity,
-            "gain_measured": True,
+            "gain_measured": gain_measured,
+            "unmeasured_gain_cases": unmeasured_gain,
             "blocked_families": list(blocked_families),
             "unmeasurable_polarities": sorted(
                 polarity for polarity, value in opportunity.items() if value == 0
@@ -999,6 +1070,7 @@ class EvolutionEngine:
     def _measurable_families(
         self, families: Sequence[Mapping[str, Any]],
         baseline_gain: Sequence[Mapping[str, Any]], arms: _ArmRunner,
+        *, gain_measured: bool = True,
     ) -> tuple[list[Mapping[str, Any]], list[dict[str, Any]]]:
         """Split families by whether the gain set can score their direction.
 
@@ -1008,11 +1080,22 @@ class EvolutionEngine:
         counts would report the mechanism unmeasurable for a reason that does
         not apply to it, so it is checked against the localization opportunity
         on the same rows.
+
+        ``gain_measured`` distinguishes "this direction has no repairable
+        case" from "the gain arm never produced a decision": both read as zero
+        opportunities, and only the first licenses a statement about the
+        action space. When the arm could not be measured, every family is
+        blocked as unmeasured rather than as opportunity-free.
         """
         opportunity = gain_opportunity(baseline_gain)
         localization = localization_opportunity(
             baseline_gain, gold_steps=self.gold_step_map,
         )
+        unmeasured_reason = (
+            "the gain arm produced no measurable decision this round, so the "
+            "absence of repair opportunities is not a reading about the "
+            "action space"
+        ) if not gain_measured else ""
         replacement = None
         replacement_localization = None
         ready, blocked = [], []
@@ -1045,7 +1128,7 @@ class EvolutionEngine:
                         "target_kind": "localization",
                         "polarity": "localization",
                         "status": "not_evaluated",
-                        "reason": (
+                        "reason": unmeasured_reason or (
                             "no mislocated-but-correctly-convicted case in gain"
                         ),
                     })
@@ -1063,7 +1146,8 @@ class EvolutionEngine:
                 ready.append(family)
             else:
                 blocked.append({"failure_family": name, "polarity": polarity,
-                                "status": "not_evaluated", "reason": "no repair opportunities in gain"})
+                                "status": "not_evaluated",
+                                "reason": unmeasured_reason or "no repair opportunities in gain"})
         return ready, blocked
 
     def record_harness(self, cycle: int) -> dict[str, Any]:
@@ -1150,6 +1234,7 @@ class EvolutionEngine:
         *,
         candidate: Mapping[str, Any],
         split: EvolutionSplit | None = None,
+        deadline: float | None = None,
     ) -> list[dict[str, Any]]:
         """Paired rows for one development check: baseline and candidate arms.
 
@@ -1161,20 +1246,40 @@ class EvolutionEngine:
 
         ``split`` is the data-separation check, not a source of cases: the
         development loop may measure a candidate on patrol findings, never on
-        the sentinel or gain sets. Spending a formal evaluation case during
-        development turns it into development exposure, and the promotion
-        protocol's candidate-unused rule would then be guarding a number that
-        was measured on data the candidate had already seen.
+        the sentinel or gain sets -- and never on the validation set, which
+        under the mini protocol is the only out-of-sample reading the run has.
+        Spending a formal evaluation case during development turns it into
+        development exposure, and the promotion protocol's candidate-unused
+        rule would then be guarding a number that was measured on data the
+        candidate had already seen.
+
+        ``deadline`` is a monotonic wall-clock timestamp, the same budget the
+        cycle's gate arms run under. Without it development ran unbounded: a
+        provider that stalled produced unresolved rows, and an unresolved row
+        is not a measurement -- "no target improved" was read off the missing
+        prediction and archived as a falsification. With it the replay
+        fail-closes exactly as the gates do, and the failure is reported as
+        "not measured" instead.
         """
         if split is not None:
-            formal = {str(case) for case in [*split.sentinel, *split.gain]}
+            # Every set reserved for a formal reading, not only the two the B
+            # gates score on: ``validation`` is the mini protocol's only
+            # out-of-sample measurement and ``final`` is read-once, so a
+            # development replay that consumed either would destroy the
+            # reading it was supposed to leave alone.
+            formal = {str(case) for case in (
+                *split.sentinel, *split.gain, *split.validation,
+            )}
+            formal.update(
+                str(item.get("case") or item) for item in (split.final or ())
+            )
             spent = sorted(formal & {str(case) for case in cases})
             if spent:
                 raise ValueError(
                     "development must not measure a candidate on formal "
                     f"evaluation cases: {spent[:5]}"
                 )
-        arms = _ArmRunner(self, None)
+        arms = _ArmRunner(self, deadline)
         active = self.registry.registry
         active_entries = list(self.registry.entries)
         unit_entries = [dict(candidate)]
@@ -1191,6 +1296,18 @@ class EvolutionEngine:
         self.development_provider_calls = getattr(
             self, "development_provider_calls", 0,
         ) + (len(cases) if fresh else 0)
+        # Refuse to hand back rows that cannot be scored. Raising is the point:
+        # the caller has a word for "not measured" (``unmeasured``) while the
+        # rows themselves spell the reading "no target improved", which is how
+        # a provider outage became a recorded falsification.
+        for arm_name, rows in (
+            ("baseline", baseline_rows), ("candidate", candidate_rows),
+        ):
+            infrastructure = arm_has_infrastructure_failure(rows)
+            if infrastructure:
+                raise DevelopmentUnmeasurable(
+                    f"{arm_name} arm could not be measured: {infrastructure}"
+                )
         return [
             {**dict(row), "arm": "baseline"} for row in baseline_rows
         ] + [
@@ -1252,6 +1369,125 @@ class EvolutionEngine:
                 ),
             })
         return targets, skipped
+
+    def _development_deadline(self) -> float | None:
+        """The wall-clock budget the development replay runs under.
+
+        The same one the cycle's gate arms run under: development is a stage of
+        the cycle, so it spends the cycle's deadline rather than a fresh one.
+        Without it the replay was unbounded -- a stalled provider produced
+        unresolved rows and the loop read the missing prediction as "no target
+        improved", so an outage was archived as a falsified candidate.
+        """
+        seconds = self._cycle_seconds()
+        if seconds is None:
+            return None
+        journal = getattr(self, "_journal", None)
+        if journal is not None:
+            # A resumed cycle has already spent the seconds it recorded before
+            # the restart; the fresh budget would otherwise be the full cap
+            # again. Mirrors the arithmetic ``_run_cycle`` uses for its arms.
+            seconds = max(
+                0.001,
+                seconds - float(getattr(journal, "previous_seconds", 0.0)),
+            )
+        return _time_monotonic() + seconds
+
+    def _record_development_episodes(
+        self,
+        *,
+        cycle: int,
+        family: Mapping[str, Any],
+        developer: Any,
+        result: Mapping[str, Any],
+    ) -> list[dict[str, Any]]:
+        """Remember the versions this cycle's development loop falsified.
+
+        The episodic store is written for every attempt a gate decides on, and
+        a development version that failed L1 *is* decided -- by the loop rather
+        than by a gate. Without it the next round's recall saw no record that
+        "this mechanism, along this route, was already tried and failed" and
+        drafted the same mechanism again.
+
+        ``unevaluable`` is the same distinction the gate path makes: a version
+        whose replay could not score it (``unmeasured``) was never judged, so
+        it is stored as an unevaluable attempt and is explicitly *not* a
+        falsification (``memory.episodic_attempts`` derives ``falsified`` from
+        exactly this pair).
+
+        Deliberately not appended to ``self.rejection_feedback``:
+        ``proposer.set_rejection_feedback`` turns every non-unevaluable entry
+        into a ``rejected_keys`` fingerprint that permanently refuses that
+        executable mechanism from later drafts, and ``_development_drafter``
+        documents that a development failure is restored afterwards rather than
+        banning the candidate. The memory write is what makes the failure
+        visible to the next draft; a permanent ban would be a stronger claim
+        than "L1 refused this version".
+
+        The stored intervention id is qualified with the version
+        (``IV-1-D001#v001``). The episodic store deduplicates on
+        ``(cycle, intervention_id, outcome)``, and every version the loop drafts
+        for one mechanism carries the *same* intervention id -- so an
+        unqualified record would silently swallow the gate's own episode for the
+        later version that did pass L1 and reach the gates. The two records name
+        different artifacts (different candidate hashes), which is what the
+        version qualifier preserves.
+        """
+        candidates_by_version = {
+            str(item.get("version_id") or ""): dict(item.get("candidate") or {})
+            for item in getattr(developer.graph, "versions", ())
+            if isinstance(item.get("candidate"), Mapping)
+        }
+        family_id = str(family.get("failure_family") or "")
+        actionability = family.get("actionability") or {}
+        polarity = str(actionability.get("polarity") or "")
+        routes = [str(item) for item in actionability.get("routes") or ()]
+        recorded: list[dict[str, Any]] = []
+        for version in result.get("versions") or ():
+            status = str(version.get("status") or "")
+            if status not in {"failed_l1", "unmeasured"}:
+                continue
+            version_id = str(version.get("version_id") or "")
+            candidate = candidates_by_version.get(version_id) or {}
+            intervention_id = str(candidate.get("intervention_id") or "")
+            l1 = version.get("l1") or {}
+            reasons = "; ".join(
+                str(item) for item in (l1.get("reasons") or ())
+            )
+            unevaluable = bool(l1.get("unmeasurable"))
+            # The reason travels into the next round's drafting prompt through
+            # memory recall, so it is redacted here: an L1 reason names the
+            # cases it scored, and case identifiers must not cross into
+            # proposer prose. The raw reason stays in the cycle report, which
+            # is a runtime record rather than prompt input.
+            record = record_episode(
+                self.memory_root,
+                cycle=int(cycle),
+                failure_family=family_id,
+                polarity=polarity,
+                outcome="rejected",
+                gate="DEVELOPMENT",
+                reason=redact_case_ids(
+                    reasons or f"{version_id} failed L1 in development"
+                ),
+                intervention_id=(
+                    f"{intervention_id}#{version_id}" if intervention_id else ""
+                ),
+                intervention_type=str(candidate.get("type") or ""),
+                hook=str(candidate.get("hook") or ""),
+                treatment_routes=routes,
+                unevaluable=unevaluable,
+            )
+            recorded.append({
+                "version_id": version_id,
+                "gate": "DEVELOPMENT",
+                "intervention_id": record.get("intervention_id"),
+                "candidate_intervention_id": intervention_id,
+                "status": status,
+                "unevaluable": unevaluable,
+                "reason": reasons or f"{version_id} failed L1 in development",
+            })
+        return recorded
 
     def _develop_candidates(
         self,
@@ -1319,6 +1555,10 @@ class EvolutionEngine:
         }
         runs: list[dict[str, Any]] = []
         frozen: list[dict[str, Any]] = []
+        # The deadline the loop's replays run under, computed once for the
+        # whole stage so every mechanism's L1 shares one budget with the gate
+        # arms rather than each spending a fresh one.
+        development_deadline = self._development_deadline()
         for target in targets:
             mechanism = target["mechanism"]
             mechanism_id = str(mechanism.get("mechanism_id") or "")
@@ -1339,6 +1579,12 @@ class EvolutionEngine:
                     development_cfg.get("allow_action_class_change", True),
                 ),
             )
+            # The id the drafter stamps on every version of this mechanism is
+            # computed here, before the loop, so the recovery branch below can
+            # name the version it recovered with the same id the drafter would
+            # have used. (It referenced a caller-scope name that does not exist
+            # in this scope: entering the branch raised NameError.)
+            draft_identifier = f"IV-{int(cycle)}-D{len(runs) + 1:03d}"
             developer = CandidateDeveloper(
                 output_dir=run_dir,
                 budget=budget,
@@ -1352,14 +1598,20 @@ class EvolutionEngine:
                 gold_steps=self.gold_step_map,
                 l1_runner=lambda cases, *, candidate, plan: self.develop_rows(
                     cases, candidate=candidate, split=self.split,
+                    deadline=development_deadline,
                 ),
             )
+            # The id the drafter stamps on every version of this mechanism is
+            # computed here, before the loop, so the recovery branch below can
+            # name the version it recovered with the same id the drafter would
+            # have used. (It referenced a caller-scope name that does not exist
+            # in this scope: entering the branch raised NameError.)
             result = developer.develop(
                 self._development_drafter(
                     cycle=cycle,
                     family=target["family"],
                     mechanism_id=mechanism_id,
-                    identifier=f"IV-{int(cycle)}-D{len(runs) + 1:03d}",
+                    identifier=draft_identifier,
                 ),
                 cycle=int(cycle),
                 max_versions=int(
@@ -1373,6 +1625,15 @@ class EvolutionEngine:
             block["neighbor_cases"] = list(target["neighbor_cases"])
             block["run_dir"] = str(run_dir)
             block["archive_policy"] = self.archive_on
+            # The versions this development run falsified are written to the
+            # episodic store here: they never reach a gate, so the gate path's
+            # own memory write could not see them, and the next round's recall
+            # then had no record that this mechanism and route had already been
+            # tried and failed.
+            block["episodes"] = self._record_development_episodes(
+                cycle=int(cycle), family=target["family"],
+                developer=developer, result=result,
+            )
             # §28.6 ``cycle_end``: a cycle that develops several mechanisms
             # remembers all of them in one place, which is why the decision is
             # taken here rather than inside the loop. With ``development_end``
@@ -1409,7 +1670,12 @@ class EvolutionEngine:
                         candidate.get("intervention_id") or ""
                     )
                     if not identifier_present:
-                        candidate["intervention_id"] = identifier
+                        # The id the drafter would have stamped. A recovered
+                        # version is normally the drafter's own output and
+                        # carries one; a version written by another path (a
+                        # ``develop`` run, a fixture) may not, and a proposal
+                        # without an id cannot be validated downstream.
+                        candidate["intervention_id"] = draft_identifier
                     candidate.pop("content_hash", None)
                     frozen.append(candidate)
                     block["recovered"] = {
@@ -1523,17 +1789,27 @@ class EvolutionEngine:
         sharing an id, which the proposal contract refuses. Assigning the id
         before the version is recorded keeps the frozen candidate, its hash and
         the batch entry describing the same object.
+
+        The proposer's own ``notes`` travel back with the candidates. They carry
+        *why* an empty answer was empty -- its call budget was spent, the
+        provider failed, it had nothing -- and a draft callback that returned a
+        bare list would drop the only machine-readable record of that difference
+        before the development loop could report it.
         """
         proposer = self.proposer
 
-        def rename(candidates):
+        def renamed(batch: Any) -> ProposalBatch:
             out: list[dict[str, Any]] = []
-            for candidate in candidates:
+            for candidate in batch.candidates:
                 item = dict(candidate)
                 item["intervention_id"] = identifier
                 item.pop("content_hash", None)
                 out.append(item)
-            return out
+            return ProposalBatch(
+                candidates=out,
+                joint_groups=list(getattr(batch, "joint_groups", None) or ()),
+                notes=[dict(note) for note in getattr(batch, "notes", None) or ()],
+            )
 
         def draft(
             _mechanism: Mapping[str, Any],
@@ -1541,14 +1817,14 @@ class EvolutionEngine:
             parent: Mapping[str, Any] | None,
             diagnosis: Mapping[str, Any] | None,
             _cycle: int,
-        ) -> list[Mapping[str, Any]]:
+        ) -> ProposalBatch:
             one = {
                 **dict(family),
                 "mechanism": dict(_mechanism),
             }
             if parent is None or not diagnosis:
                 batch = proposer.propose([one], cycle=int(cycle), max_proposals=1)
-                return rename(batch.candidates)
+                return renamed(batch)
             previous = list(getattr(proposer, "rejection_feedback", []))
             if hasattr(proposer, "set_rejection_feedback"):
                 feedback = list(previous)
@@ -1568,7 +1844,7 @@ class EvolutionEngine:
             finally:
                 if hasattr(proposer, "set_rejection_feedback"):
                     proposer.set_rejection_feedback(previous)
-            return rename(batch.candidates)
+            return renamed(batch)
 
         return draft
 
@@ -1603,6 +1879,13 @@ class EvolutionEngine:
         targeted replay was not shown to be useful, so registering its parts as
         reusable would launder a rejected candidate into the next round's
         drafting prompt.
+
+        Candidate records go to ``archive_root``; components go to
+        ``component_store``, which is the *same* directory unless
+        ``component_root`` was configured (see the warning field the
+        constructor sets when they differ). Writing the component half to the
+        archive root while retrieval read a different path is why no archived
+        component ever reached a drafting prompt.
         """
         if self.archive_on == "off" and not force:
             return {
@@ -1634,7 +1917,7 @@ class EvolutionEngine:
             mechanism=mechanism,
         ):
             try:
-                registered.append(record_component(self.archive_root, **record))
+                registered.append(record_component(self.component_store, **record))
             except (ValueError, KeyError) as exc:
                 # A component the store refuses is reported, not fatal: the
                 # candidate archive half has already been written and is the
@@ -1648,10 +1931,13 @@ class EvolutionEngine:
             "archived": True,
             "policy": self.archive_on,
             "root": str(self.archive_root),
+            "component_root": str(self.component_store),
             "versions": ingested.get("versions"),
             "recorded": ingested.get("recorded"),
             "components": registered,
-            "report": record_archive_summary(self.archive_root),
+            "report": record_archive_summary(
+                self.archive_root, component_root=self.component_store,
+            ),
         }
 
     def _components_from_development(
@@ -1771,13 +2057,22 @@ class EvolutionEngine:
             behavior = report.get("behavior") or {}
             if behavior.get("passed"):
                 continue
-            opportunity = int(
-                (report.get("gain_opportunities") or {}).get(
-                    str((candidate.get("claim") or {}).get(
-                        "target_polarity") or ""),
-                    0,
-                ) or 0
+            # A boundary claim is scorable where either direction has a
+            # repairable case, so its opportunity is the sum. Reading only the
+            # polarity key left `boundary` at zero forever -- every boundary
+            # candidate was invisible to this store, which is exactly the route
+            # the pilot's tracer directive kept re-proposing.
+            opportunities = report.get("gain_opportunities") or {}
+            polarity = str(
+                (candidate.get("claim") or {}).get("target_polarity") or ""
             )
+            if polarity in opportunities:
+                opportunity = int(opportunities.get(polarity) or 0)
+            else:
+                opportunity = int(sum(
+                    value for value in opportunities.values()
+                    if isinstance(value, int)
+                ))
             # The gain delta is the measured outcome on the benefit set, which
             # is why ``insufficiency_evidence`` reads a "benefit_set" basis:
             # an unchanged outcome there is the moment the route failed to
@@ -1950,6 +2245,11 @@ class EvolutionEngine:
             },
             "source": source_digest(),
             "detector_config": file_digest(self.config.get("detector_config")),
+            # The verdict is produced by the gates, so the gate thresholds are
+            # part of its identity: reusing a verdict recorded under different
+            # thresholds would certify gates that never ran in that form.
+            "gates": dict(self.config.get("gates") or {}),
+            "budget": dict(self.config.get("budget") or {}),
             "sentinel": sorted(self.split.sentinel),
             "gain": sorted(self.split.gain),
             "gold": {
@@ -1966,17 +2266,13 @@ class EvolutionEngine:
                 case: file_digest(Path(self.config["dataset_root"]) / case)
                 for case in [*self.split.sentinel, *self.split.gain]
             },
-            "provider_routes": {
-                key: os.environ.get(key, "")
-                for key in (
-                    "DETECTOR_ENDPOINT",
-                    "DETECTOR_JUDGE_MODEL",
-                    "DETECTOR_RECALL_MODEL",
-                    "DETECTOR_UPGRADE_MODEL",
-                    "DETECTOR_TRACER_MODEL",
-                    "DETECTOR_DEFENSE_MODEL",
-                )
-            },
+            # The provider routes are part of the identity of every verdict the
+            # audit produces: the same code under a different model is a
+            # different measurement. The key list is the detector's own
+            # (``detector.config.DETECTOR_ENV_KEYS``), not a second copy of it,
+            # so a new override cannot be added to the resolver and stay
+            # invisible here.
+            "provider_routes": detector_env_fingerprint(),
         }
         cache_path = (
             self.paths["reports"] / "defect_audit_verdict.json"
@@ -2249,6 +2545,13 @@ class EvolutionEngine:
             [*sentinel, *measurement_gain], registry=registry, fresh=fresh,
         )
         candidate_s = _subset_rows(candidate_rows, sentinel)
+        # Rows that could not be measured honestly (provider failure, deadline,
+        # non-authoritative terminal) manufacture "regressions" the moment a
+        # gate compares them: unresolved counts as incorrect, so an arm that
+        # never ran reads as a candidate that broke things. Record them here so
+        # no failing verdict on this unit can be stored as a falsification, and
+        # so admission stays fail-closed instead of passing on partial rows.
+        unmeasured = sorted(_unmeasurable_cases([*control, *candidate_rows]))
         harmlessness = harmlessness_gate(
             baseline_rows=baseline_s,
             candidate_rows=candidate_s,
@@ -2333,6 +2636,30 @@ class EvolutionEngine:
                             "claim was not measured (admission remains blocked)"
                         ),
                     )
+        def _mark_unmeasured(verdict: Any) -> Any:
+            """Mark a failing verdict whose arm could not be measured honestly.
+
+            ``passed`` is left alone (admission is blocked by the caller's
+            fail-closed check), but the verdict stops claiming to be evidence
+            about the candidate: an infrastructure failure is not a refutation.
+            """
+            if not unmeasured or not isinstance(verdict, dict):
+                return verdict
+            if verdict.get("passed") is not False or verdict.get("evaluable") is False:
+                return verdict
+            marked = dict(verdict)
+            marked["infrastructure_failure"] = True
+            marked["evaluable"] = False
+            marked["status"] = "not_evaluated"
+            note = (
+                f"{len(unmeasured)} case(s) could not be measured honestly "
+                f"(first: {unmeasured[0]}); the rejection is not attributable "
+                "to the candidate"
+            )
+            reason = str(verdict.get("reason") or "")
+            marked["reason"] = f"{reason}; {note}" if reason else note
+            return marked
+
         return {
             "intervention_id": intervention_id,
             "candidate": dict(candidate),
@@ -2343,10 +2670,14 @@ class EvolutionEngine:
             "measurement_gain_cases": measurement_gain,
             "coverage_response": response,
             "candidate_rows": _summarise_rows(candidate_rows),
-            "harmlessness": harmlessness,
-            "behavior": behavior,
-            "member_behavior": member_behavior,
-            "m": m,
+            "unmeasured_cases": unmeasured,
+            "harmlessness": _mark_unmeasured(harmlessness),
+            "behavior": _mark_unmeasured(behavior),
+            "member_behavior": {
+                key: _mark_unmeasured(verdict)
+                for key, verdict in member_behavior.items()
+            },
+            "m": _mark_unmeasured(m),
         }
 
     # ------------------------------------------------------------------
@@ -2665,6 +2996,11 @@ class EvolutionEngine:
                 return report
         contract = {"cycle": cycle, "config": fingerprint(self.config), "source": source_digest(),
                     "detector_config": file_digest(self.config.get("detector_config")),
+                    # The provider routes are part of the machinery, not of the
+                    # data: a checkpoint written under model A may not be
+                    # resumed under model B, or the arms already recorded would
+                    # be attributed to the wrong measurement conditions.
+                    "detector_env": detector_env_fingerprint(),
                     "split": split_manifest_report(self.split),
                     "data": {case: file_digest(Path(self.config["dataset_root"]) / case) for case in self.split.pool}}
         # The contract deliberately excludes the registry hash: a cycle that
@@ -2910,7 +3246,18 @@ class EvolutionEngine:
             "initial_patrol_size": patrol_size,
             "bootstrap_cases": bootstrap_cases,
             "bootstrap_count": len(bootstrap_cases),
+            # True when the reruns produced at least one family that survived
+            # mechanism profiling and actionability classification. Whether the
+            # round can *score* it is decided later, against the gain arm's
+            # coverage: read `evaluation_preflight.gain_measured` beside this
+            # flag, or the round's `instrument.gain_measured`, before treating
+            # a found family as a usable one.
             "family_found": bool(diagnosed_families),
+            "family_found_basis": (
+                "actionable families after mechanism profiling; gain coverage "
+                "is checked separately in evaluation_preflight"
+            ),
+            "family_count": len(diagnosed_families),
         }
         worksheet["capability_gaps"] = capability_gaps
         worksheet["capability_plan"] = capability_plan
@@ -2944,14 +3291,55 @@ class EvolutionEngine:
 
         proposal_families, blocked_families = self._measurable_families(
             diagnosed_families, baseline_gain, arms,
+            gain_measured=instrument["gain_measured"],
         )
         preflight = {"sentinel": coverage, "blocked_families": blocked_families,
-                     "gain_opportunity": instrument["gain_opportunity"]}
+                     "gain_opportunity": instrument["gain_opportunity"],
+                     "gain_measured": instrument["gain_measured"],
+                     "unmeasured_gain_cases": instrument["unmeasured_gain_cases"]}
         self._ledger("evaluation_preflight", {"cycle": cycle, **preflight})
         if diagnosed_families and not proposal_families and proposal_batch is None:
-            return self._stop_preflight(cycle, {
-                **preflight, "reason": "no diagnosed failure direction has repair opportunities in gain",
+            reason = "no diagnosed failure direction has repair opportunities in gain"
+            if not instrument["gain_measured"]:
+                reason = (
+                    "the gain arm produced no measurable decision this round "
+                    f"({len(instrument['unmeasured_gain_cases'])} unmeasured "
+                    "case(s)); no repair opportunity could be read"
+                )
+            report = self._stop_preflight(cycle, {
+                **preflight, "reason": reason,
             }, baseline_gain=baseline_gain, audit=audit, patrol=worksheet)
+            # H_t bookkeeping for the round that stops here. The early return
+            # used to skip the calls further down, so a round that found a
+            # capability gap *and* an unmeasurable family reported the gap in
+            # its worksheet and then dropped it: the next round had to
+            # rediscover it, and nothing in the repository recorded that the
+            # capability was missing. Only the accounting is added here -- the
+            # stop path itself is unchanged.
+            report["capability_backlog"] = self.record_capability_gaps(
+                cycle, capability_gaps,
+            )
+            report["capability_plan"] = capability_plan
+            if capability_plan.get("gaps"):
+                record_gaps(
+                    self.gap_store, cycle=cycle,
+                    gaps=capability_plan["gaps"],
+                )
+            # No candidate reached a gate, so there is no route-falsification
+            # reading to store; the empty call still records the attempt in the
+            # ledger, which is what tells "no route failed" apart from "this
+            # path never asked".
+            report["route_failures"] = self.record_route_failures(
+                cycle=cycle,
+                diagnosed_families=diagnosed_families,
+                gate_reports=(),
+            )
+            # The report was saved and appended to ``cycle_reports`` by
+            # ``_stop_preflight`` before the backlog existed; re-saving writes
+            # the same dict the caller receives, so the file, the in-memory
+            # record and the return value cannot disagree.
+            self._save_cycle_report(cycle, report)
+            return report
 
         development_block: dict[str, Any] | None = None
         # Whether the loop's batch is what this round carries to the gates.
@@ -3195,6 +3583,7 @@ class EvolutionEngine:
                 "m": unit["m"],
                 "fresh": unit["fresh"],
                 "candidate_rows": unit["candidate_rows"],
+                "unmeasured_cases": unit.get("unmeasured_cases") or [],
                 "gain_opportunities": unit["gain_opportunities"],
                 "measurement_gain_cases": unit["measurement_gain_cases"],
                 "coverage_response": unit.get("coverage_response"),
@@ -3208,6 +3597,7 @@ class EvolutionEngine:
                 )
             if (
                 (unit.get("harmlessness") or {}).get("passed")
+                and not unit.get("unmeasured_cases")
                 and all(
                     verdict["passed"]
                     for verdict in (unit.get("member_behavior") or {}).values()
@@ -3785,7 +4175,8 @@ class EvolutionEngine:
     def run_experiment(self, cycles: int | None = None, *, resume: bool = False) -> dict[str, Any]:
         import time as _time
 
-        cycles = int(self.config.get("cycles", 3) if cycles is None else cycles)
+        requested = int(self.config.get("cycles", 3) if cycles is None else cycles)
+        cycles = requested
         if cycles < 0:
             raise ValueError("cycles must be non-negative")
         for cycle in range(1, cycles + 1):
@@ -3793,18 +4184,46 @@ class EvolutionEngine:
             result = self.run_cycle(cycle, resume=resume and started)
             if result.get("state") != "completed":
                 break
+        completed = [
+            item for item in self.cycle_reports
+            if item.get("state") == "completed"
+        ]
+        # A run that stopped early must say so. Otherwise a six-cycle request
+        # that ended after one blocked preflight is indistinguishable from a
+        # six-cycle run by anyone reading the report -- the cycles list is the
+        # only trace, and counting it is not a contract.
+        stopped_early = len(completed) < requested
         report = {
             "cycles": self.cycle_reports,
+            "cycles_requested": requested,
+            "cycles_completed": len(completed),
+            "stopped_early": stopped_early,
+            "stop_reason": (
+                str(self.cycle_reports[-1].get("state") or "") if stopped_early
+                and self.cycle_reports else ""
+            ),
             "active": [
                 str(c.get("intervention_id") or "") for c in self.registry.entries
             ],
             "ledger_integrity": self.ledger.verify(),
             "registry_state": self.registry.state,
         }
-        if self.mini and self.split.validation and all(
-            item.get("state") == "completed" for item in self.cycle_reports
-        ):
-            report["mini_effect"] = self._evaluate_mini_effect()
+        if self.mini and self.split.validation:
+            if all(item.get("state") == "completed" for item in self.cycle_reports):
+                report["mini_effect"] = self._evaluate_mini_effect()
+            else:
+                # "Not measured" must be stated, not implied by a missing key:
+                # a reader that treats an absent field as success would read a
+                # skipped out-of-sample check as a passed one.
+                report["mini_effect"] = {
+                    "status": "not_run",
+                    "reason": (
+                        "the out-of-sample effect is only computed when every "
+                        "cycle completed; stopped with "
+                        f"{completed and len(completed) or 0} completed cycle(s)"
+                    ),
+                    "passed": None,
+                }
         return report
 
     def _evaluate_mini_effect(self) -> dict[str, Any]:
@@ -3952,12 +4371,24 @@ class EvolutionEngine:
                     self.split.gain, registry=make_registry(without), fresh=fresh,
                 )
                 delta = paired_delta(without_rows, active_rows)
+                # A truncated arm counts unresolved as "not correct", so a
+                # cut-off active arm looks like a *gain* over the empty one --
+                # and the leave-one-out direction flips with it: the entry
+                # reads as harmful when it was never measured. Attribution is
+                # a measurement, so an unmeasurable arm records nothing.
+                blocked = arm_has_infrastructure_failure(
+                    [*without_rows, *active_rows],
+                )
                 attribution.append({
                     "intervention_id": intervention_id,
                     "delta": delta,
                     "attribution": "leave_one_out_committed_configuration",
+                    "measured": not blocked,
+                    "unmeasured_reason": blocked,
                 })
         for item in attribution:
+            if not item["measured"]:
+                continue
             self.registry.record_marginal(
                 item["intervention_id"],
                 int(item["delta"]["marginal_cases"]),
@@ -3975,6 +4406,16 @@ class EvolutionEngine:
         report = {
             "cycle": cycle,
             "attribution": attribution,
+            # Reported explicitly so "no entry was retired because nothing was
+            # measurable" is distinguishable from "every entry is earning its
+            # place". Both leave `retired` empty.
+            "attribution_measured": all(
+                bool(item.get("measured")) for item in attribution
+            ),
+            "unmeasured_attribution": [
+                item["intervention_id"] for item in attribution
+                if not item.get("measured")
+            ],
             "retirement": retirement,
             "rollback": rollback,
             "active_after_governance": [
@@ -4007,9 +4448,13 @@ class EvolutionEngine:
                 intervention_id, {}
             )
             history = info.get("marginal_history") or []
-            if len(history) >= threshold and all(
-                int(item.get("marginal_cases", 0)) <= 0
-                for item in history[-threshold:]
+            # Count distinct cycles, not rows. Both the admission path and the
+            # governance path append to this history, so one cycle can leave
+            # two rows: a row slice would then read a single measurement as
+            # the threshold's worth of evidence and retire on one bad round.
+            recent = _recent_cycles(history, threshold)
+            if len(recent) >= threshold and all(
+                int(item.get("marginal_cases", 0)) <= 0 for item in recent
             ):
                 retire_ids.append(intervention_id)
         if not retire_ids:
@@ -4045,16 +4490,39 @@ class EvolutionEngine:
         active_rows = arms.run(
             self.split.gain, registry=self.registry.registry, fresh=fresh,
         )
+        # A truncated active arm reads as *worse than nothing*: unresolved
+        # counts as incorrect, so an arm the deadline cut short records a
+        # negative net contribution it did not earn, and two such rounds
+        # trigger the rollback that removes a working library. Rollback is
+        # irreversible from this path, so an unmeasurable comparison records
+        # nothing at all.
+        blocked = arm_has_infrastructure_failure([*empty_rows, *active_rows])
+        if blocked:
+            return {
+                "triggered": False,
+                "measured": False,
+                "unmeasured_reason": blocked,
+                "threshold": threshold,
+                "history": list(
+                    self.registry.state.get("net_contribution_history") or []
+                )[-threshold:],
+            }
         net = paired_delta(empty_rows, active_rows)
         self.registry.record_net_contribution(
             int(net["marginal_cases"]), cycle=cycle,
         )
         history = list(self.registry.state.get("net_contribution_history") or [])
-        if len(history) >= threshold and all(
-            int(item.get("net_correct_cases", 0)) < 0
-            for item in history[-threshold:]
+        recent = _recent_cycles(history, threshold)
+        if len(recent) >= threshold and all(
+            int(item.get("net_correct_cases", 0)) < 0 for item in recent
         ):
             payload = self.registry.rollback_to_snapshot(cycle - threshold)
+            # A snapshot that does not exist restores nothing. Reporting
+            # "triggered" anyway would record a rollback that never happened
+            # -- and the usual cause (the window reaching back before the
+            # first snapshot) is not rare in a run with early zero-admission
+            # cycles.
+            restored = bool(payload)
             self._ledger("rolled_back", {
                 "cycle": cycle,
                 "reason": (
@@ -4064,14 +4532,25 @@ class EvolutionEngine:
                 "restored_snapshot": (
                     str(payload.get("content_hash") or "") if payload else ""
                 ),
+                "triggered": restored,
+                "cause": "" if restored else (
+                    f"no snapshot to restore at cycle {cycle - threshold}"
+                ),
             })
             return {
-                "triggered": True,
+                "triggered": restored,
+                "measured": True,
                 "threshold": threshold,
                 "history": history[-threshold:],
+                "unrestorable_reason": "" if restored else (
+                    f"no snapshot to restore at cycle {cycle - threshold}; "
+                    "the rollback window reaches back before the first "
+                    "snapshot"
+                ),
             }
         return {
             "triggered": False,
+            "measured": True,
             "threshold": threshold,
             "history": history[-threshold:],
         }
@@ -4151,10 +4630,18 @@ class EvolutionEngine:
                 workers=workers,
             )
         effect = paired_delta(empty_rows, active_rows)
+        decisive_fixed = int(effect.get("decisive_fixed") or 0)
+        decisive_broken = int(effect.get("decisive_broken") or 0)
+        # Margin without a repaired decision is a calibration or abstention
+        # effect, not a repaired mechanism: the case count can rise purely by
+        # deciding cases the empty arm left unresolved. Requiring at least one
+        # decisive correction keeps the criterion about the mechanism.
         main_pass = (
             int(effect["marginal_cases"]) >= int(
                 (self.config.get("gates") or {}).get("m_min_marginal_cases", 1)
             )
+            and decisive_fixed > 0
+            and decisive_broken == 0
             and int(effect["new_errors"]) == 0
             and int(effect["correctness_worsened"]) == 0
             and int(effect["unresolved_added"]) == 0
@@ -4175,6 +4662,8 @@ class EvolutionEngine:
                 "new_fp": int(effect["new_fp"]),
                 "tp_lost": int(effect["tp_lost"]),
                 "unresolved_added": int(effect["unresolved_added"]),
+                "decisive_fixed": decisive_fixed,
+                "decisive_broken": decisive_broken,
                 "flips": effect["flips"],
                 "baseline_metrics": effect["baseline_metrics"],
                 "active_metrics": effect["active_metrics"],
@@ -4190,19 +4679,25 @@ class EvolutionEngine:
                 "zero_correctness_worsened": int(
                     effect["correctness_worsened"]
                 ) == 0,
+                "decisive_corrections": decisive_fixed,
+                "zero_decisive_breakage": decisive_broken == 0,
                 "health_not_regressed": int(effect["health_regressed"]) == 0,
                 "overall": (
                     "pass"
                     if main_pass and p_value < 0.05
+                    and decisive_fixed > 0
+                    and decisive_broken == 0
                     and int(effect["unresolved_added"]) <= 0
                     and bool(step_check["not_regressed"])
                     and bool(self.registry.entries)
                     else "fail"
                 ),
                 "statistical_power_note": (
-                    "with n=300 and a symmetric paired test, one-sided "
-                    "p<0.05 requires at least 5 net improving flips and zero "
-                    "worsening flips; a small true effect can be real yet "
+                    "the McNemar test counts decisive flips (a real decision "
+                    "replaced by a different one), not abstention changes: "
+                    "with n=300 and a symmetric paired test, one-sided p<0.05 "
+                    "requires at least 5 net decisive corrections and zero "
+                    "decisive breakage; a small true effect can be real yet "
                     "underpowered, which is a property of the pre-registered "
                     "criterion, not of the gate machinery"
                 ),
@@ -4242,10 +4737,43 @@ def _feedback_delta(value: Any) -> dict[str, int] | None:
     return {key: int(value.get(key) or 0) for key in keys}
 
 
+def _recent_cycles(history: Sequence[Mapping[str, Any]], count: int) -> list[Mapping[str, Any]]:
+    """The most recent ``count`` distinct cycles in a history, newest first.
+
+    Retirement and rollback thresholds are written in cycles ("negative for
+    the last two cycles"), but the histories they read are append-only rows:
+    one cycle can contribute several rows, and a repeated governance call for
+    the same cycle adds more. Slicing rows lets a single measurement fill the
+    whole window. Keeping the newest row per cycle is what the thresholds
+    mean.
+    """
+    seen: dict[int, Mapping[str, Any]] = {}
+    order: list[int] = []
+    for item in history:
+        cycle = int(item.get("cycle") or 0)
+        if cycle not in seen:
+            order.append(cycle)
+        seen[cycle] = item
+    return [seen[cycle] for cycle in order[-count:]]
+
+
 def _mcnemar_improvement_p(delta: Mapping[str, Any]) -> float:
-    """One-sided exact binomial p for symmetric discordance (McNemar)."""
-    improved = int(delta.get("correctness_improved") or 0)
-    worsened = int(delta.get("correctness_worsened") or 0)
+    """One-sided exact binomial p for symmetric discordance (McNemar).
+
+    The discordant pairs counted are *decisive* corrections and regressions,
+    not the wider ``correctness_improved`` / ``correctness_worsened``. The
+    wider pair counts unresolved -> correct as an improvement, which is a
+    calibration change rather than a corrected decision: on that pairing a
+    registry that merely decides more cases -- without repairing any wrong
+    answer -- reaches p < 0.05, while one that repairs real errors is
+    invisible whenever the provider abstains elsewhere. The boundary gate
+    already scores decisive flips only (``gates._decisive_correction``); the
+    final verdict reads the same quantity so both agree on what "improved"
+    means. With no decisive pair at all the test carries no information and
+    reports p = 1.0 rather than borrowing the wide counts.
+    """
+    improved = int(delta.get("decisive_fixed") or 0)
+    worsened = int(delta.get("decisive_broken") or 0)
     n = improved + worsened
     if n == 0:
         return 1.0

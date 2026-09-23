@@ -39,6 +39,7 @@ from evolution.contracts import (
     identity_incompleteness,
     structured_key,
 )
+from evolution.gates import arm_has_infrastructure_failure
 from evolution.metrics import paired_delta
 from evolution.mechanisms import repair_requirements
 from evolution.metamorphic import admission_error
@@ -48,6 +49,59 @@ DEVELOPMENT_SCHEMA = "evolution.candidate_development.v1"
 # How a version ended. The vocabulary lives with the version graph
 # (``candidate_versions.VERSION_STATUSES``), which is the module that writes it;
 # a second copy here would be free to drift from the one on disk.
+
+
+def _batch_reason(batch: Any) -> dict[str, Any]:
+    """The proposer's own explanation for an empty batch, if it gave one.
+
+    A ``ProposalBatch`` carries ``notes``; a caller that injects a plain
+    callable may return a bare sequence, which has no notes and yields an empty
+    report rather than an error. Only the first note is kept: one empty answer
+    carries one reason, and the caller sees a bounded record rather than a
+    prompt's worth of notes. ``stopped_reason`` is the note's coarse,
+    machine-readable half -- "the proposer's own call budget was spent" and "it
+    was asked and produced nothing" are the two a reader must be able to tell
+    apart -- and is derived from the note rather than invented, so a proposer
+    with a new kind of refusal is reported as ``other`` with its text intact.
+    """
+    notes = getattr(batch, "notes", None) or ()
+    for item in notes:
+        if not isinstance(item, Mapping):
+            continue
+        record = dict(item)
+        text = " ".join(
+            str(record.get(key) or "") for key in ("reason", "rejected")
+        ).lower()
+        if "budget" in text or "exhausted" in text:
+            record["stopped_reason"] = "budget_exhausted"
+        elif "provider_failure" in text or record.get("provider_ok") is False:
+            record["stopped_reason"] = "provider_failure"
+        elif str(record.get("reason") or "").strip():
+            record["stopped_reason"] = "no_draft_returned"
+        else:
+            record["stopped_reason"] = "other"
+        return record
+    return {}
+
+
+class DevelopmentUnmeasurable(Exception):
+    """One replay could not score the version it was run for.
+
+    Raised by a replay runner when the rows it produced carry an
+    infrastructure failure -- a provider error, a deadline skip, a
+    non-authoritative terminal -- so no honest comparison can be made. It is an
+    exception rather than a value because the runner's contract is "rows to
+    score"; a row set that cannot be scored is a different kind of answer, and
+    returning it as rows is exactly how "not measured" was read as "no
+    improvement" and recorded as a falsification.
+
+    The loop catches it and marks the version ``unmeasured``: the candidate was
+    never judged, so it must not be archived or remembered as one that failed.
+    """
+
+    def __init__(self, reason: str) -> None:
+        self.reason = str(reason or "the replay produced no scorable rows")
+        super().__init__(self.reason)
 
 
 class DevelopmentBudget:
@@ -289,14 +343,26 @@ def check_l1(
 ) -> dict[str, Any]:
     """Targeted development replay: did the target move, and did neighbours hold.
 
-    Four conditions, all required, and deliberately not netted against each
-    other: an improvement on the target that breaks a neighbour is not a
+    Every condition is required, and they are deliberately not netted against
+    each other: an improvement on the target that breaks a neighbour is not a
     partially good candidate, it is a candidate that must not be frozen. The
     plan states this as the first negative integration test (§15.4).
 
     The firing requirement comes from the same place: a candidate whose hook
     never reached the runtime produced no evidence about the mechanism, so
     "the target did not improve" would be the wrong reading of its failure.
+
+    A *target* case that regresses is the same kind of failure as a neighbour
+    that regresses, and is scored with the same function. The target set is
+    what this intervention claims to keep working and improve; reading only the
+    neighbours let a version that repaired one member of a two-case family
+    while losing the other pass L1 -- and with a two-member family, one lost
+    true positive is half the target set. ``target_unchanged`` stays what it
+    was: a case that neither improved nor regressed is not an improvement, so
+    it is still a reason to refuse the version ("no target case improved"),
+    but it is not by itself a regression. The regression and the paired delta
+    are also reported under their own names, so a reader can tell "this broke
+    something the baseline had right" from "this simply did not help".
 
     ``gold_steps`` is the evaluator-side annotation. A localization target is
     scored against it, not against "the step changed": a candidate that moves a
@@ -334,37 +400,79 @@ def check_l1(
         ):
             neighbor_regressed.append(str(case))
 
+    # The target cases get the same regression reading as the neighbours, and
+    # under their own name: ``target_regressed`` and ``neighbor_regressed``
+    # answer different questions (did this candidate damage what it claimed to
+    # fix, versus did it damage something unrelated) and a reader that had to
+    # tell them apart by looking at case ids could not.
+    target_regressed: list[str] = []
+    for case in target_cases:
+        base = baseline_by_case.get(str(case)) or {}
+        active = candidate_by_case.get(str(case)) or {}
+        if _case_regressed(
+            base, active, localization=localization, gold_step=gold_steps.get(str(case)),
+        ):
+            target_regressed.append(str(case))
+
     fired_cases = (
         _fired_cases(candidate_rows, intervention_id)
         if intervention_id else []
     )
+    delta_new_errors = int(delta.get("new_errors") or 0)
+    delta_tp_lost = int(delta.get("tp_lost") or 0)
     reasons: list[str] = []
+    reason_codes: list[str] = []
     if not target_improved:
         reasons.append(
             "no target case improved on the development replay"
         )
+        reason_codes.append("no_target_improvement")
+    if target_regressed:
+        reasons.append(
+            "target case(s) regressed: " + ", ".join(target_regressed)
+        )
+        reason_codes.append("target_regression")
     if neighbor_regressed:
         reasons.append(
             "normal neighbour(s) regressed: " + ", ".join(neighbor_regressed)
         )
+        reason_codes.append("neighbor_regression")
     if int(delta.get("health_regressed") or 0) > 0:
         reasons.append(
             f"runtime health regressed on {delta['health_regressed']} case(s)"
         )
+        reason_codes.append("health_regression")
+    # The paired delta's own reading of the same replay. It is not redundant
+    # with the per-case lists: ``new_errors`` also counts a lost true positive
+    # that the per-case regression test cannot see (a target the baseline got
+    # right by *not convicting* a clean case), and a replayed pair that nets a
+    # gain while adding an error is not an improvement to build on.
+    if delta_new_errors > 0 or delta_tp_lost > 0:
+        reasons.append(
+            f"the paired replay added {delta_new_errors} new error(s) and "
+            f"lost {delta_tp_lost} true positive(s)"
+        )
+        reason_codes.append("paired_delta_regression")
     if intervention_id and not fired_cases:
         reasons.append(
             f"the candidate {intervention_id!r} never reached the runtime on "
             "any development case, so this replay measured nothing about it"
         )
+        reason_codes.append("hook_never_fired")
     return {
         "level": "L1",
         "passed": not reasons,
         "target_improved": target_improved,
         "target_unchanged": target_unchanged,
+        "target_regressed": target_regressed,
         "neighbor_regressed": neighbor_regressed,
         "fired_cases": fired_cases,
         "delta": delta,
         "reasons": reasons,
+        # Machine-readable half of ``reasons``, in the same order. The archive
+        # reads this key to answer "how did this fail" without parsing prose,
+        # and until now the producer of L1 never wrote it.
+        "reason_codes": reason_codes,
     }
 
 
@@ -582,6 +690,13 @@ class CandidateDeveloper:
         through the real backend, and a test passes a scripted one. Development
         never calls a provider itself, so the budget is enforced by the caller
         that owns the backend.
+
+        A runner that refuses to score the rows it was asked for (``deadline``
+        exhausted, no authority to decide) raises
+        :class:`DevelopmentUnmeasurable`; the loop turns that into an
+        ``unmeasured`` version. Rows that *carry* an infrastructure failure are
+        caught by the caller, which is where the same reading lives for a
+        runner that returns them instead of raising.
         """
         if self.l1_runner is None:
             return [], []
@@ -596,13 +711,19 @@ class CandidateDeveloper:
     # -- the loop --------------------------------------------------------
     def develop(
         self,
-        propose: Callable[..., Sequence[Mapping[str, Any]]],
+        propose: Callable[..., Any],
         *,
         cycle: int,
         max_versions: int | None = None,
         revise: bool = True,
     ) -> dict[str, Any]:
         """Run the loop until the budget is spent or a version is ready.
+
+        ``propose`` returns the drafted candidates: a plain sequence, or an
+        object carrying ``candidates`` and ``notes`` (the deployment path's
+        ``ProposalBatch``). The notes are the proposer's own explanation for an
+        empty answer and are reported through ``stopped_note``; a caller that
+        returns a bare sequence simply has none.
 
         Returns the run record: every version, its L0/L1 verdicts, the lineage,
         the replay boundary of the selected version, and the version selected
@@ -618,24 +739,44 @@ class CandidateDeveloper:
         selected_candidate: Mapping[str, Any] | None = None
         selected_boundary: dict[str, Any] = {}
         stopped = ""
+        # The proposer's own explanation for an empty answer, carried into the
+        # run record. Empty for every other stop reason.
+        stopped_note: dict[str, Any] = {}
         while len(versions) < cap:
             reason = self._exhausted()
             if reason:
                 stopped = reason
                 break
-            batch = list(propose(
+            drafted = propose(
                 self.mechanism,
                 self.capability_plan,
                 parent,
                 diagnosis,
                 cycle,
-            ) or ())
+            )
+            # A proposal object carries ``candidates`` and ``notes``; a bare
+            # sequence carries the candidates only. Both are accepted, because
+            # the notes are the proposer's own explanation for an empty answer
+            # and a caller that cannot supply them must not be refused.
+            batch = list(
+                drafted.candidates
+                if hasattr(drafted, "candidates") else (drafted or ())
+            )
             # The draft itself is what costs a model call, whatever it returns,
             # so the charge lands before the empty-batch check: a proposer that
             # is asked and answers with nothing still consumed its call.
             self.budget.spend_provider()
             if not batch:
+                # "No candidate was drafted" is one word for three different
+                # situations: the proposer's own call budget was already spent,
+                # it was asked and returned nothing, or it answered with a note
+                # explaining why. The note is carried through -- without it a
+                # budget-exhausted round and an empty answer are the same
+                # record, and a reader has to guess which one happened. The
+                # reason is a *report*, not a control-flow input: the stop stays
+                # ``no_candidates`` either way.
                 stopped = "no_candidates"
+                stopped_note = _batch_reason(drafted)
                 break
             candidate = dict(batch[0])
             version_id = self.graph.new_version_id()
@@ -652,12 +793,41 @@ class CandidateDeveloper:
             l1: dict[str, Any] | None = None
             status = "failed_l0"
             if l0["passed"]:
-                baseline_rows, candidate_rows = self._l1_rows(candidate)
-                if not baseline_rows or not candidate_rows:
+                # A replay that could not score the candidate is not a
+                # falsification. The runner is asked for rows; if it says the
+                # rows cannot be scored, or hands back rows that carry an
+                # infrastructure failure, the version is *unmeasured* -- a
+                # distinction the archive, the episodic memory and the next
+                # drafting prompt all read, and one that was previously lost
+                # by writing every non-pass as ``failed_l1``.
+                unmeasurable = ""
+                try:
+                    baseline_rows, candidate_rows = self._l1_rows(candidate)
+                except DevelopmentUnmeasurable as exc:
+                    baseline_rows, candidate_rows = [], []
+                    unmeasurable = str(exc.reason)
+                if not unmeasurable and (
+                    not baseline_rows or not candidate_rows
+                ):
+                    unmeasurable = "no development measurement available"
+                if not unmeasurable:
+                    unmeasurable = (
+                        arm_has_infrastructure_failure(baseline_rows)
+                        or arm_has_infrastructure_failure(candidate_rows)
+                    )
+                if unmeasurable:
                     l1 = {
-                        "level": "L1", "passed": False,
+                        "level": "L1",
+                        "passed": False,
                         "unmeasurable": True,
-                        "reasons": ["no development measurement available"],
+                        "reasons": [f"unmeasurable: {unmeasurable}"],
+                        "reason_codes": ["unmeasurable"],
+                        "target_improved": [],
+                        "target_unchanged": list(self.target_cases),
+                        "target_regressed": [],
+                        "neighbor_regressed": [],
+                        "fired_cases": [],
+                        "delta": {},
                     }
                 else:
                     l1 = check_l1(
@@ -672,9 +842,14 @@ class CandidateDeveloper:
                         in {"localization", "joint"},
                         gold_steps=self.gold_steps,
                     )
-                status = "ready_for_freeze" if (
-                    l1 and l1.get("passed")
-                ) else "failed_l1"
+                if l1 and l1.get("passed"):
+                    status = "ready_for_freeze"
+                elif (l1 or {}).get("unmeasurable"):
+                    # Not judged, so not falsified: the vocabulary owns the
+                    # word (candidate_versions.VERSION_STATUSES).
+                    status = "unmeasured"
+                else:
+                    status = "failed_l1"
                 if self.l1_runner is not None:
                     self.budget.l1_cases_used += self._replay_cost()
             record = self.graph.record(
@@ -785,6 +960,11 @@ class CandidateDeveloper:
             ),
             "replay_boundary": selected_boundary,
             "stopped": stopped,
+            # Why the proposer produced nothing, when that is what stopped the
+            # loop: the note itself plus a coarse ``stopped_reason``. Empty for
+            # every other stop, so a reader can tell "the proposer had nothing"
+            # from "the loop ran out of ways to stop".
+            "stopped_note": stopped_note,
             # Two outcomes only: something is ready to freeze, or nothing is.
             # A run that exhausted its budget without a passing version is
             # "discarded" rather than "failed", because the versions carry
@@ -843,7 +1023,13 @@ class CandidateDeveloper:
 
 
 def development_report(result: Mapping[str, Any]) -> dict[str, Any]:
-    """A compact view of one development run for a cycle report."""
+    """A compact view of one development run for a cycle report.
+
+    ``l1_reason_codes`` travels beside ``l1_reasons`` so the report answers
+    "how did this fail" in the same machine-readable vocabulary the archive
+    stores, and ``unmeasured`` marks a version that was never judged -- a
+    reader that saw only ``l1_passed: false`` would call that a falsification.
+    """
     versions = list(result.get("versions") or ())
     return {
         "schema_version": DEVELOPMENT_SCHEMA,
@@ -852,6 +1038,7 @@ def development_report(result: Mapping[str, Any]) -> dict[str, Any]:
         "cycle": result.get("cycle"),
         "status": result.get("status"),
         "stopped": result.get("stopped"),
+        "stopped_note": dict(result.get("stopped_note") or {}),
         "versions": [
             {
                 "version_id": item.get("version_id"),
@@ -859,7 +1046,11 @@ def development_report(result: Mapping[str, Any]) -> dict[str, Any]:
                 "status": item.get("status"),
                 "l0_passed": bool((item.get("l0") or {}).get("passed")),
                 "l1_passed": bool((item.get("l1") or {}).get("passed")),
+                "unmeasured": bool((item.get("l1") or {}).get("unmeasurable")),
                 "l1_reasons": list((item.get("l1") or {}).get("reasons") or ()),
+                "l1_reason_codes": list(
+                    (item.get("l1") or {}).get("reason_codes") or ()
+                ),
             }
             for item in versions
         ],
@@ -873,6 +1064,7 @@ __all__ = [
     "DEVELOPMENT_SCHEMA",
     "CandidateDeveloper",
     "DevelopmentBudget",
+    "DevelopmentUnmeasurable",
     "check_l0",
     "check_l1",
     "development_report",

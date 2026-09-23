@@ -151,7 +151,11 @@ def test_inline_program_registers_new_fact_and_conviction():
     }])
     assert actions == ["convict_mechanical_violation"]
     assert plan.mechanical_guard_evidence[0]["predicate"] == "evo_missing_search"
-    assert "evo_missing_search" in plan.predicate_conviction_verdicts
+    # The table is keyed by the pair, not the predicate name alone: conviction
+    # authority belongs to the runner that produced the verdict, so an entry
+    # that reuses this name under an evidence-only runner cannot collect it.
+    assert ("evo_missing_search", "typed_dsl") in plan.predicate_conviction_verdicts
+    assert "evo_missing_search" not in plan.predicate_conviction_verdicts
 
 
 def test_cross_entry_binding_rejects_guard_without_program():

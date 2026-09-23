@@ -22,6 +22,40 @@ from detector.env import load_local_env
 CONFIG_SCHEMA = "detector.config.v1"
 ROUTE_NAMES = ("judge", "defense", "recall")
 
+#: Every ``DETECTOR_*`` environment variable :func:`resolve_route` consults,
+#: named once so that everything which fingerprints the detector's identity --
+#: the evolution result-cache namespace, the cycle checkpoint contract, the
+#: defect-audit verdict -- pins the *same* set. Two lists that disagree is the
+#: defect this replaces: a row produced under model A is not a measurement of
+#: model B, and a fingerprint that misses one of these keys serves A's row for
+#: B's request. ``test_detector_env_keys_cover_the_resolver`` executes the
+#: resolver against a recording environment, so this tuple cannot drift from
+#: what the resolver actually reads.
+DETECTOR_ENV_KEYS: tuple[str, ...] = (
+    "DETECTOR_ENDPOINT",
+    "DETECTOR_API_KEY_ENV",
+    # The per-route model override, then the generic fallback. Upgrading and
+    # tracing run on the judge route, so they have no key of their own.
+    *(f"DETECTOR_{name.upper()}_MODEL" for name in ROUTE_NAMES),
+    "DETECTOR_MODEL",
+    "DETECTOR_TEMPERATURE",
+    "DETECTOR_MAX_TOKENS",
+    "DETECTOR_TIMEOUT_SECONDS",
+    "DETECTOR_TOTAL_TIMEOUT_SECONDS",
+    "DETECTOR_TRANSPORT_RETRIES",
+)
+
+
+def detector_env_fingerprint() -> dict[str, str]:
+    """The detector's environment overrides as ``{key: value}``.
+
+    Unset keys are recorded as ``""`` rather than omitted: "the override was
+    cleared" and "the override never existed" both leave the resolved route
+    identical, but a fingerprint that dropped the key could not tell the two
+    apart from a build whose key list had lost it.
+    """
+    return {key: str(os.environ.get(key, "")) for key in DETECTOR_ENV_KEYS}
+
 _PROVIDER_DEFAULTS: dict[str, Any] = {
     "endpoint": "https://www.autodl.art/api/v1",
     "model": "GLM-5.3-flash",

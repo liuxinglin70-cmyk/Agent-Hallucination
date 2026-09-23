@@ -19,7 +19,10 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from detector.api import Detector
-from detector.config import load_config as load_detector_config
+from detector.config import (
+    detector_env_fingerprint,
+    load_config as load_detector_config,
+)
 from detector.interventions import (
     build_intervention_registry,
     compile_runtime_plan,
@@ -1298,6 +1301,13 @@ def make_backend(
             "source": source_digest(),
             "cache_scope": config.get("diagnostic_cache_scope"),
             "evidence": evidence_namespace(config, provider),
+            # The model, endpoint, temperature and the rest of the provider
+            # route come from ``DETECTOR_*`` overrides that ``resolve_route``
+            # reads at load time, so they are part of what a cached row
+            # measures. Without them a run under model B was served the rows
+            # model A produced -- same work root, same cache directory, no
+            # visible difference in any report.
+            "detector_env": detector_env_fingerprint(),
         })
     else:
         raise ValueError(f"unknown evolution backend {name!r}")

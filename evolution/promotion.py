@@ -97,6 +97,31 @@ PROMOTION_TERMINALS = (
     "promotion_unresolved",
 )
 
+# Keys a protocol's own hash must not cover: they are added by loading and
+# would otherwise make the hash depend on where the file was read from.
+_PROTOCOL_HASH_EXCLUDED = frozenset(
+    {"protocol_hash", "loaded_from", "resolved_cases"}
+)
+
+
+def protocol_self_hash(protocol: Mapping[str, Any]) -> str:
+    """The digest of a protocol's own frozen content.
+
+    v2 protocols carry this from ``build_alignment``; v1 protocols carry it
+    from ``freeze_protocol``. Without it "a frozen protocol may not be
+    rewritten" is unenforceable, because every run re-reads the file and the
+    loader has nothing to compare against.
+
+    The digest is ``promotion_alignment.digest`` over the same exclusion set
+    ``verify_alignment`` uses, so both schemas are checked by one rule and a
+    v2 protocol frozen by an earlier build still verifies.
+    """
+    raw = {
+        key: value for key, value in protocol.items()
+        if key not in _PROTOCOL_HASH_EXCLUDED
+    }
+    return alignment.digest(raw)
+
 
 class PromotionProtocolError(ValueError):
     """The promotion protocol file is unusable; refuse before spending budget."""
@@ -582,6 +607,16 @@ def freeze_protocol(
         "detector_config": str(resolved_detector),
         "detector_config_hash": fingerprint(config_payload),
         "code_baseline": source_digest(),
+        # Trajectory content, not just the list of case ids. The batch hash
+        # covers ids and roles; without this, replacing a case file -- cleaning
+        # it up, re-capturing it, fixing a bug in it -- silently changes what a
+        # "frozen" batch measures. v2 has carried this from the start. Null
+        # means the freeze had no dataset root to hash, which ``load_protocol``
+        # refuses: absent evidence of what was frozen is not a pass.
+        "case_digests": (
+            alignment.data_digests(dataset_root, case_ids)
+            if dataset_root is not None else None
+        ),
         # Learned artifacts (weights, tokenizer, calibration output) are not
         # covered by the code digest: replacing a weight file changes no source
         # byte while changing every decision the runner makes. Frozen empty
@@ -611,6 +646,31 @@ def freeze_protocol(
             )
         except (ValueError, OSError) as exc:
             raise PromotionProtocolError(str(exc)) from exc
+    else:
+        # v1 gets the same self-hash v2 has carried since it was introduced.
+        # Without it the freeze promise ("a frozen protocol may not be
+        # rewritten") is unenforceable: every run re-reads the file, so moving
+        # one role string after the control arm's behaviour is known re-scores
+        # the same batch against a different meaning, leaving no trace.
+        #
+        # The active registry is pinned the same way v2 pins it. Freezing
+        # reasons about the current deployment (protection coverage, repairable
+        # directions); if a deployment lands between freeze and run, the
+        # control arm is no longer the version those readings were taken on.
+        # A caller may hand the identity in directly; otherwise it is read from
+        # the framework configuration, falling back to the ambient defaults
+        # for the registry location when the caller supplied a partial config.
+        if baseline_registry_hash is None:
+            from evolution.config import DEFAULTS, load_config
+
+            registry_config = dict(framework_config or {})
+            registry_config.setdefault("registry_dir", DEFAULTS["registry_dir"])
+            if not registry_config.get("registry_dir"):
+                registry_config["registry_dir"] = load_config()["registry_dir"]
+            registry = load_active_registry(registry_config)
+            baseline_registry_hash = str(registry.registry_hash or "")
+        protocol["baseline_registry_hash"] = str(baseline_registry_hash)
+        protocol["protocol_hash"] = protocol_self_hash(protocol)
     _refuse_refrozen_batch(protocol, ledger=ledger)
     save_json(path, protocol)
     if ledger is not None:
@@ -659,6 +719,85 @@ def _refuse_refrozen_batch(
                 "may not be re-scored on the same frozen evidence. Change the "
                 "candidate or freeze a different batch."
             )
+
+
+def _verify_frozen_run_parameters(protocol: Mapping[str, Any]) -> None:
+    """Refuse a protocol whose declared run parameters cannot be honoured.
+
+    ``workers`` and ``timeout_seconds`` are the only two frozen fields that
+    describe *how* the arms run rather than what they measure, and the run
+    resolves both with ``or`` defaults: ``workers: 0`` becomes the default
+    concurrency and ``timeout_seconds: 0`` becomes no wall clock at all. An
+    operator typing 0 to mean "no limit" would therefore freeze a protocol
+    that says one thing and runs another, and the record could not reproduce
+    the conditions actually used.
+    """
+    workers = protocol.get("workers")
+    if workers is None:
+        raise PromotionProtocolError(
+            "frozen protocol declares no worker count; a promotion run needs "
+            "the concurrency it was frozen with"
+        )
+    try:
+        workers_int = int(workers)
+    except (TypeError, ValueError) as exc:
+        raise PromotionProtocolError(
+            f"frozen protocol worker count is not an integer: {workers!r}"
+        ) from exc
+    if workers_int < 1:
+        raise PromotionProtocolError(
+            f"frozen protocol worker count must be at least 1, got {workers!r}"
+        )
+    raw_timeout = protocol.get("timeout_seconds")
+    if raw_timeout is not None:
+        try:
+            timeout = float(raw_timeout)
+        except (TypeError, ValueError) as exc:
+            raise PromotionProtocolError(
+                f"frozen protocol timeout is not a number: {raw_timeout!r}"
+            ) from exc
+        if not (timeout > 0):
+            raise PromotionProtocolError(
+                "frozen protocol timeout must be positive or explicitly null "
+                f"(no batch-level wall clock), got {raw_timeout!r}; a zero "
+                "timeout silently means 'unbounded', not 'zero'"
+            )
+
+
+def _verify_frozen_policy(
+    protocol: Mapping[str, Any], config: Mapping[str, Any] | None,
+) -> None:
+    """Refuse a run whose thresholds differ from the frozen floor.
+
+    A frozen ``coverage_floor`` that the run never consults is decoration: the
+    same protocol can be re-scored after the operator relaxes
+    ``gates.harmlessness_min_protected_*``. The floor is a *necessary* condition
+    (whether a protected case is baseline-correct still depends on the control
+    arm), and freeze time already enforces it there; re-checking it here is what
+    keeps the promise true at run time.
+    """
+    if config is None:
+        return
+    floor = protocol.get("coverage_floor")
+    if not isinstance(floor, Mapping):
+        return
+    gates_cfg = config.get("gates") or {}
+    expected = {
+        "min_protected_tp": int(gates_cfg.get("harmlessness_min_protected_tp", 2)),
+        "min_protected_tn": int(gates_cfg.get("harmlessness_min_protected_tn", 2)),
+    }
+    drifted = {
+        key: (int(floor.get(key, value)), value)
+        for key, value in expected.items()
+        if int(floor.get(key, value)) != value
+    }
+    if drifted:
+        raise PromotionProtocolError(
+            "gate thresholds changed after the protocol was frozen; the "
+            f"frozen coverage floor no longer matches the run ({drifted}). "
+            "Re-freeze against the current thresholds instead of re-scoring "
+            "the batch under a different standard."
+        )
 
 
 def _verify_artifact_manifest(protocol: Mapping[str, Any]) -> None:
@@ -770,13 +909,20 @@ def load_protocol(
     *,
     dataset_root: str | Path,
     stages: Sequence[str],
+    config: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Load a frozen protocol and check it against the current machinery.
 
-    The checks are the ``freeze``-time promises, re-derived: the batch file
-    still has the hash it was frozen with, the detector configuration is
-    unchanged, and the roles still cover exactly the batch. A mismatch refuses
-    the run instead of quietly measuring something else than what was frozen.
+    The checks are the ``freeze``-time promises, re-derived: the protocol still
+    hashes to the hash it was frozen with, the batch file still has the hash it
+    was frozen with, the trajectory content is unchanged, the detector
+    configuration is unchanged, and the roles still cover exactly the batch. A
+    mismatch refuses the run instead of quietly measuring something else than
+    what was frozen.
+
+    ``config`` is optional and only used to cross-check the frozen coverage
+    floor and run parameters against the thresholds the run will actually use.
+    Absent, those checks are skipped rather than guessed.
     """
     path = Path(path)
     if not path.is_file():
@@ -788,15 +934,48 @@ def load_protocol(
     schema = str(protocol.get("schema_version"))
     if schema not in {PROMOTION_PROTOCOL_SCHEMA, alignment.ALIGNED_PROTOCOL_SCHEMA}:
         raise PromotionProtocolError("unsupported promotion protocol schema")
+    # The protocol's own hash, for both schemas. For v1 this is the check that
+    # makes the freeze promise enforceable at all: without it, roles, gold and
+    # gold steps can be edited in place after the control arm is known, and the
+    # run measures a batch with a different meaning under the same name.
+    frozen_hash = str(protocol.get("protocol_hash") or "")
+    if not frozen_hash:
+        raise PromotionProtocolError(
+            "frozen protocol carries no protocol_hash; it cannot be shown to "
+            "be the file that was frozen (re-freeze it with this build)"
+        )
+    if protocol_self_hash(protocol) != frozen_hash:
+        raise PromotionProtocolError(
+            "promotion protocol changed after it was frozen; the file no "
+            "longer hashes to the value recorded at freeze time"
+        )
     if schema == alignment.ALIGNED_PROTOCOL_SCHEMA:
         try:
             alignment.verify_alignment(protocol)
             if protocol["case_digests"] != alignment.data_digests(dataset_root, protocol["cases"]):
                 raise ValueError("promotion trajectory content changed after freeze")
-            if set(stages) != set(alignment.FORMAL_STAGES):
-                raise ValueError("v2 formal promotion must execute all four gates")
         except (ValueError, KeyError, OSError) as exc:
             raise PromotionProtocolError(str(exc)) from exc
+    else:
+        # v1 pins the trajectory content the same way v2 does. The batch file
+        # hash covers the list of case ids only, so without this a case file
+        # can be replaced (cleaned up, re-captured, fixed) and the "frozen"
+        # batch silently measures different trajectories. A null value is what
+        # a freeze without a dataset root records (a synthetic batch); the
+        # measurement path refuses those, see ``PromotionRun.run``.
+        case_digests = protocol.get("case_digests")
+        if isinstance(case_digests, Mapping) and case_digests:
+            current = alignment.data_digests(dataset_root, list(case_digests))
+            changed = sorted(
+                case for case, digest in case_digests.items()
+                if current.get(case) != digest
+            )
+            if changed:
+                raise PromotionProtocolError(
+                    "promotion trajectory content changed after freeze: "
+                    f"{changed[:5]}"
+                )
+        protocol["trajectory_pinned"] = bool(case_digests)
     batch_path = Path(str(protocol.get("batch_path") or ""))
     if not batch_path.is_file():
         raise PromotionProtocolError(f"promotion batch is missing: {batch_path}")
@@ -812,6 +991,8 @@ def load_protocol(
             "frozen; a frozen protocol is evaluated on the machinery it froze"
         )
     _verify_artifact_manifest(protocol)
+    _verify_frozen_run_parameters(protocol)
+    _verify_frozen_policy(protocol, config)
     detector_config = Path(str(protocol.get("detector_config") or ""))
     if not detector_config.is_file():
         raise PromotionProtocolError(
@@ -947,6 +1128,10 @@ class PromotionRun:
         self.deadline: float | None = None
         self._provided_rows: dict[str, list[dict[str, Any]]] = {}
         self.resumed_arms: list[str] = []
+        # The gate verdicts of the most recent evaluation, kept so the
+        # admission reason can name the gates that actually ran instead of a
+        # constant. Set at the end of each run path.
+        self._last_gates: dict[str, Any] = {}
         self.arm_health: dict[str, str] = {}
         # ``require_fresh`` re-runs every stage on both arms. It is the honest
         # choice when the mechanism touches a stage that would otherwise be
@@ -1181,6 +1366,28 @@ class PromotionRun:
     def run(self) -> dict[str, Any]:
         if self.protocol.get("schema_version") == alignment.ALIGNED_PROTOCOL_SCHEMA:
             return self._run_aligned()
+        # All four formal gates are mandatory in every promotion, not only in
+        # the mechanism-aligned shape. `gates` defaults a skipped gate to
+        # {"passed": True, "skipped": True}, so a run that drops one from
+        # --stages admits the candidate and then records a reason string
+        # claiming the gate passed. The gate set is part of what was frozen;
+        # it is not an operator knob.
+        if set(self.stages) != set(alignment.FORMAL_STAGES):
+            report = {
+                "schema_version": PROMOTION_STATE_SCHEMA,
+                "state": "promotion_blocked_preflight",
+                "admitted": False,
+                "candidate_id": self.candidate.get("candidate_id"),
+                "candidate_content_hash": self.candidate.get("content_hash"),
+                "terminal_reason": (
+                    "all four formal gates are mandatory in a promotion; "
+                    f"requested {sorted(self.stages)}, expected "
+                    f"{sorted(alignment.FORMAL_STAGES)}"
+                ),
+                "promotion_diagnosis": alignment.diagnosis("protocol_invalid"),
+            }
+            self._write(report)
+            return report
         if self.candidate.get("target_mechanism_id"):
             report = {
                 "schema_version": PROMOTION_STATE_SCHEMA,
@@ -1189,6 +1396,27 @@ class PromotionRun:
                 "candidate_content_hash": self.candidate.get("content_hash"),
                 "terminal_reason": "mechanism-bound candidates require a v2 protocol",
                 "promotion_diagnosis": alignment.diagnosis("mechanism_alignment_missing"),
+            }
+            self._write(report)
+            return report
+        # A measurement path may not run on a protocol that cannot show which
+        # trajectories it froze. Synthetic freezes (no dataset root) record
+        # null digests; they exist for tests and structural dry runs, not for
+        # scoring a candidate against real evidence. `trajectory_pinned` is set
+        # by ``load_protocol``, so a directly injected protocol (the offline
+        # harness) is unaffected.
+        if self.protocol.get("trajectory_pinned") is False:
+            report = {
+                "schema_version": PROMOTION_STATE_SCHEMA,
+                "state": "promotion_blocked_preflight", "admitted": False,
+                "candidate_id": self.candidate.get("candidate_id"),
+                "candidate_content_hash": self.candidate.get("content_hash"),
+                "terminal_reason": (
+                    "the frozen protocol pins no trajectory content (it was "
+                    "frozen without a dataset root); re-freeze it before "
+                    "measuring a candidate"
+                ),
+                "promotion_diagnosis": alignment.diagnosis("protocol_invalid"),
             }
             self._write(report)
             return report
@@ -1229,6 +1457,73 @@ class PromotionRun:
         benefit = benefit_cases(self.protocol)
         protection = protection_cases(self.protocol)
         all_cases = sorted(set(benefit) | set(protection))
+
+        # The control arm is whatever is deployed at run time. If the protocol
+        # froze a baseline identity, a deployment that landed between freeze
+        # and run has silently changed the comparison -- the delta would then
+        # mix the candidate's effect with whatever the later version did.
+        frozen_baseline = str(self.protocol.get("baseline_registry_hash") or "")
+        if frozen_baseline:
+            current_baseline = str(
+                self._registry_for(entries).get("content_hash") or ""
+            )
+            if current_baseline != frozen_baseline:
+                report.update(
+                    state="promotion_blocked_preflight",
+                    terminal_reason=(
+                        "active registry changed after the protocol was frozen; "
+                        "the control arm would not be the version the protocol "
+                        "was frozen against"
+                    ),
+                    admitted=False,
+                    gates={},
+                    elapsed_seconds=round(_time.monotonic() - started, 3),
+                )
+                self._write(report)
+                return report
+
+        # A candidate already deployed is a conflict with the deployment, not
+        # a runtime failure. The registry refuses the duplicate id at
+        # construction time, before any model call; left to the broad handler
+        # around the arms it would be recorded as `promotion_unresolved` /
+        # `runtime_unresolved`, where the correct operator action ("pick
+        # another candidate") reads as "retry".
+        existing_ids = {
+            str(entry.get("intervention_id") or "")
+            for entry in self.registry.entries
+        }
+        duplicates = sorted(
+            str(artifact.get("intervention_id") or "")
+            for artifact in artifacts
+            if str(artifact.get("intervention_id") or "") in existing_ids
+        )
+        if duplicates:
+            report.update(
+                state="promotion_blocked_preflight",
+                terminal_reason=(
+                    "candidate is already deployed: "
+                    f"{duplicates}; a version cannot be promoted twice"
+                ),
+                admitted=False,
+                gates={},
+                elapsed_seconds=round(_time.monotonic() - started, 3),
+            )
+            self._write(report)
+            return report
+
+        # One frozen protocol, one attempt. Claimed before the free STRUCTURAL
+        # check as well: the claim is about the evidence, not about how far the
+        # run got.
+        try:
+            self._claim_protocol()
+        except (ValueError, KeyError, OSError) as exc:
+            report.update(
+                state="promotion_blocked_preflight",
+                terminal_reason=str(exc), admitted=False, gates={},
+                elapsed_seconds=round(_time.monotonic() - started, 3),
+            )
+            self._write(report)
+            return report
 
         # STRUCTURAL first: it is free. A candidate that is not even a legal
         # deployment unit must not spend a single model call.
@@ -1478,6 +1773,7 @@ class PromotionRun:
                 "evaluable": False, "status": "not_evaluated",
             }
         report["gates"] = gates
+        self._last_gates = dict(gates)
 
         failing = [
             name for name, verdict in gates.items()
@@ -1609,6 +1905,24 @@ class PromotionRun:
         exposed = set(alignment.development_cases(candidate))
         if exposed & set(protocol["cases"]):
             return finish("promotion_rejected", "candidate_invalid", "candidate-unused rule violated")
+        # An already-deployed candidate is a deployment conflict, not an
+        # outage: `make_registry` refuses the duplicate id before any model
+        # call, and left to the broad handler around the arms that refusal
+        # would be recorded as runtime_unresolved -- which reads as "retry".
+        deployed = {
+            str(entry.get("intervention_id") or "") for entry in entries
+        }
+        duplicates = sorted(
+            str(artifact.get("intervention_id") or "")
+            for artifact in artifacts
+            if str(artifact.get("intervention_id") or "") in deployed
+        )
+        if duplicates:
+            return finish(
+                "promotion_blocked_preflight", "candidate_invalid",
+                "candidate is already deployed: "
+                f"{duplicates}; a version cannot be promoted twice",
+            )
         try:
             validate_intervention_batch([*entries, *artifacts], require_executable_bounds=True)
             if any(candidate_contains_case_id(entry) for entry in artifacts):
@@ -1715,8 +2029,57 @@ class PromotionRun:
         problems = self.registry.check_limits([*entries, *artifacts], library_cfg=self.config.get("library") or {})
         if problems:
             return finish("promotion_blocked_preflight", "library_limit", "; ".join(problems))
+        self._last_gates = dict(report.get("gates") or {})
         report["version"] = self._publish()
         return finish("promoted", "promoted")
+
+    def _claim_protocol(self) -> None:
+        """Claim a frozen protocol for exactly one promotion attempt.
+
+        Without a claim, a rejected candidate is re-scored simply by running
+        again -- to the same output directory or a different one -- until the
+        provider roll happens to come out favourable. The claim is keyed on the
+        protocol's own hash, so it also carries over a protocol frozen before
+        this guard existed: a run may not be retried on the same frozen
+        evidence, and a new attempt means a new freeze.
+        """
+        path = Path(str(self.protocol.get("loaded_from") or ""))
+        if not path.is_file():
+            raise ValueError(
+                "a promotion attempt needs the protocol's persisted source path"
+            )
+        protocol_hash = str(self.protocol.get("protocol_hash") or "")
+        if not protocol_hash:
+            raise ValueError("frozen protocol carries no protocol_hash to claim")
+        claim_path = path.with_name(path.name + ".attempt.json")
+        identity = {
+            "protocol_hash": protocol_hash,
+            "candidate_content_hash": self.candidate.get("content_hash"),
+            "output_dir": str(self.output_dir.resolve()),
+        }
+        if claim_path.exists():
+            recorded = json.loads(claim_path.read_text(encoding="utf-8"))
+            if recorded.get("protocol_hash") != protocol_hash:
+                raise ValueError(
+                    "protocol already consumed by another promotion attempt"
+                )
+            if recorded != identity:
+                raise ValueError(
+                    "protocol already consumed by another promotion attempt "
+                    f"(recorded {recorded.get('output_dir')!r}, this run "
+                    f"{identity['output_dir']!r}); a frozen protocol is "
+                    "measured once"
+                )
+            return        claim_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with claim_path.open("x", encoding="utf-8") as handle:
+                json.dump(identity, handle, ensure_ascii=False, sort_keys=True)
+        except FileExistsError:
+            recorded = json.loads(claim_path.read_text(encoding="utf-8"))
+            if recorded.get("protocol_hash") != protocol_hash:
+                raise ValueError(
+                    "protocol already consumed by another promotion attempt"
+                )
 
     def _claim_aligned_protocol(self) -> None:
         path = Path(str(self.protocol.get("loaded_from") or ""))
@@ -1747,17 +2110,39 @@ class PromotionRun:
         the deployed version to the candidate and protocol that produced it.
         """
         artifacts = [dict(entry) for entry in self.candidate.get("artifacts") or ()]
+        # The registry cycle counter must not be reset to 0 by a promotion:
+        # rollback windows (`cycle - threshold`), the "start from an empty
+        # registry" precondition of the full evolution run, and the version id
+        # all read it. A protocol is free to carry no cycle field -- none was
+        # ever written -- so fall back to the count the registry already has
+        # rather than to zero.
+        current_cycle = int(
+            (self.registry.state or {}).get("cycle") or 0
+        )
+        cycle = int(self.protocol.get("cycle") or current_cycle or 0)
+        gates_evaluated = sorted(
+            name for name, verdict in (self._last_gates or {}).items()
+            if verdict.get("passed") is True
+        )
+        # The recorded admission reason names the gates that actually ran.
+        # A hardcoded "STRUCTURAL/HARMLESSNESS/BEHAVIOR/M" would make the
+        # registry assert four gates on a run whose gate set was cut down,
+        # which no later audit could detect from the record.
+        gate_names = "/".join(name.upper() for name in gates_evaluated) or "NO-GATES"
         payload = self.registry.write(
             [*self.registry.entries, *artifacts],
-            cycle=int(self.protocol.get("cycle") or 0),
+            cycle=cycle,
             reason=(
-                "promotion: STRUCTURAL/HARMLESSNESS/BEHAVIOR/M passed on the "
-                f"frozen promotion protocol {self.protocol.get('frozen_at')}"
+                f"promotion: {gate_names} passed on the frozen promotion "
+                f"protocol {self.protocol.get('frozen_at')}"
             ),
             library_cfg=self.config.get("library") or {},
         )
         version = {
-            "version_id": f"V{self.registry.state.get('cycle', 0)}-{self.candidate.get('content_hash')}",
+            "version_id": (
+                f"V{self.registry.state.get('cycle', 0)}-"
+                f"{self.candidate.get('content_hash')}"
+            ),
             "candidate_id": self.candidate.get("candidate_id"),
             "candidate_content_hash": self.candidate.get("content_hash"),
             "registry_hash": str(payload.get("content_hash") or ""),
@@ -1880,7 +2265,7 @@ def promote(
     config = dict(config or load_config())
     dataset_root = config["dataset_root"]
     protocol = load_protocol(
-        protocol_path, dataset_root=dataset_root, stages=stages,
+        protocol_path, dataset_root=dataset_root, stages=stages, config=config,
     )
     candidate = dict(candidate)
     _transition(candidate, "promotion_pending")

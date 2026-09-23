@@ -46,6 +46,9 @@ from evolution.development import CandidateDeveloper, DevelopmentBudget
 from evolution.engine import EvolutionEngine
 from evolution.splits import EvolutionSplit
 
+#: ``resolve_path``'s base, i.e. the repository root, for the assertions below.
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+
 
 # --------------------------------------------------------------------------
 # A synthetic workspace, offline
@@ -291,6 +294,45 @@ def test_the_archive_policy_defaults_to_off():
     assert config["archive"]["root"] == ""
 
 
+def test_a_relative_archive_root_is_resolved_at_load_time(tmp_path, monkeypatch):
+    """``archive.root`` is the one configured path that was not resolved.
+
+    Every other configured path is resolved against the repository root by
+    ``load_config``, so downstream code cannot depend on the caller's cwd.
+    ``archive.root`` was read verbatim, which made a relative value mean
+    "relative to whatever directory this cycle happened to be launched from":
+    two runs of the same configuration from different cwds archived into two
+    silently different trees, and the cycle report echoed a relative path
+    beside absolute ``run_dir`` values.
+    """
+    config_path = tmp_path / "config.json"
+    config_path.write_text(json.dumps({
+        "schema_version": "evolution.framework.v1",
+        "archive": {"on": "cycle_end", "root": "artifacts/some-run/candidates"},
+    }), encoding="utf-8")
+    loaded = load_config(config_path)
+    root = loaded["archive"]["root"]
+    assert pathlib.Path(root).is_absolute(), root
+    # Resolved against the repository root, like every other configured path.
+    assert pathlib.Path(root) == (
+        ROOT / "artifacts" / "some-run" / "candidates"
+    ).resolve()
+
+    # The same string resolves identically from another cwd, which is the
+    # property that makes the archive one tree rather than two.
+    monkeypatch.chdir(tmp_path)
+    again = load_config(config_path)["archive"]["root"]
+    assert again == root
+
+    # An empty root keeps its meaning: the engine derives work_root/candidates.
+    empty_path = tmp_path / "empty.json"
+    empty_path.write_text(
+        '{"schema_version": "evolution.framework.v1", "archive": {"root": ""}}',
+        encoding="utf-8",
+    )
+    assert load_config(empty_path)["archive"]["root"] == ""
+
+
 def test_an_unknown_archive_policy_is_refused(tmp_path):
     config, split, _cases = _workspace(tmp_path)
     config["archive"]["on"] = "whenever"
@@ -320,20 +362,28 @@ def test_off_writes_nothing_and_says_so(harness):
 # --------------------------------------------------------------------------
 
 def test_a_passing_run_is_archived_with_its_component(harness, passing_run):
-    """The frozen version is recorded, and its program becomes a component."""
+    """The frozen version is recorded, and its program becomes a component.
+
+    The candidate record and the component are read from their own roots: the
+    archive writes candidates under ``archive.root`` and components under
+    ``component_store``, and reading both from one of them is how a run that
+    registered a part appeared to have registered nothing (the store the next
+    drafting prompt reads was the other one).
+    """
     assert passing_run["result"].get("selected_version_id"), (
         "the repairing mock must pass L1"
     )
     outcome = harness.archive(passing_run)
     assert outcome["archived"] is True
     root = passing_run["engine"].archive_root
+    components_root = passing_run["engine"].component_store
     candidates = load_candidates(root)
     assert candidates, outcome
     assert all(
         record["mechanism_id"] == harness.mechanism["mechanism_id"]
         for record in candidates
     )
-    components = load_components(root)
+    components = load_components(components_root)
     assert components, outcome["components"]
     assert components[0]["name"] == PROGRAM["name"]
     assert components[0]["digest"]
@@ -345,9 +395,11 @@ def test_a_passing_run_is_archived_with_its_component(harness, passing_run):
     assert components[0]["capability"], components[0]
     expected = EvolutionEngine.component_capability(harness.mechanism)
     assert components[0]["capability"] == expected
-    report = archive_report(root)
-    assert report["candidates"]["total"] == len(candidates)
+    # The archive's own report reads each store from its own root, so a split
+    # layout still reports both halves.
+    report = archive_report(components_root, component_root=components_root)
     assert report["components"]["total"] == len(components)
+    assert archive_report(root)["candidates"]["total"] == len(candidates)
     assert report["metric_role"] == "diagnostic-only"
 
 
@@ -364,7 +416,7 @@ def test_a_failing_run_is_archived_with_its_reason(harness, failing_run):
     assert all(str(record["status"]) != "frozen" for record in candidates)
     # A version that failed L1 was not shown to be useful, so none of its parts
     # may be offered to the next round's drafting prompt.
-    assert load_components(root) == []
+    assert load_components(failing_run["engine"].component_store) == []
     assert outcome["components"] == []
 
 
@@ -428,20 +480,32 @@ def test_archived_candidates_are_recallable_by_mechanism(harness, failing_run):
 
 
 def test_a_component_registered_from_a_run_is_retrievable(harness, passing_run):
-    """End to end: a run's part must be findable by the next round."""
+    """End to end: a run's part must be findable by the next round.
+
+    The retrieval reads the same store the registration wrote. The two used to
+    be different paths, which made the registration unreachable: the archive
+    reported a component and the next round's drafting prompt saw an empty
+    store.
+    """
     outcome = harness.archive(passing_run)
     assert outcome["components"], outcome
     mechanism_id = str(harness.mechanism["mechanism_id"])
     capability = str(outcome["components"][0].get("capability") or "")
     assert capability, "a component without a capability cannot be ranked"
     found = retrieve_components(
-        passing_run["engine"].archive_root,
+        passing_run["engine"].component_store,
         mechanism_id=mechanism_id,
         capability=capability,
         limit=5,
     )
     assert found["components"], (capability, found)
     assert found["components"][0]["name"] == PROGRAM["name"]
+    # And the engine's own retrieval -- the one the drafting prompt is built
+    # from -- sees it too.
+    reusable = passing_run["engine"]._reusable_components([{
+        "mechanism": harness.mechanism,
+    }])
+    assert [item["name"] for item in reusable] == [PROGRAM["name"]], reusable
 
 
 # --------------------------------------------------------------------------

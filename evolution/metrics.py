@@ -10,7 +10,25 @@ from typing import Any, Mapping, Sequence
 
 
 def _bool_prediction(value: bool | None) -> bool | None:
-    return True if value is True else (False if value is False else None)
+    """A prediction, or ``None`` for "no decision", and nothing else.
+
+    ``None`` is a legitimate value here -- it is how an unresolved row reads,
+    and the paired deltas are built around it. Anything *else* (1/0 from a
+    hand-written row, "true" from a third-party backend) used to be demoted to
+    ``None`` as well, which silently converts a real decision into an
+    abstention: the control arm then looks like it decided nothing and the
+    candidate appears to gain cases it never moved. The strict reader
+    (``detector.result.prediction_state``) rejects those values, so accepting
+    them here would be the looser of two standards for the same quantity.
+    """
+    if value is True or value is False:
+        return value
+    if value is None:
+        return None
+    raise ValueError(
+        f"prediction must be True, False or None; got {value!r} "
+        f"({type(value).__name__})"
+    )
 
 
 def confusion_rows(
@@ -165,6 +183,15 @@ def paired_delta(
     transitions_by_gold: dict[str, dict[str, int]] = {"error": {}, "clean": {}}
     correctness_improved = 0
     correctness_worsened = 0
+    # Decisive-only flips: one real decision replaced by another. Both
+    # predictions must exist, so "stopped abstaining" and "started abstaining"
+    # are excluded -- those are calibration and infrastructure movements,
+    # reported separately as resolved/added above. The boundary BEHAVIOR check
+    # (``gates._decisive_correction``) and the final verdict both score this
+    # pair; one definition keeps them from disagreeing about what "improved"
+    # means.
+    decisive_fixed = 0
+    decisive_broken = 0
     for r in paired:
         a = r["baseline_prediction"]
         b = r["active_prediction"]
@@ -181,6 +208,11 @@ def paired_delta(
             correctness_improved += 1
         elif baseline_is_correct and not active_is_correct:
             correctness_worsened += 1
+        if a is not None and b is not None:
+            if active_is_correct and not baseline_is_correct:
+                decisive_fixed += 1
+            elif baseline_is_correct and not active_is_correct:
+                decisive_broken += 1
     metrics_base = binary_metrics(baseline_rows)
     metrics_active = binary_metrics(active_rows)
     baseline_by_case = {
@@ -216,6 +248,8 @@ def paired_delta(
         "transitions_by_gold": transitions_by_gold,
         "correctness_improved": correctness_improved,
         "correctness_worsened": correctness_worsened,
+        "decisive_fixed": decisive_fixed,
+        "decisive_broken": decisive_broken,
         "baseline_metrics": metrics_base,
         "active_metrics": metrics_active,
         "rows": paired,
@@ -641,6 +675,48 @@ def localization_metrics(
         ),
     }
 
+
+
+BEHAVIOR_EVENT_KINDS = {
+    "evidence_check": "evidence_increment",
+    "text_boundary": "text_injected",
+    "recall_trigger": "recall_triggered",
+    "decision_guard": "guard_fired",
+}
+
+
+def deployment_events(
+    rows: Sequence[Mapping[str, Any]],
+    intervention_id: str,
+    intervention_type: str = "",
+) -> tuple[int, str]:
+    """How many times an intervention actually reached the runtime.
+
+    Returns ``(events, kind)``: the count of the deployment trace entries that
+    show this intervention's own effect (``text_injected``, ``guard_fired``,
+    ``recall_triggered``), and the machine-readable kind name.
+
+    The detection BEHAVIOR gate computes this per intervention type and reports
+    it, because route-insufficiency evidence is a claim about numbers -- "the
+    hook fired and nothing moved". The localization gate reads the same
+    quantity through this helper, so a localization claim can be recorded as an
+    insufficient route too; without it, every localization failure was
+    invisible to that store and the next round re-proposed the same route.
+    """
+    kind = BEHAVIOR_EVENT_KINDS.get(intervention_type, "")
+    if not kind:
+        return 0, ""
+    count = 0
+    for row in rows:
+        deployment = ((row.get("result") or {}).get("proof") or {}).get(
+            "deployment"
+        ) or {}
+        count += sum(
+            1 for item in deployment.get("fired") or ()
+            if str(item.get("intervention_id") or "") == intervention_id
+            and item.get("event") == kind
+        )
+    return count, kind
 
 
 def fired_rate(

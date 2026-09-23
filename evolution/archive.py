@@ -364,10 +364,22 @@ def component_prompt_view(record: Mapping[str, Any]) -> dict[str, Any]:
 # ----------------------------------------------------------------------
 # Reporting
 # ----------------------------------------------------------------------
-def archive_report(root: str | Path) -> dict[str, Any]:
-    """A compact view of both stores, for a cycle report or a researcher."""
+def archive_report(
+    root: str | Path, *, component_root: str | Path | None = None,
+) -> dict[str, Any]:
+    """A compact view of both stores, for a cycle report or a researcher.
+
+    ``component_root`` exists because the two stores have two writers with two
+    configured paths: the candidate half is written where ``archive.root``
+    says, and the component half where the component store lives (which is the
+    same directory by default). A summary that read both from one of them would
+    report an empty component half whenever an operator split the two -- the
+    same "wrote one place, read another" mistake, one level up.
+    """
     candidates = load_candidates(root)
-    components = load_components(root)
+    components = load_components(
+        root if component_root is None else component_root
+    )
     by_status: dict[str, int] = {}
     for record in candidates:
         status = str(record.get("status") or "(unstated)")
@@ -400,9 +412,12 @@ def archive_report(root: str | Path) -> dict[str, Any]:
     }
 
 
-def record_archive_summary(root: str | Path) -> dict[str, Any]:
+def record_archive_summary(
+    root: str | Path, *, component_root: str | Path | None = None,
+) -> dict[str, Any]:
+    """Write the summary for one root, reading each store from its own root."""
     paths = _ensure(root)
-    report = archive_report(root)
+    report = archive_report(root, component_root=component_root)
     save_json(paths["summary"], report)
     return report
 

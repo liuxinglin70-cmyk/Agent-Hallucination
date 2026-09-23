@@ -119,19 +119,29 @@ def record_gaps(
 ) -> list[dict[str, Any]]:
     """Append observations for this cycle's gaps and return the open backlog.
 
-    Only genuinely new observations are appended: repeating an unchanged gap
-    every round would otherwise turn the store into a per-cycle log rather than
-    a backlog. A gap that reappears with a different reason or a wider route
-    set is appended, because that is new information about the same gap.
+    One observation per gap per cycle, appended whenever the gap is *observed*
+    -- not only when its content changes. Re-seeing a standing gap in a later
+    round is itself the information the backlog exists to carry:
+    ``occurrences`` is what :func:`open_gaps` ranks by and what the engine's
+    ``recurring_capability_gaps`` gates on (``occurrences >= 2``). Comparing
+    only reason/routes/count left a gap that persisted in exactly the same
+    shape stuck at ``occurrences == 1`` forever, so the strongest memory signal
+    the proposer gets could never fire.
+
+    Identity still dedups the *entries*, and
+    :func:`_already_recorded_for_cycle` keeps a resumed cycle's replay to one
+    observation per cycle, so the store stays a backlog rather than becoming a
+    per-cycle log with one row per round.
     """
     path = Path(path)
-    existing = load_gap_state(path)
     appended: list[dict[str, Any]] = []
     for gap in gaps:
         identity = str(gap.get("identity") or gap_identity(
             str(gap.get("failure_family") or ""),
             str(gap.get("classification") or ""),
         ))
+        if _already_recorded_for_cycle(path, identity, cycle):
+            continue
         observation = gap_record(
             cycle=cycle,
             failure_family=str(gap.get("failure_family") or ""),
@@ -141,13 +151,8 @@ def record_gaps(
             sources=gap.get("sources") or (),
             routes=gap.get("routes") or (),
         )
-        previous = existing.get(identity)
-        if previous is None or _is_new_information(previous, observation):
-            # A resumed cycle replays its writes; the identity-plus-content
-            # check keeps one observation per cycle even when it does.
-            if not _already_recorded_for_cycle(path, identity, cycle):
-                append_jsonl(path, {**observation, "identity": identity})
-                appended.append(observation)
+        append_jsonl(path, {**observation, "identity": identity})
+        appended.append(observation)
     return open_gaps(path)
 
 
@@ -157,14 +162,6 @@ def _already_recorded_for_cycle(path: Path, identity: str, cycle: int) -> bool:
         and int(record.get("cycle") or -1) == int(cycle)
         and record.get("kind") != "resolution"
         for record in load_gap_observations(path)
-    )
-
-
-def _is_new_information(previous: Mapping[str, Any], observation: Mapping[str, Any]) -> bool:
-    return (
-        str(previous.get("reason") or "") != str(observation.get("reason") or "")
-        or set(previous.get("routes") or ()) != set(observation.get("routes") or ())
-        or int(previous.get("count") or 0) != int(observation.get("count") or 0)
     )
 
 

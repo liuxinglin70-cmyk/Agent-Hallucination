@@ -45,6 +45,10 @@ def main() -> int:
     environment = {**os.environ, "PYTHONUTF8": "1", "PYTHONDONTWRITEBYTECODE": "1"}
 
     def run(name: str, arguments: list[str]) -> bool:
+        result = run_capture(name, arguments)
+        return result.returncode == 0
+
+    def run_capture(name: str, arguments: list[str]):
         before = time.monotonic()
         result = subprocess.run([sys.executable, *arguments], cwd=ROOT, env=environment,
                                 text=True, encoding="utf-8", errors="replace",
@@ -54,7 +58,20 @@ def main() -> int:
                        "exit_code": result.returncode,
                        "seconds": round(time.monotonic() - before, 3)})
         print(f"{name}: {'PASS' if result.returncode == 0 else 'FAIL'}", flush=True)
-        return result.returncode == 0
+        return result
+
+    def record(name: str, passed: bool, detail: str = "") -> None:
+        """A content assertion, recorded beside the subprocess exit codes.
+
+        The exit code alone cannot carry every verdict: ``--help`` exits 0 for
+        a CLI whose commands have all been unregistered, and a report command
+        that exits 0 while its own body says the thing under test is not
+        admissible is the check that cannot fail. Checks that make a claim
+        about *content* record it here, under its own name.
+        """
+        checks.append({"name": name, "exit_code": 0 if passed else 1,
+                       **({"detail": detail} if detail else {})})
+        print(f"{name}: {'PASS' if passed else 'FAIL'}", flush=True)
 
     manifest = json.loads((ROOT / "datasets/integrity.json").read_text(encoding="utf-8"))
     raw = ROOT / manifest["root"]
@@ -74,10 +91,32 @@ def main() -> int:
     print(f"dataset_integrity: {'PASS' if integrity['passed'] else 'FAIL'}", flush=True)
     run("pytest", ["-m", "pytest", "-q", "-p", "no:cacheprovider",
                    "--junitxml=reports/latest/pytest.xml"])
-    run("detector_cli", ["-m", "detector", "--help"])
-    run("evolution_cli", ["-m", "evolution", "--help"])
-    if run("capability_audit", ["-m", "evolution", "capability-audit"]):
-        save("capability_audit.json", json.loads((OUT / "capability_audit.log").read_text(encoding="utf-8")))
+    # Importability is not coverage: ``--help`` exits 0 for a CLI whose
+    # commands the parser no longer registers. Assert the subcommands the
+    # repository's own docs and scripts invoke are actually there.
+    for name, arguments, expected_commands in (
+        ("detector_cli", ["-m", "detector", "--help"],
+         ("detect", "batch", "evaluate")),
+        ("evolution_cli", ["-m", "evolution", "--help"],
+         ("cycle", "smoke", "capability-audit", "metamorphic-gate",
+          "sandbox-check", "capability-smoke")),
+    ):
+        result = run_capture(name, arguments)
+        missing = [c for c in expected_commands if c not in result.stdout]
+        record(f"{name}_registers_commands", result.returncode == 0 and not missing,
+               f"missing subcommand(s): {missing}" if missing else "")
+    result = run_capture("capability_audit", ["-m", "evolution", "capability-audit"])
+    # The exit code is the report's verdict (cmd_capability_audit), and the
+    # body is asserted too: a report whose own content says an executor is not
+    # admissible must not be recorded as a pass, whichever half regresses.
+    if result.returncode == 0:
+        audit_report = json.loads((OUT / "capability_audit.log").read_text(encoding="utf-8"))
+        save("capability_audit.json", audit_report)
+        inventory = audit_report.get("executable_inventory") or {}
+        admitted = bool((inventory.get("runner_admission") or {}).get("all_admitted"))
+        blockers = list((inventory.get("sandbox") or {}).get("admission_blockers") or ())
+        record("capability_audit_admissible", admitted and not blockers,
+               f"all_admitted={admitted}, sandbox_blockers={blockers}")
     if run("metamorphic_gate", ["-m", "evolution", "metamorphic-gate"]):
         save("metamorphic_gate.json", json.loads((OUT / "metamorphic_gate.log").read_text(encoding="utf-8")))
     if run("sandbox_check", ["-m", "evolution", "sandbox-check"]):

@@ -18,7 +18,9 @@
     "gain_opportunity": {
       "recall": 2,
       "precision": 0
-    }
+    },
+    "gain_measured": true,
+    "unmeasured_gain_cases": []
   },
   "split": {
     "name": "capability-smoke",
@@ -850,7 +852,9 @@
       "initial_patrol_size": 5,
       "bootstrap_cases": [],
       "bootstrap_count": 0,
-      "family_found": true
+      "family_found": true,
+      "family_found_basis": "actionable families after mechanism profiling; gain coverage is checked separately in evaluation_preflight",
+      "family_count": 1
     },
     "capability_gaps": [],
     "capability_plan": {
@@ -1124,6 +1128,7 @@
       "precision": 0
     },
     "gain_measured": true,
+    "unmeasured_gain_cases": [],
     "blocked_families": [],
     "unmeasurable_polarities": [
       "precision"
@@ -1277,6 +1282,8 @@
           },
           "correctness_improved": 0,
           "correctness_worsened": 0,
+          "decisive_fixed": 0,
+          "decisive_broken": 0,
           "baseline_metrics": {
             "n": 4,
             "decisive": 4,
@@ -1432,6 +1439,8 @@
           },
           "correctness_improved": 2,
           "correctness_worsened": 0,
+          "decisive_fixed": 2,
+          "decisive_broken": 0,
           "baseline_metrics": {
             "n": 12,
             "decisive": 12,
@@ -1603,6 +1612,8 @@
           },
           "correctness_improved": 2,
           "correctness_worsened": 0,
+          "decisive_fixed": 2,
+          "decisive_broken": 0,
           "baseline_metrics": {
             "n": 8,
             "decisive": 8,
@@ -1886,6 +1897,8 @@
           },
           "correctness_improved": 0,
           "correctness_worsened": 0,
+          "decisive_fixed": 0,
+          "decisive_broken": 0,
           "baseline_metrics": {
             "n": 4,
             "decisive": 4,
@@ -2041,6 +2054,8 @@
           },
           "correctness_improved": 2,
           "correctness_worsened": 0,
+          "decisive_fixed": 2,
+          "decisive_broken": 0,
           "baseline_metrics": {
             "n": 12,
             "decisive": 12,
@@ -2212,6 +2227,8 @@
           },
           "correctness_improved": 2,
           "correctness_worsened": 0,
+          "decisive_fixed": 2,
+          "decisive_broken": 0,
           "baseline_metrics": {
             "n": 8,
             "decisive": 8,
@@ -2405,6 +2422,7 @@
           "authority": "authoritative"
         }
       ],
+      "unmeasured_cases": [],
       "gain_opportunities": {
         "recall": 2,
         "precision": 0
@@ -2471,6 +2489,8 @@
     },
     "correctness_improved": 2,
     "correctness_worsened": 0,
+    "decisive_fixed": 2,
+    "decisive_broken": 0,
     "baseline_metrics": {
       "n": 8,
       "decisive": 8,
@@ -2866,7 +2886,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "84a732e394f5",
+          "digest": "0ff847f0dee4",
           "payload": {
             "stages": [
               "validate",
@@ -2887,7 +2907,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "97bd8580208abd7b",
+            "source_digest": "80c0fec8a9a67ec9",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -3126,11 +3146,11 @@
         }
       },
       "registry_hash": "27cb8345a131f281ab40cc20763ef690ffa867acd4bd050111c603b88d338380",
-      "digest": "2ea8d6421636"
+      "digest": "fa9aab318e69"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "2ea8d6421636",
+      "current_digest": "fa9aab318e69",
       "first_manifest": true,
       "changed": [
         "G",

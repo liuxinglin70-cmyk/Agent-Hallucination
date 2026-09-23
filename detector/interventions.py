@@ -685,6 +685,75 @@ def custom_conviction_verdicts_for(
     }
 
 
+#: The runner that executes the built-in predicates. Named here because the
+#: conviction table's key is ``(predicate, runner)`` and a built-in predicate
+#: has exactly one executor.
+DETERMINISTIC_RUNNER = "deterministic"
+
+
+def conviction_verdict_table(
+    programs: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[tuple[str, str], frozenset[str]]:
+    """Which verdicts may authorize a terminal conviction, per ``(predicate, runner)``.
+
+    The key is the pair, not the predicate name alone, because conviction
+    authority belongs to the executor: one registry can carry a ``typed_dsl``
+    program named ``P`` (conviction authority) and a ``typed_semantic`` entry
+    that also calls itself ``P`` (evidence only), and a table keyed by name
+    alone let the semantic row collect the program's authority. The pair is
+    what the guard reads when it binds mechanical evidence.
+    """
+    table: dict[tuple[str, str], frozenset[str]] = {
+        (str(predicate), DETERMINISTIC_RUNNER): frozenset(verdicts)
+        for predicate, verdicts in PREDICATE_CONVICTION_VERDICTS.items()
+    }
+    for name, verdicts in custom_conviction_verdicts_for(programs or {}).items():
+        table[(name, PROGRAM_RUNNER)] = frozenset(verdicts)
+    return table
+
+
+def conviction_verdicts_for(
+    conviction_verdicts: Mapping[Any, Any] | None,
+    predicate: str,
+    runner: str = "",
+) -> frozenset[str]:
+    """The verdicts one evidence row may convict on; empty means "none".
+
+    The table is keyed by ``(predicate, runner)``, and this reader accepts a
+    predicate-only key as well so a legacy call that hands over
+    :data:`detector.predicates.PREDICATE_CONVICTION_VERDICTS` keeps working.
+
+    Two rules decide the answer:
+
+    1. A row that names a runner is governed by that runner's declaration. A
+       runner whose ``terminal_authority`` is not ``conviction`` may report
+       anything and convict nothing, whatever the table holds under its
+       predicate name. This is the runtime half of the declaration -- before
+       it, ``terminal_authority`` was read by reports and audits only, so an
+       ``evidence_only`` runner's verdict could authorize
+       ``convict_mechanical_violation``.
+    2. The pair key is looked up first, then the predicate-only key. A
+       ``typed_semantic`` entry that reuses a typed-DSL program's predicate
+       name therefore never collects that program's conviction verdicts: the
+       pair is what the plan's guard binds against.
+
+    A row that names no runner -- the shape a hand-built ``adjudicate`` call
+    uses -- falls back to the predicate-only key alone.
+    """
+    table = conviction_verdicts or {}
+    predicate = str(predicate or "")
+    runner = str(runner or "")
+    if not runner:
+        return frozenset(table.get(predicate) or ())
+    spec = runner_spec(runner)
+    if spec is None or spec.terminal_authority != TERMINAL_CONVICTION:
+        return frozenset()
+    allowed = table.get((predicate, runner))
+    if allowed is None:
+        allowed = table.get(predicate)
+    return frozenset(allowed or ())
+
+
 def validate_intervention_batch(
     entries: Sequence[Mapping[str, Any]],
     *,
@@ -1347,10 +1416,14 @@ class InterventionPlan:
         self.registry_hash = ""
         self.predicate_programs = inline_predicate_programs(self.entries)
         self.recall_trigger_programs = inline_trigger_programs(self.entries)
-        self.predicate_conviction_verdicts = {
-            **PREDICATE_CONVICTION_VERDICTS,
-            **custom_conviction_verdicts_for(self.predicate_programs),
-        }
+        # ``(predicate, runner) -> conviction verdicts``. The runner is part of
+        # the key so an entry that shares a predicate name with a
+        # conviction-authorized program cannot inherit its authority: a
+        # ``typed_semantic`` / ``sandboxed_component`` row reports evidence and
+        # may never be the thing that convicts.
+        self.predicate_conviction_verdicts = conviction_verdict_table(
+            self.predicate_programs,
+        )
         self.semantic_executor = semantic_executor
         # Keyed by predicate, not a single executor: each component entry
         # carries its own component, so each has its own artifact identity and
@@ -1723,9 +1796,15 @@ class InterventionPlan:
                                 "failure_family"
                             ) or ""
                         )
+                        # The row's own runner decides whether this verdict may
+                        # convict at all; a ``typed_semantic`` or
+                        # ``sandboxed_component`` row is readable evidence and
+                        # can never satisfy this binding.
                         and str(item.get("verdict") or "")
-                        in self.predicate_conviction_verdicts.get(
-                            predicate, frozenset(),
+                        in conviction_verdicts_for(
+                            self.predicate_conviction_verdicts,
+                            predicate,
+                            str(item.get("runner") or ""),
                         )
                     ),
                     None,
@@ -1735,7 +1814,8 @@ class InterventionPlan:
                         self._record(
                             entry,
                             "guard_suppressed",
-                            "mechanical evidence binding missing or non-violating",
+                            "mechanical evidence binding missing, non-violating, "
+                            "or produced by an evidence-only runner",
                         )
                     continue
                 if record:
@@ -1743,6 +1823,7 @@ class InterventionPlan:
                         "intervention_id": str(entry.get("intervention_id") or ""),
                         "action": action,
                         "predicate": predicate,
+                        "runner": str(evidence.get("runner") or ""),
                         "evidence_intervention_id": str(
                             evidence.get("intervention_id") or ""
                         ),
