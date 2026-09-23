@@ -3,7 +3,7 @@
   "evidence_grade": "instrumentation only: mock backend and scripted proposer throughout, zero provider calls. A mock oracle is what makes a target reachable, so nothing here is a statement about detection or localization quality.",
   "scenarios": {
     "loop_off": {
-      "seconds": 0.4,
+      "seconds": 0.46,
       "state": "completed",
       "round_path": "single_shot",
       "proposer_calls": 1,
@@ -45,7 +45,7 @@
       ]
     },
     "loop_on_unrepaired": {
-      "seconds": 0.43,
+      "seconds": 0.58,
       "state": "completed",
       "round_path": "development",
       "proposer_calls": 2,
@@ -111,7 +111,7 @@
       ]
     },
     "loop_on_repaired": {
-      "seconds": 0.54,
+      "seconds": 0.61,
       "state": "completed",
       "round_path": "development",
       "proposer_calls": 1,
@@ -170,7 +170,7 @@
       ]
     },
     "loop_off_repaired": {
-      "seconds": 0.4,
+      "seconds": 0.46,
       "state": "completed",
       "round_path": "single_shot",
       "proposer_calls": 1,
