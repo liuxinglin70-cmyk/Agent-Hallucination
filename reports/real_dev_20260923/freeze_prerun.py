@@ -26,18 +26,31 @@ if str(REPO) not in sys.path:
 
 from evolution.backends import file_digest, source_digest  # noqa: E402
 
-OUT = pathlib.Path(__file__).resolve().parent / "prerun_state.json"
-CONFIG = "evolution/configs/selfevo_real_dev_20260923.json"
+OUT = pathlib.Path(__file__).resolve().parent / "prerun_state_run2.json"
+CONFIG = "evolution/configs/selfevo_real_dev2_20260923.json"
 
 
 def main() -> int:
     config_path = REPO / CONFIG
     config = json.loads(config_path.read_text(encoding="utf-8-sig"))
     work_root = REPO / str(config["work_root"])
-    if work_root.exists():
+    # What makes this state "pre-run" is that no measurement has happened yet,
+    # and the evidence of a measurement is the ledger or a checkpoint -- not the
+    # directory. ``ensure_dirs`` creates the work root (and an empty registry)
+    # for any code path that loads a config, a read-only inspection included, so
+    # keying on the directory would refuse to freeze a genuinely untouched
+    # state. Keying on run evidence asks the question this guard exists to ask.
+    run_evidence = [
+        work_root / "ledger.jsonl",
+        work_root / "checkpoints",
+        work_root / "cycles" / "cycle001.json",
+    ]
+    present = [path for path in run_evidence if path.exists()]
+    if present:
         print(
-            f"refusing to freeze: {work_root} already exists, so this state did "
-            "not precede the run", file=sys.stderr,
+            f"refusing to freeze: run evidence already present under {work_root} "
+            f"({[str(path.relative_to(REPO)) for path in present]}), so this "
+            "state did not precede the run", file=sys.stderr,
         )
         return 2
     # The digest the plan's §23.8 pipeline cites is over the execution

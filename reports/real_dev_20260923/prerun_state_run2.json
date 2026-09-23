@@ -1,0 +1,146 @@
+{
+  "recorded_at_utc": "2026-09-23T07:36:29.085894+00:00",
+  "purpose": "pre-run identity for the cycle-side development stage's first real run; written before the cycle started",
+  "run_root": "artifacts/selfevo-real-dev2-20260923",
+  "run_config": "evolution/configs/selfevo_real_dev2_20260923.json",
+  "run_config_sha256": "0ec2667bb966b204",
+  "detector_config": "detector/configs/autodl.json",
+  "detector_config_sha256": "da3131e671c5d981",
+  "source_digest": "97bd8580208abd7b",
+  "source_scope": "detector/** + evolution/** (.py, tests excluded)",
+  "git_head": "0ae0d0d",
+  "split": {
+    "seed": 20260923,
+    "sentinel_positives": 3,
+    "sentinel_negatives": 3,
+    "mini_pool_size": 30,
+    "mini_gain_size": 6,
+    "mini_gain_min_positives": 2,
+    "mini_gain_min_negatives": 2
+  },
+  "budget": {
+    "patrol_cases": 8,
+    "stable_failure_rerun_cases": 8,
+    "llm_calls": 3,
+    "max_proposals": 3,
+    "max_admits": 2,
+    "cycle_timeout_seconds": 14400
+  },
+  "gates": {
+    "structural_jaccard_threshold": 0.72,
+    "harmlessness_new_fn_allowed": 0,
+    "harmlessness_new_fp_allowed": 0,
+    "harmlessness_new_unresolved_allowed": 0,
+    "harmlessness_min_protected_tp": 2,
+    "harmlessness_min_protected_tn": 2,
+    "behavior_require_fired": true,
+    "m_min_marginal_cases": 1,
+    "m_new_errors_allowed": 0,
+    "localization_min_joint_cases": 1,
+    "localization_joint_broken_allowed": 0
+  },
+  "development": {
+    "enabled": true,
+    "max_mechanisms_per_cycle": 1,
+    "max_versions_per_mechanism": 2,
+    "max_provider_calls": 4,
+    "max_l1_cases": 40,
+    "require_normal_neighbors": 2,
+    "allow_action_class_change": true
+  },
+  "archive": {
+    "on": "cycle_end",
+    "root": "artifacts/selfevo-real-dev2-20260923/candidates"
+  },
+  "detector_model": "GLM-5.3-flash",
+  "config_body": {
+    "schema_version": "evolution.framework.v1",
+    "detector_config": "detector/configs/autodl.json",
+    "dataset_root": "datasets/raw/agenthallu/AgentHallu",
+    "mini_split_manifest": "datasets/protocols/development.json",
+    "split_manifest": null,
+    "work_root": "artifacts/selfevo-real-dev2-20260923",
+    "registry_dir": "artifacts/selfevo-real-dev2-20260923/registry",
+    "ledger_path": "artifacts/selfevo-real-dev2-20260923/ledger.jsonl",
+    "harness_dir": "artifacts/selfevo-real-dev2-20260923/harness",
+    "memory_root": "artifacts/selfevo-real-dev2-20260923/memory",
+    "historical_development_manifests": [
+      "datasets/protocols/development_exposure.json"
+    ],
+    "patrol_registry": "active",
+    "coverage_response": {
+      "mode": "strict",
+      "policies": {}
+    },
+    "split": {
+      "seed": 20260923,
+      "sentinel_positives": 3,
+      "sentinel_negatives": 3,
+      "mini_pool_size": 30,
+      "mini_gain_size": 6,
+      "mini_gain_min_positives": 2,
+      "mini_gain_min_negatives": 2
+    },
+    "budget": {
+      "patrol_cases": 8,
+      "stable_failure_rerun_cases": 8,
+      "llm_calls": 3,
+      "max_proposals": 3,
+      "max_admits": 2,
+      "cycle_timeout_seconds": 14400
+    },
+    "gates": {
+      "structural_jaccard_threshold": 0.72,
+      "harmlessness_new_fn_allowed": 0,
+      "harmlessness_new_fp_allowed": 0,
+      "harmlessness_new_unresolved_allowed": 0,
+      "harmlessness_min_protected_tp": 2,
+      "harmlessness_min_protected_tn": 2,
+      "behavior_require_fired": true,
+      "m_min_marginal_cases": 1,
+      "m_new_errors_allowed": 0,
+      "localization_min_joint_cases": 1,
+      "localization_joint_broken_allowed": 0
+    },
+    "mini_effect": {
+      "min_marginal_cases": 1,
+      "max_new_errors": 0,
+      "max_unresolved_added": 0
+    },
+    "library": {
+      "max_width": 6,
+      "max_text_boundary_per_hook": 1,
+      "max_decision_guards": 4,
+      "retire_after_cycles_marginal_le0": 2,
+      "rollback_after_cycles_net_negative": 2
+    },
+    "audit": {
+      "enabled": true
+    },
+    "backend": {
+      "name": "detector",
+      "workers": 8,
+      "cache": true
+    },
+    "proposer": {
+      "mode": "llm",
+      "max_output_tokens": 32768,
+      "thinking_level": "",
+      "max_repair_calls": 1
+    },
+    "archive": {
+      "on": "cycle_end",
+      "root": "artifacts/selfevo-real-dev2-20260923/candidates"
+    },
+    "development": {
+      "enabled": true,
+      "max_mechanisms_per_cycle": 1,
+      "max_versions_per_mechanism": 2,
+      "max_provider_calls": 4,
+      "max_l1_cases": 40,
+      "require_normal_neighbors": 2,
+      "allow_action_class_change": true
+    }
+  },
+  "body_sha256": "76d63c2ff4d4d4ae6f76d4b24c3e7afba76f32845d1d88e691a0b30d944c2844"
+}
