@@ -544,6 +544,15 @@ class EvolutionEngine:
         # implicit one -- see the ``archive`` block in ``config.DEFAULTS`` for
         # what each value claims -- and ``off`` is the default so that adding
         # the wiring cannot change what an existing run records.
+        # Whether this cycle runs the development loop before its gates, and
+        # how many mechanisms it may develop if so (§23.3.6). Read once at
+        # construction: a cycle's path is a property of its configuration, not
+        # something a later stage may flip.
+        development_cfg = self.config.get("development") or {}
+        self.development_enabled = bool(development_cfg.get("enabled", False))
+        self.development_max_mechanisms = int(
+            development_cfg.get("max_mechanisms_per_cycle", 1)
+        )
         archive_cfg = self.config.get("archive") or {}
         self.archive_on = str(archive_cfg.get("on") or "off")
         if self.archive_on not in {"off", "development_end", "cycle_end"}:
@@ -916,6 +925,12 @@ class EvolutionEngine:
         instrument["instrument_limited"] = True
         report = {
             "cycle": cycle, "state": "blocked_evaluation_preflight",
+            # Neither path ran: the round stopped before drafting, so there is
+            # no batch whose route could be described. Named explicitly rather
+            # than omitted, so a reader can tell "no path was taken" from "this
+            # build has no such field".
+            "round_path": "not_reached",
+            "development": None,
             "split": split_manifest_report(self.split), "preflight": dict(preflight),
             "audit": dict(audit or {"enabled": bool((self.config.get("audit") or {}).get("enabled")),
                                     "passed": False, "status": "not_evaluated"}),
@@ -1181,6 +1196,315 @@ class EvolutionEngine:
         ] + [
             {**dict(row), "arm": "candidate"} for row in candidate_rows
         ]
+
+    def _development_targets(
+        self, families: Sequence[Mapping[str, Any]],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """The mechanisms this cycle may develop, and why the rest were skipped.
+
+        A target needs a mechanism identity (the loop drafts against a
+        mechanism, not a path) and at least two member cases, because a
+        candidate's provenance must name a family with two or more patrol cases
+        to be a valid proposal at all. A family that cannot yield a valid
+        proposal is skipped *here*, before any budget is spent, and reported
+        rather than dropped.
+        """
+        targets: list[dict[str, Any]] = []
+        skipped: list[dict[str, Any]] = []
+        for family in families:
+            family_id = str(family.get("failure_family") or "")
+            mechanism = family.get("mechanism")
+            reason = ""
+            if not isinstance(mechanism, Mapping):
+                reason = "no mechanism attached to the family"
+            elif not str(mechanism.get("mechanism_id") or ""):
+                reason = "mechanism has no id"
+            else:
+                cases = [str(case) for case in family.get("failure_cases") or ()]
+                if len(cases) < 2:
+                    reason = (
+                        "family has fewer than two member cases, so a candidate "
+                        "drawn against it could not carry a valid provenance"
+                    )
+            if reason:
+                skipped.append({"failure_family": family_id, "reason": reason})
+                continue
+            mechanism = dict(mechanism)
+            members = {str(case) for case in mechanism.get("member_cases") or ()}
+            member_cases = [
+                str(case) for case in family.get("failure_cases") or ()
+            ]
+            targets.append({
+                "failure_family": family_id,
+                "family": dict(family),
+                "mechanism": mechanism,
+                "target_cases": member_cases,
+                "neighbor_cases": [
+                    str(case) for case in mechanism.get("normal_neighbors") or ()
+                    if str(case) not in members
+                    and str(case) not in set(member_cases)
+                ],
+                "target_kind": (
+                    "localization"
+                    if str(family.get("target_kind") or "") == "localization"
+                    or family_id.startswith("FAM-loc-")
+                    else "detection"
+                ),
+            })
+        return targets, skipped
+
+    def _develop_candidates(
+        self,
+        *,
+        cycle: int,
+        families: Sequence[Mapping[str, Any]],
+        capability_plan: Mapping[str, Any],
+    ) -> tuple[ProposalBatch | None, dict[str, Any] | None]:
+        """Run the development loop for this cycle's mechanisms (plan §23.3.6).
+
+        Returns ``(batch, block)``. A batch means the round's candidates are
+        the versions that passed L0 and L1 here; an empty batch with a block
+        means development ran and certified nothing, and the *reason* is the
+        versions' own verdicts. ``(None, None)`` means development had no
+        target at all, and the caller falls back to single-shot drafting
+        unchanged.
+
+        Why this is a filter and not a second opinion: a candidate that fails
+        its targeted replay is not sent to the gates anyway -- the gates judge
+        candidates, they do not re-run the development loop's job -- and the
+        gate path costs orders of magnitude more than the L1 replay that
+        already falsified it. The first real cycle showed the cost of not
+        having this: a single drafted candidate was carried into a 62-minute
+        paired promotion run and came back rejected.
+        """
+        from evolution.development import (
+            CandidateDeveloper,
+            DevelopmentBudget,
+            development_report,
+        )
+
+        development_cfg = dict(self.config.get("development") or {})
+        development_root = (
+            Path(self.config["work_root"]) / "development" / f"cycle{int(cycle):03d}"
+        )
+        targets, skipped = self._development_targets(families)
+        cap = max(0, int(self.development_max_mechanisms))
+        capped = targets[cap:]
+        targets = targets[:cap]
+        skipped.extend({
+            "failure_family": str(item["failure_family"]),
+            "reason": (
+                f"development.max_mechanisms_per_cycle={cap} was already "
+                "reached by earlier mechanisms this cycle"
+            ),
+        } for item in capped)
+        if not targets:
+            # No mechanism can carry a valid candidate this round, so the round
+            # falls back to its single-shot path and says why it did.
+            return None, {
+                "schema_version": "evolution.cycle_development.v1",
+                "cycle": int(cycle),
+                "root": str(development_root),
+                "targets": 0,
+                "skipped": skipped,
+                "runs": [],
+                "frozen_versions": [],
+                "candidate_count": 0,
+                "reason": "no mechanism was eligible for development this cycle",
+                "metric_role": "diagnostic-only",
+            }
+        requirements = {
+            str(item.get("mechanism_id") or ""): dict(item)
+            for item in (capability_plan.get("requirements") or ())
+        }
+        runs: list[dict[str, Any]] = []
+        frozen: list[dict[str, Any]] = []
+        for target in targets:
+            mechanism = target["mechanism"]
+            mechanism_id = str(mechanism.get("mechanism_id") or "")
+            requirement = requirements.get(mechanism_id, {})
+            run_dir = development_root / mechanism_id
+            budget = DevelopmentBudget(
+                max_versions_per_mechanism=int(
+                    development_cfg.get("max_versions_per_mechanism", 4),
+                ),
+                max_provider_calls=int(
+                    development_cfg.get("max_provider_calls", 6),
+                ),
+                max_l1_cases=int(development_cfg.get("max_l1_cases", 24)),
+                require_normal_neighbors=int(
+                    development_cfg.get("require_normal_neighbors", 2),
+                ),
+                allow_action_class_change=bool(
+                    development_cfg.get("allow_action_class_change", True),
+                ),
+            )
+            developer = CandidateDeveloper(
+                output_dir=run_dir,
+                budget=budget,
+                mechanism=mechanism,
+                capability_plan=requirement,
+                route_failure_records=self.route_failure_records(),
+                target_cases=target["target_cases"],
+                neighbor_cases=target["neighbor_cases"],
+                active_entries=self.registry.entries,
+                target_kind=target["target_kind"],
+                gold_steps=self.gold_step_map,
+                l1_runner=lambda cases, *, candidate, plan: self.develop_rows(
+                    cases, candidate=candidate, split=self.split,
+                ),
+            )
+            result = developer.develop(
+                self._development_drafter(
+                    cycle=cycle,
+                    family=target["family"],
+                    mechanism_id=mechanism_id,
+                    identifier=f"IV-{int(cycle)}-D{len(runs) + 1:03d}",
+                ),
+                cycle=int(cycle),
+                max_versions=int(
+                    development_cfg.get("max_versions_per_mechanism", 4),
+                ),
+            )
+            block = development_report(result)
+            block["failure_family"] = target["failure_family"]
+            block["target_kind"] = target["target_kind"]
+            block["target_cases"] = list(target["target_cases"])
+            block["neighbor_cases"] = list(target["neighbor_cases"])
+            block["run_dir"] = str(run_dir)
+            block["archive_policy"] = self.archive_on
+            # §28.6 ``cycle_end``: a cycle that develops several mechanisms
+            # remembers all of them in one place, which is why the decision is
+            # taken here rather than inside the loop. With ``development_end``
+            # the caller owns that boundary (``develop`` archives its own run),
+            # and with ``off`` nothing is written -- so neither policy is
+            # silently upgraded into this one.
+            if self.archive_on == "cycle_end":
+                block["archive"] = self.archive_development_run(
+                    run_dir,
+                    cycle=int(cycle),
+                    mechanism_id=mechanism_id,
+                    family_id=target["failure_family"],
+                    mechanism=mechanism,
+                )
+            selected = str(result.get("selected_version_id") or "")
+            if selected:
+                # ``freeze`` is the loop's only exit and the only writer of the
+                # status the promotion path accepts, so a version is frozen
+                # here rather than merely reported as ready.
+                handed = developer.freeze(selected)
+                candidate = dict(handed.get("candidate") or {})
+                candidate.pop("content_hash", None)
+                frozen.append(candidate)
+                block["frozen"] = {
+                    "version_id": handed["version_id"],
+                    "candidate_hash": handed["candidate_hash"],
+                    "intervention_id": str(candidate.get("intervention_id") or ""),
+                }
+            runs.append(block)
+        # The draft calls are *not* folded into ``development_provider_calls``:
+        # that attribute counts fresh case evaluations spent by
+        # ``develop_rows``, and one counter holding two units is a reading
+        # nobody can check. The draft cost travels in each run's ``budget``
+        # block instead.
+        batch = ProposalBatch(
+            candidates=frozen,
+            joint_groups=infer_joint_groups(frozen),
+            notes=[{
+                "generator": "development",
+                "provider_called": False,
+                "reason": (
+                    f"{len(frozen)} version(s) passed development and were frozen "
+                    f"from {len(runs)} developed mechanism(s)"
+                ),
+            }],
+        )
+        block = {
+            "schema_version": "evolution.cycle_development.v1",
+            "cycle": int(cycle),
+            "root": str(development_root),
+            "targets": len(targets),
+            "skipped": skipped,
+            "runs": runs,
+            "frozen_versions": [run.get("frozen") for run in runs if run.get("frozen")],
+            "candidate_count": len(frozen),
+            "metric_role": "diagnostic-only",
+        }
+        return batch, block
+
+    def _development_drafter(
+        self,
+        *,
+        cycle: int,
+        family: Mapping[str, Any],
+        mechanism_id: str,
+        identifier: str,
+    ):
+        """The drafting callback the development loop revises through.
+
+        The first draft is an ordinary proposal drawn against this one family,
+        so it travels the same prompt, memory and component context as a
+        single-shot cycle. A revision re-asks with the previous version's
+        L0/L1 verdicts attached as gate feedback, which is the only channel the
+        proposer has for being told why a draft was falsified; the feedback is
+        restored afterwards so a development failure does not permanently ban
+        the candidate from later cycles.
+
+        The intervention id is set here rather than left to the proposer,
+        because a proposer numbers its batch from one on every call: two
+        mechanisms developed in the same cycle would each come back as
+        ``IV-<cycle>-001`` and the resulting batch would have two candidates
+        sharing an id, which the proposal contract refuses. Assigning the id
+        before the version is recorded keeps the frozen candidate, its hash and
+        the batch entry describing the same object.
+        """
+        proposer = self.proposer
+
+        def rename(candidates):
+            out: list[dict[str, Any]] = []
+            for candidate in candidates:
+                item = dict(candidate)
+                item["intervention_id"] = identifier
+                item.pop("content_hash", None)
+                out.append(item)
+            return out
+
+        def draft(
+            _mechanism: Mapping[str, Any],
+            _plan: Mapping[str, Any],
+            parent: Mapping[str, Any] | None,
+            diagnosis: Mapping[str, Any] | None,
+            _cycle: int,
+        ) -> list[Mapping[str, Any]]:
+            one = {
+                **dict(family),
+                "mechanism": dict(_mechanism),
+            }
+            if parent is None or not diagnosis:
+                batch = proposer.propose([one], cycle=int(cycle), max_proposals=1)
+                return rename(batch.candidates)
+            previous = list(getattr(proposer, "rejection_feedback", []))
+            if hasattr(proposer, "set_rejection_feedback"):
+                feedback = list(previous)
+                feedback.append({
+                    "gate": "DEVELOPMENT",
+                    "type": parent.get("type"),
+                    "hook": parent.get("hook"),
+                    "candidate": dict(parent),
+                    "delta": None,
+                    "reason": "; ".join(
+                        str(item) for item in (diagnosis.get("reasons") or ())
+                    ) or f"{mechanism_id} version {diagnosis.get('version_id')} failed development",
+                })
+                proposer.set_rejection_feedback(feedback)
+            try:
+                batch = proposer.propose([one], cycle=int(cycle), max_proposals=1)
+            finally:
+                if hasattr(proposer, "set_rejection_feedback"):
+                    proposer.set_rejection_feedback(previous)
+            return rename(batch.candidates)
+
+        return draft
 
     def archive_development_run(
         self,
@@ -2202,6 +2526,19 @@ class EvolutionEngine:
         report = {
             "mode": "preview",
             "cycle": cycle,
+            # Which path a real cycle would take with this configuration, and
+            # how many mechanisms it may develop. The preview itself drafts
+            # single-shot -- running the loop here would spend L1 replay budget
+            # to answer a question the preview exists to avoid spending on --
+            # so the field is a statement about the configured cycle, not about
+            # the candidates shown below.
+            "round_path": (
+                "development" if self.development_enabled else "single_shot"
+            ),
+            "development": {
+                "enabled": self.development_enabled,
+                "max_mechanisms_per_cycle": self.development_max_mechanisms,
+            },
             "patrol_size": len(patrol_cases),
             "bootstrap_count": len(bootstrap_cases),
             "families": [
@@ -2550,6 +2887,7 @@ class EvolutionEngine:
                 **preflight, "reason": "no diagnosed failure direction has repair opportunities in gain",
             }, baseline_gain=baseline_gain, audit=audit, patrol=worksheet)
 
+        development_block: dict[str, Any] | None = None
         if proposal_batch is None:
             self._journal.save(proposing=True)
             if hasattr(self.proposer, "active_entries"):
@@ -2586,13 +2924,35 @@ class EvolutionEngine:
                 "recurring_gaps": len(memory_context["recurring_capability_gaps"]),
                 "components": len(components),
             })
-            proposal_batch = self.proposer.propose(
-                proposal_families,
-                cycle=cycle,
-                max_proposals=int(
-                    (self.config.get("budget") or {}).get("max_proposals", 3)
-                ),
-            )
+            if self.development_enabled:
+                # §23.3.6: with the loop on, the round's candidates are the
+                # versions that passed L0 and L1, not the first drafts. The
+                # empty batch is deliberate -- a round whose developed versions
+                # were all falsified has *measured* that, and letting the
+                # single-shot proposer draft again would silently restore the
+                # behaviour this path exists to replace. `--resume` reuses the
+                # persisted batch, so the loop is not re-entered either.
+                developed, development_block = self._develop_candidates(
+                    cycle=cycle,
+                    families=proposal_families,
+                    capability_plan=capability_plan,
+                )
+                if developed is not None:
+                    proposal_batch = developed
+                    self._ledger("development", {
+                        "cycle": cycle, **{
+                            key: value for key, value in development_block.items()
+                            if key not in {"runs"}
+                        },
+                    })
+            if proposal_batch is None:
+                proposal_batch = self.proposer.propose(
+                    proposal_families,
+                    cycle=cycle,
+                    max_proposals=int(
+                        (self.config.get("budget") or {}).get("max_proposals", 3)
+                    ),
+                )
             # Only a batch drawn without memory can establish what memory
             # changed. This records the counterfactual, not an assertion that
             # memory improved the drafting.
@@ -2604,9 +2964,27 @@ class EvolutionEngine:
                 ),
                 "candidates": len(proposal_batch.candidates),
             })
+        if proposal_batch is None:  # pragma: no cover - defensive, see below
+            raise RuntimeError("no proposal batch was produced this cycle")
+        if development_block is None:
+            # A resumed cycle restores its batch from the checkpoint and never
+            # re-enters drafting, so the development record has to come back
+            # from there too. Without this, a resumed development round would
+            # describe itself as single-shot -- exactly the distinction the
+            # field exists to make, inverted.
+            restored = self._journal.state.get("development")
+            development_block = restored if isinstance(restored, Mapping) else None
         self._journal.save(proposing=False, proposal={
             "candidates": proposal_batch.candidates, "joint_groups": proposal_batch.joint_groups,
-            "notes": proposal_batch.notes})
+            "notes": proposal_batch.notes},
+            development=development_block)
+        # Which path this round took, read from the run rather than asserted:
+        # `single_shot` is one draft carried to the gates, `development` is
+        # draft -> L0 -> L1 -> revise with only a certified version admitted to
+        # them. A reader of the cycle report must be able to tell these apart,
+        # because the readings are not comparable: a gate rejection under
+        # development has already survived a targeted replay.
+        round_path = "development" if development_block is not None else "single_shot"
         self._validate_proposal_batch(
             proposal_batch,
             cycle=cycle,
@@ -2919,6 +3297,13 @@ class EvolutionEngine:
         report = {
             "cycle": cycle,
             "state": "completed",
+            # Which path this round's candidates travelled (plan §23.3.6).
+            # Reported even when the loop is off, because "single_shot" is the
+            # reading a later comparison needs and an absent field cannot be
+            # told apart from a version of the framework that had no such
+            # concept.
+            "round_path": round_path,
+            "development": development_block,
             "preflight": preflight,
             "split": split_manifest_report(self.split),
             "audit": audit,

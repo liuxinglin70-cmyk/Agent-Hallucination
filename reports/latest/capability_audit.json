@@ -2,7 +2,7 @@
   "schema_version": "evolution.capability_surface.v2",
   "classification": "typed_program_synthesis_with_runtime_registration_and_control_flow_policy",
   "open_ended_self_evolution": false,
-  "reason": "the runtime can register new typed-DSL predicate programs (with AND-conjoined conditions) as evidence observations and as recall.trigger control-flow policies at admission time; it still cannot create LLM stage hooks, arbitrary sandboxed code, execution-graph rewrites, or weight updates",
+  "reason": "the runtime can register new typed-DSL predicate programs (with AND-conjoined conditions) as evidence observations and as recall.trigger control-flow policies at admission time, and it can bind a caller-injected learned executor (typed_semantic) under an enforced evidence-only contract; it still cannot create LLM stage hooks, arbitrary sandboxed code, execution-graph rewrites, or weight updates, and it cannot itself produce a learned executor",
   "executable_inventory": {
     "intervention_types": [
       "decision_guard",
@@ -22,6 +22,229 @@
       "upgrade.pre",
       "upgrade.system"
     ],
+    "runners": [
+      {
+        "name": "deterministic",
+        "supported_hooks": [
+          "defense.pre",
+          "judge.post",
+          "recall.trigger",
+          "upgrade.pre"
+        ],
+        "intervention_types": [
+          "evidence_check",
+          "recall_trigger"
+        ],
+        "input_schema": "body.predicate names a built-in predicate; body.output_verdicts must equal that predicate's full verdict vocabulary",
+        "deterministic": true,
+        "learned": false,
+        "requires_artifact": false,
+        "terminal_authority": "conviction",
+        "metamorphic_classes": [
+          "case_id_rename",
+          "irrelevant_tool_call",
+          "localization_event_move",
+          "neighbor_surface_token",
+          "source_rename"
+        ],
+        "description": "A built-in mechanical predicate. Its verdicts are computed from the packet by fixed code, so a conviction verdict proves a task-level mechanical violation."
+      },
+      {
+        "name": "sandboxed_component",
+        "supported_hooks": [
+          "defense.pre",
+          "judge.post",
+          "upgrade.pre"
+        ],
+        "intervention_types": [
+          "evidence_check"
+        ],
+        "input_schema": "body.component carries a validated evolution.sandboxed_component.v1 component whose name equals body.predicate, and body.component_inputs maps each declared parameter to one fixed packet view",
+        "deterministic": true,
+        "learned": false,
+        "requires_artifact": true,
+        "terminal_authority": "evidence_only",
+        "metamorphic_classes": [
+          "case_id_rename",
+          "irrelevant_tool_call",
+          "localization_event_move",
+          "neighbor_surface_token",
+          "source_rename"
+        ],
+        "description": "A small pure function generated as source and executed under the Level B sandbox (fixed parameter schema, import whitelist, no filesystem or network, OS-enforced CPU/time/memory limits). Evidence only: it reports, and it can never convict."
+      },
+      {
+        "name": "typed_dsl",
+        "supported_hooks": [
+          "defense.pre",
+          "judge.post",
+          "recall.trigger",
+          "upgrade.pre"
+        ],
+        "intervention_types": [
+          "evidence_check",
+          "recall_trigger"
+        ],
+        "input_schema": "body.predicate_definition carries a validated detector.predicate_program.v1 program whose name equals body.predicate",
+        "deterministic": true,
+        "learned": false,
+        "requires_artifact": false,
+        "terminal_authority": "conviction",
+        "metamorphic_classes": [
+          "case_id_rename",
+          "irrelevant_tool_call",
+          "localization_event_move",
+          "neighbor_surface_token",
+          "source_rename"
+        ],
+        "description": "An inline typed-DSL program. Non-Turing-complete and interpreted by fixed operators, so it is deterministic and may hold conviction verdicts."
+      },
+      {
+        "name": "typed_semantic",
+        "supported_hooks": [
+          "defense.pre",
+          "judge.post",
+          "upgrade.pre"
+        ],
+        "intervention_types": [
+          "evidence_check"
+        ],
+        "input_schema": "body.predicate names the task schema the executor judges; body.output_verdicts must equal the semantic verdict vocabulary",
+        "deterministic": false,
+        "learned": true,
+        "requires_artifact": true,
+        "terminal_authority": "evidence_only",
+        "metamorphic_classes": [
+          "case_id_rename",
+          "irrelevant_tool_call",
+          "localization_event_move",
+          "neighbor_surface_token",
+          "semantic_equivalence",
+          "source_rename"
+        ],
+        "description": "A typed semantic judgment produced by an injected executor. Evidence only: it can never authorize a terminal conviction, and its artifact must be digest-pinned."
+      }
+    ],
+    "runner_admission": {
+      "schema_version": "evolution.metamorphic_gate.v1",
+      "classes": [
+        "case_id_rename",
+        "source_rename",
+        "irrelevant_tool_call",
+        "neighbor_surface_token",
+        "semantic_equivalence",
+        "localization_event_move"
+      ],
+      "runners": [
+        {
+          "runner": "deterministic",
+          "admitted": true,
+          "required_classes": [
+            "case_id_rename",
+            "irrelevant_tool_call",
+            "localization_event_move",
+            "neighbor_surface_token",
+            "source_rename"
+          ],
+          "failed": [],
+          "authority": "admission-only"
+        },
+        {
+          "runner": "sandboxed_component",
+          "admitted": true,
+          "required_classes": [
+            "case_id_rename",
+            "irrelevant_tool_call",
+            "localization_event_move",
+            "neighbor_surface_token",
+            "source_rename"
+          ],
+          "failed": [],
+          "authority": "admission-only"
+        },
+        {
+          "runner": "typed_dsl",
+          "admitted": true,
+          "required_classes": [
+            "case_id_rename",
+            "irrelevant_tool_call",
+            "localization_event_move",
+            "neighbor_surface_token",
+            "source_rename"
+          ],
+          "failed": [],
+          "authority": "admission-only"
+        },
+        {
+          "runner": "typed_semantic",
+          "admitted": true,
+          "required_classes": [
+            "case_id_rename",
+            "irrelevant_tool_call",
+            "localization_event_move",
+            "neighbor_surface_token",
+            "semantic_equivalence",
+            "source_rename"
+          ],
+          "failed": [],
+          "authority": "admission-only"
+        }
+      ],
+      "all_admitted": true,
+      "authority": "admission-only"
+    },
+    "sandbox": {
+      "capabilities": {
+        "mechanism": "windows_job_object",
+        "platform": "win32",
+        "declared": {
+          "wall_seconds": true,
+          "cpu_seconds": true,
+          "memory_bytes": true
+        },
+        "verified": {},
+        "probe_run": false
+      },
+      "admission_blockers": [],
+      "soft_defaults": {
+        "wall_seconds": 5.0,
+        "cpu_seconds": 2.0,
+        "memory_bytes": 268435456,
+        "max_input_bytes": 262144,
+        "max_output_bytes": 65536
+      },
+      "hard_ceiling": {
+        "wall_seconds": 10.0,
+        "cpu_seconds": 5.0,
+        "memory_bytes": 536870912,
+        "max_input_bytes": 1048576,
+        "max_output_bytes": 262144
+      },
+      "import_whitelist": [
+        "re",
+        "json",
+        "math",
+        "statistics",
+        "decimal",
+        "fractions",
+        "itertools",
+        "functools",
+        "collections",
+        "string",
+        "unicodedata",
+        "difflib",
+        "textwrap",
+        "datetime",
+        "operator",
+        "typing"
+      ],
+      "component_kinds_served": [
+        "field parsing",
+        "argument binding comparison",
+        "structured contract checking",
+        "event dependency extraction"
+      ]
+    },
     "system_prompt_hooks": [
       "defense.system",
       "judge.system",
@@ -139,14 +362,18 @@
     "prompt_not_when_text": true,
     "new_predicate_program": true,
     "new_executor": true,
+    "name_a_learned_executor": true,
+    "generate_a_learned_executor": false,
     "new_fact_type": true,
     "new_hook": false,
     "new_guard_action": false,
     "new_control_flow_policy": true,
     "typed_dsl_template_proposer": true,
     "execution_graph_rewrite": false,
-    "sandboxed_code_generation": false,
-    "model_weight_update": false
+    "sandboxed_code_generation": true,
+    "sandboxed_code_generation_scope": "pure function, fixed parameter schema, import whitelist, no filesystem or network access, OS-enforced cpu/time/memory limits, evidence-only (may never convict)",
+    "model_weight_update": false,
+    "new_executor_admission_criterion": true
   },
   "causal_limits": {
     "evidence_check_changes_terminal_alone": false,
@@ -158,10 +385,34 @@
     "capability_gap_can_expand_terminal_effects": true
   },
   "required_for_open_ended_evolution": [
-    "typed declarative predicate programs",
-    "typed control-flow policy artifacts",
+    {
+      "requirement": "typed declarative predicate programs",
+      "satisfied": true,
+      "closed_by": "inline detector.predicate_program.v1 (typed_dsl)"
+    },
+    {
+      "requirement": "typed control-flow policy artifacts",
+      "satisfied": true,
+      "closed_by": "recall_trigger carrying an inline typed-DSL program"
+    },
+    {
+      "requirement": "sandboxed new executors with property and metamorphic tests",
+      "satisfied": true,
+      "closed_by": "P2.2 evolution.sandbox (Level B) + P2.3 evolution.metamorphic admission gate"
+    },
+    {
+      "requirement": "typed execution-graph artifacts",
+      "satisfied": false,
+      "closed_by": ""
+    },
+    {
+      "requirement": "immutable capability artifact store",
+      "satisfied": false,
+      "closed_by": ""
+    }
+  ],
+  "open_ended_evolution_blockers": [
     "typed execution-graph artifacts",
-    "immutable capability artifact store",
-    "sandboxed new executors with property and metamorphic tests"
+    "immutable capability artifact store"
   ]
 }

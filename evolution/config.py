@@ -6,6 +6,7 @@ Paths in ``configs/development.json`` are resolved against the repository root
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 from pathlib import Path
@@ -146,8 +147,21 @@ DEFAULTS: dict[str, Any] = {
         "on": "off",
         "root": "",
     },
+    # ``enabled`` turns the deployment-side development loop on inside a
+    # cycle: the mechanisms this round diagnosed are drafted against, revised
+    # through L0/L1, and only a version that passed both reaches the gates.
+    # ``off`` keeps the single-shot path -- one draft, straight to the gates --
+    # which is what every cycle did before this was wired, so the default
+    # cannot change an existing run's behaviour.
+    #
+    # ``max_mechanisms_per_cycle`` bounds how many mechanisms one cycle may
+    # develop: each one costs its own drafts and L1 replays, and a cycle that
+    # develops every diagnosed mechanism would spend the whole patrol's budget
+    # before the gates run. The mechanisms beyond the cap are reported as
+    # skipped with that reason rather than silently dropped.
     "development": {
         "enabled": False,
+        "max_mechanisms_per_cycle": 1,
         "max_versions_per_mechanism": 4,
         "max_provider_calls": 6,
         "max_l1_cases": 24,
@@ -162,8 +176,25 @@ def resolve_path(value: str | os.PathLike[str], base: Path = REPO_ROOT) -> Path:
     return path if path.is_absolute() else (base / path).resolve()
 
 
+def _copy_container(value: Any) -> Any:
+    """A deep copy of a nested default, so a loaded config owns its own blocks.
+
+    ``_deep_merge`` returns a new *top-level* dict, and any block the config
+    file mentions is rebuilt on the way through. A block the file does **not**
+    mention used to be carried over by reference, so it was the same object as
+    ``DEFAULTS[...]`` -- and mutating it through one loaded config changed the
+    defaults every later load in the process saw. Six blocks are in that
+    position for the shipped config file (``archive``, ``development``,
+    ``coverage_response``, ``patrol_registry``, ``harness_dir``,
+    ``memory_root``), and ``archive`` and ``development`` are both read from
+    run paths that callers mutate -- a test or script setting the archive
+    policy silently re-configured every later load.
+    """
+    return copy.deepcopy(value)
+
+
 def _deep_merge(base: dict[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
-    merged = dict(base)
+    merged = {key: _copy_container(value) for key, value in base.items()}
     for key, value in override.items():
         if (
             key in merged

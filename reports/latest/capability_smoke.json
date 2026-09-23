@@ -1,6 +1,8 @@
 {
   "cycle": 1,
   "state": "completed",
+  "round_path": "single_shot",
+  "development": null,
   "preflight": {
     "sentinel": {
       "protected_tp": 2,
@@ -328,6 +330,92 @@
           }
         },
         "diagnostic_complete": true,
+        "mechanism": {
+          "schema_version": "evolution.failure_mechanism.v1",
+          "family_id": "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f-P70fe7f80fd90",
+          "objective": "detection",
+          "task_obligation": {
+            "kind": "unspecified",
+            "subject": "task_contract",
+            "expected_relation": "unclassified_obligation"
+          },
+          "observed_deviation": {
+            "kind": "unclassified",
+            "actual": "unclassified_deviation",
+            "expected": "unclassified_deviation"
+          },
+          "evidence_bindings": [
+            {
+              "field": "judge.contracts",
+              "role": "obligation"
+            },
+            {
+              "field": "proof.stage_status",
+              "role": "detector_failure"
+            },
+            {
+              "field": "proof.terminal_basis.decisive_facts",
+              "role": "detector_failure"
+            }
+          ],
+          "detector_failure": {
+            "stage": "recall_scanner",
+            "failure_mode": "not_reached",
+            "path_signature": {
+              "judge_positive": false,
+              "stages": {
+                "judge": "not_run",
+                "recall_scanner": "not_run",
+                "causal_upgrade": "not_run",
+                "step_tracer": "not_run",
+                "defense": "not_run"
+              },
+              "recall_path": "not_run",
+              "upgrade_positive": false,
+              "defense_verdict": "none",
+              "positive_source": "none"
+            }
+          },
+          "repair_hypothesis": {
+            "operation": "route_recall",
+            "required_inputs": [
+              "question_text",
+              "tool_names",
+              "packet_features"
+            ],
+            "required_capabilities": [
+              "control_flow"
+            ],
+            "forbidden_shortcuts": [
+              "case_id",
+              "gold_label",
+              "gold_step",
+              "dataset_annotation"
+            ]
+          },
+          "mechanism_id": "M-17aad6d46f7a",
+          "member_cases": [
+            "A/012.json",
+            "A/013.json"
+          ],
+          "normal_neighbors": [
+            "A/014.json",
+            "A/015.json",
+            "A/016.json"
+          ],
+          "status": "confirmed",
+          "confidence_basis": "multi_case",
+          "reading_count": 2,
+          "reading_unanimous": true,
+          "signature": [
+            "unspecified",
+            "unclassified",
+            "recall_scanner",
+            "not_reached",
+            "route_recall"
+          ]
+        },
+        "mechanism_subgroup": false,
         "actionability": {
           "classification": "actionable",
           "reason": "at least one action or capability-creation route exists for this family's mechanism",
@@ -576,6 +664,92 @@
           }
         },
         "diagnostic_complete": true,
+        "mechanism": {
+          "schema_version": "evolution.failure_mechanism.v1",
+          "family_id": "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f-P70fe7f80fd90",
+          "objective": "detection",
+          "task_obligation": {
+            "kind": "unspecified",
+            "subject": "task_contract",
+            "expected_relation": "unclassified_obligation"
+          },
+          "observed_deviation": {
+            "kind": "unclassified",
+            "actual": "unclassified_deviation",
+            "expected": "unclassified_deviation"
+          },
+          "evidence_bindings": [
+            {
+              "field": "judge.contracts",
+              "role": "obligation"
+            },
+            {
+              "field": "proof.stage_status",
+              "role": "detector_failure"
+            },
+            {
+              "field": "proof.terminal_basis.decisive_facts",
+              "role": "detector_failure"
+            }
+          ],
+          "detector_failure": {
+            "stage": "recall_scanner",
+            "failure_mode": "not_reached",
+            "path_signature": {
+              "judge_positive": false,
+              "stages": {
+                "judge": "not_run",
+                "recall_scanner": "not_run",
+                "causal_upgrade": "not_run",
+                "step_tracer": "not_run",
+                "defense": "not_run"
+              },
+              "recall_path": "not_run",
+              "upgrade_positive": false,
+              "defense_verdict": "none",
+              "positive_source": "none"
+            }
+          },
+          "repair_hypothesis": {
+            "operation": "route_recall",
+            "required_inputs": [
+              "question_text",
+              "tool_names",
+              "packet_features"
+            ],
+            "required_capabilities": [
+              "control_flow"
+            ],
+            "forbidden_shortcuts": [
+              "case_id",
+              "gold_label",
+              "gold_step",
+              "dataset_annotation"
+            ]
+          },
+          "mechanism_id": "M-17aad6d46f7a",
+          "member_cases": [
+            "A/012.json",
+            "A/013.json"
+          ],
+          "normal_neighbors": [
+            "A/014.json",
+            "A/015.json",
+            "A/016.json"
+          ],
+          "status": "confirmed",
+          "confidence_basis": "multi_case",
+          "reading_count": 2,
+          "reading_unanimous": true,
+          "signature": [
+            "unspecified",
+            "unclassified",
+            "recall_scanner",
+            "not_reached",
+            "route_recall"
+          ]
+        },
+        "mechanism_subgroup": false,
         "actionability": {
           "classification": "actionable",
           "reason": "at least one action or capability-creation route exists for this family's mechanism",
@@ -589,6 +763,70 @@
       }
     ],
     "localization_families": [],
+    "mechanisms": {
+      "count": 1,
+      "mechanisms": [
+        {
+          "mechanism_id": "M-17aad6d46f7a",
+          "schema_version": "evolution.failure_mechanism.v1",
+          "objective": "detection",
+          "status": "confirmed",
+          "confidence_basis": "multi_case",
+          "task_obligation": {
+            "kind": "unspecified",
+            "subject": "task_contract",
+            "expected_relation": "unclassified_obligation"
+          },
+          "observed_deviation": {
+            "kind": "unclassified",
+            "actual": "unclassified_deviation",
+            "expected": "unclassified_deviation"
+          },
+          "detector_failure": {
+            "stage": "recall_scanner",
+            "failure_mode": "not_reached",
+            "path_signature": {
+              "judge_positive": false,
+              "stages": {
+                "judge": "not_run",
+                "recall_scanner": "not_run",
+                "causal_upgrade": "not_run",
+                "step_tracer": "not_run",
+                "defense": "not_run"
+              },
+              "recall_path": "not_run",
+              "upgrade_positive": false,
+              "defense_verdict": "none",
+              "positive_source": "none"
+            }
+          },
+          "repair_hypothesis": {
+            "operation": "route_recall",
+            "required_inputs": [
+              "question_text",
+              "tool_names",
+              "packet_features"
+            ],
+            "required_capabilities": [
+              "control_flow"
+            ],
+            "forbidden_shortcuts": [
+              "case_id",
+              "gold_label",
+              "gold_step",
+              "dataset_annotation"
+            ]
+          },
+          "families": [
+            "FAM-fn-judge_false_no_recall_candidates-94b70b8ead3f-P70fe7f80fd90"
+          ],
+          "case_count": 2,
+          "proposable": true
+        }
+      ],
+      "unrepresented": [],
+      "excluded": []
+    },
     "patrol_registry": "active",
     "failure_contrast": {
       "active_registry_size": 0,
@@ -614,7 +852,271 @@
       "bootstrap_count": 0,
       "family_found": true
     },
-    "capability_gaps": []
+    "capability_gaps": [],
+    "capability_plan": {
+      "schema_version": "evolution.capability_requirement.v1",
+      "requirements": [
+        {
+          "schema_version": "evolution.capability_requirement.v1",
+          "mechanism_id": "M-17aad6d46f7a",
+          "classification": "actionable",
+          "required_capability": "",
+          "repair_operation": "route_recall",
+          "required_inputs": [
+            "question_text",
+            "tool_names",
+            "packet_features"
+          ],
+          "current_routes": [
+            "evolved_predicate",
+            "recall_directive",
+            "recall_trigger",
+            "upgrade_directive"
+          ],
+          "sufficient_routes": [
+            "recall_trigger"
+          ],
+          "insufficient_routes": [
+            {
+              "route": "evolved_predicate",
+              "capability": "observation",
+              "capability_fits": false,
+              "reasons": [
+                "route 'evolved_predicate' provides 'observation', but the repair needs ['control_flow']; observation cannot act on this failure"
+              ],
+              "falsification": {}
+            },
+            {
+              "route": "recall_directive",
+              "capability": "prompt",
+              "capability_fits": false,
+              "reasons": [
+                "route 'recall_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+              ],
+              "falsification": {}
+            },
+            {
+              "route": "upgrade_directive",
+              "capability": "prompt",
+              "capability_fits": false,
+              "reasons": [
+                "route 'upgrade_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+              ],
+              "falsification": {}
+            }
+          ],
+          "route_statuses": [
+            {
+              "route": "evolved_predicate",
+              "capability": "observation",
+              "hooks": [
+                "judge.post",
+                "adjudicate.guard"
+              ],
+              "capability_fits": false,
+              "readable_fields": [
+                "answer_anchor_status",
+                "context_contract_kinds",
+                "context_contract_requirements",
+                "context_evidence_refs",
+                "context_judge_confidence",
+                "context_judge_delivered_result",
+                "context_judge_hallucination_reason",
+                "context_judge_positive",
+                "context_quote",
+                "event_count",
+                "event_ids",
+                "event_texts",
+                "interaction_count",
+                "interaction_ids",
+                "interaction_texts",
+                "last_answer_tool_arguments",
+                "last_answer_tool_name",
+                "last_answer_tool_observation",
+                "last_prose_text",
+                "packet_features",
+                "prose_event_count",
+                "prose_texts",
+                "question_text",
+                "tool_arguments",
+                "tool_call_count",
+                "tool_names",
+                "tool_observations"
+              ],
+              "unreadable_fields": [],
+              "semantic_fields": [
+                "question_text"
+              ],
+              "semantic_relation": false,
+              "falsification": {},
+              "sufficient": false,
+              "reasons": [
+                "route 'evolved_predicate' provides 'observation', but the repair needs ['control_flow']; observation cannot act on this failure"
+              ]
+            },
+            {
+              "route": "recall_directive",
+              "capability": "prompt",
+              "hooks": [
+                "scanner.system"
+              ],
+              "capability_fits": false,
+              "readable_fields": [],
+              "unreadable_fields": [
+                "packet_features",
+                "question_text",
+                "tool_names"
+              ],
+              "semantic_fields": [
+                "question_text"
+              ],
+              "semantic_relation": false,
+              "falsification": {},
+              "sufficient": false,
+              "reasons": [
+                "route 'recall_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+              ]
+            },
+            {
+              "route": "recall_trigger",
+              "capability": "control_flow",
+              "hooks": [
+                "recall.trigger"
+              ],
+              "capability_fits": true,
+              "readable_fields": [],
+              "unreadable_fields": [
+                "packet_features",
+                "question_text",
+                "tool_names"
+              ],
+              "semantic_fields": [
+                "question_text"
+              ],
+              "semantic_relation": false,
+              "falsification": {},
+              "sufficient": true,
+              "reasons": []
+            },
+            {
+              "route": "upgrade_directive",
+              "capability": "prompt",
+              "hooks": [
+                "upgrade.system"
+              ],
+              "capability_fits": false,
+              "readable_fields": [],
+              "unreadable_fields": [
+                "packet_features",
+                "question_text",
+                "tool_names"
+              ],
+              "semantic_fields": [
+                "question_text"
+              ],
+              "semantic_relation": false,
+              "falsification": {},
+              "sufficient": false,
+              "reasons": [
+                "route 'upgrade_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+              ]
+            }
+          ],
+          "evidence": [
+            "evolved_predicate: route 'evolved_predicate' provides 'observation', but the repair needs ['control_flow']; observation cannot act on this failure",
+            "recall_directive: route 'recall_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure",
+            "upgrade_directive: route 'upgrade_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+          ]
+        }
+      ],
+      "actionable_mechanisms": [
+        "M-17aad6d46f7a"
+      ],
+      "gaps": [],
+      "capability_surface": {
+        "schema_version": "evolution.capability_requirement.v1",
+        "capabilities": {
+          "observation": "evidence_check + inline typed-DSL program: a deterministic comparison over typed fields, conjoined to at most 4 conditions",
+          "guard": "decision_guard: one of the closed guard actions ['convict_mechanical_violation', 'require_full_view_defense', 'restore_judge_conviction', 'withhold_conviction']",
+          "control_flow": "recall_trigger: forces the existing recall net for a case",
+          "prompt": "text_boundary: a prose directive injected into an LLM stage"
+        },
+        "hooks": [
+          "adjudicate.guard",
+          "defense.pre",
+          "defense.system",
+          "judge.post",
+          "judge.system",
+          "recall.trigger",
+          "scanner.system",
+          "tracer.system",
+          "upgrade.pre",
+          "upgrade.system"
+        ],
+        "intervention_types": [
+          "decision_guard",
+          "evidence_check",
+          "recall_trigger",
+          "text_boundary"
+        ],
+        "guard_actions": [
+          "convict_mechanical_violation",
+          "require_full_view_defense",
+          "restore_judge_conviction",
+          "withhold_conviction"
+        ],
+        "treatment_routes": [
+          "defense_directive",
+          "defense_requirement",
+          "evolved_predicate",
+          "judge_directive",
+          "mechanical_conviction",
+          "recall_directive",
+          "recall_trigger",
+          "restore_guard",
+          "tracer_directive",
+          "upgrade_directive",
+          "withhold_guard"
+        ],
+        "typed_field_count": 27,
+        "max_conditions_per_rule": 4,
+        "hook_reads_context_fields": {
+          "defense.pre": [
+            "context_contract_kinds",
+            "context_contract_requirements",
+            "context_evidence_refs",
+            "context_quote"
+          ],
+          "judge.post": [
+            "context_contract_kinds",
+            "context_contract_requirements",
+            "context_evidence_refs",
+            "context_judge_confidence",
+            "context_judge_delivered_result",
+            "context_judge_hallucination_reason",
+            "context_judge_positive",
+            "context_quote"
+          ],
+          "recall.trigger": [
+            "context_contract_kinds",
+            "context_contract_requirements",
+            "context_evidence_refs",
+            "context_judge_confidence",
+            "context_judge_delivered_result",
+            "context_judge_hallucination_reason",
+            "context_judge_positive",
+            "context_quote"
+          ],
+          "upgrade.pre": []
+        }
+      }
+    },
+    "route_failures": {
+      "records": 0,
+      "pairs": 0,
+      "insufficient": [],
+      "observed_only": []
+    }
   },
   "instrument": {
     "gain_opportunity": {
@@ -1064,7 +1566,9 @@
           ]
         },
         "fired_rate": 1.0,
-        "behavior_note": "evidence_increment_rows=12"
+        "behavior_note": "evidence_increment_rows=12",
+        "behavior_events": 12,
+        "behavior_event_kind": "evidence_increment"
       },
       "m": {
         "passed": true,
@@ -1671,7 +2175,9 @@
           ]
         },
         "fired_rate": 1.0,
-        "behavior_note": "guard_fired_cases=12"
+        "behavior_note": "guard_fired_cases=12",
+        "behavior_events": 12,
+        "behavior_event_kind": "guard_fired"
       },
       "m": {
         "passed": true,
@@ -2084,6 +2590,274 @@
       "observations": 0
     }
   },
+  "capability_plan": {
+    "schema_version": "evolution.capability_requirement.v1",
+    "requirements": [
+      {
+        "schema_version": "evolution.capability_requirement.v1",
+        "mechanism_id": "M-17aad6d46f7a",
+        "classification": "actionable",
+        "required_capability": "",
+        "repair_operation": "route_recall",
+        "required_inputs": [
+          "question_text",
+          "tool_names",
+          "packet_features"
+        ],
+        "current_routes": [
+          "evolved_predicate",
+          "recall_directive",
+          "recall_trigger",
+          "upgrade_directive"
+        ],
+        "sufficient_routes": [
+          "recall_trigger"
+        ],
+        "insufficient_routes": [
+          {
+            "route": "evolved_predicate",
+            "capability": "observation",
+            "capability_fits": false,
+            "reasons": [
+              "route 'evolved_predicate' provides 'observation', but the repair needs ['control_flow']; observation cannot act on this failure"
+            ],
+            "falsification": {}
+          },
+          {
+            "route": "recall_directive",
+            "capability": "prompt",
+            "capability_fits": false,
+            "reasons": [
+              "route 'recall_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+            ],
+            "falsification": {}
+          },
+          {
+            "route": "upgrade_directive",
+            "capability": "prompt",
+            "capability_fits": false,
+            "reasons": [
+              "route 'upgrade_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+            ],
+            "falsification": {}
+          }
+        ],
+        "route_statuses": [
+          {
+            "route": "evolved_predicate",
+            "capability": "observation",
+            "hooks": [
+              "judge.post",
+              "adjudicate.guard"
+            ],
+            "capability_fits": false,
+            "readable_fields": [
+              "answer_anchor_status",
+              "context_contract_kinds",
+              "context_contract_requirements",
+              "context_evidence_refs",
+              "context_judge_confidence",
+              "context_judge_delivered_result",
+              "context_judge_hallucination_reason",
+              "context_judge_positive",
+              "context_quote",
+              "event_count",
+              "event_ids",
+              "event_texts",
+              "interaction_count",
+              "interaction_ids",
+              "interaction_texts",
+              "last_answer_tool_arguments",
+              "last_answer_tool_name",
+              "last_answer_tool_observation",
+              "last_prose_text",
+              "packet_features",
+              "prose_event_count",
+              "prose_texts",
+              "question_text",
+              "tool_arguments",
+              "tool_call_count",
+              "tool_names",
+              "tool_observations"
+            ],
+            "unreadable_fields": [],
+            "semantic_fields": [
+              "question_text"
+            ],
+            "semantic_relation": false,
+            "falsification": {},
+            "sufficient": false,
+            "reasons": [
+              "route 'evolved_predicate' provides 'observation', but the repair needs ['control_flow']; observation cannot act on this failure"
+            ]
+          },
+          {
+            "route": "recall_directive",
+            "capability": "prompt",
+            "hooks": [
+              "scanner.system"
+            ],
+            "capability_fits": false,
+            "readable_fields": [],
+            "unreadable_fields": [
+              "packet_features",
+              "question_text",
+              "tool_names"
+            ],
+            "semantic_fields": [
+              "question_text"
+            ],
+            "semantic_relation": false,
+            "falsification": {},
+            "sufficient": false,
+            "reasons": [
+              "route 'recall_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+            ]
+          },
+          {
+            "route": "recall_trigger",
+            "capability": "control_flow",
+            "hooks": [
+              "recall.trigger"
+            ],
+            "capability_fits": true,
+            "readable_fields": [],
+            "unreadable_fields": [
+              "packet_features",
+              "question_text",
+              "tool_names"
+            ],
+            "semantic_fields": [
+              "question_text"
+            ],
+            "semantic_relation": false,
+            "falsification": {},
+            "sufficient": true,
+            "reasons": []
+          },
+          {
+            "route": "upgrade_directive",
+            "capability": "prompt",
+            "hooks": [
+              "upgrade.system"
+            ],
+            "capability_fits": false,
+            "readable_fields": [],
+            "unreadable_fields": [
+              "packet_features",
+              "question_text",
+              "tool_names"
+            ],
+            "semantic_fields": [
+              "question_text"
+            ],
+            "semantic_relation": false,
+            "falsification": {},
+            "sufficient": false,
+            "reasons": [
+              "route 'upgrade_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+            ]
+          }
+        ],
+        "evidence": [
+          "evolved_predicate: route 'evolved_predicate' provides 'observation', but the repair needs ['control_flow']; observation cannot act on this failure",
+          "recall_directive: route 'recall_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure",
+          "upgrade_directive: route 'upgrade_directive' provides 'prompt', but the repair needs ['control_flow']; prompt cannot act on this failure"
+        ]
+      }
+    ],
+    "actionable_mechanisms": [
+      "M-17aad6d46f7a"
+    ],
+    "gaps": [],
+    "capability_surface": {
+      "schema_version": "evolution.capability_requirement.v1",
+      "capabilities": {
+        "observation": "evidence_check + inline typed-DSL program: a deterministic comparison over typed fields, conjoined to at most 4 conditions",
+        "guard": "decision_guard: one of the closed guard actions ['convict_mechanical_violation', 'require_full_view_defense', 'restore_judge_conviction', 'withhold_conviction']",
+        "control_flow": "recall_trigger: forces the existing recall net for a case",
+        "prompt": "text_boundary: a prose directive injected into an LLM stage"
+      },
+      "hooks": [
+        "adjudicate.guard",
+        "defense.pre",
+        "defense.system",
+        "judge.post",
+        "judge.system",
+        "recall.trigger",
+        "scanner.system",
+        "tracer.system",
+        "upgrade.pre",
+        "upgrade.system"
+      ],
+      "intervention_types": [
+        "decision_guard",
+        "evidence_check",
+        "recall_trigger",
+        "text_boundary"
+      ],
+      "guard_actions": [
+        "convict_mechanical_violation",
+        "require_full_view_defense",
+        "restore_judge_conviction",
+        "withhold_conviction"
+      ],
+      "treatment_routes": [
+        "defense_directive",
+        "defense_requirement",
+        "evolved_predicate",
+        "judge_directive",
+        "mechanical_conviction",
+        "recall_directive",
+        "recall_trigger",
+        "restore_guard",
+        "tracer_directive",
+        "upgrade_directive",
+        "withhold_guard"
+      ],
+      "typed_field_count": 27,
+      "max_conditions_per_rule": 4,
+      "hook_reads_context_fields": {
+        "defense.pre": [
+          "context_contract_kinds",
+          "context_contract_requirements",
+          "context_evidence_refs",
+          "context_quote"
+        ],
+        "judge.post": [
+          "context_contract_kinds",
+          "context_contract_requirements",
+          "context_evidence_refs",
+          "context_judge_confidence",
+          "context_judge_delivered_result",
+          "context_judge_hallucination_reason",
+          "context_judge_positive",
+          "context_quote"
+        ],
+        "recall.trigger": [
+          "context_contract_kinds",
+          "context_contract_requirements",
+          "context_evidence_refs",
+          "context_judge_confidence",
+          "context_judge_delivered_result",
+          "context_judge_hallucination_reason",
+          "context_judge_positive",
+          "context_quote"
+        ],
+        "upgrade.pre": []
+      }
+    }
+  },
+  "route_failures": {
+    "observed": 0,
+    "appended": 0,
+    "state": {
+      "records": 0,
+      "pairs": 0,
+      "insufficient": [],
+      "observed_only": []
+    }
+  },
   "harness": {
     "manifest": {
       "schema_version": "evolution.harness.v1",
@@ -2092,7 +2866,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "3a0ab1e1c345",
+          "digest": "72884cdde760",
           "payload": {
             "stages": [
               "validate",
@@ -2113,7 +2887,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "98485e220211b1c2",
+            "source_digest": "9c27b514b1613c5c",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -2352,11 +3126,11 @@
         }
       },
       "registry_hash": "27cb8345a131f281ab40cc20763ef690ffa867acd4bd050111c603b88d338380",
-      "digest": "ddc78603e59b"
+      "digest": "ceaa342adb48"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "ddc78603e59b",
+      "current_digest": "ceaa342adb48",
       "first_manifest": true,
       "changed": [
         "G",

@@ -108,6 +108,14 @@ def main() -> int:
                     audit_passed = bool((report.get("audit") or {}).get("passed"))
                     checks.append({"name": "smoke_admission_and_audit", "exit_code":
                                    0 if admitted and audit_passed and report.get("state") == "completed" else 1})
+                    # The smoke config leaves the development loop off, so the
+                    # cycle must report the single-shot path. This is the
+                    # guarantee the wiring was required to keep: an offline
+                    # cycle that never opted into the loop takes the same path
+                    # it took before the loop could be reached from one.
+                    path_ok = report.get("round_path") == "single_shot"
+                    checks.append({"name": "smoke_round_path_single_shot", "exit_code":
+                                   0 if path_ok else 1})
 
     test_totals = Counter()
     xml_path = OUT / "pytest.xml"
