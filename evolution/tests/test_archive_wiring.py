@@ -442,3 +442,67 @@ def test_a_component_registered_from_a_run_is_retrievable(harness, passing_run):
     )
     assert found["components"], (capability, found)
     assert found["components"][0]["name"] == PROGRAM["name"]
+
+
+# --------------------------------------------------------------------------
+# Store paths come from the modules that define them
+# --------------------------------------------------------------------------
+
+def test_every_experience_store_path_is_module_defined():
+    """A store path must be read from its writer, not remembered.
+
+    A reporting script named the memory store ``episodes.jsonl`` from memory;
+    the store is ``episodic.jsonl``, so a run that had written one episode was
+    reported as having written nothing. The names are therefore pinned here
+    against the modules that define them, and this test fails if one is
+    renamed without the readers being updated.
+    """
+    from evolution.gaps import GAP_STORE_NAME
+    from evolution.memory import (
+        CORRECTION_NAME,
+        EPISODIC_NAME,
+        IMPROVEMENT_NAME,
+        PROCEDURAL_NAME,
+        RECALL_NAME,
+        memory_paths,
+    )
+    from evolution.engine import ROUTE_FAILURE_NAME
+
+    assert EPISODIC_NAME == "episodic.jsonl"
+    assert GAP_STORE_NAME == "gaps.jsonl"
+    paths = memory_paths("root")
+    for name, expected in (
+        ("episodic", EPISODIC_NAME),
+        ("procedural", PROCEDURAL_NAME),
+        ("improvement", IMPROVEMENT_NAME),
+        ("recall", RECALL_NAME),
+        ("corrections", CORRECTION_NAME),
+    ):
+        assert paths[name].name == expected, name
+    # The two harness stores share one directory, which is why a reader that
+    # guessed the directory right and the name wrong could still look plausible.
+    assert str(ROUTE_FAILURE_NAME).endswith(".jsonl")
+    assert GAP_STORE_NAME.endswith(".jsonl")
+
+
+def test_the_engine_writes_the_stores_it_declares():
+    """The engine's store attributes are the module constants, not literals."""
+    from evolution.engine import ROUTE_FAILURE_NAME
+    from evolution.gaps import GAP_STORE_NAME
+
+    config, split, _cases = _workspace(pathlib.Path(".") / "artifacts" / "_storepath_probe")
+    try:
+        engine = EvolutionEngine(
+            config, backend=MockDetectorBackend(), split=split, mini=True,
+        )
+    finally:
+        import shutil
+
+        shutil.rmtree(engine.config["work_root"], ignore_errors=True)
+        shutil.rmtree(engine.config["registry_dir"], ignore_errors=True)
+        pathlib.Path("artifacts/_storepath_probe").exists() and shutil.rmtree(
+            "artifacts/_storepath_probe", ignore_errors=True,
+        )
+    assert engine.gap_store.name == GAP_STORE_NAME
+    assert engine.route_failure_store.name == ROUTE_FAILURE_NAME
+    assert engine.component_store.name == "components"

@@ -138,15 +138,36 @@ LLM proposer 产出 **1 个候选**：
 | `active_after_cycle` | `[]`（**0 准入**） |
 | `marginal_selection.selected` | `[]` |
 | 账本 | 11 条记录，链 `valid=true` |
-| `route_failures.jsonl` | 0 条（本轮无"触发但无收益"的路由） |
-| `gaps.jsonl` | 0 条（两个机制都 actionable，没有能力缺口） |
-| `candidates/`（存档） | 0 条 |
-| `components/` | 0 条 |
-| memory episodes | 0 条 |
+| `harness/route_failures.jsonl` | **文件不存在**（本轮无"触发但无收益"的路由） |
+| `harness/gaps.jsonl` | **文件不存在**（两个机制都 actionable，没有能力缺口） |
+| `candidates/`、`components/` | **目录不存在**（见下） |
+| `memory/episodic.jsonl` | **存在**，1 条记录（442 字节） |
 
-**`candidates/` 为 0 是预期行为**：本轮的 `archive.on` 设为 `cycle_end`，而 §28.6 报告的
-"未做"一节已经说明 `cycle_end` **已声明但未接线**——没有开发 run 目录可归档，因此没有写入。
-这条读数是那个缺口的直接后果，不是新缺陷。
+**memory 的权威读数是运行自己记的**（H_t manifest 的 `M` 组件，`evolution.memory.v1`，
+digest `13d0474272cd`）：
+
+```json
+{"episodic":  {"records": 1, "falsified": 1, "unevaluable": 0, "admitted": 0},
+ "procedural": {"records": 0},
+ "improvement": {"records": 0}}
+```
+
+即：**这次拒绝被真实写入了情景记忆**（1 条，标记为 falsified，0 准入）。这条读数比
+计数更重要——它是 §19.10"每次拒绝必须产生机器可读原因"在真实数据上的落盘证据。
+
+**前两个文件不存在是预期行为**，不是缺陷：`route_failures` 与 `gaps` 只在有内容时才写，
+本轮既无路由反证也无能力缺口。**这一点有运行自己的计数作为交叉核对**：
+cycle 报告自报 `route_failures = {"observed": 0, "appended": 0, "state": {"records": 0}}`、
+`capability_backlog.summary = {"recorded": 0, "open": 0, "resolved": 0}`——与"文件不存在"
+一致。仅凭"文件不存在"本身无法区分"无内容可写"与"归档漏带"，两组读数放在一起才能。
+
+抽取脚本对每个存储同时报 `present` 与 `records`，正是为了让这两件事可区分：
+`present=false, records=null` 表示证据里没有这个文件，`present=true, records=0` 表示
+文件存在且为空——一个把两者都压成 `0` 的版本已经被这个区别抓出过一次错误。
+
+**`candidates/` 目录不存在同样是预期行为**：本轮 `archive.on=cycle_end`，而 §28.6 报告的
+"未做"一节已说明 `cycle_end` **已声明但未接线**——没有开发 run 目录可归档，因此连目录都
+没建。这条读数是那个缺口的直接后果，不是新缺陷。
 
 ## 这一轮证明了什么，没证明什么
 

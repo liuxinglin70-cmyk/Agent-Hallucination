@@ -262,13 +262,99 @@ def cycle_section(root: pathlib.Path) -> dict[str, Any]:
     }
 
 
-def stores_section(root: pathlib.Path) -> dict[str, Any]:
+def _store(path: pathlib.Path) -> dict[str, Any]:
+    """One store's reading, distinguishing "absent" from "present and empty".
+
+    The two are different claims, and both mistakes have now happened once:
+
+    * ``readings.json`` was regenerated from a partial copy of a run, and every
+      store the copy did not carry read as ``0`` -- the number an empty store
+      also produces, so "wrote nothing" and "evidence missing" were
+      indistinguishable;
+    * this section originally named the files by guessing (``episodes.jsonl``,
+      ``route_failures.jsonl`` under ``harness/``), and one of those guesses was
+      wrong: the memory store is ``episodic.jsonl``, and it *did* hold a record
+      the guess reported as absent.
+
+    The names therefore come from the modules that write them, not from this
+    file's memory of them.
+    """
+    if not path.exists():
+        return {"present": False, "records": None, "bytes": None}
     return {
-        "route_failures": len(read_jsonl(root / "harness" / "route_failures.jsonl")),
-        "gaps": len(read_jsonl(root / "harness" / "gaps.jsonl")),
-        "candidates": len(read_jsonl(root / "candidates" / "candidates.jsonl")),
-        "components": len(read_jsonl(root / "candidates" / "components.jsonl")),
-        "memory_episodes": len(read_jsonl(root / "memory" / "episodes.jsonl")),
+        "present": True,
+        "records": len(read_jsonl(path)),
+        "bytes": path.stat().st_size,
+    }
+
+
+def store_paths(root: pathlib.Path) -> dict[str, pathlib.Path]:
+    """Where each store lives, read from the modules that define them."""
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
+    from evolution.gaps import GAP_STORE_NAME
+    from evolution.memory import memory_paths
+    from evolution.engine import ROUTE_FAILURE_NAME
+
+    memory = memory_paths(root / "memory")
+    return {
+        "route_failures": root / "harness" / ROUTE_FAILURE_NAME,
+        "gaps": root / "harness" / GAP_STORE_NAME,
+        "episodic": memory["episodic"],
+        "procedural": memory["procedural"],
+        "candidates": root / "candidates" / "candidates.jsonl",
+        "components": root / "candidates" / "components.jsonl",
+    }
+
+
+def stores_section(root: pathlib.Path) -> dict[str, Any]:
+    """What the run's stores hold, and whether each was found in the evidence.
+
+    ``present: false`` means the file is not in the evidence at all. For the
+    four stores the engine writes lazily (route failures, gaps, candidates,
+    components) that is the honest reading of "the run had nothing to write
+    there" *or* "the archive does not carry it", and the two are separated by
+    the cycle report, which says how many records the run itself observed.
+    """
+    stores = {
+        name: _store(path) for name, path in store_paths(root).items()
+    }
+    return {
+        "stores": stores,
+        "present": sorted(n for n, row in stores.items() if row["present"]),
+        "absent": sorted(n for n, row in stores.items() if not row["present"]),
+        "note": (
+            "A store the run wrote but the archive does not carry would be "
+            "unverifiable here; ``absent`` names it rather than reporting 0, "
+            "and the cycle report's own counters are the cross-check."
+        ),
+    }
+
+
+def memory_section(root: pathlib.Path) -> dict[str, Any]:
+    """The run's own count of what its experience stores held.
+
+    Read from the cycle report's H_t manifest rather than from the store files,
+    and that is deliberate: the manifest is what the run *itself* recorded about
+    the generation it was, it travels with the cycle report (so it survives
+    cleanup), and it is the reading a later generation would inherit from. The
+    files are checked separately by :func:`stores_section`; when the two
+    disagree, the files are the evidence and the manifest is the claim.
+
+    The component is ``M`` in the harness manifest -- ``evolution.memory.v1`` --
+    and it counts per store: records, and for the episodic store how many were
+    falsified, admitted, or left unevaluable.
+    """
+    cycle_files = sorted((root / "cycles").glob("*.json"))
+    if not cycle_files:
+        return {}
+    report = load(cycle_files[-1]) or {}
+    manifest = ((report.get("harness") or {}).get("manifest") or {})
+    component = (manifest.get("components") or {}).get("M") or {}
+    payload = component.get("payload") or {}
+    return {
+        "digest": component.get("digest"),
+        "configured": payload.get("configured"),
+        "stores": payload.get("stores"),
     }
 
 
@@ -285,6 +371,7 @@ def main() -> int:
         "ledger": ledger_section(root),
         "cycle": cycle_section(root),
         "stores": stores_section(root),
+        "memory_manifest": memory_section(root),
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     out = pathlib.Path(__file__).resolve().parent / "readings.json"

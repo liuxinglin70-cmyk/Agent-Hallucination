@@ -1,5 +1,5 @@
 {
-  "run_root": "artifacts\\_rb",
+  "run_root": "reports\\real_evolution_20260923\\run_archive",
   "contract": {
     "config_hash": "7d9ff8b47ed2",
     "source_hash": "6b382bd0ac13c675",
@@ -897,10 +897,65 @@
     }
   },
   "stores": {
-    "route_failures": 0,
-    "gaps": 0,
-    "candidates": 0,
-    "components": 0,
-    "memory_episodes": 0
+    "stores": {
+      "route_failures": {
+        "present": false,
+        "records": null,
+        "bytes": null
+      },
+      "gaps": {
+        "present": false,
+        "records": null,
+        "bytes": null
+      },
+      "episodic": {
+        "present": false,
+        "records": null,
+        "bytes": null
+      },
+      "procedural": {
+        "present": false,
+        "records": null,
+        "bytes": null
+      },
+      "candidates": {
+        "present": false,
+        "records": null,
+        "bytes": null
+      },
+      "components": {
+        "present": false,
+        "records": null,
+        "bytes": null
+      }
+    },
+    "present": [],
+    "absent": [
+      "candidates",
+      "components",
+      "episodic",
+      "gaps",
+      "procedural",
+      "route_failures"
+    ],
+    "note": "A store the run wrote but the archive does not carry would be unverifiable here; ``absent`` names it rather than reporting 0, and the cycle report's own counters are the cross-check."
+  },
+  "memory_manifest": {
+    "digest": "13d0474272cd",
+    "configured": true,
+    "stores": {
+      "episodic": {
+        "records": 1,
+        "falsified": 1,
+        "unevaluable": 0,
+        "admitted": 0
+      },
+      "procedural": {
+        "records": 0
+      },
+      "improvement": {
+        "records": 0
+      }
+    }
   }
 }
