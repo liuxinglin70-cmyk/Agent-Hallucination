@@ -1401,6 +1401,34 @@ class EvolutionEngine:
                     "candidate_hash": handed["candidate_hash"],
                     "intervention_id": str(candidate.get("intervention_id") or ""),
                 }
+            else:
+                recovered = self._recover_certified_version(developer)
+                if recovered is not None:
+                    candidate = dict(recovered["candidate"])
+                    identifier_present = str(
+                        candidate.get("intervention_id") or ""
+                    )
+                    if not identifier_present:
+                        candidate["intervention_id"] = identifier
+                    candidate.pop("content_hash", None)
+                    frozen.append(candidate)
+                    block["recovered"] = {
+                        "version_id": recovered["version_id"],
+                        "candidate_hash": recovered["candidate_hash"],
+                        "status": recovered["status"],
+                        "reason": (
+                            "a version from an earlier pass of this run already "
+                            "passed L1; it is used rather than re-developed"
+                        ),
+                    }
+                    block["frozen"] = {
+                        "version_id": recovered["version_id"],
+                        "candidate_hash": recovered["candidate_hash"],
+                        "intervention_id": str(
+                            candidate.get("intervention_id") or ""
+                        ),
+                    }
+                    block["status"] = "ready_for_freeze"
             runs.append(block)
         # The draft calls are *not* folded into ``development_provider_calls``:
         # that attribute counts fresh case evaluations spent by
@@ -1431,6 +1459,44 @@ class EvolutionEngine:
             "metric_role": "diagnostic-only",
         }
         return batch, block
+
+    @staticmethod
+    def _recover_certified_version(developer: Any) -> dict[str, Any] | None:
+        """A version already on disk that this run certified but never used.
+
+        The loop's output directory is keyed by cycle and mechanism, so
+        re-entering it is a live possibility: a process that dies *after* a
+        version passed but before the round persisted its batch leaves a
+        ``frozen`` version behind. Re-running the loop then finds its budget
+        already spent, drafts nothing, and would report "development produced
+        nothing" -- losing certified work and describing the stage as empty
+        when it was not.
+
+        So when the loop stops without a selection, the last version on disk
+        whose status admits it to promotion is used instead. Only the two
+        statuses ``freeze`` can produce are accepted: ``ready_for_freeze`` and
+        ``frozen``. A ``failed_l0``/``failed_l1`` version is still a failure on
+        re-entry, exactly as it was the first time.
+        """
+        admissible = {"ready_for_freeze", "frozen"}
+        recovered: dict[str, Any] | None = None
+        for version in developer.graph.versions:
+            version_id = str(version.get("version_id") or "")
+            status = str(
+                developer.graph.development_status(version_id).get("status") or ""
+            )
+            if status not in admissible:
+                continue
+            candidate = version.get("candidate")
+            if not isinstance(candidate, Mapping):
+                continue
+            recovered = {
+                "version_id": version_id,
+                "candidate_hash": str(version.get("candidate_hash") or ""),
+                "candidate": dict(candidate),
+                "status": status,
+            }
+        return recovered
 
     def _development_drafter(
         self,

@@ -651,6 +651,99 @@ def test_preflight_block_names_not_reached(tmp_path):
     assert patrol_true  # the fixture plants the failures the patrol would find
 
 
+def test_reentering_the_loop_reuses_a_version_that_already_passed(tmp_path):
+    """A certified version on disk is used, not silently dropped.
+
+    The loop's output directory is keyed by cycle and mechanism, so re-entering
+    it is possible -- and a run that dies after a version passed but before the
+    round persisted its batch leaves exactly that state. The loop then finds
+    its budget spent, drafts nothing, and would report "development produced
+    nothing", losing certified work. Verified here by driving the stage twice
+    over one directory with a drafter that has nothing left to say.
+    """
+    cases = _make_dataset(tmp_path / "data")
+    config = _config(tmp_path, enabled=True)
+    base, patrol_true, gain_true = _planted(cases)
+    engine = EvolutionEngine(
+        config,
+        backend=MockDetectorBackend(
+            base_predictions=base,
+            overrides=_repairs("IV-1-D001", patrol_true, gain_true),
+        ),
+        split=_split(cases),
+        mini=True,
+        proposer=_CountingProposer(_scanner_candidate()),
+    )
+    preview = engine.preview_cycle(1)
+    family = next(
+        item for item in preview["families"]
+        if (item.get("mechanism") or {}).get("mechanism_id")
+    )
+    first_batch, first = engine._develop_candidates(
+        cycle=1, families=[family], capability_plan={"requirements": []},
+    )
+    assert first["candidate_count"] == 1, first["runs"]
+    assert first["runs"][0]["frozen"]["version_id"] == "v001"
+
+    # Second pass over the same directory, with a drafter that produces
+    # nothing: this is what a re-entry looks like once the budget is spent.
+    engine.proposer = _CountingProposer(_scanner_candidate())
+    engine.proposer.propose = lambda *a, **k: ProposalBatch()
+    second_batch, second = engine._develop_candidates(
+        cycle=1, families=[family], capability_plan={"requirements": []},
+    )
+
+    assert second["candidate_count"] == 1, second
+    recovered = second["runs"][0].get("recovered")
+    assert recovered, second["runs"][0]
+    assert recovered["version_id"] == "v001"
+    assert recovered["status"] in {"ready_for_freeze", "frozen"}
+    assert second_batch is not None
+    assert [c["intervention_id"] for c in second_batch.candidates] == ["IV-1-D001"]
+    # The recovered candidate is the same object the first pass certified.
+    assert (
+        second_batch.candidates[0]["intervention_id"]
+        == first_batch.candidates[0]["intervention_id"]
+    )
+
+
+def test_reentering_does_not_revive_a_failed_version(tmp_path):
+    """Recovery accepts what ``freeze`` can produce, and nothing else.
+
+    A version that failed its replay must not become admissible by being
+    re-read: that would turn "the loop measured this and it did not work" into
+    "the loop found something".
+    """
+    cases = _make_dataset(tmp_path / "data")
+    config = _config(tmp_path, enabled=True)
+    base, _patrol_true, _gain_true = _planted(cases)
+    engine = EvolutionEngine(
+        config,
+        backend=MockDetectorBackend(base_predictions=base, overrides={}),
+        split=_split(cases),
+        mini=True,
+        proposer=_CountingProposer(_scanner_candidate()),
+    )
+    preview = engine.preview_cycle(1)
+    family = next(
+        item for item in preview["families"]
+        if (item.get("mechanism") or {}).get("mechanism_id")
+    )
+    _batch, first = engine._develop_candidates(
+        cycle=1, families=[family], capability_plan={"requirements": []},
+    )
+    assert first["candidate_count"] == 0
+    assert first["runs"][0]["versions"][-1]["l1_passed"] is False
+
+    engine.proposer = _CountingProposer(_scanner_candidate())
+    engine.proposer.propose = lambda *a, **k: ProposalBatch()
+    _batch, second = engine._develop_candidates(
+        cycle=1, families=[family], capability_plan={"requirements": []},
+    )
+    assert second["candidate_count"] == 0, second["runs"]
+    assert not second["runs"][0].get("recovered")
+
+
 # --------------------------------------------------------------------------
 # 6. A loaded config owns its blocks (defect found by these tests)
 # --------------------------------------------------------------------------
