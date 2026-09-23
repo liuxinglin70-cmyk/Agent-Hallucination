@@ -807,3 +807,17 @@ def test_loop_on_without_a_developable_mechanism_falls_back_to_single_shot(
 
     assert report["state"] == "completed"
     assert report["development"]["candidate_count"] == 0
+    # The round fell back to single-shot, so that is what it must report. The
+    # first version of this wiring reported ``development`` whenever a
+    # development *record* existed, which is the wrong question: a round can
+    # enable the loop, find nothing developable, and carry a proposer draft to
+    # the gates. The real run caught that -- it was labelled ``development``
+    # while the candidates came from the proposer.
+    assert report["round_path"] == "single_shot"
+    development = report["development"]
+    assert development["targets"] == 0
+    assert development["reason"]
+    # The ledger and the report must agree: no ``development`` event means no
+    # development batch was adopted.
+    events = [record["event"] for record in engine.ledger.read()]
+    assert ("development" in events) is (report["round_path"] == "development")

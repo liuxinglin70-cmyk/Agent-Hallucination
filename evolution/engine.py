@@ -2954,6 +2954,16 @@ class EvolutionEngine:
             }, baseline_gain=baseline_gain, audit=audit, patrol=worksheet)
 
         development_block: dict[str, Any] | None = None
+        # Whether the loop's batch is what this round carries to the gates.
+        # Kept apart from ``development_block``, which is the loop's *record*:
+        # a round can enable the loop, find no mechanism it may develop, and
+        # fall back to single-shot drafting. It then has a development record
+        # describing why nothing was developed, while the candidates that reach
+        # the gates came from the proposer -- and reporting that round as
+        # "development" would misdescribe which path produced them. The ledger
+        # is the cross-check: it records a ``development`` event only when the
+        # loop's batch is adopted, so the two readings agree.
+        development_used = False
         if proposal_batch is None:
             self._journal.save(proposing=True)
             if hasattr(self.proposer, "active_entries"):
@@ -3005,6 +3015,7 @@ class EvolutionEngine:
                 )
                 if developed is not None:
                     proposal_batch = developed
+                    development_used = True
                     self._ledger("development", {
                         "cycle": cycle, **{
                             key: value for key, value in development_block.items()
@@ -3034,23 +3045,24 @@ class EvolutionEngine:
             raise RuntimeError("no proposal batch was produced this cycle")
         if development_block is None:
             # A resumed cycle restores its batch from the checkpoint and never
-            # re-enters drafting, so the development record has to come back
-            # from there too. Without this, a resumed development round would
-            # describe itself as single-shot -- exactly the distinction the
-            # field exists to make, inverted.
+            # re-enters drafting, so the development record -- and which path it
+            # describes -- have to come back from there too. Without this, a
+            # resumed development round would describe itself as single-shot,
+            # exactly the distinction the field exists to make, inverted.
             restored = self._journal.state.get("development")
             development_block = restored if isinstance(restored, Mapping) else None
+            development_used = bool(self._journal.state.get("development_used"))
         self._journal.save(proposing=False, proposal={
             "candidates": proposal_batch.candidates, "joint_groups": proposal_batch.joint_groups,
             "notes": proposal_batch.notes},
-            development=development_block)
+            development=development_block, development_used=development_used)
         # Which path this round took, read from the run rather than asserted:
         # `single_shot` is one draft carried to the gates, `development` is
         # draft -> L0 -> L1 -> revise with only a certified version admitted to
         # them. A reader of the cycle report must be able to tell these apart,
         # because the readings are not comparable: a gate rejection under
         # development has already survived a targeted replay.
-        round_path = "development" if development_block is not None else "single_shot"
+        round_path = "development" if development_used else "single_shot"
         self._validate_proposal_batch(
             proposal_batch,
             cycle=cycle,
