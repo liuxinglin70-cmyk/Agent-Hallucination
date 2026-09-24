@@ -1,0 +1,68 @@
+{
+  "metrics": {
+    "decisive": 160,
+    "unresolved": 6,
+    "completion": 0.963855421686747,
+    "decisive_accuracy": 0.7625,
+    "all_case_accuracy": 0.7349397590361446,
+    "tp": 73,
+    "fp": 11,
+    "fn": 27,
+    "tn": 49,
+    "positive_precision": 0.8690476190476191,
+    "positive_recall": 0.73,
+    "positive_f1": 0.7934782608695652,
+    "macro_precision": 0.7568922305764412,
+    "macro_recall": 0.7733333333333333,
+    "macro_f1": 0.7570332480818415,
+    "authoritative": 160,
+    "degraded": 6,
+    "degraded_disagreeing": 4,
+    "terminal_metrics": {
+      "decisive": 166,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.7469879518072289,
+      "all_case_accuracy": 0.7469879518072289,
+      "tp": 74,
+      "fp": 11,
+      "fn": 31,
+      "tn": 50,
+      "positive_precision": 0.8705882352941177,
+      "positive_recall": 0.7047619047619048,
+      "positive_f1": 0.7789473684210526,
+      "macro_precision": 0.7439360929557008,
+      "macro_recall": 0.762217017954723,
+      "macro_f1": 0.7415863602668643
+    },
+    "provider_unresolved": 0,
+    "no_terminal_decision": 0,
+    "requested_cases": 166,
+    "found_results": 166,
+    "missing_cases": 0,
+    "step_localization": {
+      "n": 105,
+      "hits": 32,
+      "accuracy": 0.3047619047619048,
+      "by_step_kind": {
+        "unclassified": {
+          "n": 31,
+          "hits": 0,
+          "accuracy": 0.0
+        },
+        "content_step": {
+          "n": 51,
+          "hits": 27,
+          "accuracy": 0.5294117647058824
+        },
+        "action_step": {
+          "n": 23,
+          "hits": 5,
+          "accuracy": 0.21739130434782608
+        }
+      },
+      "note": "action-step and content-step accuracy answer different questions; read them apart, never as one rate"
+    }
+  },
+  "cases": 166
+}

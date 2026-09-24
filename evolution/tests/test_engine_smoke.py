@@ -1903,6 +1903,41 @@ def test_thin_sentinel_stops_before_audit_patrol_and_proposer(tmp_path, audit_en
     assert not (engine.memory_root / "episodic.jsonl").exists()
 
 
+
+def test_an_inconclusive_audit_is_not_cached_and_is_retried_once(tmp_path):
+    """An unmeasured audit must not become a permanent property of the work_root.
+
+    The 2026-09-24 multi-generation runs froze three times on one gain-set case
+    that exceeded its recall deadline. The first of them wrote that verdict to
+    ``defect_audit_verdict.json``, and every later cycle in the same work_root
+    took the cache hit -- so a provider condition turned into "this directory
+    can never run". A decided verdict is still cached; only the inconclusive
+    one is re-attempted.
+    """
+    from evolution.engine import _ArmRunner
+    cases = _make_dataset(tmp_path / "data", n=20)
+    split = EvolutionSplit(name="synthetic", pool=cases, sentinel=cases[:4],
+                           gain=cases[4:12], patrol_pool=cases[12:], mini=True)
+    config = _config(tmp_path)
+    config["audit"] = {"enabled": True, "max_attempts": 2}
+    engine = EvolutionEngine(config, split=split, mini=True,
+                             backend=MockDetectorBackend(base_predictions={"A/001.json": True}))
+    verdict = engine._audit(1, _ArmRunner(engine, None))
+    assert verdict["passed"] is False and verdict["frozen"] is True
+    assert verdict["retryable"] is True, (
+        "a freeze caused by unmeasurable rows is a machine condition, not a verdict"
+    )
+    cache = engine.paths["reports"] / "defect_audit_verdict.json"
+    assert not cache.exists(), (
+        "caching an inconclusive verdict is what made one outage permanent"
+    )
+    # A decided verdict, by contrast, is still reused.
+    assert engine._audit_should_be_retried({"frozen": False, "retryable": False}) is False
+    assert engine._audit_should_be_retried({"frozen": True, "retryable": False}) is False
+    assert engine._audit_should_be_retried(
+        {"frozen": True, "retryable": True, "attempt": 2}
+    ) is False, "the retry is bounded: attempt 2 of 2 is final"
+
 def test_direct_audit_does_not_certify_insufficient_coverage(tmp_path):
     from evolution.engine import _ArmRunner
     cases = _make_dataset(tmp_path / "data", n=20)

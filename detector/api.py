@@ -23,7 +23,9 @@ from detector.interventions import (
 from detector.judge import _parse_judge, run_judge
 from detector.packet import build_packet, validate_record
 from detector.predicate_context import judge_predicate_context
-from detector.provider import case_deadline_ctx
+from detector.provider import ProviderError, accumulate_usage, case_deadline_ctx
+from detector.runtime import usage_scope, utc_now
+import time
 from detector.recaller import (
     _parse_candidates,
     _parse_upgrades,
@@ -341,15 +343,36 @@ class Detector:
         convict or clear on facts another stage already had. The snapshot
         digest is part of the run's provenance.
         """
-        with case_deadline_ctx(self.config.get("case_timeout_seconds")):
-            return self._detect(
-                record,
-                case_id=case_id,
-                interventions=interventions,
-                frozen_judge=frozen_judge,
-                frozen_stages=frozen_stages,
-                evidence=evidence,
-            )
+        started = time.perf_counter()
+        started_at = utc_now()
+        with usage_scope() as observations, case_deadline_ctx(self.config.get("case_timeout_seconds")):
+            try:
+                result = self._detect(
+                    record, case_id=case_id, interventions=interventions,
+                    frozen_judge=frozen_judge, frozen_stages=frozen_stages,
+                    evidence=evidence,
+                )
+            except ProviderError as exc:
+                result = {
+                    "schema_version": "detector.detection_result.v1", "case_id": case_id,
+                    "state": "unresolved", "occurrence_state": "unresolved",
+                    "runtime_valid": False, "decision_authority": "invalid",
+                    "responsible_step": None, "proof": {}, "stage_status": {}, "providers": {},
+                    "authority_failure_reasons": [{"component": exc.route_name, "code": exc.error_type, **exc.as_dict()}],
+                    "provenance": {},
+                }
+            usage: dict[str, Any] = {}
+            for observation in observations:
+                if isinstance(observation.get("usage"), Mapping):
+                    accumulate_usage(usage, observation["usage"])
+            result["execution"] = {
+                "schema_version": "detector.execution.v1", "started_at": started_at,
+                "finished_at": utc_now(), "elapsed_seconds": time.perf_counter() - started,
+                "requests": observations, "provider_attempts": len(observations),
+                "usage": usage or None,
+                "usage_missing_attempts": sum(o.get("usage") is None for o in observations),
+            }
+            return result
 
     def _detect(
         self,

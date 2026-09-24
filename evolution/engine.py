@@ -36,6 +36,7 @@ from evolution.backends import (
     source_digest,
 )
 from evolution.config import ensure_dirs, load_config, resolve_path
+from detector.runtime import exclusive_writer
 from evolution.contracts import (
     empty_registry,
     make_registry,
@@ -509,6 +510,20 @@ class EvolutionEngine:
         self.config = dict(load_config()) if config is None else dict(config)
         self.paths = ensure_dirs(self.config)
         self.mini = mini
+        # One writer per work_root, enforced rather than documented. Two runs
+        # sharing a work_root do not corrupt the ledger any more (it has a
+        # cross-process lock), but they still overwrite each other's registry,
+        # checkpoints and caches -- and the 2026-09-23 incident showed the
+        # result is two measurements silently mixed into one run. The lease is
+        # held for as long as the engine lives and released by ``close()``.
+        self._writer_lease = exclusive_writer(self.paths["root"])
+        self.holds_writer_lease = bool(
+            (self.config.get("runtime") or {}).get("exclusive_work_root", True)
+        )
+        self._writer_lease: Any | None = None
+        if self.holds_writer_lease:
+            self._writer_lease = exclusive_writer(self.paths["root"])
+            self._writer_lease.__enter__()
         self.backend = backend or make_backend(
             self.config,
             mock_base=mock_base,
@@ -919,6 +934,18 @@ class EvolutionEngine:
             "provider_attached": provider is not None,
         }
 
+    def close(self) -> None:
+        """Release the work_root writer lease. Safe to call more than once."""
+        lease, self._writer_lease = self._writer_lease, None
+        if lease is not None:
+            lease.__exit__(None, None, None)
+
+    def __enter__(self) -> "EvolutionEngine":
+        return self
+
+    def __exit__(self, *_exc: Any) -> None:
+        self.close()
+
     def _instrument_report(
         self,
         *,
@@ -1020,6 +1047,20 @@ class EvolutionEngine:
             # both mean the claim was not measured, so one check covers them.
             "instrument_limited": bool(counts.get("not_evaluated") or blocked_families),
         }
+
+    def _audit_should_be_retried(self, audit: Mapping[str, Any]) -> bool:
+        """Whether a stored audit is a measurement failure worth re-running.
+
+        Only a verdict that froze *because rows could not be measured* is
+        re-attempted, and only when the journal holds one from an earlier
+        attempt of the same cycle. A decided verdict -- passed or a real
+        rejection -- is reused as before, so this cannot turn "the gates
+        rejected the defect" into "ask again until they pass".
+        """
+        if not audit.get("frozen") or not audit.get("retryable"):
+            return False
+        attempts = int((self.config.get("audit") or {}).get("max_attempts", 2))
+        return int(audit.get("attempt") or 1) < max(1, attempts)
 
     def _stop_preflight(
         self, cycle: int, preflight: Mapping[str, Any], *,
@@ -2439,6 +2480,18 @@ class EvolutionEngine:
                     if infrastructure:
                         report["audit_inconclusive"] = True
                         report["audit_inconclusive_reason"] = infrastructure
+                        # The exact rows that could not be measured, kept on
+                        # the report so a reader can tell "the gates rejected
+                        # the defect" from "nobody measured it" without
+                        # re-deriving it from the delta.
+                        report["unmeasured_rows"] = [
+                            row for row in (
+                                *(unit.get("candidate_rows") or ()),
+                                *baseline_s,
+                                *baseline_g,
+                            )
+                            if arm_has_infrastructure_failure([row])
+                        ]
             if not report["audit_passed"]:
                 report["audit_rejected"] = True
             if report["audit_passed"]:
@@ -2454,18 +2507,42 @@ class EvolutionEngine:
             "frozen": passed_any or inconclusive_any,
             "reports": reports,
             "cache": "miss",
+            # A freeze that rests on cases nobody could measure is a statement
+            # about the machine, not about the gates, so the machinery is free
+            # to try again (see the cache write below).
+            "retryable": inconclusive_any and not passed_any,
+            "unmeasured_cases": sorted(
+                _unmeasurable_cases([
+                    *baseline_s,
+                    *baseline_g,
+                    *[
+                        row
+                        for report in reports
+                        for row in (report.get("unmeasured_rows") or ())
+                    ],
+                ])
+            ),
         }
-        save_json(cache_path, {
-            "fingerprint": fingerprint(fingerprint_payload),
-            "passed": verdict["passed"],
-            "frozen": verdict["frozen"],
-            "reports": reports,
-        })
+        if not verdict["retryable"]:
+            # Only a decided verdict is cached. An inconclusive one records
+            # that the measurement failed, and caching it would turn one
+            # provider outage into a permanent property of this work_root:
+            # every later cycle would take the cache hit and freeze again
+            # without ever re-measuring. That is the same defect as reading
+            # "not measured" as "falsified" (see §32.3), one layer up.
+            save_json(cache_path, {
+                "fingerprint": fingerprint(fingerprint_payload),
+                "passed": verdict["passed"],
+                "frozen": verdict["frozen"],
+                "reports": reports,
+            })
         self._ledger("audit", {
             "cycle": cycle,
             "passed": verdict["passed"],
             "reports": reports,
             "cache": "miss",
+            "retryable": verdict["retryable"],
+            "unmeasured_cases": verdict["unmeasured_cases"],
         })
         return verdict
 
@@ -3275,8 +3352,23 @@ class EvolutionEngine:
             }, provider_stage=active_fresh)
 
         audit = self._journal.state.get("audit")
-        if audit is None:
-            audit = self._audit(cycle, arms)
+        if audit is None or self._audit_should_be_retried(audit):
+            attempts = int((self.config.get("audit") or {}).get("max_attempts", 2))
+            audit = None
+            for attempt in range(max(1, attempts)):
+                audit = self._audit(cycle, arms)
+                audit["attempt"] = attempt + 1
+                if audit.get("retryable") and attempt + 1 < max(1, attempts):
+                    # An inconclusive audit rests on rows nobody could measure
+                    # -- a transient provider state, not a property of the
+                    # gates. One bounded re-measurement is the difference
+                    # between "the gates could not be exercised now" and "this
+                    # work_root can never run": the first real multi-cycle run
+                    # froze on a single gain-set case that timed out, and a
+                    # cached inconclusive verdict would have made that
+                    # permanent for the work_root.
+                    continue
+                break
             self._journal.save(audit=audit)
         if audit.get("frozen"):
             self._ledger("cycle_completed", {

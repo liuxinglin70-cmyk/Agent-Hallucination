@@ -24,6 +24,10 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib import error as urlerror
 from urllib import request as urlrequest
+from contextlib import nullcontext
+from detector.runtime import (
+    RunStopped, current_control, current_deadline, deadline_scope, record_request,
+)
 
 # A whole-detection wall-clock deadline, set by the detector around one
 # ``detect`` call and honoured by every provider call inside it. Each stage
@@ -114,12 +118,32 @@ class ProviderError(RuntimeError):
         *,
         error_type: str = "provider_error",
         attempts: int = 0,
+        http_status: int | None = None,
+        retryable: bool = True,
     ) -> None:
         super().__init__(f"route {route_name}: {message}")
         self.route_name = route_name
         self.error_type = error_type
         self.attempts = attempts
         self.message = message
+        self.http_status = http_status
+        self.retryable = retryable
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"route": self.route_name, "message": self.message,
+                "error_type": self.error_type, "http_status": self.http_status,
+                "retryable": self.retryable, "attempts": self.attempts}
+
+
+FATAL_PROVIDER_ERRORS = frozenset({
+    "missing_credential", "authentication_error", "permission_error",
+    "invalid_request", "quota_exhausted", "model_unavailable", "run_cancelled",
+})
+
+
+def raise_if_fatal(exc: ProviderError) -> None:
+    if exc.error_type in FATAL_PROVIDER_ERRORS:
+        raise exc
 
 
 def extract_json_object(text: str) -> Any | None:
@@ -175,24 +199,8 @@ def extract_json_object(text: str) -> Any | None:
 
 
 def case_deadline_ctx(seconds: float | None) -> Any:
-    """Context manager that bounds all provider calls within the block.
-
-    ``None`` disables the deadline (unbounded, the historical behaviour).
-    """
-    from contextlib import contextmanager
-
-    @contextmanager
-    def _ctx():
-        if seconds is None:
-            yield
-            return
-        token = _CASE_DEADLINE.set(time.monotonic() + float(seconds))
-        try:
-            yield
-        finally:
-            _CASE_DEADLINE.reset(token)
-
-    return _ctx()
+    """Nested stages and whole-case retries may shorten, never reset, a deadline."""
+    return deadline_scope(seconds)
 
 
 def required_quorum(votes: int) -> int:
@@ -263,6 +271,28 @@ def _endpoint_url(endpoint: str) -> str:
 
 
 def provider_call(
+    *, route: Mapping[str, Any], system: str, user: str,
+    purpose: str, cache_tag: str = "",
+) -> tuple[Any, dict[str, Any]]:
+    control = current_control()
+    try:
+        if control is not None:
+            control.check()
+        return _provider_call(route=route, system=system, user=user,
+                              purpose=purpose, cache_tag=cache_tag)
+    except RunStopped as exc:
+        raise ProviderError(
+            str(route.get("_route_name") or purpose), str(exc),
+            error_type=str(exc.reason.get("error_type") or "run_cancelled"),
+            retryable=False,
+        ) from exc
+    except ProviderError as exc:
+        if control is not None and exc.error_type in FATAL_PROVIDER_ERRORS:
+            control.stop(exc.as_dict())
+        raise
+
+
+def _provider_call(
     *,
     route: Mapping[str, Any],
     system: str,
@@ -334,7 +364,7 @@ def provider_call(
     growth = max(1.0, float(route.get("timeout_growth_factor", 1.5)))
     per_attempt = int(route.get("timeout_seconds", 120))
     total_timeout = max(1.0, float(route.get("total_timeout_seconds", 360)))
-    case_deadline = _CASE_DEADLINE.get()
+    case_deadline = current_deadline()
     if case_deadline is not None:
         remaining_case = case_deadline - time.monotonic()
         if remaining_case <= 0:
@@ -347,6 +377,9 @@ def provider_call(
     last_error = ""
     attempts = 0
     needs_recovery = False
+    call_usage: dict[str, Any] = {}
+    last_status: int | None = None
+    control = current_control()
     def retry_delay(attempt: int) -> bool:
         """Sleep only while the shared request deadline still permits it."""
         remaining = deadline - time.monotonic()
@@ -378,13 +411,18 @@ def provider_call(
             },
             ensure_ascii=False,
         ).encode("utf-8")
+        if control is not None:
+            control.check()
+        request_started = time.perf_counter()
+        queue_seconds = 0.0
         try:
-            status, raw = _isolated_transport(
-                url=url,
-                headers=headers,
-                body=body,
-                timeout=timeout,
-            )
+            with control.request_slot() if control is not None else nullcontext():
+                queue_seconds = time.perf_counter() - request_started
+                if control is not None:
+                    timeout = min(timeout, max(0.001, deadline - time.monotonic()))
+                status, raw = _isolated_transport(
+                    url=url, headers=headers, body=body, timeout=timeout,
+                )
         except (
             urlerror.URLError,
             TimeoutError,
@@ -392,6 +430,10 @@ def provider_call(
             ValueError,
             IncompleteRead,
         ) as exc:
+            record_request({"purpose": purpose, "attempt": attempts,
+                            "elapsed_seconds": time.perf_counter() - request_started,
+                            "queue_seconds": queue_seconds, "status": "transport_error",
+                            "error_type": type(exc).__name__, "usage": None})
             last_error = f"{type(exc).__name__}: {exc}"
             if attempt < retries and not retry_delay(attempt):
                 last_error = "total timeout exceeded"
@@ -400,8 +442,25 @@ def provider_call(
         try:
             data = json.loads(raw.decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
-            last_error = f"provider returned non-JSON body: {raw[:160]!r}"
-            needs_recovery = True
+            data = {}
+        if not isinstance(data, Mapping):
+            data = {}
+        observed_usage = data.get("usage")
+        record_request({"purpose": purpose, "attempt": attempts,
+                        "elapsed_seconds": time.perf_counter() - request_started,
+                        "queue_seconds": queue_seconds, "http_status": status,
+                        "status": "response", "model": str(data.get("model") or route.get("model") or ""),
+                        "usage": dict(observed_usage) if isinstance(observed_usage, Mapping) else None})
+        if isinstance(observed_usage, Mapping):
+            accumulate_usage(call_usage, observed_usage)
+        last_status = status
+        if status in {400, 401, 402, 403, 404, 422}:
+            category = {401: "authentication_error", 403: "permission_error",
+                        402: "quota_exhausted", 404: "model_unavailable"}.get(status, "invalid_request")
+            raise ProviderError(route_name, f"http {status}: {str(data.get('error') or 'request refused')[:200]}",
+                                error_type=category, attempts=attempts, http_status=status, retryable=False)
+        if not data:
+            last_error = "provider returned non-JSON body"
             if attempt < retries and not retry_delay(attempt):
                 last_error = "total timeout exceeded"
                 break
@@ -409,6 +468,9 @@ def provider_call(
         if status != 200 or not data.get("choices"):
             detail = data.get("error") or {}
             last_error = f"http {status}: {str(detail)[:200]}"
+            if status == 429 and isinstance(detail, Mapping) and str(detail.get("code") or detail.get("type")) in {"insufficient_quota", "quota_exhausted"}:
+                raise ProviderError(route_name, last_error, error_type="quota_exhausted",
+                                    attempts=attempts, http_status=status, retryable=False)
             if attempt < retries and not retry_delay(attempt):
                 last_error = "total timeout exceeded"
                 break
@@ -423,6 +485,7 @@ def provider_call(
         meta: dict[str, Any] = {
             "attempts": attempts,
             "usage": usage,
+            "usage_total": dict(call_usage),
             "cache_hit": bool(usage.get("prompt_cache_hit_tokens")),
             "prompt_cache_hit_tokens": int(
                 usage.get("prompt_cache_hit_tokens") or 0
@@ -466,8 +529,9 @@ def provider_call(
             last_error = "provider reply carried no usable JSON object"
             break
         return parsed, meta
-    error_type = "invalid_json" if "JSON" in last_error else "provider_error"
+    error_type = ("invalid_json" if "JSON" in last_error else
+                  "rate_limited" if last_status == 429 else "provider_error")
     raise ProviderError(
         route_name, last_error or "unknown failure",
-        error_type=error_type, attempts=attempts,
+        error_type=error_type, attempts=attempts, http_status=last_status,
     )

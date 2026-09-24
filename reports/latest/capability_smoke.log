@@ -68,7 +68,8 @@
     "enabled": false,
     "passed": true,
     "frozen": false,
-    "reports": []
+    "reports": [],
+    "attempt": 1
   },
   "patrol": {
     "patrol_size": 5,
@@ -3062,7 +3063,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "394fce770ef1",
+          "digest": "87347388cf44",
           "payload": {
             "stages": [
               "validate",
@@ -3083,7 +3084,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "faf96c15a8bea412",
+            "source_digest": "aedaa8a3128cae6f",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -3322,11 +3323,11 @@
         }
       },
       "registry_hash": "27cb8345a131f281ab40cc20763ef690ffa867acd4bd050111c603b88d338380",
-      "digest": "9b38945fec19"
+      "digest": "f00c991ca32e"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "9b38945fec19",
+      "current_digest": "f00c991ca32e",
       "first_manifest": true,
       "changed": [
         "G",
@@ -3423,4 +3424,4 @@
   }
 }
 
-capability-smoke verdict: PASS; selected=['IV-1-001', 'IV-1-002']; gain=2; heldout=1; report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_l7pudncc\work\capability_smoke\capability_smoke_report.json
+capability-smoke verdict: PASS; selected=['IV-1-001', 'IV-1-002']; gain=2; heldout=1; report -> E:\agent hallucination\agent hallucination\artifacts\offline_verification_4q4f2vg0\work\capability_smoke\capability_smoke_report.json

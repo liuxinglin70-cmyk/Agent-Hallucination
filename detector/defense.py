@@ -26,8 +26,10 @@ from detector.provider import (
     accumulate_usage,
     majority_vote,
     provider_call,
+    raise_if_fatal,
     required_quorum,
 )
+from detector.runtime import parallel_ordered
 
 
 def _provider_call(
@@ -198,6 +200,7 @@ def _call_defense(
             cache_tag=cache_tag,
         )
     except ProviderError as exc:
+        raise_if_fatal(exc)
         return {"ok": False, "parsed": None, "error": exc.message,
                 "error_type": exc.error_type}, {
             "stage": "defense", "state": "provider_error",
@@ -224,6 +227,7 @@ def _call_defense(
                     result, packet, positive, snapshot,
                 )
         except ProviderError as exc:
+            raise_if_fatal(exc)
             return {"ok": False, "parsed": None, "error": exc.message,
                     "error_type": exc.error_type}, {
                 "stage": "defense", "state": "provider_error",
@@ -298,8 +302,39 @@ def _vote_defense(
                 ),
             }
 
-    for _ in range(votes):
-        cast_one()
+    def cast_at(_index: int) -> tuple[dict[str, Any], dict[str, Any]]:
+        return _call_defense(
+            packet=packet, route=route, system=system, user=user,
+            positive=positive, snapshot=snapshot,
+        )
+
+    def absorb(outcome: tuple[dict[str, Any], dict[str, Any]]) -> None:
+        nonlocal total_attempts, last_error, sample_meta
+        result, status = outcome
+        total_attempts += int(status.get("attempts") or 0)
+        warnings.extend(status.get("warnings") or [])
+        if result.get("ok") and isinstance(result.get("parsed"), Mapping):
+            ballots.append(dict(result["parsed"]))
+            sample_meta = dict(result.get("provider") or {})
+            accumulate_usage(
+                ballots_usage, (sample_meta or {}).get("usage") or {},
+            )
+        else:
+            last_error = {
+                "error": str(result.get("error") or "defense vote failed"),
+                "error_type": str(
+                    result.get("error_type") or "provider_error"
+                ),
+            }
+
+    # Independent ballots, cast concurrently; index order is preserved so the
+    # returned sample does not depend on completion order (see
+    # ``parallel_ordered``). Defense was the second serial vote in every
+    # convicted case, so this halves the serial round trips a case waits on.
+    parallel = max(1, int((route.get("vote_concurrency") or votes) or 1))
+    for outcome in parallel_ordered(cast_at, votes, workers=parallel):
+        if outcome is not None:
+            absorb(outcome)
     while len(ballots) < votes and topup_budget > 0:
         topup_budget -= 1
         topups_used += 1

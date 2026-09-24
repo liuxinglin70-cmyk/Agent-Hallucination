@@ -1,17 +1,17 @@
 {
-  "started_at_utc": "2026-09-23T15:26:04.600197+00:00",
-  "finished_at_utc": "2026-09-23T15:29:14.608490+00:00",
+  "started_at_utc": "2026-09-24T04:01:29.194597+00:00",
+  "finished_at_utc": "2026-09-24T04:04:52.017316+00:00",
   "python": "3.13.7",
   "platform": "Windows-10-10.0.19045-SP0",
   "scope": "Offline regression and mock mechanism validation; no live provider accuracy measurement.",
-  "source_sha256": "11f2dc2b3d5c28187173e179aaad10d836280a9ba7af43dde2d8f61f27f5d348",
+  "source_sha256": "849de244b2cdfcd062acc1f8ff62155935f5173ae1390e9041e3bbe823cab0e0",
   "passed": true,
   "tests": {
-    "tests": 1043,
+    "tests": 1101,
     "failures": 0,
     "errors": 0,
     "skipped": 0,
-    "passed": 1043
+    "passed": 1101
   },
   "checks": [
     {
@@ -29,7 +29,7 @@
         "--junitxml=reports/latest/pytest.xml"
       ],
       "exit_code": 0,
-      "seconds": 172.328
+      "seconds": 185.48
     },
     {
       "name": "detector_cli",
@@ -39,7 +39,7 @@
         "--help"
       ],
       "exit_code": 0,
-      "seconds": 0.209
+      "seconds": 0.211
     },
     {
       "name": "detector_cli_registers_commands",
@@ -53,7 +53,7 @@
         "--help"
       ],
       "exit_code": 0,
-      "seconds": 0.261
+      "seconds": 0.252
     },
     {
       "name": "evolution_cli_registers_commands",
@@ -67,7 +67,7 @@
         "capability-audit"
       ],
       "exit_code": 0,
-      "seconds": 0.632
+      "seconds": 0.619
     },
     {
       "name": "capability_audit_admissible",
@@ -82,7 +82,7 @@
         "metamorphic-gate"
       ],
       "exit_code": 0,
-      "seconds": 0.624
+      "seconds": 0.625
     },
     {
       "name": "sandbox_check",
@@ -92,7 +92,7 @@
         "sandbox-check"
       ],
       "exit_code": 0,
-      "seconds": 0.254
+      "seconds": 0.257
     },
     {
       "name": "smoke",
@@ -101,10 +101,10 @@
         "evolution",
         "smoke",
         "--config",
-        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_l7pudncc\\config.json"
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_4q4f2vg0\\config.json"
       ],
       "exit_code": 0,
-      "seconds": 9.163
+      "seconds": 8.921
     },
     {
       "name": "smoke_admission_and_audit",
@@ -121,10 +121,10 @@
         "evolution",
         "capability-smoke",
         "--config",
-        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_l7pudncc\\config.json"
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_4q4f2vg0\\config.json"
       ],
       "exit_code": 0,
-      "seconds": 6.153
+      "seconds": 6.05
     },
     {
       "name": "source_unchanged_during_checks",

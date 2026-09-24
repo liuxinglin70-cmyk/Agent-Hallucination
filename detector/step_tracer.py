@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 from detector.interventions import InterventionPlan, empty_plan
 from detector.packet import packet_features, render_judge_view
-from detector.provider import ProviderError, provider_call
+from detector.provider import ProviderError, provider_call, raise_if_fatal
 from detector.semantics import TRACER_CONTRACT_REPAIR, TRACER_SYSTEM
 
 
@@ -101,6 +101,7 @@ def run_step_tracer(
             route=route, system=system, user=user, purpose="step_tracer",
         )
     except ProviderError as exc:
+        raise_if_fatal(exc)
         return {
             "ok": False, "parsed": None, "error": exc.message,
             "error_type": exc.error_type,
@@ -121,6 +122,7 @@ def run_step_tracer(
             )
             result, error = _parse_tracer(parsed, packet)
         except ProviderError as exc:
+            raise_if_fatal(exc)
             return {
                 "ok": False, "parsed": None, "error": exc.message,
                 "error_type": exc.error_type,

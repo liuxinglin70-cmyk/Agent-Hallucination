@@ -27,8 +27,10 @@ from detector.interventions import (
     build_intervention_registry,
     compile_runtime_plan,
 )
+from detector.measurement import measurement_status
 from detector.packet import build_packet
 from detector.result import prediction_state
+from detector.runtime import bounded_map, deadline_scope
 
 from evolution.config import resolve_path
 from evolution.contracts import save_json
@@ -274,9 +276,11 @@ class DetectionBackend:
     ) -> list[dict[str, Any]]:
         """Evaluate cases paired by id.
 
-        ``deadline`` is a monotonic wall-clock timestamp for the whole batch.
-        A case that cannot start before it fail-closes to an unresolved row:
-        bounded runtime never silently drops or invents outcomes.
+        ``deadline`` is a monotonic wall-clock timestamp for the whole batch. A
+        case that cannot start before it fail-closes to an unresolved row:
+        bounded runtime never silently drops or invents outcomes. The deadline
+        also reaches the detector, so a case already running when it passes is
+        stopped rather than allowed to exceed it.
 
         ``gold_step_map`` carries the evaluator-side localization annotation so
         a row can be scored jointly on detection and responsible step. It is
@@ -301,9 +305,10 @@ class DetectionBackend:
             else:
                 try:
                     record = load_record(dataset_root, case_id)
-                    result = self.run_case(
-                        record, case_id=case_id, registry=registry, gold=gold,
-                    )
+                    with deadline_scope(deadline=deadline):
+                        result = self.run_case(
+                            record, case_id=case_id, registry=registry, gold=gold,
+                        )
                 except Exception as exc:
                     result = _unresolved_backend_result(
                         case_id,
@@ -319,6 +324,16 @@ class DetectionBackend:
                 "state": result.get("state"),
                 "authority": result.get("decision_authority"),
                 "responsible_step": result.get("responsible_step"),
+                "responsible_step_kind": result.get("responsible_step_kind"),
+                # How this row reads as a *measurement*, in one vocabulary
+                # shared with the batch runner. ``prediction is None`` alone
+                # conflates "the provider died" with "the case was answered but
+                # degraded", and every downstream count needs them apart.
+                "measurement": measurement_status(result),
+                "failure_reasons": [
+                    dict(item) for item in result.get("authority_failure_reasons") or ()
+                    if isinstance(item, Mapping)
+                ],
                 # Wall time this row actually cost, including a cache hit
                 # (which is near zero) and a deadline skip. Recorded because a
                 # batch's total is dominated by its slowest case: the
@@ -352,30 +367,28 @@ class DetectionBackend:
                     flush=True,
                 )
             try:
-                with ThreadPoolExecutor(max_workers=int(workers)) as pool:
-                    futures = [pool.submit(one, case) for case in cases]
-                    for future in as_completed(futures):
-                        row = future.result()
-                        rows.append(row)
-                        if progress:
-                            print(
-                                f"[evolution] {len(rows)}/{total} {row['case']} -> "
-                                f"{row['prediction']} ({row['state']})",
-                                file=sys.stderr,
-                                flush=True,
-                            )
-                        if handle is not None:
-                            handle.write(json.dumps({
-                                "done": len(rows),
-                                "total": total,
-                                "case": row.get("case"),
-                                "prediction": row.get("prediction"),
-                                "state": row.get("state"),
-                                "authority": row.get("authority"),
-                                "responsible_step": row.get("responsible_step"),
-                                "elapsed_seconds": row.get("elapsed_seconds"),
-                            }, ensure_ascii=False) + "\n")
-                            handle.flush()
+                for row in bounded_map(one, cases, workers=int(workers)):
+                    rows.append(row)
+                    if progress:
+                        print(
+                            f"[evolution] {len(rows)}/{total} {row['case']} -> "
+                            f"{row['prediction']} ({row['state']})",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+                    if handle is not None:
+                        handle.write(json.dumps({
+                            "done": len(rows),
+                            "total": total,
+                            "case": row.get("case"),
+                            "prediction": row.get("prediction"),
+                            "state": row.get("state"),
+                            "authority": row.get("authority"),
+                            "measurement": row.get("measurement"),
+                            "responsible_step": row.get("responsible_step"),
+                            "elapsed_seconds": row.get("elapsed_seconds"),
+                        }, ensure_ascii=False) + "\n")
+                        handle.flush()
             finally:
                 if handle is not None:
                     handle.close()

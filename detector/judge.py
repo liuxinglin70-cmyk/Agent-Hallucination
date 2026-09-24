@@ -20,8 +20,10 @@ from detector.provider import (
     accumulate_usage,
     majority_vote,
     provider_call,
+    raise_if_fatal,
     required_quorum,
 )
+from detector.runtime import parallel_ordered
 from detector.semantics import (
     CONTRACT_KINDS,
     JUDGE_BASIS_VALUES,
@@ -172,6 +174,8 @@ def _cast_vote(
             route=route, system=system, user=user, purpose="judge",
         )
     except ProviderError as exc:
+        if exc.error_type != "missing_credential":
+            raise_if_fatal(exc)
         if exc.error_type == "missing_credential":
             return fatal_error(exc.message, exc.attempts, "provider_error")
         return abstain(exc.message)
@@ -186,6 +190,8 @@ def _cast_vote(
             )
             result, error = _parse_judge(parsed, packet)
         except ProviderError as exc:
+            if exc.error_type != "missing_credential":
+                raise_if_fatal(exc)
             if exc.error_type == "missing_credential":
                 return fatal_error(exc.message, exc.attempts, "provider_error")
             return abstain(exc.message)
@@ -256,8 +262,39 @@ def run_judge(
             accumulate_usage(ballots_usage, (meta or {}).get("usage") or {})
         return True
 
-    for _ in range(votes):
-        if not cast_one():
+    # Independent ballots are exactly that, so they are cast concurrently: the
+    # vote count is a majority requirement, not a serial protocol. Order is
+    # preserved (see ``parallel_ordered``) so the returned sample does not
+    # depend on which ballot happened to finish first.
+    def cast_at(_index: int) -> tuple[Any, Any, bool, list]:
+        return _cast_vote(
+            packet=packet, route=route, system=system, user=user,
+            view_state=view_state,
+        )
+
+    def absorb(result: tuple[Any, Any, bool, list]) -> bool:
+        nonlocal fatal_error, sample_meta
+        parsed, meta, fatal, vote_warnings = result
+        warnings.extend(vote_warnings)
+        if fatal:
+            fatal_error = (
+                vote_warnings[-1]["error"] if vote_warnings else "judge vote failed"
+            )
+            return False
+        if parsed is not None:
+            ballots.append(parsed)
+            sample_meta = dict(meta or {})
+            accumulate_usage(ballots_usage, (meta or {}).get("usage") or {})
+        return True
+
+    parallel = max(1, int((route.get("vote_concurrency") or votes) or 1))
+    outcomes = parallel_ordered(cast_at, votes, workers=parallel)
+    for outcome in outcomes:
+        if outcome is None:
+            warnings.append({"attempt": "parallel", "error": "ballot raised"})
+            continue
+        total_attempts += int((outcome[1] or {}).get("attempts") or 0)
+        if not absorb(outcome):
             break
     while (
         not fatal_error and len(ballots) < votes and topup_budget > 0

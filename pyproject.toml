@@ -17,7 +17,7 @@ hallucination-detector = "detector.cli:main"
 hallucination-evolution = "evolution.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["detector", "evolution"]
+include = ["detector", "evolution", "experiments"]
 
 [tool.setuptools.package-data]
 # ``calibration/conviction_predicates.json`` is the record that lets a built-in

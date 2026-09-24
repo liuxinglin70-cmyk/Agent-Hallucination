@@ -582,7 +582,10 @@
         "audit_inconclusive": false
       }
     ],
-    "cache": "miss"
+    "cache": "miss",
+    "retryable": false,
+    "unmeasured_cases": [],
+    "attempt": 1
   },
   "patrol": {
     "patrol_size": 12,
@@ -3220,7 +3223,7 @@
       "components": {
         "G": {
           "version": "detector.workflow.v1",
-          "digest": "394fce770ef1",
+          "digest": "87347388cf44",
           "payload": {
             "stages": [
               "validate",
@@ -3241,7 +3244,7 @@
               "defense": "detector.defense.run_defense",
               "adjudicate": "detector.adjudication.adjudicate"
             },
-            "source_digest": "faf96c15a8bea412",
+            "source_digest": "aedaa8a3128cae6f",
             "intervention_types": [
               "decision_guard",
               "evidence_check",
@@ -3409,11 +3412,11 @@
         }
       },
       "registry_hash": "4ed0ab57b823ff677233bc83dcea127de47aaf093666073ccc8e06bdad1d6773",
-      "digest": "a1f8fd3cea35"
+      "digest": "5399bc0c77a3"
     },
     "diff": {
       "previous_digest": null,
-      "current_digest": "a1f8fd3cea35",
+      "current_digest": "5399bc0c77a3",
       "first_manifest": true,
       "changed": [
         "G",

@@ -26,6 +26,7 @@ from detector.packet import (
     packet_features,
     render_judge_view,
 )
+from detector.provider import raise_if_fatal
 from detector.provider import (
     ProviderError,
     majority_vote,
@@ -158,6 +159,7 @@ def run_recall_scan(
             cache_tag=cache_tag,
         )
     except ProviderError as exc:
+        raise_if_fatal(exc)
         return {
             "ok": False, "candidates": [], "error": exc.message,
             "error_type": exc.error_type,
@@ -180,6 +182,7 @@ def run_recall_scan(
             )
             candidates, error = _parse_candidates(parsed, packet, snapshot)
         except ProviderError as exc:
+            raise_if_fatal(exc)
             return {
                 "ok": False, "candidates": [], "error": exc.message,
                 "error_type": exc.error_type,
@@ -352,6 +355,7 @@ def _upgrade_sample(
             cache_tag=cache_tag,
         )
     except ProviderError as exc:
+        raise_if_fatal(exc)
         return None, {}, warnings, {
             "state": "provider_error", "error": exc.message,
             "error_type": exc.error_type, "attempts": exc.attempts,
@@ -372,6 +376,7 @@ def _upgrade_sample(
                 parsed, candidates, packet, snapshot,
             )
         except ProviderError as exc:
+            raise_if_fatal(exc)
             return None, {}, warnings, {
                 "state": "provider_error", "error": exc.message,
                 "error_type": exc.error_type, "attempts": exc.attempts,
@@ -399,6 +404,7 @@ def _upgrade_sample(
                 parsed, candidates, packet, snapshot,
             )
         except ProviderError as exc:
+            raise_if_fatal(exc)
             return None, dict(meta or {}), warnings, {
                 "state": "provider_error", "error": exc.message,
                 "error_type": exc.error_type, "attempts": exc.attempts,

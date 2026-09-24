@@ -332,8 +332,29 @@ def check_timeouts(report: Report, cfg: dict) -> None:
               "the per-transport retry cannot help before the case dies")
 
 
+def _cost_sample() -> dict:
+    path = REPO / "reports/cost_model_693.json"
+    if not path.is_file():
+        return {}
+    try:
+        model = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, ValueError):
+        return {}
+    return model.get("sample") or {}
+
+
 def check_budget(report: Report, cfg: dict, phase: str) -> dict:
-    """Rough composition of one round: does the declared budget fit?"""
+    """Does one round's declared workload fit its declared wall clock?
+
+    Counting case evaluations is not enough. A round can evaluate the right
+    number of cases and still be unable to finish: the arithmetic that decides
+    it is ``cycle_timeout_seconds`` against *measured* per-case wall time at the
+    configured worker count. The 2026-09-24 multi-generation attempts are the
+    worked example -- the audit alone re-measures S+G, whose slowest member took
+    over an hour, and the round spent its budget before patrol ran. The run then
+    reported "0 admissions" for a reason that was arithmetic rather than
+    scientific.
+    """
     if phase == "baseline":
         _ok(report, "budget", "baseline phase is one batch; round budget N/A")
         return {}
@@ -342,7 +363,6 @@ def check_budget(report: Report, cfg: dict, phase: str) -> dict:
     patrol = int(budget.get("patrol_cases", 0))
     rerun = int(budget.get("stable_failure_rerun_cases", 0))
     audit_defects = 2
-    gates_cfg = cfg.get("gates") or {}
     gain = int((cfg.get("split") or {}).get("mini_gain_size", 0))
     sentinel = int((cfg.get("split") or {}).get("sentinel_positives", 0)) + int(
         (cfg.get("split") or {}).get("sentinel_negatives", 0)
@@ -352,22 +372,59 @@ def check_budget(report: Report, cfg: dict, phase: str) -> dict:
     development = cfg.get("development") or {}
     if development.get("enabled"):
         fresh += int(development.get("max_l1_cases", 0))
+    workers = int((cfg.get("backend") or {}).get("workers", 1) or 1)
+    sample = _cost_sample()
+    mean_minutes = sample.get("mean_minutes")
+    max_minutes = sample.get("max_minutes")
     parts = {
         "patrol": patrol, "bootstrap_rerun": rerun, "audit": audit_defects,
         "sentinel": sentinel, "gain": gain,
         "development_l1": int(development.get("max_l1_cases", 0)),
         "fresh_case_evaluations_upper_bound": fresh,
         "cycle_timeout_seconds": cycle_timeout,
+        "workers": workers,
         "development_enabled": bool(development.get("enabled")),
         "archive_on": (cfg.get("archive") or {}).get("on"),
     }
-    if not cycle_timeout:
+    if mean_minutes and cycle_timeout:
+        # Work floor: a round cannot finish faster than its total case-work
+        # divided by its workers. Compared against the declared round budget
+        # with the cost model's own caveat in mind -- its sample is small and
+        # skewed toward hard cases, so this is a floor to sanity-check against,
+        # not a prediction.
+        floor_minutes = float(mean_minutes) * fresh / max(1, workers)
+        parts["work_floor_minutes"] = round(floor_minutes, 1)
+        parts["work_floor_fraction_of_budget"] = round(
+            floor_minutes * 60 / float(cycle_timeout), 3
+        )
+        if max_minutes:
+            parts["slowest_observed_case_minutes"] = float(max_minutes)
+        if floor_minutes * 60 >= float(cycle_timeout):
+            _blocker(
+                report, "budget",
+                f"one round bounds ~{fresh} fresh case evaluations, whose work "
+                f"floor is {floor_minutes:.0f} min at workers={workers}, against "
+                f"cycle_timeout_seconds={cycle_timeout}: the round cannot finish "
+                "its own declared workload",
+            )
+        elif floor_minutes * 60 >= 0.7 * float(cycle_timeout):
+            _warn(
+                report, "budget",
+                f"one round's work floor is {floor_minutes:.0f} min against a "
+                f"{float(cycle_timeout) / 60:.0f} min budget "
+                f"({parts['work_floor_fraction_of_budget']:.0%}); the long tail "
+                "decides whether patrol runs",
+            )
+        else:
+            _ok(report, "budget",
+                f"~{fresh} fresh case evaluations fit {cycle_timeout}s "
+                f"(work floor {floor_minutes:.0f} min at workers={workers})")
+    elif not cycle_timeout:
         _warn(report, "budget", "no cycle_timeout_seconds: the round is unbounded")
     else:
-        _ok(report, "budget",
-            f"one round bounds ~{fresh} fresh case evaluations inside "
-            f"{cycle_timeout}s")
-    development = cfg.get("development") or {}
+        _warn(report, "budget",
+              f"one round bounds ~{fresh} fresh case evaluations, but no "
+              "measured cost sample exists to check that against")
     if development.get("enabled") and not development.get("max_provider_calls"):
         _warn(report, "budget",
               "development is enabled but max_provider_calls is unset")

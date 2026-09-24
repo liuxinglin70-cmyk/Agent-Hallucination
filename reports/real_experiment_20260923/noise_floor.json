@@ -1,0 +1,409 @@
+{
+  "case_set_mismatch": true,
+  "cases": [
+    {
+      "case": "BFCL/017.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "BFCL/034.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "BFCL/041.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "BFCL/055.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "BFCL/062.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "BFCL/107.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Camel/018.json",
+      "reads": 2,
+      "tallies": {
+        "verified_error": 2
+      },
+      "unstable": false
+    },
+    {
+      "case": "Camel/042.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Camel/048.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Camel/054.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Magentic_One/036.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Magentic_One/049.json",
+      "reads": 1,
+      "tallies": {
+        "verified_clean": 1
+      },
+      "unstable": false
+    },
+    {
+      "case": "Magentic_One/050.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 1,
+        "verified_error": 2
+      },
+      "unstable": true
+    },
+    {
+      "case": "Magentic_One/085.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Magentic_One/092.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Magentic_One/093.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Octotools/005.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Octotools/023.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Octotools/030.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Octotools/033.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Octotools/035.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "Octotools/040.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenDeepSearch/002.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenDeepSearch/035.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenDeepSearch/063.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenDeepSearch/067.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenDeepSearch/077.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenDeepSearch/079.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenDeepSearch/080.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenDeepSearch/084.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenDeepSearch/088.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenDeepSearch/095.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenManus/042.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenManus/064.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenManus/073.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "OpenManus/086.json",
+      "reads": 2,
+      "tallies": {
+        "verified_clean": 2
+      },
+      "unstable": false
+    },
+    {
+      "case": "SmolAgents/019.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "SmolAgents/037.json",
+      "reads": 3,
+      "tallies": {
+        "verified_error": 3
+      },
+      "unstable": false
+    },
+    {
+      "case": "SmolAgents/064.json",
+      "reads": 3,
+      "tallies": {
+        "verified_clean": 3
+      },
+      "unstable": false
+    }
+  ],
+  "cases_per_roll": [
+    39,
+    39,
+    38
+  ],
+  "disagreeing_cases": [
+    "Magentic_One/050.json"
+  ],
+  "mode": "rolls",
+  "one_sided_cases": [
+    "Camel/018.json",
+    "Magentic_One/049.json",
+    "OpenManus/086.json"
+  ],
+  "read_by_every_roll": [
+    "BFCL/017.json",
+    "BFCL/034.json",
+    "BFCL/041.json",
+    "BFCL/055.json",
+    "BFCL/062.json",
+    "BFCL/107.json",
+    "Camel/042.json",
+    "Camel/048.json",
+    "Camel/054.json",
+    "Magentic_One/036.json",
+    "Magentic_One/050.json",
+    "Magentic_One/085.json",
+    "Magentic_One/092.json",
+    "Magentic_One/093.json",
+    "Octotools/005.json",
+    "Octotools/023.json",
+    "Octotools/030.json",
+    "Octotools/033.json",
+    "Octotools/035.json",
+    "Octotools/040.json",
+    "OpenDeepSearch/002.json",
+    "OpenDeepSearch/035.json",
+    "OpenDeepSearch/063.json",
+    "OpenDeepSearch/067.json",
+    "OpenDeepSearch/077.json",
+    "OpenDeepSearch/079.json",
+    "OpenDeepSearch/080.json",
+    "OpenDeepSearch/084.json",
+    "OpenDeepSearch/086.json",
+    "OpenDeepSearch/088.json",
+    "OpenDeepSearch/095.json",
+    "OpenManus/042.json",
+    "OpenManus/064.json",
+    "OpenManus/073.json",
+    "SmolAgents/019.json",
+    "SmolAgents/037.json",
+    "SmolAgents/064.json"
+  ],
+  "roll_count": 3,
+  "rolls": 3,
+  "stable_case_count": 39,
+  "total_cases": 40,
+  "unstable_case_count": 1,
+  "unstable_cases": [
+    "Magentic_One/050.json"
+  ],
+  "unstable_share": 0.025,
+  "widest_pair": {
+    "flipped_cases": [
+      "BFCL/055.json",
+      "Camel/018.json",
+      "Magentic_One/049.json",
+      "Magentic_One/050.json",
+      "OpenManus/086.json"
+    ],
+    "gold": false,
+    "marginal_cases": null,
+    "new_errors": null,
+    "rolls": [
+      1,
+      3
+    ],
+    "transitions": {
+      "F->F": 19,
+      "F->T": 1,
+      "T->T": 17
+    }
+  }
+}

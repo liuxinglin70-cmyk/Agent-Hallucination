@@ -210,6 +210,107 @@ def _case_elapsed(runs_root: Path, run_id: str, case: str) -> float | None:
     return float(value) if isinstance(value, (int, float)) else None
 
 
+def _case_usage(runs_root: Path, run_id: str, case: str) -> dict[str, Any] | None:
+    """Tokens one case burned, summed over its stages.
+
+    ``usage`` under a stage is the *last ballot's* provider meta, not the
+    stage's spend; the summed vote lives beside it as ``usage_total``
+    (``detector.provider.accumulate_usage``). One archived real row reads
+    4948 against 17359 -- a 3.5x undercount -- and the burn is the one number a
+    run's cost has to be sized from, so ``usage_total`` wins wherever it is
+    present and ``usage`` is only the fallback for a non-voting stage. Summing
+    both would double-count the final ballot, so exactly one is read per stage.
+    """
+    path = runs_root / run_id / "cases" / safe_case_id(case) / "result.json"
+    if not path.exists():
+        return None
+    try:
+        result = json.loads(path.read_text(encoding="utf-8-sig"))
+    except ValueError:
+        return None
+    total: dict[str, Any] = {}
+    found = False
+    for provider in (result.get("providers") or {}).values():
+        if not isinstance(provider, dict):
+            continue
+        usage = provider.get("usage_total") or provider.get("usage") or {}
+        if not usage:
+            continue
+        found = True
+        _fold_usage(total, usage)
+    return total if found else None
+
+
+def _fold_usage(total: dict[str, Any], usage: Mapping[str, Any]) -> None:
+    """Add every numeric leaf of *usage* into *total*, keyed by its path.
+
+    Deliberately path-agnostic: providers report nested details blocks
+    (``completion_tokens_details.reasoning_tokens`` and friends) and a new
+    counter must be totalled without a code change here, which is the same
+    bargain ``detector.provider.accumulate_usage`` strikes.
+    """
+    for key, value in usage.items():
+        if isinstance(value, Mapping):
+            nested = total.setdefault(str(key), {})
+            if isinstance(nested, dict):
+                _fold_usage(nested, value)
+        elif isinstance(value, bool):
+            continue
+        elif isinstance(value, (int, float)):
+            total[str(key)] = total.get(str(key), 0) + value
+
+
+def usage_report(
+    *,
+    runs_root: str | Path,
+    run_id: str,
+    cases: Sequence[str],
+) -> dict[str, Any]:
+    """Token burn for the run, per case and in total.
+
+    Reported because it has been missing from every archived real run: the
+    §30/§31 reports carry ``provider_usage: {}``, which forced the 693-case
+    cost model to lean on four hand-transcribed prose readings that make up 61%
+    of its sample minutes and move the workers=8 work floor between 9.4h and
+    21.3h. A measurement whose cost is unknown is a measurement that cannot be
+    scheduled.
+    """
+    runs_root = Path(runs_root)
+    per_case: list[dict[str, Any]] = []
+    total: dict[str, Any] = {}
+    for case in cases:
+        usage = _case_usage(runs_root, run_id, case)
+        if usage is None:
+            continue
+        per_case.append({"case": case, "usage": usage})
+        _fold_usage(total, usage)
+    values = [
+        float(entry["usage"]["total_tokens"])
+        for entry in per_case
+        if isinstance(entry["usage"].get("total_tokens"), (int, float))
+    ]
+    return {
+        "measured_cases": len(per_case),
+        "unmeasured_cases": len(cases) - len(per_case),
+        "total": total or None,
+        "total_tokens": int(sum(values)) if values else None,
+        "mean_tokens_per_case": (
+            round(sum(values) / len(values), 1) if values else None
+        ),
+        "max_tokens_case": (
+            max(
+                (
+                    (float(entry["usage"]["total_tokens"]), entry["case"])
+                    for entry in per_case
+                    if isinstance(entry["usage"].get("total_tokens"), (int, float))
+                ),
+                default=None,
+            )
+        ),
+        "per_case": per_case,
+    }
+
+
 def timing_report(
     *,
     runs_root: str | Path,
@@ -357,6 +458,9 @@ def build_report(
         },
         "timing": timing_report(
             runs_root=runs_root, run_id=run_id, cases=list(cases), slowest=slowest,
+        ),
+        "usage": usage_report(
+            runs_root=runs_root, run_id=run_id, cases=list(cases),
         ),
         "errors": evaluation["errors"],
         "degraded_disagreements": evaluation["degraded_disagreements"],
@@ -569,6 +673,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         },
         "timing": report["timing"],
+        "usage": {
+            key: report["usage"][key] for key in (
+                "measured_cases", "unmeasured_cases", "total_tokens",
+                "mean_tokens_per_case", "max_tokens_case",
+            )
+        },
         "report_path": report.get("report_path"),
     }, ensure_ascii=False, indent=2), flush=True)
     return 0
