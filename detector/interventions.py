@@ -82,7 +82,7 @@ TARGET_POLARITIES = frozenset({"recall", "precision", "boundary"})
 # requires at least one objective to improve while the other does not
 # regress. The two objectives are scored by different gates and their values
 # must not be added into a single weighted number.
-TARGET_KINDS = frozenset({"detection", "localization", "joint"})
+TARGET_KINDS = frozenset({"detection", "localization", "joint", "resolution"})
 
 FACT_NAMES: dict[str, frozenset[str]] = {
     "judge_confidence": frozenset({"high", "medium", "low"}),

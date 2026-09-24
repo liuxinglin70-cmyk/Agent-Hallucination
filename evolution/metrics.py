@@ -8,6 +8,37 @@ from __future__ import annotations
 
 from typing import Any, Collection, Mapping, Sequence
 
+from detector.measurement import measurement_status
+from detector.result import RESULT_SCHEMA, prediction_state
+
+
+class EvaluationState:
+    """The 8 evaluator-side states for single-case prediction quality and health."""
+
+    AUTHORITATIVE_CORRECT = "authoritative_correct"
+    AUTHORITATIVE_WRONG = "authoritative_wrong"
+    SEMANTIC_UNRESOLVED_HEALTHY = "semantic_unresolved_healthy"
+    DEGRADED = "degraded"
+    INFRASTRUCTURE_FAILURE = "infrastructure_failure"
+    FATAL_PROVIDER = "fatal_provider"
+    NOT_STARTED = "not_started"
+    INVALID_ENVELOPE = "invalid_envelope"
+
+    ALL = frozenset({
+        "authoritative_correct",
+        "authoritative_wrong",
+        "semantic_unresolved_healthy",
+        "degraded",
+        "infrastructure_failure",
+        "fatal_provider",
+        "not_started",
+        "invalid_envelope",
+    })
+
+
+EVALUATION_STATE_SCHEMA = "evolution.evaluation_state.v1"
+PAIRED_STATE_TRANSITIONS_SCHEMA = "evolution.paired_state_transitions.v1"
+
 
 def _bool_prediction(value: bool | None) -> bool | None:
     """A prediction, or ``None`` for "no decision", and nothing else.
@@ -29,6 +60,331 @@ def _bool_prediction(value: bool | None) -> bool | None:
         f"prediction must be True, False or None; got {value!r} "
         f"({type(value).__name__})"
     )
+
+
+def evaluate_row_state(row: Mapping[str, Any]) -> str:
+    """Classify a row or detection result into one of the 8 EvaluationState values."""
+    if not isinstance(row, Mapping):
+        return EvaluationState.INVALID_ENVELOPE
+
+    explicit_state = row.get("evaluation_state")
+    if explicit_state in EvaluationState.ALL:
+        return str(explicit_state)
+
+    if str(row.get("state") or "") == "not_started":
+        return EvaluationState.NOT_STARTED
+
+    result = row.get("result")
+    if not isinstance(result, Mapping) and str(row.get("schema_version") or "") == RESULT_SCHEMA:
+        result = row
+
+    gold = row.get("gold")
+    has_bool_gold = gold is True or gold is False
+
+    if isinstance(result, Mapping) and result:
+        status = measurement_status(result)
+        if status == "invalid_envelope":
+            return EvaluationState.INVALID_ENVELOPE
+        if status == "not_started":
+            return EvaluationState.NOT_STARTED
+        if status == "fatal_provider":
+            return EvaluationState.FATAL_PROVIDER
+        if status == "infrastructure_failure":
+            return EvaluationState.INFRASTRUCTURE_FAILURE
+        if status == "degraded":
+            return EvaluationState.DEGRADED
+        if status == "authoritative":
+            pred = prediction_state(result)
+            if pred is None and row.get("prediction") is not None:
+                try:
+                    pred = _bool_prediction(row.get("prediction"))
+                except ValueError:
+                    pred = None
+            if pred is not None and has_bool_gold:
+                return (
+                    EvaluationState.AUTHORITATIVE_CORRECT
+                    if pred == gold
+                    else EvaluationState.AUTHORITATIVE_WRONG
+                )
+            if pred is not None:
+                return EvaluationState.DEGRADED
+            return EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
+        if status == "semantic_unresolved":
+            is_valid = result.get("runtime_valid") is True
+            authority = str(result.get("decision_authority") or "")
+            if not is_valid or authority.startswith("degraded"):
+                return EvaluationState.DEGRADED
+            statuses = list((result.get("stage_status") or {}).values())
+            for hearing in (result.get("proof") or {}).get("hearings") or ():
+                statuses.extend(
+                    hearing.get(name) or {} for name in ("tracer_status", "defense_status")
+                )
+            if any(
+                str((s or {}).get("state") or "").startswith(
+                    ("provider_error", "invalid", "contract_error", "degraded", "no_quorum", "timeout")
+                )
+                for s in statuses
+            ):
+                return EvaluationState.INFRASTRUCTURE_FAILURE
+            return EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
+
+    explicit_m_status = row.get("measurement_status")
+    if explicit_m_status:
+        if explicit_m_status == "fatal_provider":
+            return EvaluationState.FATAL_PROVIDER
+        if explicit_m_status == "infrastructure_failure":
+            return EvaluationState.INFRASTRUCTURE_FAILURE
+        if explicit_m_status == "degraded":
+            return EvaluationState.DEGRADED
+        if explicit_m_status == "not_started":
+            return EvaluationState.NOT_STARTED
+        if explicit_m_status == "invalid_envelope":
+            return EvaluationState.INVALID_ENVELOPE
+
+    authority = str(row.get("authority") or row.get("decision_authority") or "authoritative")
+    if authority.startswith("degraded"):
+        return EvaluationState.DEGRADED
+    if authority in ("infrastructure_failure", "fatal_provider"):
+        return authority
+
+    pred = None
+    if "prediction" in row and row["prediction"] is not None:
+        try:
+            pred = _bool_prediction(row["prediction"])
+        except ValueError:
+            return EvaluationState.INVALID_ENVELOPE
+
+    if pred is not None:
+        if has_bool_gold:
+            return (
+                EvaluationState.AUTHORITATIVE_CORRECT
+                if pred == gold
+                else EvaluationState.AUTHORITATIVE_WRONG
+            )
+        return EvaluationState.DEGRADED
+
+    if row.get("error_type") or row.get("authority_failure_reasons"):
+        return EvaluationState.INFRASTRUCTURE_FAILURE
+
+    return EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
+
+
+def classify_transition(base_state: str, active_state: str) -> str:
+    """Classify the transition between baseline and active evaluation states."""
+    if active_state in (EvaluationState.INFRASTRUCTURE_FAILURE, EvaluationState.FATAL_PROVIDER):
+        if base_state not in (EvaluationState.INFRASTRUCTURE_FAILURE, EvaluationState.FATAL_PROVIDER):
+            return "health_regressed"
+        return "still_infrastructure_failure"
+
+    if base_state in (EvaluationState.INFRASTRUCTURE_FAILURE, EvaluationState.FATAL_PROVIDER):
+        if active_state in (
+            EvaluationState.AUTHORITATIVE_CORRECT,
+            EvaluationState.AUTHORITATIVE_WRONG,
+            EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY,
+        ):
+            return "service_recovery"
+
+    if active_state == EvaluationState.DEGRADED and base_state != EvaluationState.DEGRADED:
+        return "degraded_added"
+    if base_state == EvaluationState.DEGRADED and active_state != EvaluationState.DEGRADED:
+        return "degraded_recovered"
+
+    if (
+        base_state == EvaluationState.AUTHORITATIVE_WRONG
+        and active_state == EvaluationState.AUTHORITATIVE_CORRECT
+    ):
+        return "decisive_fixed"
+
+    if (
+        base_state == EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
+        and active_state == EvaluationState.AUTHORITATIVE_CORRECT
+    ):
+        return "resolution_correct"
+
+    if (
+        base_state == EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
+        and active_state == EvaluationState.AUTHORITATIVE_WRONG
+    ):
+        return "resolution_wrong"
+
+    if (
+        base_state == EvaluationState.AUTHORITATIVE_CORRECT
+        and active_state == EvaluationState.AUTHORITATIVE_WRONG
+    ):
+        return "correctness_worsened"
+
+    if (
+        base_state == EvaluationState.AUTHORITATIVE_CORRECT
+        and active_state == EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
+    ):
+        return "unresolved_added"
+
+    if (
+        base_state == EvaluationState.AUTHORITATIVE_WRONG
+        and active_state == EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
+    ):
+        return "wrong_to_abstain"
+
+    if (
+        base_state == EvaluationState.AUTHORITATIVE_WRONG
+        and active_state == EvaluationState.AUTHORITATIVE_WRONG
+    ):
+        return "still_wrong"
+
+    if (
+        base_state == EvaluationState.AUTHORITATIVE_CORRECT
+        and active_state == EvaluationState.AUTHORITATIVE_CORRECT
+    ):
+        return "still_correct"
+
+    if (
+        base_state == EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
+        and active_state == EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
+    ):
+        return "still_unresolved"
+
+    return f"{base_state}->{active_state}"
+
+
+def paired_state_transitions_v1(
+    baseline_rows: Sequence[Mapping[str, Any]],
+    active_rows: Sequence[Mapping[str, Any]],
+    *,
+    case_key: str = "case",
+) -> dict[str, Any]:
+    """Calculate the paired evaluation state transition matrix and metrics.
+
+    Does not modify paired_delta(), preserving backward compatibility.
+    """
+    base_map: dict[str, Mapping[str, Any]] = {}
+    for row in baseline_rows:
+        case = str(row.get(case_key) or "")
+        if not case:
+            raise ValueError("paired state transitions received a row without a case id")
+        if case in base_map:
+            raise ValueError(f"duplicate baseline case in paired transitions: {case}")
+        base_map[case] = row
+
+    active_seen: set[str] = set()
+    per_case_rows: list[dict[str, Any]] = []
+
+    matrix: dict[str, dict[str, int]] = {
+        s1: {s2: 0 for s2 in EvaluationState.ALL}
+        for s1 in EvaluationState.ALL
+    }
+    transition_counts: dict[str, int] = {}
+    category_counts: dict[str, int] = {}
+
+    summary = {
+        "decisive_fixed": 0,
+        "resolution_correct": 0,
+        "resolution_correct_positive": 0,
+        "resolution_correct_negative": 0,
+        "resolution_wrong": 0,
+        "resolution_wrong_fp": 0,
+        "resolution_wrong_fn": 0,
+        "correctness_worsened": 0,
+        "new_fp": 0,
+        "new_fn": 0,
+        "unresolved_added": 0,
+        "wrong_to_abstain": 0,
+        "still_wrong": 0,
+        "still_correct": 0,
+        "still_unresolved": 0,
+        "health_regressed": 0,
+        "service_recovery": 0,
+        "degraded_added": 0,
+        "degraded_recovered": 0,
+    }
+
+    for active in active_rows:
+        case = str(active.get(case_key) or "")
+        if not case:
+            raise ValueError("paired state transitions received a row without a case id")
+        if case in active_seen:
+            raise ValueError(f"duplicate active case in paired transitions: {case}")
+        active_seen.add(case)
+        if case not in base_map:
+            raise ValueError(f"paired state transitions received unexpected active case: {case}")
+
+        baseline = base_map[case]
+        base_gold = baseline.get("gold")
+        active_gold = active.get("gold")
+        if (base_gold is True or base_gold is False) and (active_gold is True or active_gold is False):
+            if base_gold != active_gold:
+                raise ValueError(f"paired state transitions gold mismatch for case {case}")
+        gold = base_gold if (base_gold is True or base_gold is False) else active_gold
+
+        base_state = evaluate_row_state(baseline)
+        active_state = evaluate_row_state(active)
+        transition = f"{base_state}->{active_state}"
+        category = classify_transition(base_state, active_state)
+
+        matrix[base_state][active_state] += 1
+        transition_counts[transition] = transition_counts.get(transition, 0) + 1
+        category_counts[category] = category_counts.get(category, 0) + 1
+
+        if category == "decisive_fixed":
+            summary["decisive_fixed"] += 1
+        elif category == "resolution_correct":
+            summary["resolution_correct"] += 1
+            if gold is True:
+                summary["resolution_correct_positive"] += 1
+            elif gold is False:
+                summary["resolution_correct_negative"] += 1
+        elif category == "resolution_wrong":
+            summary["resolution_wrong"] += 1
+            if gold is False:
+                summary["resolution_wrong_fp"] += 1
+            elif gold is True:
+                summary["resolution_wrong_fn"] += 1
+        elif category == "correctness_worsened":
+            summary["correctness_worsened"] += 1
+            if gold is False:
+                summary["new_fp"] += 1
+            elif gold is True:
+                summary["new_fn"] += 1
+        elif category == "unresolved_added":
+            summary["unresolved_added"] += 1
+        elif category == "wrong_to_abstain":
+            summary["wrong_to_abstain"] += 1
+        elif category == "still_wrong":
+            summary["still_wrong"] += 1
+        elif category == "still_correct":
+            summary["still_correct"] += 1
+        elif category == "still_unresolved":
+            summary["still_unresolved"] += 1
+        elif category == "health_regressed":
+            summary["health_regressed"] += 1
+        elif category == "service_recovery":
+            summary["service_recovery"] += 1
+        elif category == "degraded_added":
+            summary["degraded_added"] += 1
+        elif category == "degraded_recovered":
+            summary["degraded_recovered"] += 1
+
+        per_case_rows.append({
+            "case": case,
+            "gold": gold,
+            "baseline_state": base_state,
+            "active_state": active_state,
+            "transition": transition,
+            "category": category,
+        })
+
+    missing = sorted(set(base_map) - active_seen)
+    if missing:
+        raise ValueError(f"paired state transitions missing active rows for case(s): {missing[:5]}")
+
+    return {
+        "schema_version": PAIRED_STATE_TRANSITIONS_SCHEMA,
+        "n": len(per_case_rows),
+        "matrix": matrix,
+        "transition_counts": transition_counts,
+        "category_counts": category_counts,
+        "summary": summary,
+        "rows": per_case_rows,
+    }
 
 
 def confusion_rows(
@@ -593,6 +949,38 @@ def localization_opportunity(
     }
 
 
+def resolution_opportunity(
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[str, int]:
+    """How many cases a resolution claim can actually reward.
+
+    A resolution opportunity requires:
+    1. Evaluator holds a boolean gold label.
+    2. Baseline measurement is healthy but unresolved (EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY).
+    Ineligible cases (infrastructure failure, degraded mode, missing gold) are excluded.
+    """
+    pos = neg = 0
+    ineligible = 0
+    for row in rows:
+        gold = row.get("gold")
+        if gold is not True and gold is not False:
+            ineligible += 1
+            continue
+        state = evaluate_row_state(row)
+        if state != EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY:
+            continue
+        if gold is True:
+            pos += 1
+        else:
+            neg += 1
+    return {
+        "total": pos + neg,
+        "positive": pos,
+        "negative": neg,
+        "ineligible": ineligible,
+    }
+
+
 def mechanism_opportunity(
     baseline_rows: Sequence[Mapping[str, Any]],
     mechanism: Mapping[str, Any],
@@ -639,6 +1027,22 @@ def mechanism_opportunity(
             continue
         target_cases.append(case)
         gold, prediction = row.get("gold"), row.get("prediction")
+        if objective == "resolution":
+            state = evaluate_row_state(row)
+            if type(gold) is not bool or state != EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY:
+                unresolved_cases.append(case)
+                continue
+            polarity_match = (
+                polarity == "boundary"
+                or (polarity == "recall" and gold)
+                or (polarity == "precision" and not gold)
+            )
+            if membership.get("repairable") is True and polarity_match:
+                opportunity_cases.append(case)
+            else:
+                ineligible_cases.append(case)
+            continue
+
         if type(gold) is not bool or type(prediction) is not bool or not mechanism_row_healthy(row):
             unresolved_cases.append(case)
             continue
@@ -673,7 +1077,7 @@ def mechanism_opportunity(
             localization_errors += int(localization_error)
         else:
             ineligible_cases.append(case)
-    valid = bool(mechanism_id) and objective in {"detection", "localization", "joint"}
+    valid = bool(mechanism_id) and objective in {"detection", "localization", "joint", "resolution"}
     if not valid or polarity not in {"recall", "precision", "boundary"}:
         reason = "mechanism_invalid"
     elif mechanism.get("status") != "confirmed":
@@ -1304,20 +1708,27 @@ def source_deltas(
 
 
 __all__ = [
+    "EvaluationState",
     "binary_metrics",
+    "classify_transition",
     "confusion_rows",
+    "evaluate_row_state",
     "evidence_increment_rows",
     "fired_rate",
     "flipped_cases",
     "gain_opportunity",
     "localization_metrics",
     "localization_opportunity",
+    "mechanism_opportunity",
+    "mechanism_row_healthy",
     "noise_floor",
     "noise_floor_flipped_cases",
     "paired_delta",
     "paired_localization_delta",
+    "paired_state_transitions_v1",
     "protection_repair",
     "repeated_roll_disagreement",
+    "resolution_opportunity",
     "row_responsible_step",
     "source_deltas",
     "source_of",
