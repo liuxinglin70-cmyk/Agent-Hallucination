@@ -570,7 +570,6 @@ def test_localization_class_fails_when_the_reading_is_positional():
         localization=case,
     )
 
-    from evolution.metamorphic import _localization_case  # noqa: F401
     from evolution.worksheet import localization_state
 
     row = dict(case["row"])

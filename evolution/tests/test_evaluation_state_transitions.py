@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from detector.result import build_detection_output
 from evolution.metrics import (
     EvaluationState,
