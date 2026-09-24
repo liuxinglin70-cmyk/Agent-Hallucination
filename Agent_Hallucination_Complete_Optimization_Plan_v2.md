@@ -1097,10 +1097,10 @@ PR-10  Registry atomic units / contribution monitoring / rollback hardening
 |---|---|---|---|
 | **P0-Clean / 纯净基准** | 消除 `detector.conviction_calibration` 中导致全包隐式循环引用的 `from detector import predicates`，将其规范为 `import detector.predicates`；在 `tests/test_repository.py` 中新增 `test_no_circular_dependencies`，强制要求全仓库 0 循环引用。 | `detector/conviction_calibration.py`<br>`tests/test_repository.py` | `pytest tests/test_repository.py` PASS（21 项全部通过，全仓库检测 0 环依赖） |
 | **P0-PR01 / 数据口径与暴露审计** | **C01**：在 `scripts/measure_noise_floor.py` 与 `experiments/report.py` 中增加分层分母审计（`requested_n`, `attempted_n`, `healthy_n`, `authoritative_n`, `semantic_unresolved_n`, `degraded_n`, `infrastructure_failure_n`）与模型路由分析。<br>**C02**：在 `evolution/splits.py` 中实现 `audit_case_exposure()`，并在 `scripts/preflight_real_run.py` 的 `check_split` 中集成数据暴露与角色污染阻断；在 `tests/test_preflight_real_run.py` 中增加污染阻断测试。 | `scripts/measure_noise_floor.py`<br>`experiments/report.py`<br>`evolution/splits.py`<br>`scripts/preflight_real_run.py`<br>`tests/test_preflight_real_run.py` | `pytest tests/test_preflight_real_run.py` PASS（19 项全通）<br>`pytest evolution/tests/test_noise_floor.py` PASS（23 项全通）<br>`pytest tests/test_experiments_contract.py` PASS（17 项全通） |
+| **P1-PR02 / RepairUnit 契约与纯编译器** | **C03**：创建 `evolution/repair_unit.py`，定义 `RepairUnit` 声明式 AST（Target/Scope/Observation/Decision/Claim）、`CompiledUnit` 及 8 种版本化编译错误码，支持规范化确定性哈希。<br>**C04**：创建 `evolution/repair_compiler.py`，实现确定性编译流水线 `compile_repair_unit`，严格执行机制绑定检查、能力权限约束（如禁止语义执行器直接机械定罪）、数据泄漏检测及跨项依赖闭包校验。 | `evolution/repair_unit.py`<br>`evolution/repair_compiler.py`<br>`evolution/tests/test_repair_unit_compiler.py` | `pytest evolution/tests/test_repair_unit_compiler.py` PASS（9 项全通）<br>`pytest tests/test_repository.py` PASS（21 项全通） |
 
 ### 21.2 待交付工作项 (In Progress / Backlog)
 
-- [ ] **P1 / PR-02 (C03, C04)**: `RepairUnit` v1 Schema、语义目标、Scope AST、依赖图、版本化错误码 (`evolution/repair_unit.py`) 及确定性编译器 (`evolution/repair_compiler.py`) 与合约测试。
 - [ ] **P1 / PR-03 (C05, C06, C16)**: Proposer `ProposalBatch` 升级支持 `units`，Unit 级 L0/L1 开发去重与 Registry 依赖闭包安全退役。
 - [ ] **P1 / PR-04 (C07, C08)**: 评估侧 `EvaluationState` 状态类型、迁移矩阵 `paired_state_transitions_v1()` 与 `resolution` 机会机制。
 - [ ] **P2 / PR-05~07 (C09, C10, C11, C12)**: Packet scoped 投影、Scoped typed_semantic shadow 验证器与受控证据消费路径。
