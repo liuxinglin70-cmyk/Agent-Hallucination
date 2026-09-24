@@ -31,8 +31,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 import time
 from typing import Any, Mapping, Sequence
@@ -47,7 +45,7 @@ from detector.measurement import (
     result_usage,
     retry_in_run,
 )
-from detector.provider import ProviderError, accumulate_usage, case_deadline_ctx
+from detector.provider import accumulate_usage, case_deadline_ctx
 from detector.result import RESULT_SCHEMA
 from detector.runtime import (
     RunControl,

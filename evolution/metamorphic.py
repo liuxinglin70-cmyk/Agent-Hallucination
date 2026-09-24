@@ -44,9 +44,7 @@ meaningful: the report binds to the artifact that was actually exercised.
 
 from __future__ import annotations
 
-import hashlib
 import json
-import math
 import unicodedata
 from typing import Any, Mapping, Sequence
 
@@ -59,7 +57,7 @@ from detector.interventions import (
     runner_spec,
 )
 from detector.packet import build_packet, delivered_result, packet_features
-from detector.predicates import PREDICATES, run_predicate
+from detector.predicates import run_predicate
 from evolution.mechanisms import infer_mechanism, member_reading, reading_signature
 
 GATE_SCHEMA = "evolution.metamorphic_gate.v1"
@@ -122,10 +120,6 @@ def _is_inert_text(text: str) -> tuple[bool, str]:
     if any(char.isdigit() for char in lowered):
         return False, "carries digits, which set has_numeric_content"
     return True, ""
-
-
-def _sha(value: str) -> str:
-    return hashlib.sha256(str(value).encode("utf-8")).hexdigest()[:12]
 
 
 # --------------------------------------------------------------------------

@@ -65,17 +65,6 @@ ALLOWED_INTERVENTION_TYPE = "text_boundary"
 ALLOWED_HOOK = "judge.system"
 
 
-def canonical_hash(payload: Any) -> str:
-    return hashlib.sha256(
-        json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
-    ).hexdigest()
-
-
-def case_file_name(case_id: str) -> str:
-    """File-system-safe artifact name for one case id."""
-    safe = str(case_id).replace("/", "__").replace("\\", "__")
-    return safe if safe.endswith(".json") else f"{safe}.json"
-
 @dataclass
 class ResearchBudget:
     baseline_case_evaluations: int = 0

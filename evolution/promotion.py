@@ -951,7 +951,7 @@ def load_protocol(
             "promotion protocol changed after it was frozen; the file no "
             "longer hashes to the value recorded at freeze time"
         )
-    if schema in {alignment.ALIGNED_PROTOCOL_SCHEMA, alignment.ALIGNED_PROTOCOL_V3_SCHEMA}:
+    if schema == alignment.ALIGNED_PROTOCOL_SCHEMA:
         try:
             alignment.verify_alignment(protocol)
             if protocol["case_digests"] != alignment.data_digests(dataset_root, protocol["cases"]):

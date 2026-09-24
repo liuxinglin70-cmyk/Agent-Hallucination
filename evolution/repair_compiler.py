@@ -7,8 +7,7 @@ with strict dependency closure, deterministic canonical identities, and capabili
 from __future__ import annotations
 
 from dataclasses import asdict
-import re
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 from detector.interventions import (
     GUARD_ACTIONS,
@@ -19,7 +18,6 @@ from detector.interventions import (
 from detector.predicate_dsl import validate_predicate_program
 from evolution.contracts import _CASE_ID_RE
 from evolution.repair_unit import (
-    COMPILED_UNIT_SCHEMA,
     ERROR_DEPENDENCY_UNRESOLVED,
     ERROR_MECHANISM_UNBOUND,
     ERROR_SCHEMA_INVALID,

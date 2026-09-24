@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass, field
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 REPAIR_UNIT_SCHEMA = "evolution.repair_unit.v1"
 COMPILED_UNIT_SCHEMA = "evolution.compiled_unit.v1"

@@ -43,7 +43,6 @@ import subprocess
 import sys
 import textwrap
 import time
-from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 SANDBOX_SCHEMA = "evolution.sandboxed_component.v1"
