@@ -13,14 +13,14 @@ Two modes, both read-only:
 
     # 1. N independent rolls of one configuration -> per-case tallies
     python scripts/measure_noise_floor.py rolls \
-        reports/run_rep01 reports/run_rep02 reports/run_rep03
+        artifacts/run_rep01 artifacts/run_rep02 artifacts/run_rep03
 
     # 2. what one evolution cycle already published, from its report
-    python scripts/measure_noise_floor.py cycle reports/.../cycle001.json
+    python scripts/measure_noise_floor.py cycle artifacts/.../cycle001.json
 
 A "roll" is a detector run tree -- a directory holding ``cases/<case>/result.json``,
 which is what the detector's own run writer produces (see
-``reports/rsi_pilot_20260919/*/cases``). Rolls must cover the same case set;
+``artifacts/rsi_pilot_20260919/*/cases``). Rolls must cover the same case set;
 the tool reports a case read by fewer rolls than the rest rather than pooling it
 silently.
 

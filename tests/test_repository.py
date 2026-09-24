@@ -16,6 +16,22 @@ from evolution.splits import build_split, split_manifest_report
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_verification_identity_tracks_experiment_implementation(tmp_path, monkeypatch):
+    from scripts import verify
+
+    (tmp_path / "datasets").mkdir()
+    (tmp_path / "datasets/integrity.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
+    (tmp_path / "experiments").mkdir()
+    implementation = tmp_path / "experiments/runner.py"
+    implementation.write_text("VERSION = 1\n", encoding="utf-8")
+    monkeypatch.setattr(verify, "ROOT", tmp_path)
+    before = verify.source_manifest()
+    implementation.write_text("VERSION = 2\n", encoding="utf-8")
+    after = verify.source_manifest()
+    assert before["experiments/runner.py"] != after["experiments/runner.py"]
+
+
 def test_detector_has_no_dependency_on_evolution():
     for path in (ROOT / "detector").glob("*.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))

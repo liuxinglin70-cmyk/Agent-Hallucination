@@ -15,7 +15,7 @@ import time
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "reports" / "latest"
+OUT = ROOT / "artifacts" / "latest"
 
 
 def save(name: str, payload: object) -> None:
@@ -24,7 +24,7 @@ def save(name: str, payload: object) -> None:
 
 def source_manifest() -> dict[str, str]:
     files = [ROOT / "pyproject.toml", ROOT / "datasets/integrity.json"]
-    for folder in ("detector", "evolution", "tests", "scripts", "datasets/protocols"):
+    for folder in ("detector", "evolution", "experiments", "tests", "scripts", "datasets/protocols"):
         files.extend(p for p in (ROOT / folder).rglob("*")
                      if p.is_file() and p.suffix in {".py", ".json"})
     return {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -90,7 +90,7 @@ def main() -> int:
     checks.append({"name": "dataset_integrity", "exit_code": 0 if integrity["passed"] else 1})
     print(f"dataset_integrity: {'PASS' if integrity['passed'] else 'FAIL'}", flush=True)
     run("pytest", ["-m", "pytest", "-q", "-p", "no:cacheprovider",
-                   "--junitxml=reports/latest/pytest.xml"])
+                   "--junitxml=artifacts/latest/pytest.xml"])
     # Importability is not coverage: ``--help`` exits 0 for a CLI whose
     # commands the parser no longer registers. Assert the subcommands the
     # repository's own docs and scripts invoke are actually there.
@@ -182,9 +182,7 @@ def main() -> int:
         f"{'通过' if integrity['passed'] else '失败'}。\n\n"
         "| 检查 | 结果 |\n|---|---|\n" + rows + "\n\n"
         "这些结果包括本地 HTTP 命令链回归与 mock 机制验证，不是真实模型准确率或独立泛化结论。\n\n"
-        "另行执行的真实服务检查见 [../live/README.md](../live/README.md)（两例合成联调）与 "
-        "[../real/README.md](../real/README.md)（真实数据集小规模路径与重复运行）；两者都有独立时间与源码记录，"
-        "本命令不会重新调用模型服务。\n\n"
+        "历史真实实验统一见 docs/experiment-log.md；本命令不调用模型服务。\n\n"
         f"源码 SHA-256：`{digest}`。逐文件摘要见 [source_manifest.json](source_manifest.json)。\n\n"
         "复现：在仓库根目录运行 `python scripts/verify.py`。机器摘要见 [summary.json](summary.json)，"
         "测试详情见 [pytest.xml](pytest.xml) 和 [pytest.log](pytest.log)。\n",

@@ -1,7 +1,6 @@
 """研究轮驱动的阶段门：Fisher 非劣性判据与面板规则（离线，无模型调用）。
 
-驱动脚本位于 ``output/rsi-planning/run_round.py``（与冻结 manifest 同目录，
-使一轮研究的所有输入物自包含）；这里按路径加载它，锁定门逻辑本身。
+驱动脚本位于 ``scripts/run_research_round.py``（冻结 manifest 由调用方显式提供）；这里按路径加载它，锁定门逻辑本身。
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
-DRIVER = REPO / "output" / "rsi-planning" / "run_round.py"
+DRIVER = REPO / "scripts" / "run_research_round.py"
 
 
 def _driver():

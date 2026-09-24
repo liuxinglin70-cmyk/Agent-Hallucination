@@ -1,2 +1,0 @@
-{"event": "report_written", "path": "artifacts\\selfevo-bigrun5\\cycles\\cycle002.json", "waited_minutes": 61.0}
-{"cycle": 2, "state": "completed", "admitted": [], "patrol": {"patrol_size": 20, "tp": 12, "fp": 1, "fn": 2, "tn": 5, "unresolved": 0, "stable_failure_families": []}}

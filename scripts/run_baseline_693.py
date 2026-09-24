@@ -643,7 +643,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.interventions, require_executable_bounds=True,
         )
     report_path = args.report or (
-        ROOT / "reports" / f"baseline_693_{args.run_id}.json"
+        ROOT / "artifacts" / f"baseline_693_{args.run_id}.json"
     )
     report = run_baseline(
         dataset_root=args.dataset_root,

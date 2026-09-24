@@ -2,7 +2,7 @@
 """Freeze the pre-registered measurement order, before any real reading exists.
 
 Why this file exists. The corpus is 693 cases and a full pass costs 21-28h at
-``workers=8`` (``reports/cost_model_693.json``), so the run will be stopped at
+``workers=8`` (``artifacts/cost_model_693.json``), so the run will be stopped at
 some prefix of whatever order it walks. ``detector.runner.run_batch`` submits
 in case-list order, and the corpus lists its sources as contiguous blocks
 (BFCL, then Camel, then Magentic_One, ...). Stopping inside that order

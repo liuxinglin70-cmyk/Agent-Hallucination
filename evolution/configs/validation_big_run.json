@@ -2,7 +2,7 @@
   "schema_version": "evolution.framework.v1",
   "detector_config": "detector/configs/autodl.json",
   "dataset_root": "datasets/raw/agenthallu/AgentHallu",
-  "mini_split_manifest": "output/selfevo-run/split-big.json",
+  "mini_split_manifest": "datasets/protocols/validation.json",
   "work_root": "artifacts/selfevo-bigrun5",
   "registry_dir": "artifacts/selfevo-bigrun5/registry",
   "ledger_path": "artifacts/selfevo-bigrun5/ledger.jsonl",

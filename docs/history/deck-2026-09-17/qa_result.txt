@@ -1,2 +1,0 @@
-ALL RENDER CHECKS PASS
---- 0 failure(s) ---

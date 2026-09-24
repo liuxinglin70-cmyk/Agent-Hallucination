@@ -26,3 +26,7 @@ dist/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Generated legacy output roots (use artifacts/ for new runs)
+reports/
+output/

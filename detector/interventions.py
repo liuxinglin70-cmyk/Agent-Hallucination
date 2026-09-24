@@ -1803,9 +1803,19 @@ class InterventionPlan:
                 (entry.get("provenance") or {}).get("failure_family") or ""
             )
             self.evidence.append(dict(result))
-            self.facts[str(result.get("predicate") or "")] = str(
-                result.get("verdict") or ""
+            # Namespace facts by predicate AND failure_family to prevent
+            # cross-family contamination.  A guard whose trigger requires
+            # ``required_action_present=violated`` must only see the fact
+            # produced by its own family's evidence_check, not an unrelated
+            # family that happens to use the same predicate name.
+            fact_key = str(result.get("predicate") or "")
+            fact_family = str(
+                (entry.get("provenance") or {}).get("failure_family") or ""
             )
+            fact_value = str(result.get("verdict") or "")
+            self.facts[fact_key] = fact_value
+            if fact_family:
+                self.facts[f"{fact_key}@{fact_family}"] = fact_value
             self._record(
                 entry, "evidence_appended",
                 f"predicate={result.get('predicate')} verdict={result.get('verdict')}",
@@ -1851,7 +1861,23 @@ class InterventionPlan:
         for entry, matched_facts in entries:
             body = entry.get("body") or {}
             fact_map = self._facts_map(matched_facts)
-            fact_map.update(self.facts)
+            # Prefer family-scoped facts for this guard's own family so
+            # cross-family evidence cannot trigger or suppress unrelated guards.
+            guard_family = str(
+                (entry.get("provenance") or {}).get("failure_family") or ""
+            )
+            for key, value in self.facts.items():
+                if "@" in key:
+                    # Family-scoped fact: only merge if it belongs to this
+                    # guard's family.
+                    pred, fam = key.rsplit("@", 1)
+                    if fam == guard_family:
+                        fact_map[pred] = value
+                else:
+                    # Global fact: only set if no family-scoped version exists.
+                    scoped_key = f"{key}@{guard_family}" if guard_family else ""
+                    if scoped_key not in self.facts:
+                        fact_map.setdefault(key, value)
             excluded = self._facts_map(
                 body.get("action_not_when_facts") or ()
             )

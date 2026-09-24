@@ -120,6 +120,19 @@ def test_a_provider_error_is_retried_inside_the_run():
     assert retry_in_run(outage) is True
 
 
+@pytest.mark.parametrize("reason", [
+    {"error_type": "authentication_error", "code": "provider_error"},
+    {"error_type": "ProviderError", "code": "authentication_error"},
+])
+def test_fatal_error_in_either_field_stops_same_run_retry(reason):
+    row = _envelope("fatal.json", state="unresolved", authority="invalid",
+                    reasons=[reason])
+    assert fatal_failure(row) == reason
+    assert measurement_status(row) == "fatal_provider"
+    assert retry_in_run(row) is False
+    assert needs_remeasurement(row) is True
+
+
 def test_a_decision_is_never_retried():
     decided = _envelope("e.json")
     assert retry_in_run(decided) is False

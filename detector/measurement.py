@@ -47,8 +47,8 @@ def _error_types(result: Mapping[str, Any]) -> set[str]:
 
 def fatal_failure(result: Mapping[str, Any]) -> dict[str, Any] | None:
     for item in failure_reasons(result):
-        error_type = str(item.get("error_type") or item.get("code") or "")
-        if error_type in FATAL_PROVIDER_ERRORS:
+        if any(str(item.get(key) or "") in FATAL_PROVIDER_ERRORS
+               for key in ("error_type", "code")):
             return dict(item)
     return None
 
@@ -87,9 +87,9 @@ def retry_in_run(result: Mapping[str, Any]) -> bool:
     different competing load, the same case is worth asking again.
     """
     errors = _error_types(result)
-    if errors & EXHAUSTED_ERRORS:
+    if errors & EXHAUSTED_ERRORS or fatal_failure(result):
         return False
-    return measurement_status(result) in {"infrastructure_failure", "fatal_provider"}
+    return measurement_status(result) == "infrastructure_failure"
 
 
 def needs_remeasurement(result: Mapping[str, Any]) -> bool:

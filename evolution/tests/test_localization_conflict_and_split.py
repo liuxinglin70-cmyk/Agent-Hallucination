@@ -60,7 +60,7 @@ from evolution.metrics import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DATASET_ROOT = REPO_ROOT / "datasets" / "raw" / "agenthallu" / "AgentHallu"
-ARCHIVE = REPO_ROOT / "reports" / "rsi_pilot_20260919"
+ARCHIVE = REPO_ROOT / "evolution/tests/fixtures/localization_replay.json"
 
 # 5 events: act, speak, act, act, speak. Positions 1/3/4 are action steps.
 RECORD = {
@@ -511,17 +511,8 @@ def test_engine_split_verdict_does_not_read_the_decomposition(tmp_path):
 # Task 3: the archived corpus agrees with the fix
 # --------------------------------------------------------------------------
 def _archive_records():
-    if not ARCHIVE.exists():
-        pytest.skip("archived real-run records are not present")
-    rows = []
-    for path in sorted(ARCHIVE.rglob("results/*.json")):
-        payload = json.loads(path.read_text(encoding="utf-8-sig"))
-        envelope = payload.get("result") if isinstance(
-            payload.get("result"), dict
-        ) else payload
-        if envelope.get("state") == "verified_error":
-            rows.append((path, envelope))
-    return rows
+    records = json.loads(ARCHIVE.read_text(encoding="utf-8"))
+    return [(Path(row["source"]), row["result"]) for row in records]
 
 
 def _replay(path: Path, envelope) -> tuple[dict, dict]:

@@ -35,8 +35,8 @@ if str(ROOT) not in sys.path:
 
 from evolution.calibration import calibration_report  # noqa: E402
 
-DEFAULT_ARCHIVE = ROOT / "reports" / "error_scope_20260918" / "attempts"
-DEFAULT_OUT = ROOT / "reports" / "calibration_audit.json"
+DEFAULT_ARCHIVE = ROOT / "artifacts" / "error_scope_20260918" / "attempts"
+DEFAULT_OUT = ROOT / "artifacts" / "calibration_audit.json"
 
 
 def rows_from_archive(archive: pathlib.Path) -> tuple[list[dict], dict[str, str]]:

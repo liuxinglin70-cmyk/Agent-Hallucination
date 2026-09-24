@@ -1,7 +1,7 @@
 """Promotion bridge: a frozen research candidate becomes a deployable version.
 
 This is the implementation of the first optimization work package
-(docs/optimization-plan.md §4): one unified candidate object, one entry that
+(docs/technical-solution.md): one unified candidate object, one entry that
 carries a frozen research candidate through the existing deployment gates, and
 one version record written only when the gates actually pass.
 

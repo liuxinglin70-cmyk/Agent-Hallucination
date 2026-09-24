@@ -69,6 +69,36 @@ def test_paired_delta_counts_only_paired_flips():
     assert binary_metrics(active)["tp"] == 2
 
 
+def test_registry_does_not_expose_mutable_deployment_state(tmp_path):
+    registry = ActiveRegistry(tmp_path)
+    candidate = _candidate("IV-1-001")
+    published = registry.write([candidate], cycle=1, reason="test")
+    expected = registry.registry_hash
+    candidate["body"]["directive"] = "mutated input"
+    published["interventions"][0]["body"]["directive"] = "mutated return"
+    registry.entries[0]["body"]["directive"] = "mutated reader"
+    registry.registry["interventions"][0]["body"]["directive"] = "mutated envelope"
+    registry.state["snapshots"].clear()
+    assert registry.registry_hash == expected
+    assert registry.state["snapshots"]
+    assert ActiveRegistry(tmp_path).registry_hash == expected
+
+
+def test_same_cycle_same_second_writes_preserve_every_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setattr("evolution.registry.time.strftime", lambda _: "fixed")
+    registry = ActiveRegistry(tmp_path)
+    first = registry.write([_candidate("IV-1-001")], cycle=1, reason="first")
+    second = registry.write([], cycle=1, reason="second")
+    snapshots = registry.state["snapshots"][-2:]
+    assert snapshots[0]["file"] != snapshots[1]["file"]
+    for snapshot, payload in zip(snapshots, (first, second)):
+        saved = json.loads((tmp_path / "snapshots" / snapshot["file"]).read_text())
+        assert saved["content_hash"] == payload["content_hash"]
+    registry.write([_candidate("IV-2-001")], cycle=2, reason="next cycle")
+    restored = registry.rollback_to_snapshot(1)
+    assert restored["content_hash"] == second["content_hash"]
+
+
 def test_paired_delta_counts_unresolved_to_wrong_as_new_error():
     baseline = [{"case": "a", "gold": True, "prediction": None}]
     active = [{"case": "a", "gold": True, "prediction": False}]

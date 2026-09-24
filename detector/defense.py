@@ -387,7 +387,16 @@ def _vote_defense(
             (b for b in ballots if b.get("verdict") == "substantiated"),
             ballots[0],
         )
-        parsed = {**anchor, "verdict": UPGRADED_SUBSTANTIATED}
+        # The adjudication contract (adjudication.py) states: "A defense
+        # that only half-convicts (substantiated_upgraded) has no confirmed
+        # step to disagree with: its contract forces the field to null."
+        # Leaking the anchor's confirmed_step causes false localization
+        # conflicts and degrades authority on rows that should be clean.
+        parsed = {
+            **anchor,
+            "verdict": UPGRADED_SUBSTANTIATED,
+            "confirmed_step": None,
+        }
     elif collapsed == "inconclusive":
         # No strict majority and no substantiated ballot: synthesize the
         # degraded, non-overturning verdict instead of adopting an arbitrary

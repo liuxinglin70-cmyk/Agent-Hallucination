@@ -8,10 +8,12 @@ mechanical drift rollback in the design has a concrete implementation.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 import os
 import tempfile
 import threading
 import time
+from uuid import uuid4
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -69,11 +71,11 @@ class ActiveRegistry:
 
     @property
     def entries(self) -> list[dict[str, Any]]:
-        return list(self._entries)
+        return deepcopy(self._entries)
 
     @property
     def registry(self) -> dict[str, Any]:
-        return make_registry(self._entries)
+        return make_registry(deepcopy(self._entries))
 
     @property
     def registry_hash(self) -> str:
@@ -81,7 +83,7 @@ class ActiveRegistry:
 
     @property
     def state(self) -> dict[str, Any]:
-        return dict(self._state)
+        return deepcopy(self._state)
 
     def _load_entries(self) -> list[dict[str, Any]]:
         if not self.active_path.exists():
@@ -166,11 +168,11 @@ class ActiveRegistry:
                         for e in self._entries
                     ],
                 })
-            snapshot_name = f"cycle{int(cycle):03d}_{time.strftime('%Y%m%d_%H%M%S')}.json"
+            snapshot_name = f"cycle{int(cycle):03d}_{time.strftime('%Y%m%d_%H%M%S')}_{uuid4().hex}.json"
             snapshot_path = self.dir / SNAPSHOTS_DIR / snapshot_name
             self._atomic_write(snapshot_path, payload)
             self._atomic_write(self.active_path, payload)
-            self._entries = [dict(entry) for entry in entries]
+            self._entries = deepcopy(list(entries))
             self._state["cycle"] = int(cycle)
             self._state["active_hash"] = str(payload.get("content_hash") or "")
             self._state.setdefault("snapshots", []).append({
@@ -280,9 +282,7 @@ class ActiveRegistry:
         previous_hash = self.registry_hash
         with self._lock:
             self._atomic_write(self.active_path, validated)
-            self._entries = [
-                dict(entry) for entry in validated.get("interventions") or ()
-            ]
+            self._entries = deepcopy(list(validated.get("interventions") or ()))
             self._state["active_hash"] = restored_hash
             if previous_hash != restored_hash:
                 self._state.setdefault("snapshots", []).append({
@@ -304,7 +304,10 @@ class ActiveRegistry:
         if not snapshots:
             return None
         target = max(
-            (item for item in snapshots if int(item.get("cycle") or 0) <= int(cycle)),
+            (item for item in reversed(snapshots)
+             if int(item.get("cycle") or 0) <= int(cycle)
+             and item.get("file")
+             and (self.dir / SNAPSHOTS_DIR / str(item["file"])).is_file()),
             key=lambda item: int(item.get("cycle") or 0),
             default=None,
         )

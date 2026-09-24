@@ -40,7 +40,7 @@ distribution is unknown, and the three answers differ by an order of magnitude
 depending on which part of it is assumed to look like the archive.
 
     python scripts/cost_model_693.py
-    python scripts/cost_model_693.py --json reports/cost_model_693.json
+    python scripts/cost_model_693.py --json artifacts/cost_model_693.json
 """
 
 from __future__ import annotations
@@ -77,31 +77,6 @@ CASE_CAPS = {
     10800.0: "case_timeout_seconds (10800) in detector/configs/autodl.json",
 }
 
-#: Phase wall clock and case counts of the two real batches whose case lists are
-#: known, from the run-2 readings (machine-readable, see ``harvest``). These are
-#: the throughput anchors: the only readings that include the tail and the
-#: queueing.
-BATCH_ANCHORS = {
-    "audit": {
-        "source": "reports/real_dev_20260923/readings_run2.json",
-        "cases": 12,
-        "wall_minutes": 118.37,
-        "detail": "sentinel 6 + gain 6, workers=8, the same 12-case set whose"
-                  " per-case rows are archived under"
-                  " reports/real_evolution_20260923/contaminated_attempt/",
-    },
-    "patrol": {
-        "source": "reports/real_dev_20260923/readings_run2.json",
-        "cases": 8,
-        "wall_minutes": 52.86,
-        "detail": "patrol batch, workers=8, unresolved=0 -- the run in which"
-                  " the batch actually fit its budget",
-    },
-}
-
-#: The audit batch's own case list (run 2's contract: sentinel + gain). Used to
-#: compute that batch's ideal wall clock from its per-case costs, so the anchor
-#: yields a packing efficiency instead of a raw extrapolation.
 AUDIT_CASES = (
     "BFCL/041.json", "Magentic_One/085.json", "Octotools/005.json",
     "OpenDeepSearch/067.json", "OpenDeepSearch/077.json", "SmolAgents/019.json",
@@ -109,219 +84,15 @@ AUDIT_CASES = (
     "Octotools/030.json", "OpenDeepSearch/002.json", "OpenDeepSearch/063.json",
 )
 
-#: Readings that exist only in prose. Kept apart from the harvested rows so the
-#: machine-readable part stays machine-readable, and cited where they are used.
-DOCUMENTED = (
-    {
-        "case": "Magentic_One/049.json",
-        "seconds": 93.8 * 60,
-        "source": "reports/real_dev_20260923/run2_README.md",
-        "note": "audit slowest, run 2; run 1 measured the same case at 36.0 min",
-    },
-    {
-        "case": "Magentic_One/049.json",
-        "seconds": 36.0 * 60,
-        "source": "reports/real_dev_20260923/run2_README.md",
-        "note": "audit slowest, run 1 -- the spread on one case is 2.6x",
-    },
-    {
-        "case": "Camel/018.json",
-        "seconds": 101.0 * 60,
-        "source": "reports/real_dev_20260923/run1_README.md",
-        "note": "patrol, run 1",
-    },
-    {
-        "case": "Magentic_One/050.json",
-        "seconds": 108.0 * 60,
-        "source": "reports/real_dev_20260923/run1_README.md",
-        "note": "patrol, run 1; both ran while 8 workers shared the batch",
-    },
-)
-
-
-def _load(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8-sig"))
-
-
-def _tokens_from_result(result: Mapping[str, Any]) -> int:
-    total = 0
-    for provider in (result.get("providers") or {}).values():
-        if not isinstance(provider, Mapping):
-            continue
-        usage = provider.get("usage_total") or provider.get("usage") or {}
-        total += int(usage.get("total_tokens") or 0)
-    return total
-
-
-def _rows_from_single_mechanism(out: Path) -> list[dict[str, Any]]:
-    """Per-run rows from a verification directory.
-
-    ``analysis.json`` and ``summary.json`` are aggregates of the very rows the
-    ``*.rep*.json`` files already carry; reading them too would count the same
-    measurement two or three times and pull the mean toward whichever case was
-    repeated most. They are skipped.
-    """
-    rows = []
-    for path in sorted(out.glob("*.json")):
-        if path.name in {"analysis.json", "summary.json"}:
-            continue
-        payload = _load(path)
-        if not isinstance(payload, Mapping):
-            continue
-        if "elapsed_seconds" in payload:
-            summary = payload.get("summary") or {}
-            rows.append({
-                "case": str(payload.get("case")),
-                "seconds": float(payload["elapsed_seconds"]),
-                "source": str(path.relative_to(ROOT)),
-                "tokens": _tokens_from_result(payload.get("result") or {}) or None,
-                "state": summary.get("state"),
-                "study": out.name,
-            })
-        for item in payload.get("runs") or []:
-            if not isinstance(item, Mapping) or "elapsed_seconds" not in item:
-                continue
-            rows.append({
-                "case": str(item.get("case")),
-                "seconds": float(item["elapsed_seconds"]),
-                "source": str(path.relative_to(ROOT)),
-                "tokens": item.get("tokens"),
-                "state": item.get("state"),
-                "study": out.name,
-            })
-    return rows
-
 
 def harvest() -> dict[str, Any]:
-    """Every real per-case reading in the repository, with its provenance."""
-    per_case: list[dict[str, Any]] = []
-    batches: list[dict[str, Any]] = []
-    notes: list[str] = []
-
-    # --- reports/real/summary.json: the 2026-09-16 real-path check ----------
-    path = ROOT / "reports" / "real" / "summary.json"
-    if path.exists():
-        payload = _load(path)
-        for repetition in payload.get("repetitions") or []:
-            for row in repetition.get("cases") or []:
-                per_case.append({
-                    "case": str(row.get("case")),
-                    "seconds": float(row.get("elapsed_seconds") or 0.0),
-                    "tokens": row.get("tokens"),
-                    "state": row.get("state"),
-                    "source": str(path.relative_to(ROOT)),
-                })
-        for row in (payload.get("recall_phase") or {}).get("rows") or []:
-            per_case.append({
-                "case": str(row.get("case")),
-                "seconds": float(row.get("elapsed_seconds") or 0.0),
-                "tokens": row.get("tokens"),
-                "state": row.get("state"),
-                "source": str(path.relative_to(ROOT)) + "#recall_phase",
-            })
-        batches.append({
-            "name": "real_path_check",
-            "cases": len((payload.get("limits") or {}).get("cases")
-                         and payload["freeze"]["case_list"] or []),
-            "wall_minutes": None,
-            "workers": (payload.get("limits") or {}).get("workers"),
-            "source": str(path.relative_to(ROOT)),
-            "detail": "6 cases x 2 repetitions, workers=2; per-repetition wall"
-                      " clock not recorded, per-case rows are",
-        })
-
-    # --- verification runs: single_mechanism and the two-arm evidence ------
-    for name in (
-        "single_mechanism",
-        "two_arm_evidence",
-        "two_arm_evidence_round1_pre_fixes",
-        "two_arm_evidence_round3_pre_upgrade_law",
-        "two_arm_retrieved",
-    ):
-        out = ROOT / "reports" / "verification_20260917" / name
-        if out.is_dir():
-            per_case.extend(_rows_from_single_mechanism(out))
-    notes.append(
-        "the 2026-09-17 verification rows ran under study-specific settings"
-        " (evidence arms, single-mechanism repeats); they are the same model and"
-        " endpoint, so they witness the per-case cost scale, but a study that"
-        " changed the route is not a measurement of the shipped route"
-    )
-
-    # --- the contaminated attempt's arm rows: per-case, with usage ---------
-    arms = (
-        ROOT / "reports" / "real_evolution_20260923" / "contaminated_attempt"
-        / "checkpoints" / "cycle001" / "arms"
-    )
-    if arms.is_dir():
-        for path in sorted(arms.rglob("*.json")):
-            payload = _load(path)
-            row = payload.get("row") if isinstance(payload, Mapping) else None
-            if not isinstance(row, Mapping):
-                continue
-            result = row.get("result") or {}
-            per_case.append({
-                "case": str(row.get("case")),
-                "seconds": float(row.get("elapsed_seconds") or 0.0),
-                "tokens": _tokens_from_result(result) or None,
-                "state": row.get("state"),
-                "authority": row.get("authority"),
-                "source": str(path.relative_to(ROOT)),
-            })
-
-    # --- the 2026-09-18 stage-timing diagnostic ----------------------------
-    path = (ROOT / "reports" / "error_scope_20260918" / "diagnostics"
-            / "019_timing.json")
-    if path.exists():
-        payload = _load(path)
-        per_case.append({
-            "case": str(payload.get("case")),
-            "seconds": float(payload.get("elapsed_seconds") or 0.0),
-            "tokens": None,
-            "state": payload.get("state"),
-            "source": str(path.relative_to(ROOT)),
-            "stage_seconds": {
-                key: value.get("attempts")
-                for key, value in (payload.get("stage_status") or {}).items()
-                if isinstance(value, Mapping)
-            },
-        })
-
-    # --- batch anchors from the run-2 phase table --------------------------
-    readings = ROOT / "reports" / "real_dev_20260923" / "readings_run2.json"
-    if readings.exists():
-        payload = _load(readings)
-        phases = {
-            phase.get("event"): phase.get("gap_minutes")
-            for phase in (payload.get("timing") or {}).get("phases") or []
-        }
-        for name, anchor in BATCH_ANCHORS.items():
-            anchor = dict(anchor)
-            anchor["wall_minutes"] = phases.get(name)
-            anchor["cases"] = anchor["cases"]
-            batches.append({"name": name, **anchor})
-        notes.append(
-            "run 2 timing phases give audit/patrol wall clock; the case lists"
-            " come from the same run's contract (sentinel+gain) and ledger"
-            " (patrol)"
-        )
-
-    for documented in DOCUMENTED:
-        per_case.append({
-            "case": documented["case"],
-            "seconds": documented["seconds"],
-            "tokens": None,
-            "state": None,
-            "source": documented["source"],
-            "note": documented["note"],
-            "prose_only": True,
-        })
-    notes.append(
-        "Magentic_One/049, Camel/018 and Magentic_One/050 exist only in prose;"
-        " the README states them in minutes, so they are recorded as such and"
-        " flagged instead of being silently mixed into the JSON readings"
-    )
-    return {"per_case": per_case, "batches": batches, "notes": notes}
+    """Read the frozen numeric sample consolidated into the experiment log."""
+    source = ROOT / "docs" / "experiment-log.md"
+    text = source.read_text(encoding="utf-8")
+    start = text.index("<!-- cost-calibration:start -->")
+    start = text.index("```json\n", start) + len("```json\n")
+    end = text.index("\n```\n<!-- cost-calibration:end -->", start)
+    return json.loads(text[start:end])
 
 
 def classify(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:

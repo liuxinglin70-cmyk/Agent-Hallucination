@@ -1,6 +1,0 @@
-{
-  "archived_round": 1,
-  "why_archived": "Raw evidence for the two defects this repair fixed: an unrelated snapshot reopened the recall scan on every case (Magentic_One/036 false positive), and one fixed input produced opposite conflict interpretations across repetitions (OpenDeepSearch/086 rep1 vs rep2). Runs are the unedited originals from before the fixes.",
-  "recorded_source_digest": "4b80b626a7aecf2f",
-  "snapshot_digest": "e4b32079e2707f944b2baa76c203c6b1a9c80548c656b3ff4e613315b3a847a4"
-}

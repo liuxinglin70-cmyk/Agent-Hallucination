@@ -29,7 +29,7 @@ def main() -> int:
     run_id = timestamp.strftime("live_smoke_%Y%m%dT%H%M%S%fZ")
     root = ROOT / "artifacts" / "integration" / run_id
     root.mkdir(parents=True)
-    output = ROOT / "reports" / "live"
+    output = ROOT / "artifacts" / "live"
     output.mkdir(parents=True, exist_ok=True)
     report = {"status": "running", "passed": False,
               "started_at_utc": timestamp.isoformat(),
@@ -45,7 +45,7 @@ def main() -> int:
     except (ValueError, OSError) as exc:
         report.update(status="blocked", reason=str(exc))
         write_report()
-        print("Live configuration/credentials unavailable; see reports/live/summary.json")
+        print("Live configuration/credentials unavailable; see artifacts/live/summary.json")
         return 2
     # Preserve configured models and vote counts; bound transport time and retries.
     config["case_timeout_seconds"] = 180

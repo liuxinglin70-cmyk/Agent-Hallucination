@@ -333,7 +333,7 @@ def check_timeouts(report: Report, cfg: dict) -> None:
 
 
 def _cost_sample() -> dict:
-    path = REPO / "reports/cost_model_693.json"
+    path = REPO / "artifacts/cost_model_693.json"
     if not path.is_file():
         return {}
     try:
@@ -442,7 +442,7 @@ def check_long_tail(report: Report, cfg: dict, phase: str) -> None:
             "the baseline batch runs the whole corpus, so the long tail is "
             "already inside its own batch budget")
         return
-    model_path = REPO / "reports/cost_model_693.json"
+    model_path = REPO / "artifacts/cost_model_693.json"
     if not model_path.is_file():
         _warn(report, "long_tail",
               "no cost model on file; the slow-case floor is unknown")
@@ -669,7 +669,7 @@ def check_source_identity(report: Report) -> dict:
 
 
 def check_cost(report: Report, phase: str, cfg: dict) -> None:
-    model_path = REPO / "reports/cost_model_693.json"
+    model_path = REPO / "artifacts/cost_model_693.json"
     if not model_path.is_file():
         _warn(report, "cost", "no cost model on file")
         return

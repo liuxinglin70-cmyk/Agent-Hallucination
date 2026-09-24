@@ -39,7 +39,7 @@ def test_model_is_calibrated_on_real_repository_readings(built):
     for source in sources:
         assert (ROOT / source).exists(), f"missing calibration source: {source}"
     # The three archives the task names must all be represented.
-    joined = "\n".join(sorted(sources))
+    joined = "\n".join(row.get("original_source", "").replace("\\", "/") for row in readings)
     assert "reports/real/summary.json" in joined
     assert "real_evolution_20260923" in joined
     assert "verification_20260917" in joined

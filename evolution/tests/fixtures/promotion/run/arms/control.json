@@ -1,0 +1,125 @@
+{
+  "source": "reports/promotion_20260921/run/arms/control.json",
+  "rows": [
+    {
+      "case": "BFCL/000.json",
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean"
+    },
+    {
+      "case": "BFCL/001.json",
+      "gold": false,
+      "prediction": true,
+      "state": "verified_error"
+    },
+    {
+      "case": "BFCL/004.json",
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean"
+    },
+    {
+      "case": "BFCL/005.json",
+      "gold": true,
+      "prediction": true,
+      "state": "verified_error"
+    },
+    {
+      "case": "BFCL/007.json",
+      "gold": false,
+      "prediction": false,
+      "state": "verified_clean"
+    },
+    {
+      "case": "BFCL/009.json",
+      "gold": false,
+      "prediction": true,
+      "state": "verified_error"
+    },
+    {
+      "case": "BFCL/010.json",
+      "gold": false,
+      "prediction": false,
+      "state": "verified_clean"
+    },
+    {
+      "case": "BFCL/011.json",
+      "gold": false,
+      "prediction": false,
+      "state": "verified_clean"
+    },
+    {
+      "case": "BFCL/012.json",
+      "gold": false,
+      "prediction": false,
+      "state": "verified_clean"
+    },
+    {
+      "case": "BFCL/014.json",
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean"
+    },
+    {
+      "case": "BFCL/015.json",
+      "gold": true,
+      "prediction": true,
+      "state": "verified_error"
+    },
+    {
+      "case": "BFCL/016.json",
+      "gold": true,
+      "prediction": true,
+      "state": "verified_error"
+    },
+    {
+      "case": "BFCL/023.json",
+      "gold": true,
+      "prediction": true,
+      "state": "verified_error"
+    },
+    {
+      "case": "BFCL/027.json",
+      "gold": true,
+      "prediction": true,
+      "state": "verified_error"
+    },
+    {
+      "case": "BFCL/030.json",
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean"
+    },
+    {
+      "case": "BFCL/031.json",
+      "gold": true,
+      "prediction": true,
+      "state": "verified_error"
+    },
+    {
+      "case": "BFCL/032.json",
+      "gold": true,
+      "prediction": true,
+      "state": "verified_error"
+    },
+    {
+      "case": "BFCL/034.json",
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean"
+    },
+    {
+      "case": "BFCL/035.json",
+      "gold": true,
+      "prediction": false,
+      "state": "verified_clean"
+    },
+    {
+      "case": "BFCL/037.json",
+      "gold": true,
+      "prediction": true,
+      "state": "verified_error"
+    }
+  ]
+}

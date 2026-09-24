@@ -16,7 +16,7 @@ distinction honest is to read it from the artefact that records it
 
     python scripts/read_multigen.py \
         --run artifacts/selfevo-real-multigen-20260923 \
-        --json reports/<date>_real_experiment/multigen.json
+        --json artifacts/<date>_real_experiment/multigen.json
 """
 
 from __future__ import annotations

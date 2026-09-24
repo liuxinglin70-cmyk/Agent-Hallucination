@@ -116,7 +116,7 @@ def main() -> int:
     root = ROOT / "artifacts" / "real" / run_id
     runs_root = root / "runs"
     runs_root.mkdir(parents=True)
-    out = ROOT / "reports" / "real"
+    out = ROOT / "artifacts" / "real"
     out.mkdir(parents=True, exist_ok=True)
 
     report: dict = {
@@ -144,7 +144,7 @@ def main() -> int:
     except (ValueError, OSError) as exc:
         report.update(status="blocked", reason=str(exc))
         write_report()
-        print("Real configuration/credentials unavailable; see reports/real/summary.json")
+        print("Real configuration/credentials unavailable; see artifacts/real/summary.json")
         return 2
 
     # Freeze the base: pin the resolved routes, then hash every source file the

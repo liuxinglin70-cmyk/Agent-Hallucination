@@ -33,7 +33,7 @@ labels.
         --baseline-roll artifacts/baseline/runs/g0_roll2 \
         --deployed artifacts/baseline/runs/g1 \
         --dataset-root datasets/raw/agenthallu/AgentHallu \
-        --json reports/<date>_real_experiment/endpoint.json
+        --json artifacts/<date>_real_experiment/endpoint.json
 """
 
 from __future__ import annotations

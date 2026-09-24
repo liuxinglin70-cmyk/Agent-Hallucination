@@ -95,7 +95,7 @@ def test_repair_reading_matches_the_archived_run():
     from pathlib import Path
 
     archive = (
-        Path(__file__).resolve().parents[2] / "reports" / "promotion_20260921"
+        Path(__file__).resolve().parents[2] / "evolution" / "tests" / "fixtures" / "promotion"
     )
     if not (archive / "run" / "arms" / "control.json").is_file():
         import pytest
