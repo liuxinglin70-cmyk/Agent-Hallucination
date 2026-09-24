@@ -1,0 +1,235 @@
+"""Tests for packet scoped projection and scoped semantic executor (P2-PR05/PR06 / C09, C10)."""
+
+from __future__ import annotations
+
+import pytest
+
+from detector.interventions import (
+    INTERVENTION_SCHEMA,
+    SCOPED_SEMANTIC_EVIDENCE_SCHEMA,
+    InterventionPlan,
+    SemanticExecutor,
+    TERMINAL_EVIDENCE_ONLY,
+    validate_intervention,
+)
+from detector.packet import (
+    EVENT_WINDOW_PROJECTION_SCHEMA,
+    PacketError,
+    build_packet,
+    event_source_mapping,
+    project_event_window,
+)
+
+
+class DummySemanticExecutor(SemanticExecutor):
+    def __init__(self, artifact_id: str = "art-1", artifact_digest: str = "dig-1"):
+        self._id = artifact_id
+        self._digest = artifact_digest
+        self.calls = []
+
+    def identity(self) -> dict[str, str]:
+        return {"id": self._id, "digest": self._digest}
+
+    def judge(self, predicate: str, packet: dict, context: dict) -> dict:
+        self.calls.append((predicate, context))
+        return {
+            "verdict": "supported",
+            "detail": "semantic check passed",
+            "evidence_refs": ["event_002"],
+        }
+
+
+def _sample_packet() -> dict:
+    history = [
+        {"role": "user", "content": "Fetch the balance and calculate taxes."},
+        {"role": "assistant", "tool_calls": [{"name": "fetch_balance", "arguments": "{}"}]},
+        {"role": "tool", "content": '{"balance": 1000}'},
+        {"role": "assistant", "tool_calls": [{"name": "compute_tax", "arguments": '{"rate": 0.2}'}]},
+        {"role": "tool", "content": '{"tax": 200}'},
+        {"role": "assistant", "content": "Your balance is 1000 and taxes are 200."},
+    ]
+    return build_packet({"question": "Calculate taxes", "history": history})
+
+
+def test_project_event_window_causal_boundaries():
+    packet = _sample_packet()
+    # Anchor at event_004 (compute_tax), window_before=1, window_after=1
+    proj = project_event_window(
+        packet,
+        anchor_event_id="event_004",
+        window_before=1,
+        window_after=1,
+    )
+    assert proj["schema_version"] == EVENT_WINDOW_PROJECTION_SCHEMA
+    assert proj["anchor_event_id"] == "event_004"
+    assert proj["anchor_position"] == 4
+    # Event 003, 004, 005
+    assert proj["event_ids"] == ["event_003", "event_004", "event_005"]
+    assert proj["is_window_complete"] is True
+    assert proj["has_subsequent_recovery"] is True  # event_006 has answer content
+    assert proj["delivered_result"] is not None
+    assert isinstance(proj["projection_hash"], str)
+    assert len(proj["projection_hash"]) == 64
+
+
+def test_project_event_window_with_target():
+    packet = _sample_packet()
+    proj = project_event_window(
+        packet,
+        anchor_event_id="event_002",
+        target_event_id="event_004",
+        window_before=1,
+        window_after=1,
+    )
+    assert proj["anchor_event_id"] == "event_002"
+    assert proj["target_event_id"] == "event_004"
+    assert proj["event_ids"] == ["event_001", "event_002", "event_003", "event_004", "event_005"]
+    assert proj["is_window_complete"] is True
+
+
+def test_project_event_window_incomplete_bounds():
+    packet = _sample_packet()
+    # Anchor at event_001 with window_before=2 (clips at start)
+    proj = project_event_window(
+        packet,
+        anchor_event_id="event_001",
+        window_before=2,
+        window_after=1,
+    )
+    assert proj["is_window_complete"] is False
+    assert proj["event_ids"] == ["event_001", "event_002"]
+
+
+def test_project_event_window_missing_anchor():
+    packet = _sample_packet()
+    with pytest.raises(PacketError, match="anchor event 'non_existent' not found"):
+        project_event_window(packet, anchor_event_id="non_existent")
+
+
+def test_event_source_mapping():
+    packet = _sample_packet()
+    mapping = event_source_mapping(packet)
+    assert len(mapping) == 6
+    assert "event_001" in mapping
+    assert mapping["event_001"]["role"] == "user"
+    assert mapping["event_001"]["has_tool_calls"] is False
+    assert mapping["event_001"]["has_content"] is True
+
+    assert mapping["event_002"]["role"] == "assistant"
+    assert mapping["event_002"]["has_tool_calls"] is True
+    assert mapping["event_002"]["tool_names"] == ["fetch_balance"]
+
+
+def test_scoped_semantic_layer1_static_applicability_not_met():
+    packet = _sample_packet()
+    executor = DummySemanticExecutor()
+    entry = {
+        "schema_version": INTERVENTION_SCHEMA,
+        "intervention_id": "IV-SEM-001",
+        "type": "evidence_check",
+        "hook": "defense.pre",
+        "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
+        "body": {
+            "predicate": "check_retrieval",
+            "runner": "typed_semantic",
+            "output_verdicts": ["supported", "contradicted", "abstained"],
+            "scope": {
+                "required_features": ["question_has_numbers"],  # packet question has no numbers
+                "anchor_event": "event_002",
+                "window_before": 1,
+            },
+        },
+        "artifact": {"id": "art-1", "digest": "dig-1"},
+        "claim": {"expected_behavior": "test", "target_polarity": "boundary"},
+        "provenance": {"cycle": 1, "failure_family": "fam", "failure_cases": ["c1", "c2"]},
+    }
+    validate_intervention(entry)
+    plan = InterventionPlan([entry], semantic_executor=executor)
+    evidence = plan.evidence_for("defense.pre", packet=packet, context={})
+    assert len(evidence) == 1
+    ev = evidence[0]
+    assert ev["schema_version"] == SCOPED_SEMANTIC_EVIDENCE_SCHEMA
+    assert ev["scope_status"] == "not_applicable"
+    assert ev["verdict"] == "abstained"
+    assert ev["terminal_authority"] == TERMINAL_EVIDENCE_ONLY
+    assert ev["blocking_reasons"] == ["static_features_not_met"]
+    # Crucial: executor must NOT have been called!
+    assert len(executor.calls) == 0
+
+
+def test_scoped_semantic_layer2_incomplete_window():
+    packet = _sample_packet()
+    executor = DummySemanticExecutor()
+    entry = {
+        "schema_version": INTERVENTION_SCHEMA,
+        "intervention_id": "IV-SEM-002",
+        "type": "evidence_check",
+        "hook": "defense.pre",
+        "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
+        "body": {
+            "predicate": "check_taxes",
+            "runner": "typed_semantic",
+            "output_verdicts": ["supported", "contradicted", "abstained"],
+            "scope": {
+                "required_features": ["has_tool_calls"],
+                "anchor_event": "event_001",
+                "window_before": 5,  # Too large for start of packet
+                "window_after": 1,
+            },
+        },
+        "artifact": {"id": "art-1", "digest": "dig-1"},
+        "claim": {"expected_behavior": "test", "target_polarity": "boundary"},
+        "provenance": {"cycle": 1, "failure_family": "fam", "failure_cases": ["c1", "c2"]},
+    }
+    validate_intervention(entry)
+    plan = InterventionPlan([entry], semantic_executor=executor)
+    evidence = plan.evidence_for("defense.pre", packet=packet, context={})
+    assert len(evidence) == 1
+    ev = evidence[0]
+    assert ev["scope_status"] == "window_incomplete"
+    assert ev["verdict"] == "abstained"
+    assert ev["terminal_authority"] == TERMINAL_EVIDENCE_ONLY
+    assert ev["blocking_reasons"] == ["window_incomplete"]
+    # Executor must NOT have been called!
+    assert len(executor.calls) == 0
+
+
+def test_scoped_semantic_layer3_applicable_execution():
+    packet = _sample_packet()
+    executor = DummySemanticExecutor()
+    entry = {
+        "schema_version": INTERVENTION_SCHEMA,
+        "intervention_id": "IV-SEM-003",
+        "type": "evidence_check",
+        "hook": "defense.pre",
+        "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
+        "body": {
+            "predicate": "check_taxes",
+            "runner": "typed_semantic",
+            "output_verdicts": ["supported", "contradicted", "abstained"],
+            "scope": {
+                "required_features": ["has_tool_calls"],
+                "anchor_event": "event_004",
+                "window_before": 1,
+                "window_after": 1,
+            },
+        },
+        "artifact": {"id": "art-1", "digest": "dig-1"},
+        "claim": {"expected_behavior": "test", "target_polarity": "boundary"},
+        "provenance": {"cycle": 1, "failure_family": "fam", "failure_cases": ["c1", "c2"]},
+    }
+    validate_intervention(entry)
+    plan = InterventionPlan([entry], semantic_executor=executor)
+    evidence = plan.evidence_for("defense.pre", packet=packet, context={})
+    assert len(evidence) == 1
+    ev = evidence[0]
+    assert ev["schema_version"] == SCOPED_SEMANTIC_EVIDENCE_SCHEMA
+    assert ev["scope_status"] == "applicable"
+    assert ev["verdict"] == "supported"
+    assert ev["terminal_authority"] == TERMINAL_EVIDENCE_ONLY
+    assert ev["anchor_event_ids"] == ["event_004"]
+    assert len(executor.calls) == 1
+    # Verify window projection was delivered in context
+    _, ctx = executor.calls[0]
+    assert "window_projection" in ctx
+    assert ctx["window_projection"]["event_ids"] == ["event_003", "event_004", "event_005"]

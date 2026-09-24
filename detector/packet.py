@@ -8,9 +8,11 @@ never enter or persist in a detector input.
 from __future__ import annotations
 
 import ast
+import hashlib
 from typing import Any, Mapping, Sequence
 
 PACKET_SCHEMA = "detector.packet.v1"
+EVENT_WINDOW_PROJECTION_SCHEMA = "detector.event_window_projection.v1"
 
 ALLOWED_RECORD_KEYS = frozenset({"question", "history"})
 
@@ -271,6 +273,124 @@ def step_kind(packet: Mapping[str, Any], step: int) -> str | None:
             return STEP_KIND_ACTION
         return STEP_KIND_EMPTY
     return None
+
+
+def event_source_mapping(packet: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Map each event in the packet to its provenance and structural attributes."""
+    mapping: dict[str, dict[str, Any]] = {}
+    for event in packet.get("events") or []:
+        event_id = str(event.get("event_id") or "")
+        pos = int(event.get("position") or 0)
+        tool_names = [
+            str(i.get("tool_name") or "")
+            for i in event.get("tool_interactions") or ()
+            if str(i.get("tool_name") or "")
+        ]
+        mapping[event_id] = {
+            "event_id": event_id,
+            "position": pos,
+            "source_step_id": event.get("source_step_id"),
+            "role": event.get("role"),
+            "step_kind": step_kind(packet, pos),
+            "tool_names": tool_names,
+            "has_tool_calls": len(tool_names) > 0,
+            "has_content": bool(event.get("content") and str(event.get("content")).strip()),
+        }
+    return mapping
+
+
+def project_event_window(
+    packet: Mapping[str, Any],
+    *,
+    anchor_event_id: str,
+    target_event_id: str | None = None,
+    window_before: int = 2,
+    window_after: int = 2,
+    include_delivered: bool = True,
+) -> dict[str, Any]:
+    """Construct a read-only causal event window projection from the canonical packet.
+
+    Strictly label-free: consumes only the canonical packet.
+    """
+    events = list(packet.get("events") or [])
+    if not events:
+        raise PacketError("packet contains no events")
+
+    anchor_event = None
+    for event in events:
+        if str(event.get("event_id") or "") == anchor_event_id:
+            anchor_event = event
+            break
+    if anchor_event is None:
+        raise PacketError(f"anchor event {anchor_event_id!r} not found in packet")
+
+    anchor_pos = int(anchor_event.get("position") or 0)
+
+    target_pos = None
+    if target_event_id is not None:
+        target_event = None
+        for event in events:
+            if str(event.get("event_id") or "") == target_event_id:
+                target_event = event
+                break
+        if target_event is None:
+            raise PacketError(f"target event {target_event_id!r} not found in packet")
+        target_pos = int(target_event.get("position") or 0)
+
+    total_events = len(events)
+    start_pos = max(1, anchor_pos - max(0, window_before))
+    if target_pos is not None:
+        end_pos = min(total_events, max(target_pos, anchor_pos) + max(0, window_after))
+    else:
+        end_pos = min(total_events, anchor_pos + max(0, window_after))
+
+    projected_events = [
+        event for event in events
+        if start_pos <= int(event.get("position") or 0) <= end_pos
+    ]
+    projected_ids = [str(e.get("event_id") or "") for e in projected_events]
+
+    is_window_complete = (
+        (anchor_pos - window_before >= 1)
+        and ((target_pos or anchor_pos) + window_after <= total_events)
+    )
+
+    has_subsequent_recovery = False
+    for event in events:
+        pos = int(event.get("position") or 0)
+        if pos > anchor_pos:
+            if event.get("tool_interactions"):
+                has_subsequent_recovery = True
+                break
+            content = str(event.get("content") or "").strip()
+            if content and (
+                any(hint in content.lower() for hint in _ANSWER_TOOL_HINTS)
+                or event.get("role") == "assistant"
+            ):
+                has_subsequent_recovery = True
+                break
+
+    delivered = delivered_result(packet) if include_delivered else None
+
+    raw_hash_body = f"{anchor_event_id}:{target_event_id}:{window_before}:{window_after}:{','.join(projected_ids)}"
+    proj_hash = hashlib.sha256(raw_hash_body.encode("utf-8")).hexdigest()
+
+    return {
+        "schema_version": EVENT_WINDOW_PROJECTION_SCHEMA,
+        "anchor_event_id": anchor_event_id,
+        "anchor_position": anchor_pos,
+        "target_event_id": target_event_id,
+        "target_position": target_pos,
+        "window_before": window_before,
+        "window_after": window_after,
+        "events": projected_events,
+        "event_ids": projected_ids,
+        "is_window_complete": is_window_complete,
+        "has_subsequent_recovery": has_subsequent_recovery,
+        "delivered_result": delivered,
+        "omitted_event_count": total_events - len(projected_events),
+        "projection_hash": proj_hash,
+    }
 
 
 def evidence_refs_support_event(
@@ -635,6 +755,7 @@ def packet_features(packet: Mapping[str, Any]) -> set[str]:
 __all__ = [
     "ALLOWED_RECORD_KEYS",
     "EVALUATOR_ONLY_FIELDS",
+    "EVENT_WINDOW_PROJECTION_SCHEMA",
     "PACKET_FEATURE_NAMES",
     "PACKET_SCHEMA",
     "PacketError",
@@ -644,9 +765,11 @@ __all__ = [
     "build_packet",
     "delivered_result",
     "event_id_for_step",
+    "event_source_mapping",
     "evidence_refs_support_event",
     "evidence_refs_support_step",
     "packet_features",
+    "project_event_window",
     "render_defense_view",
     "render_full_view",
     "render_judge_view",
