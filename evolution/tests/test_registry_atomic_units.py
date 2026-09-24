@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import pytest
 
 from evolution.contracts import empty_registry, make_intervention

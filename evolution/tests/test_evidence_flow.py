@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from detector.evidence import excerpt_sha256
 from evolution.backends import (
     CachingBackend,

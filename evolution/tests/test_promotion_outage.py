@@ -11,20 +11,13 @@ the promotion gate must refuse to score it and say so.
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
-
-import pytest
 
 from evolution.promotion import (
     PromotionRun,
-    PromotionProtocolError,
-    freeze_protocol,
 )
-from evolution.contracts import make_intervention
 from evolution.tests.test_promotion import (  # reuse the offline harness
-    BENEFIT,
-    PROTECTION_NEG,
-    PROTECTION_POS,
     _FakeLedger,
     _FakeRegistry,
     _ScriptedBackend,
@@ -115,16 +108,30 @@ def test_an_unmeasured_arm_is_not_persisted_for_resume(tmp_path):
 
 
 def test_batch_deadline_fail_closes_to_unresolved_not_to_a_gain(tmp_path):
-    """Expiry must resolve as unresolved, which the run then refuses to score."""
+    """Expiry must resolve as unresolved, which the run then refuses to score.
+
+    The overrun is simulated the way ``DetectionBackend.evaluate`` handles one:
+    the case runs past the deadline, then fail-closes to an unresolved,
+    non-authoritative row instead of reporting a prediction. ``_ScriptedBackend``
+    replaces that per-case loop, so it has to reproduce the fail-close itself --
+    delegating to the parent would return fully scored rows and quietly assert
+    nothing about the deadline.
+    """
     protocol = _standard_protocol(tmp_path)
     protocol["timeout_seconds"] = 0.001
 
     class _Slow(_ScriptedBackend):
         def evaluate_fresh(self, cases, **kwargs):
-            import time as _time
-
             time.sleep(0.05)
-            return super().evaluate_fresh(cases, **kwargs)
+            rows = super().evaluate_fresh(cases, **kwargs)
+            for row in rows:
+                row.update({
+                    "prediction": None,
+                    "state": "unresolved",
+                    "authority": "invalid",
+                    "measurement": "infrastructure_failure",
+                })
+            return rows
 
     run, report = _run(
         tmp_path, protocol,

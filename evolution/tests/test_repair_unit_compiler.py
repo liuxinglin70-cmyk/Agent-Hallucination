@@ -13,13 +13,8 @@ from evolution.repair_unit import (
     ERROR_UNSAFE_TERMINAL_ACTION,
     ERROR_UNSUPPORTED_CAPABILITY,
     REPAIR_UNIT_SCHEMA,
-    ClaimContract,
-    DecisionContract,
-    ObservationContract,
     RepairUnit,
     RepairUnitError,
-    ScopeContract,
-    TargetContract,
     repair_unit_hash,
 )
 

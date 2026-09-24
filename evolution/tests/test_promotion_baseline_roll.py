@@ -23,7 +23,6 @@ import pytest
 from evolution.promotion import (
     PromotionProtocolError,
     freeze_protocol,
-    load_protocol,
 )
 
 

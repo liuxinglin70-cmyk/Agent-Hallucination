@@ -22,7 +22,6 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -186,7 +185,6 @@ class _TruncatingThenDrafting:
 
 def test_truncation_note_is_repairable_but_a_credential_failure_is_not():
     from detector.provider import ProviderError
-    from evolution.proposer import HybridProposer as HP
 
     # Reproduce the note the except-branch builds, for both error types.
     def note_for(error_type: str) -> dict:

@@ -30,7 +30,6 @@ from detector.packet import build_packet
 from evolution.metamorphic import (
     CASE_ID_RENAME,
     CLASS_ORDER,
-    CompositeSubject,
     IRRELEVANT_TOOL_CALL,
     LOCALIZATION_EVENT_MOVE,
     MechanismSubject,
