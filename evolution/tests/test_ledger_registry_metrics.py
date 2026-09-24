@@ -226,3 +226,66 @@ def test_registry_rollback_restores_governance_state(tmp_path):
         "cycle": 1, "marginal_cases": 2, "fired_rate": 1.0,
     }]
     assert state["interventions"]["IV-2-001"]["rolled_back_out"] is True
+
+
+def test_retire_dependency_closure_blocks_orphaning_guard(tmp_path):
+    from evolution.repair_compiler import compile_repair_unit
+    from evolution.repair_unit import REPAIR_UNIT_SCHEMA
+
+    unit_data = {
+        "schema_version": REPAIR_UNIT_SCHEMA,
+        "target": {
+            "mechanism_id": "mech-retire-test",
+            "objective": "detection",
+            "polarity": "recall",
+            "repair_operation": "require_tool",
+        },
+        "scope": {
+            "contract_kind": "required_tool_action",
+            "anchor_selector": "task_instruction",
+            "target_selector": "terminal_delivery",
+            "event_window": "causal_slice",
+            "must_include": ["final_delivery"],
+            "on_incomplete": "abstain",
+        },
+        "observation": {
+            "runner": "typed_dsl",
+            "predicate_name": "evo_retire_check",
+            "input_views": ["tool_names"],
+            "rules": [{
+                "field": "tool_names",
+                "operator": "none_contains",
+                "value": "calc",
+                "verdict": "violated",
+            }],
+            "default_verdict": "satisfied",
+            "conviction_verdicts": ["violated"],
+            "verdicts": ["satisfied", "violated", "not_applicable"],
+        },
+        "decision": {
+            "requested_action": "convict_mechanical_violation",
+            "required_evidence": ["evo_retire_check=violated"],
+            "not_when": ["not_applicable"],
+            "on_uncertain": "no_new_action",
+        },
+        "claim": {
+            "expected_behavior": "convict missing calc",
+            "target_kind": "detection",
+        },
+        "provenance": {"failure_cases": ["c1", "c2"]},
+    }
+    compiled = compile_repair_unit(unit_data, confirmed_mechanism={"mechanism_id": "mech-retire-test", "objective": "detection"})
+    registry = ActiveRegistry(tmp_path / "registry")
+    registry.write(compiled.entries, cycle=1, reason="deploy compiled unit")
+
+    evidence_id = compiled.entries[0]["intervention_id"]
+    guard_id = compiled.entries[1]["intervention_id"]
+
+    # Attempting to retire evidence alone while guard remains must raise ValueError
+    with pytest.raises(ValueError, match="depend on evidence being retired"):
+        registry.retire([evidence_id], cycle=2)
+
+    # Retiring both together (full closure) succeeds
+    retired = registry.retire([evidence_id, guard_id], cycle=2)
+    assert set(retired) == {evidence_id, guard_id}
+

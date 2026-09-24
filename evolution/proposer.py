@@ -46,6 +46,18 @@ class ProposalBatch:
     candidates: list[dict[str, Any]] = field(default_factory=list)
     joint_groups: list[list[str]] = field(default_factory=list)
     notes: list[dict[str, Any]] = field(default_factory=list)
+    units: list[Any] = field(default_factory=list)
+
+    def add_compiled_unit(self, unit: Any) -> None:
+        """Register a CompiledUnit into the batch, maintaining candidate entries and joint groups."""
+        self.units.append(unit)
+        entry_ids = []
+        for entry in getattr(unit, "entries", ()):
+            self.candidates.append(dict(entry))
+            entry_ids.append(str(entry.get("intervention_id") or ""))
+        if len(entry_ids) > 1:
+            self.joint_groups.append(entry_ids)
+
 
 
 _LLM_DRAFT_SYSTEM_TEMPLATE = """\

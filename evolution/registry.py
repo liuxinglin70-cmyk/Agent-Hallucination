@@ -227,6 +227,34 @@ class ActiveRegistry:
         history.append({"cycle": int(cycle), "net_correct_cases": int(net_correct)})
         self._save_state()
 
+    def check_retire_dependencies(
+        self,
+        retiring_ids: Sequence[str],
+    ) -> list[str]:
+        """Check if retiring any of these IDs would orphan a remaining guard."""
+        to_retire = set(retiring_ids)
+        remaining = [
+            e for e in self._entries
+            if str(e.get("intervention_id") or "") not in to_retire
+        ]
+        retired_predicates = {
+            str((e.get("body") or {}).get("predicate") or "")
+            for e in self._entries
+            if str(e.get("intervention_id") or "") in to_retire
+            and e.get("type") == "evidence_check"
+        }
+        orphans = []
+        for e in remaining:
+            if e.get("type") == "decision_guard":
+                consumed = {
+                    str(fact).split("=", 1)[0]
+                    for fact in (e.get("trigger") or {}).get("facts") or ()
+                    if "=" in str(fact)
+                }
+                if consumed & retired_predicates:
+                    orphans.append(str(e.get("intervention_id")))
+        return sorted(orphans)
+
     def retire(
         self,
         intervention_ids: Sequence[str],
@@ -236,6 +264,12 @@ class ActiveRegistry:
     ) -> list[str]:
         with self._lock:
             ids = set(intervention_ids)
+            orphans = self.check_retire_dependencies(intervention_ids)
+            if orphans:
+                raise ValueError(
+                    f"Cannot retire {sorted(ids)}: remaining guard(s) {orphans} "
+                    "depend on evidence being retired. Retire the full unit closure instead."
+                )
             retired = [
                 entry for entry in self._entries
                 if str(entry.get("intervention_id") or "") in ids

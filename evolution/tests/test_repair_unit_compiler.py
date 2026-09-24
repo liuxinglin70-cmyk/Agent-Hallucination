@@ -169,3 +169,20 @@ def test_repair_unit_dataclass_roundtrip():
     unit2 = RepairUnit.from_dict(serialized)
     assert unit == unit2
     assert repair_unit_hash(unit) == repair_unit_hash(unit2)
+
+
+def test_proposal_batch_registers_compiled_unit():
+    from evolution.proposer import ProposalBatch
+
+    data = _valid_unit_dict()
+    confirmed = {"mechanism_id": "test-mech-001", "objective": "detection"}
+    compiled = compile_repair_unit(data, confirmed_mechanism=confirmed)
+
+    batch = ProposalBatch()
+    batch.add_compiled_unit(compiled)
+
+    assert len(batch.units) == 1
+    assert len(batch.candidates) == 2
+    assert len(batch.joint_groups) == 1
+    assert batch.joint_groups[0] == [e["intervention_id"] for e in compiled.entries]
+

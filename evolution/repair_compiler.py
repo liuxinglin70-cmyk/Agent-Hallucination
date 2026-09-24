@@ -220,10 +220,13 @@ def compile_repair_unit(
 
     # 6. Build Guard intervention entry if action requested
     if action != "no_new_action":
+        not_when_facts = [f for f in unit.decision.not_when if "=" in f]
+        if not not_when_facts:
+            not_when_facts = ["defense_verdict=refuted"]
         guard_body: dict[str, Any] = {
             "action": action,
-            "action_not_when": "; ".join(unit.decision.not_when) or "None",
-            "action_not_when_facts": [],
+            "action_not_when": "; ".join(unit.decision.not_when) or "defense refuted",
+            "action_not_when_facts": not_when_facts,
         }
         guard_facts = [f"{unit.observation.predicate_name}=violated"]
         if action == "convict_mechanical_violation":
