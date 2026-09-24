@@ -203,7 +203,7 @@ def check_labels(report: Report, cfg: dict, cases: list[str]) -> dict:
 
 
 def check_split(report: Report, cfg: dict, cases: list[str], phase: str) -> dict:
-    from evolution.splits import build_split
+    from evolution.splits import audit_case_exposure, build_split
 
     if phase == "baseline":
         _ok(report, "split", "baseline phase measures the whole corpus; no split")
@@ -230,6 +230,15 @@ def check_split(report: Report, cfg: dict, cases: list[str], phase: str) -> dict
         _blocker(report, "split", "the gain set is empty; nothing can be scored")
     if not split.sentinel:
         _blocker(report, "split", "the sentinel set is empty")
+    exposure = audit_case_exposure(config=cfg, split=split)
+    if not exposure["clean"]:
+        details = []
+        if exposure["validation_contamination"]:
+            details.append(f"validation contaminated: {exposure['validation_contamination'][:3]}")
+        if exposure["final_verification_contamination"]:
+            details.append(f"final verification contaminated: {exposure['final_verification_contamination'][:3]}")
+        _blocker(report, "split", f"data exposure check failed: {'; '.join(details)}")
+        return parts
     budget = cfg.get("budget") or {}
     patrol = int(budget.get("patrol_cases", 0))
     if patrol > len(split.patrol_pool):

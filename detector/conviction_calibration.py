@@ -291,7 +291,7 @@ def dependency_items(predicate: str) -> dict[str, str]:
     digested, so the fingerprint answers a question a whole-file digest cannot:
     *did anything this predicate reads change?*
     """
-    from detector import predicates as predicate_module
+    import detector.predicates as predicate_module
 
     runner = predicate_module._RUNNERS.get(predicate)
     if runner is None:

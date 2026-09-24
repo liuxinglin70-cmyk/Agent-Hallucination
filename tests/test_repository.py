@@ -41,6 +41,64 @@ def test_detector_has_no_dependency_on_evolution():
             assert all(name.split(".")[0] != "evolution" for name in names), path
 
 
+def test_no_circular_dependencies():
+    from collections import defaultdict
+    modules = {}
+    for p in ROOT.rglob("*.py"):
+        if any(part in p.parts for part in [".git", ".pytest_cache", "artifacts", "output"]):
+            continue
+        rel = p.relative_to(ROOT).as_posix()
+        mod_name = rel.removesuffix(".py").replace("/", ".")
+        if mod_name.endswith(".__init__"):
+            mod_name = mod_name.removesuffix(".__init__")
+        modules[mod_name] = p
+
+    proj_graph = defaultdict(set)
+    for mod_name, path in modules.items():
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for node in ast.walk(tree):
+            imported = []
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    imported.append(alias.name)
+            elif isinstance(node, ast.ImportFrom):
+                if node.module:
+                    imported.append(node.module)
+                    for alias in node.names:
+                        sub = f"{node.module}.{alias.name}"
+                        if sub in modules:
+                            imported.append(sub)
+            for imp in imported:
+                if imp in modules and imp != mod_name:
+                    proj_graph[mod_name].add(imp)
+
+    visited: dict[str, int] = {}
+    path_stack: list[str] = []
+    cycles: list[list[str]] = []
+
+    def dfs(node: str) -> None:
+        visited[node] = 1
+        path_stack.append(node)
+        for neighbor in proj_graph.get(node, ()):
+            if visited.get(neighbor) == 1:
+                idx = path_stack.index(neighbor)
+                cycles.append(path_stack[idx:] + [neighbor])
+            elif visited.get(neighbor) is None:
+                dfs(neighbor)
+        path_stack.pop()
+        visited[node] = 2
+
+    for n in list(proj_graph.keys()):
+        if visited.get(n) is None:
+            dfs(n)
+
+    assert not cycles, f"Found circular dependencies: {cycles}"
+
+
+
 def test_current_configuration_resolves_real_development_partition():
     config = load_config()
     split = build_split(config=config, dataset_root=config["dataset_root"], mini=True)

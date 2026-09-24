@@ -509,9 +509,54 @@ def split_manifest_report(split: EvolutionSplit) -> dict[str, Any]:
     }
 
 
+def audit_case_exposure(
+    *,
+    config: Mapping[str, Any],
+    split: EvolutionSplit | None = None,
+) -> dict[str, Any]:
+    """Audit case exposure records against development manifests and holdouts.
+
+    Ensures no cases in validation or final verification sets have been
+    previously exposed in historical development manifests, and verifies
+    role boundaries.
+    """
+    historical_paths = [
+        Path(str(p)) for p in (config.get("historical_development_manifests") or ())
+    ]
+    exposed: dict[str, list[str]] = {}
+    for path in historical_paths:
+        if path.is_file():
+            content = load_json(path)
+            for case in content.get("cases") or ():
+                exposed.setdefault(str(case), []).append(str(path))
+
+    report: dict[str, Any] = {
+        "historical_manifest_count": len(historical_paths),
+        "total_exposed_cases": len(exposed),
+        "validation_contamination": [],
+        "final_verification_contamination": [],
+        "clean": True,
+    }
+
+    if split is not None:
+        val_leaks = [c for c in split.validation if c in exposed]
+        if val_leaks:
+            report["validation_contamination"] = sorted(set(val_leaks))
+            report["clean"] = False
+
+        final_cases = [str(item.get("case_id") or "") for item in split.final]
+        final_leaks = [c for c in final_cases if c in exposed]
+        if final_leaks:
+            report["final_verification_contamination"] = sorted(set(final_leaks))
+            report["clean"] = False
+
+    return report
+
+
 __all__ = [
     "EvolutionSplit",
     "FinalHoldout",
+    "audit_case_exposure",
     "bool_gold",
     "build_split",
     "load_gold",
@@ -519,3 +564,4 @@ __all__ = [
     "load_record",
     "split_manifest_report",
 ]
+

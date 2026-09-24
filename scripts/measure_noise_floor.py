@@ -46,10 +46,14 @@ import json
 import sys
 from pathlib import Path
 
+from collections import Counter
+from typing import Mapping
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from detector.measurement import measurement_status  # noqa: E402
 from evolution.metrics import (  # noqa: E402
     flipped_cases,
     noise_floor_flipped_cases,
@@ -79,6 +83,9 @@ def read_roll(root: Path, *, case_ids: list[str] | None = None) -> list[dict]:
         case_id = str(result.get("case_id") or path.name.replace("__", "/"))
         if wanted is not None and case_id not in wanted:
             continue
+        status = measurement_status(result)
+        route_info = (result.get("execution") or {}).get("model_route") or (result.get("config") or {}).get("judge_route") or "unspecified"
+        route_name = route_info.get("model", "unspecified") if isinstance(route_info, Mapping) else str(route_info)
         rows.append({
             "case": case_id,
             "prediction": {
@@ -88,6 +95,8 @@ def read_roll(root: Path, *, case_ids: list[str] | None = None) -> list[dict]:
             "state": result.get("state"),
             "authority": result.get("decision_authority"),
             "responsible_step": result.get("responsible_step"),
+            "measurement_status": status,
+            "route": route_name,
             "result": result,
         })
     return rows
@@ -120,6 +129,33 @@ def report_rolls(roots: list[Path]) -> dict:
     read_by_every_roll = [
         item["case"] for item in reading["cases"] if item["reads"] == len(rolls)
     ]
+    all_cases = {row["case"] for roll in rolls for row in roll}
+    per_roll_stats = []
+    routes: Counter[str] = Counter()
+    for roll in rolls:
+        status_counts: Counter[str] = Counter(row.get("measurement_status", "unknown") for row in roll)
+        authoritative = status_counts.get("authoritative", 0)
+        semantic_unresolved = status_counts.get("semantic_unresolved", 0)
+        degraded = status_counts.get("degraded", 0)
+        infra = status_counts.get("infrastructure_failure", 0) + status_counts.get("fatal_provider", 0)
+        for row in roll:
+            routes[row.get("route", "unspecified")] += 1
+        per_roll_stats.append({
+            "attempted_n": len(roll),
+            "healthy_n": authoritative + semantic_unresolved,
+            "authoritative_n": authoritative,
+            "semantic_unresolved_n": semantic_unresolved,
+            "degraded_n": degraded,
+            "infrastructure_failure_n": infra,
+            "by_status": dict(status_counts),
+        })
+
+    denominator_audit = {
+        "corpus_n": len(all_cases),
+        "roll_count": len(rolls),
+        "per_roll": per_roll_stats,
+        "routes": dict(routes),
+    }
     out = {
         "mode": "rolls",
         "rolls": [str(root) for root in roots],
@@ -132,6 +168,7 @@ def report_rolls(roots: list[Path]) -> dict:
         # Rolls that do not cover the same case set cannot be pooled into one
         # tally, so the difference is named instead of averaged over.
         "case_set_mismatch": len(set(counts)) > 1 or bool(one_sided),
+        "denominator_audit": denominator_audit,
         **reading,
     }
     if len(rolls) >= 2:

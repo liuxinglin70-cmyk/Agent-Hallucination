@@ -265,3 +265,22 @@ def test_the_checklist_covers_every_condition_it_claims(preflight):
     assert "corpus" in preflight.CHECK_ORDER
     assert "path_length" in preflight.CHECK_ORDER
     assert len(preflight.CHECK_ORDER) == len(set(preflight.CHECK_ORDER))
+
+
+def test_exposure_audit_catches_validation_contamination(preflight, tmp_path):
+    from types import SimpleNamespace
+    from evolution.splits import audit_case_exposure
+
+    hist = tmp_path / "hist.json"
+    hist.write_text(json.dumps({"cases": ["A/001.json", "A/002.json"]}), encoding="utf-8")
+    config = {"historical_development_manifests": [str(hist)]}
+
+    split = SimpleNamespace(
+        validation=["A/001.json", "B/001.json"],
+        final=[{"case_id": "C/001.json"}],
+    )
+    result = audit_case_exposure(config=config, split=split)
+    assert result["clean"] is False
+    assert result["validation_contamination"] == ["A/001.json"]
+    assert result["final_verification_contamination"] == []
+

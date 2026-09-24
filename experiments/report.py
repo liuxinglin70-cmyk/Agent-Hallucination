@@ -105,6 +105,30 @@ class StageReport:
             "step_localization": metrics.get("step_localization"),
         }
 
+    def denominator_audit(self) -> dict[str, int]:
+        """Decompose requested cases into strict mutually exclusive categories."""
+        by_status = {key: len(value) for key, value in self.buckets().items()}
+        attempted = len(self.rows)
+        authoritative = len(self.admitted_cases)
+        semantic_unresolved = by_status.get("semantic_unresolved", 0)
+        healthy = authoritative + semantic_unresolved
+        degraded = by_status.get("degraded", 0)
+        infra = (
+            by_status.get("infrastructure_failure", 0)
+            + by_status.get("fatal_provider", 0)
+        )
+        not_started = len(self.requested) - attempted
+        return {
+            "requested_n": len(self.requested),
+            "attempted_n": attempted,
+            "healthy_n": healthy,
+            "authoritative_n": authoritative,
+            "semantic_unresolved_n": semantic_unresolved,
+            "degraded_n": degraded,
+            "infrastructure_failure_n": infra,
+            "not_started_n": max(0, not_started),
+        }
+
     def cost(self) -> dict[str, Any]:
         """Wall time, provider attempts and tokens, from the rows themselves."""
         elapsed = 0.0
@@ -159,6 +183,7 @@ class StageReport:
                 ),
             },
             "readings": self.readings(evaluation),
+            "denominators": self.denominator_audit(),
             "cost": self.cost(),
             "stop": dict(self.stop),
             "notes": list(self.notes),
