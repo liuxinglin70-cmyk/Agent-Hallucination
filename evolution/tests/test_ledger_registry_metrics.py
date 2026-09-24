@@ -229,63 +229,56 @@ def test_registry_rollback_restores_governance_state(tmp_path):
 
 
 def test_retire_dependency_closure_blocks_orphaning_guard(tmp_path):
-    from evolution.repair_compiler import compile_repair_unit
-    from evolution.repair_unit import REPAIR_UNIT_SCHEMA
+    """Retiring an evidence_check alone must not orphan a guard that reads it.
 
-    unit_data = {
-        "schema_version": REPAIR_UNIT_SCHEMA,
-        "target": {
-            "mechanism_id": "mech-retire-test",
-            "objective": "detection",
-            "polarity": "recall",
-            "repair_operation": "require_tool",
+    Built from ``make_intervention`` rather than a compiled RepairUnit: what is
+    under test is ``ActiveRegistry.retire``'s reverse-dependency refusal, and a
+    hand-built pair states that precondition directly.
+    """
+    from evolution.contracts import make_intervention
+
+    evidence = make_intervention(
+        intervention_id="IV-EVID-001",
+        intervention_type="evidence_check",
+        hook="judge.post",
+        packet_features=["has_tool_calls"],
+        body={
+            "predicate": "required_action_present",
+            "runner": "deterministic",
+            "output_verdicts": ["satisfied", "violated", "not_applicable"],
         },
-        "scope": {
-            "contract_kind": "required_tool_action",
-            "anchor_selector": "task_instruction",
-            "target_selector": "terminal_delivery",
-            "event_window": "causal_slice",
-            "must_include": ["final_delivery"],
-            "on_incomplete": "abstain",
+        expected_behavior="record whether the required tool ran",
+        target_polarity="recall",
+        cycle=1,
+        failure_family="FAM-retire-test",
+        failure_cases=["c1", "c2"],
+    )
+    guard = make_intervention(
+        intervention_id="IV-GUARD-001",
+        intervention_type="decision_guard",
+        hook="adjudicate.guard",
+        packet_features=["has_tool_calls"],
+        body={
+            "action": "withhold_conviction",
+            "evidence_predicate": "required_action_present",
+            "action_not_when": "the predicate abstained or did not apply",
         },
-        "observation": {
-            "runner": "typed_dsl",
-            "predicate_name": "evo_retire_check",
-            "input_views": ["tool_names"],
-            "rules": [{
-                "field": "tool_names",
-                "operator": "none_contains",
-                "value": "calc",
-                "verdict": "violated",
-            }],
-            "default_verdict": "satisfied",
-            "conviction_verdicts": ["violated"],
-            "verdicts": ["satisfied", "violated", "not_applicable"],
-        },
-        "decision": {
-            "requested_action": "convict_mechanical_violation",
-            "required_evidence": ["evo_retire_check=violated"],
-            "not_when": ["not_applicable"],
-            "on_uncertain": "no_new_action",
-        },
-        "claim": {
-            "expected_behavior": "convict missing calc",
-            "target_kind": "detection",
-        },
-        "provenance": {"failure_cases": ["c1", "c2"]},
-    }
-    compiled = compile_repair_unit(unit_data, confirmed_mechanism={"mechanism_id": "mech-retire-test", "objective": "detection"})
+        facts=["required_action_present=violated"],
+        expected_behavior="withhold conviction when the tool never ran",
+        target_polarity="recall",
+        cycle=1,
+        failure_family="FAM-retire-test",
+        failure_cases=["c1", "c2"],
+    )
     registry = ActiveRegistry(tmp_path / "registry")
-    registry.write(compiled.entries, cycle=1, reason="deploy compiled unit")
+    registry.write([evidence, guard], cycle=1, reason="deploy the pair")
 
-    evidence_id = compiled.entries[0]["intervention_id"]
-    guard_id = compiled.entries[1]["intervention_id"]
-
-    # Attempting to retire evidence alone while guard remains must raise ValueError
+    # Retiring the evidence alone would leave the guard reading a predicate that
+    # no longer exists, so the closure check refuses it.
     with pytest.raises(ValueError, match="depend on evidence being retired"):
-        registry.retire([evidence_id], cycle=2)
+        registry.retire(["IV-EVID-001"], cycle=2)
 
-    # Retiring both together (full closure) succeeds
-    retired = registry.retire([evidence_id, guard_id], cycle=2)
-    assert set(retired) == {evidence_id, guard_id}
-
+    # Retiring the full closure succeeds and leaves an empty registry.
+    retired = registry.retire(["IV-EVID-001", "IV-GUARD-001"], cycle=2)
+    assert set(retired) == {"IV-EVID-001", "IV-GUARD-001"}
+    assert registry.entries == []

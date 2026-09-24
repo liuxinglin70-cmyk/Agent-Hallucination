@@ -949,36 +949,6 @@ def localization_opportunity(
     }
 
 
-def resolution_opportunity(
-    rows: Sequence[Mapping[str, Any]],
-) -> dict[str, int]:
-    """How many cases a resolution claim can actually reward.
-
-    A resolution opportunity requires:
-    1. Evaluator holds a boolean gold label.
-    2. Baseline measurement is healthy but unresolved (EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY).
-    Ineligible cases (infrastructure failure, degraded mode, missing gold) are excluded.
-    """
-    pos = neg = 0
-    ineligible = 0
-    for row in rows:
-        gold = row.get("gold")
-        if gold is not True and gold is not False:
-            ineligible += 1
-            continue
-        state = evaluate_row_state(row)
-        if state != EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY:
-            continue
-        if gold is True:
-            pos += 1
-        else:
-            neg += 1
-    return {
-        "total": pos + neg,
-        "positive": pos,
-        "negative": neg,
-        "ineligible": ineligible,
-    }
 
 
 def mechanism_opportunity(
@@ -1728,7 +1698,6 @@ __all__ = [
     "paired_state_transitions_v1",
     "protection_repair",
     "repeated_roll_disagreement",
-    "resolution_opportunity",
     "row_responsible_step",
     "source_deltas",
     "source_of",

@@ -12,7 +12,6 @@ from evolution.metrics import (
     mechanism_opportunity,
     paired_delta,
     paired_state_transitions_v1,
-    resolution_opportunity,
 )
 
 
@@ -228,21 +227,6 @@ def test_paired_delta_invariance():
     transitions = paired_state_transitions_v1(baseline, active)
     assert transitions["summary"]["decisive_fixed"] == 2
     assert transitions["summary"]["correctness_worsened"] == 0
-
-
-def test_resolution_opportunity():
-    rows = [
-        {"case": "c1", "gold": True, "prediction": None},               # eligible positive
-        {"case": "c2", "gold": False, "prediction": None},              # eligible negative
-        {"case": "c3", "gold": True, "prediction": True},               # decided (not unresolved)
-        {"case": "c4", "gold": True, "prediction": None, "measurement_status": "infrastructure_failure"},  # outage
-        {"case": "c5", "gold": "invalid", "prediction": None},          # missing gold
-    ]
-    opp = resolution_opportunity(rows)
-    assert opp["total"] == 2
-    assert opp["positive"] == 1
-    assert opp["negative"] == 1
-    assert opp["ineligible"] == 1
 
 
 def test_mechanism_opportunity_with_resolution_objective():
