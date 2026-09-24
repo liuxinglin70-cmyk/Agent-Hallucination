@@ -689,9 +689,6 @@ def default_calibration() -> ConvictionCalibration:
     return _CACHE[key]
 
 
-def reset_cache() -> None:
-    """Drop the cached view. For tests and for a caller that re-measures."""
-    _CACHE.clear()
 
 
 __all__ = [
@@ -708,6 +705,5 @@ __all__ = [
     "dependency_items",
     "iter_case_paths",
     "measure_corpus",
-    "reset_cache",
     "source_fingerprint",
 ]

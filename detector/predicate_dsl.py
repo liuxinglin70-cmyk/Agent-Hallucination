@@ -477,13 +477,6 @@ def predicate_program_hash(program: Mapping[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
 
 
-def program_signature(program: Mapping[str, Any]) -> dict[str, Any]:
-    """Compact identity used by proposer digests and structured keys."""
-    return {
-        "name": str(program.get("name") or ""),
-        "hash": predicate_program_hash(program),
-        "rule_count": len(list(program.get("rules") or ())),
-    }
 
 
 # ---------------------------------------------------------------------------
@@ -846,7 +839,6 @@ __all__ = [
     "PROGRAM_SCHEMA",
     "SCALAR_OPERATORS",
     "predicate_program_hash",
-    "program_signature",
     "run_predicate_program",
     "typed_field_profile",
     "validate_predicate_program",

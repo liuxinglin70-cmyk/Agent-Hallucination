@@ -18,7 +18,6 @@ from detector.interventions import (
     RUNNER_REGISTRY,
     build_intervention_registry,
     intervention_content_hash,
-    load_intervention_registry,
     validate_intervention,
 )
 from detector.predicate_dsl import PROGRAM_RUNNER, predicate_program_hash
@@ -113,15 +112,6 @@ def make_intervention(
     validate_intervention(payload, require_executable_bounds=True)
     payload["content_hash"] = intervention_content_hash(payload)
     return payload
-
-
-def validate_candidate(entry: Mapping[str, Any]) -> dict[str, Any]:
-    validate_intervention(entry)
-    return dict(entry)
-
-
-def load_registry(path: str | Path) -> dict[str, Any]:
-    return load_intervention_registry(path)
 
 
 def iter_strings(value: Any, *, keys: Iterable[str] | None = None) -> list[str]:
@@ -428,12 +418,10 @@ __all__ = [
     "jaccard",
     "learned_runner_of",
     "load_json",
-    "load_registry",
     "make_intervention",
     "make_registry",
     "read_jsonl",
     "redact_case_ids",
     "save_json",
     "structured_key",
-    "validate_candidate",
 ]

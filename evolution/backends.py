@@ -74,12 +74,6 @@ def _compile_with_component_executors(
     )
 
 
-def prediction_from_state(state: Any) -> bool | None:
-    if state == "verified_error":
-        return True
-    if state == "verified_clean":
-        return False
-    return None
 
 
 def _prediction_from_result(result: Mapping[str, Any]) -> bool | None:
@@ -983,80 +977,6 @@ class MockDetectorBackend(DetectionBackend):
         }
 
 
-class CachedRunBackend(DetectionBackend):
-    """Replay an existing detector run tree as the deterministic baseline.
-
-    - Empty registry: returns the cached ``result.json`` with zero LLM cost.
-    - Non-empty registry: calls the real detector, but with the cached run's
-      judge output as ``frozen_judge`` (unless the registry targets
-      ``judge.system``). Candidate arms are cached by registry hash.
-    """
-
-    name = "cached_run"
-
-    def __init__(
-        self,
-        config: Mapping[str, Any],
-        run_root: str | Path,
-        cases: Sequence[str],
-        *,
-        cache_dir: str | Path | None = None,
-    ) -> None:
-        self.config = config
-        self.case_ids = [str(case) for case in cases]
-        self.results: dict[str, dict[str, Any]] = {}
-        for case in self.case_ids:
-            safe = str(case).replace("/", "__").replace("\\", "__")
-            path = Path(run_root) / "cases" / safe / "result.json"
-            self.results[str(case)] = json.loads(
-                path.read_text(encoding="utf-8-sig")
-            )
-        self.live = LiveDetectorBackend(
-            config, baseline_results=self.results,
-            evidence_provider=build_evidence_provider(config),
-        )
-        cache_path = (
-            Path(cache_dir)
-            if cache_dir is not None
-            else resolve_path(config["work_root"]) / "cache"
-        )
-        namespace = (
-            "cached-" + CACHE_FORMAT + "-"
-            + fingerprint({
-                "run_root": str(Path(run_root).resolve()),
-                "detector_config": file_digest(config.get("detector_config")),
-                "source": source_digest(),
-                "cases": sorted(self.case_ids),
-                "baseline_results": self.results,
-            })
-        )
-        self.candidate_cache = CachingBackend(
-            self.live, cache_path, namespace=namespace,
-            extra_key=(
-                self.live.evidence_tag if self.live._evidence_provider else None
-            ),
-        )
-
-    def run_case(
-        self,
-        record: Mapping[str, Any],
-        *,
-        case_id: str,
-        registry: Mapping[str, Any] | None = None,
-        gold: bool | None = None,
-    ) -> dict[str, Any]:
-        entries = (registry or {}).get("interventions") or []
-        if not entries:
-            cached = self.results.get(str(case_id))
-            if cached is None:
-                raise KeyError(f"no cached baseline result for {case_id}")
-            return cached
-        return self.candidate_cache.run_case(
-            record, case_id=case_id, registry=registry, gold=gold,
-        )
-
-    def evaluate_fresh(self, cases: Sequence[str], **kwargs: Any) -> list[dict[str, Any]]:
-        return self.live.evaluate_fresh(cases, **kwargs)
 
 
 # Windows' legacy path ceiling is 260 characters and an over-long write fails
@@ -1500,7 +1420,6 @@ __all__ = [
     "artifact_digest",
     "artifact_manifest",
     "replay_boundary",
-    "CachedRunBackend",
     "CachingBackend",
     "DetectionBackend",
     "HOOK_DEPENDENCY_GRAPH",
@@ -1509,7 +1428,6 @@ __all__ = [
     "file_digest",
     "fingerprint",
     "make_backend",
-    "prediction_from_state",
     "registry_key",
     "source_digest",
 ]
