@@ -275,28 +275,6 @@ def step_kind(packet: Mapping[str, Any], step: int) -> str | None:
     return None
 
 
-def event_source_mapping(packet: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
-    """Map each event in the packet to its provenance and structural attributes."""
-    mapping: dict[str, dict[str, Any]] = {}
-    for event in packet.get("events") or []:
-        event_id = str(event.get("event_id") or "")
-        pos = int(event.get("position") or 0)
-        tool_names = [
-            str(i.get("tool_name") or "")
-            for i in event.get("tool_interactions") or ()
-            if str(i.get("tool_name") or "")
-        ]
-        mapping[event_id] = {
-            "event_id": event_id,
-            "position": pos,
-            "source_step_id": event.get("source_step_id"),
-            "role": event.get("role"),
-            "step_kind": step_kind(packet, pos),
-            "tool_names": tool_names,
-            "has_tool_calls": len(tool_names) > 0,
-            "has_content": bool(event.get("content") and str(event.get("content")).strip()),
-        }
-    return mapping
 
 
 def project_event_window(
@@ -765,7 +743,6 @@ __all__ = [
     "build_packet",
     "delivered_result",
     "event_id_for_step",
-    "event_source_mapping",
     "evidence_refs_support_event",
     "evidence_refs_support_step",
     "packet_features",

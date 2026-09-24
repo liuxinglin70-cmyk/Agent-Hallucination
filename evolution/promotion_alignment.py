@@ -13,7 +13,6 @@ from evolution.mechanisms import MECHANISM_SCHEMA, mechanism_key
 from evolution.metrics import mechanism_opportunity, mechanism_row_healthy
 
 ALIGNED_PROTOCOL_SCHEMA = "evolution.promotion_protocol.v2"
-ALIGNED_PROTOCOL_V3_SCHEMA = "evolution.promotion_protocol.v3"
 ALIGNED_CANDIDATE_SCHEMA = "evolution.candidate.v2"
 MEMBERSHIP_SCHEMA = "evolution.mechanism_membership.v1"
 FORMAL_STAGES = ("structural", "harmlessness", "behavior", "m")
@@ -262,51 +261,6 @@ def build_alignment(
     return bound
 
 
-def build_aligned_protocol_v3(
-    protocol: Mapping[str, Any], *, candidate: Mapping[str, Any],
-    mechanism: Mapping[str, Any], membership: Mapping[str, Any],
-    dataset_root: str | Path, config: Mapping[str, Any],
-    baseline_registry_hash: str,
-    statistical_params: Mapping[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Build a frozen V3 promotion protocol with pre-registered statistical parameters.
-
-    V3 extends V2 by explicitly incorporating statistical risk bounds (alpha_g, alpha_h,
-    epsilon_fp, epsilon_fn, delta_min, min_effective_sample_size) and supporting the
-    'resolution' mechanism objective. Self-hashes with ALIGNED_PROTOCOL_V3_SCHEMA.
-    """
-    v2 = build_alignment(
-        protocol, candidate=candidate, mechanism=mechanism,
-        membership=membership, dataset_root=dataset_root,
-        config=config, baseline_registry_hash=baseline_registry_hash,
-    )
-    bound = copy.deepcopy(v2)
-    bound["schema_version"] = ALIGNED_PROTOCOL_V3_SCHEMA
-
-    stat_cfg = {
-        "alpha_g": 0.05,
-        "alpha_h": 0.05,
-        "delta_min": 0.0,
-        "epsilon_fp": 0.035,
-        "epsilon_fn": 0.035,
-        "min_effective_sample_size": 10,
-        "max_repeats": 3,
-        **(statistical_params or {}),
-    }
-    if not (0 < float(stat_cfg["alpha_g"]) < 1):
-        raise ValueError("alpha_g must be in (0, 1)")
-    if not (0 < float(stat_cfg["alpha_h"]) < 1):
-        raise ValueError("alpha_h must be in (0, 1)")
-    if float(stat_cfg["epsilon_fp"]) < 0 or float(stat_cfg["epsilon_fn"]) < 0:
-        raise ValueError("risk epsilon bounds must be non-negative")
-    if int(stat_cfg["min_effective_sample_size"]) < 1:
-        raise ValueError("min_effective_sample_size must be >= 1")
-
-    bound["statistical_params"] = stat_cfg
-    bound.pop("protocol_hash", None)
-    bound["protocol_hash"] = digest(bound)
-    return bound
-
 
 def verify_alignment(protocol: Mapping[str, Any]) -> None:
     raw = {key: value for key, value in protocol.items()
@@ -314,7 +268,7 @@ def verify_alignment(protocol: Mapping[str, Any]) -> None:
     if protocol.get("protocol_hash") != digest(raw):
         raise ValueError("frozen protocol content hash mismatch")
     schema = protocol.get("schema_version")
-    if schema not in {ALIGNED_PROTOCOL_SCHEMA, ALIGNED_PROTOCOL_V3_SCHEMA}:
+    if schema != ALIGNED_PROTOCOL_SCHEMA:
         raise ValueError(f"unsupported promotion protocol schema: {schema}")
     mechanism = mechanism_descriptor(protocol["mechanism"])
     cases = case_ids(protocol["cases"], name="promotion cases")
@@ -347,18 +301,6 @@ def verify_alignment(protocol: Mapping[str, Any]) -> None:
                     )
     if not protocol.get("baseline_registry_hash"):
         raise ValueError("protocol must freeze the baseline registry identity")
-    if schema == ALIGNED_PROTOCOL_V3_SCHEMA:
-        stat_cfg = protocol.get("statistical_params")
-        if not isinstance(stat_cfg, Mapping):
-            raise ValueError("V3 protocol must declare statistical_params")
-        if not (0 < float(stat_cfg.get("alpha_g", 0)) < 1):
-            raise ValueError("alpha_g must be in (0, 1)")
-        if not (0 < float(stat_cfg.get("alpha_h", 0)) < 1):
-            raise ValueError("alpha_h must be in (0, 1)")
-        if float(stat_cfg.get("epsilon_fp", -1)) < 0 or float(stat_cfg.get("epsilon_fn", -1)) < 0:
-            raise ValueError("risk epsilon bounds must be non-negative")
-        if int(stat_cfg.get("min_effective_sample_size", 0)) < 1:
-            raise ValueError("min_effective_sample_size must be >= 1")
 
 
 def checked_rows(rows: Sequence[Mapping[str, Any]], protocol: Mapping[str, Any]) -> list[dict[str, Any]]:

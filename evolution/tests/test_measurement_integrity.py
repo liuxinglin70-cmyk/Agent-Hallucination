@@ -23,7 +23,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
 
 from evolution.backends import MockDetectorBackend
 from evolution.config import load_config
@@ -35,7 +34,6 @@ from evolution.engine import (
     _mcnemar_improvement_p,
     terminal_classification,
 )
-from evolution.gates import arm_has_infrastructure_failure
 from evolution.metrics import paired_delta
 from evolution.splits import EvolutionSplit
 

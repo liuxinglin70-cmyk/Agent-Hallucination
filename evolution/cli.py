@@ -23,7 +23,7 @@ from evolution.config import load_config, resolve_path
 from evolution.capability_surface import capability_surface_report
 from evolution.contracts import save_json
 from evolution.engine import EvolutionEngine, run_full_self_evolution
-from evolution.ledger import Ledger, load_ledger
+from evolution.ledger import load_ledger
 from evolution.meta_eval import write_meta_report
 from evolution.registry import load_active_registry
 from evolution.splits import build_split
@@ -762,7 +762,6 @@ def cmd_archive(args: argparse.Namespace) -> int:
     numbers describe what was tried rather than what works.
     """
     from evolution.archive import (
-        archive_report,
         ingest_development_run,
         record_archive_summary,
     )

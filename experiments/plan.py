@@ -20,7 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PLAN_SCHEMA = "experiments.plan.v1"

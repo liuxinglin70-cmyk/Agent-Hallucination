@@ -42,7 +42,6 @@ from evolution.promotion import (
     candidate_from_development,
     freeze_protocol,
     load_protocol,
-    promote,
 )
 
 GAIN = ["A/001.json", "A/002.json"]

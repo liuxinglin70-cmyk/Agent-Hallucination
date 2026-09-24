@@ -5,7 +5,6 @@ import pytest
 from evolution.config import load_config
 from evolution.contracts import (
     candidate_contains_case_id,
-    empty_registry,
     make_intervention,
     make_registry,
 )

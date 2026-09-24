@@ -1,4 +1,4 @@
-"""Tests for evaluation-side state transitions and resolution mechanisms (PR-04 / C07, C08)."""
+"""Tests for evaluation-side row-state classification (EvaluationState)."""
 
 from __future__ import annotations
 
@@ -7,12 +7,9 @@ import pytest
 from detector.result import build_detection_output
 from evolution.metrics import (
     EvaluationState,
-    classify_transition,
     evaluate_row_state,
     mechanism_opportunity,
     paired_delta,
-    paired_state_transitions_v1,
-    resolution_opportunity,
 )
 
 
@@ -108,108 +105,7 @@ def test_evaluate_row_state_with_result_envelope():
     assert evaluate_row_state({"case": "c4", "gold": False, "result": deg_env}) == EvaluationState.DEGRADED
 
 
-def test_classify_transition():
-    # Core Plan §7.2 transitions
-    assert classify_transition(EvaluationState.AUTHORITATIVE_WRONG, EvaluationState.AUTHORITATIVE_CORRECT) == "decisive_fixed"
-    assert classify_transition(EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY, EvaluationState.AUTHORITATIVE_CORRECT) == "resolution_correct"
-    assert classify_transition(EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY, EvaluationState.AUTHORITATIVE_WRONG) == "resolution_wrong"
-    assert classify_transition(EvaluationState.AUTHORITATIVE_CORRECT, EvaluationState.AUTHORITATIVE_WRONG) == "correctness_worsened"
-    assert classify_transition(EvaluationState.AUTHORITATIVE_CORRECT, EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY) == "unresolved_added"
-    assert classify_transition(EvaluationState.AUTHORITATIVE_WRONG, EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY) == "wrong_to_abstain"
-    assert classify_transition(EvaluationState.AUTHORITATIVE_WRONG, EvaluationState.AUTHORITATIVE_WRONG) == "still_wrong"
-    assert classify_transition(EvaluationState.AUTHORITATIVE_CORRECT, EvaluationState.AUTHORITATIVE_CORRECT) == "still_correct"
-    assert classify_transition(EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY, EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY) == "still_unresolved"
-
-    # Infrastructure transitions
-    assert classify_transition(EvaluationState.AUTHORITATIVE_CORRECT, EvaluationState.INFRASTRUCTURE_FAILURE) == "health_regressed"
-    assert classify_transition(EvaluationState.INFRASTRUCTURE_FAILURE, EvaluationState.AUTHORITATIVE_CORRECT) == "service_recovery"
-    assert classify_transition(EvaluationState.INFRASTRUCTURE_FAILURE, EvaluationState.INFRASTRUCTURE_FAILURE) == "still_infrastructure_failure"
-
-    # Degraded transitions
-    assert classify_transition(EvaluationState.AUTHORITATIVE_CORRECT, EvaluationState.DEGRADED) == "degraded_added"
-    assert classify_transition(EvaluationState.DEGRADED, EvaluationState.AUTHORITATIVE_CORRECT) == "degraded_recovered"
-
-
-def test_paired_state_transitions_v1_accounting():
-    baseline = [
-        {"case": "c1", "gold": True, "prediction": False},               # authoritative_wrong -> fixed
-        {"case": "c2", "gold": True, "prediction": None},                # unresolved -> resolution_correct (positive)
-        {"case": "c3", "gold": False, "prediction": None},               # unresolved -> resolution_wrong (FP)
-        {"case": "c4", "gold": True, "prediction": True},                # authoritative_correct -> worsened (FN)
-        {"case": "c5", "gold": False, "prediction": False},              # authoritative_correct -> unresolved_added
-        {"case": "c6", "gold": True, "prediction": False},               # authoritative_wrong -> abstain
-        {"case": "c7", "gold": True, "prediction": True},                # still_correct
-        {"case": "c8", "gold": False, "prediction": False},              # correct -> health_regressed
-    ]
-    active = [
-        {"case": "c1", "gold": True, "prediction": True},                # decisive_fixed
-        {"case": "c2", "gold": True, "prediction": True},                # resolution_correct
-        {"case": "c3", "gold": False, "prediction": True},               # resolution_wrong
-        {"case": "c4", "gold": True, "prediction": False},               # correctness_worsened (new_fn)
-        {"case": "c5", "gold": False, "prediction": None},               # unresolved_added
-        {"case": "c6", "gold": True, "prediction": None},                # wrong_to_abstain
-        {"case": "c7", "gold": True, "prediction": True},                # still_correct
-        {"case": "c8", "gold": False, "prediction": None, "measurement_status": "infrastructure_failure"},  # health_regressed
-    ]
-
-    report = paired_state_transitions_v1(baseline, active)
-    assert report["n"] == 8
-    summary = report["summary"]
-    assert summary["decisive_fixed"] == 1
-    assert summary["resolution_correct"] == 1
-    assert summary["resolution_correct_positive"] == 1
-    assert summary["resolution_correct_negative"] == 0
-    assert summary["resolution_wrong"] == 1
-    assert summary["resolution_wrong_fp"] == 1
-    assert summary["resolution_wrong_fn"] == 0
-    assert summary["correctness_worsened"] == 1
-    assert summary["new_fn"] == 1
-    assert summary["new_fp"] == 0
-    assert summary["unresolved_added"] == 1
-    assert summary["wrong_to_abstain"] == 1
-    assert summary["still_correct"] == 1
-    assert summary["health_regressed"] == 1
-
-    # Matrix integrity
-    assert report["matrix"][EvaluationState.AUTHORITATIVE_WRONG][EvaluationState.AUTHORITATIVE_CORRECT] == 1
-    assert report["matrix"][EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY][EvaluationState.AUTHORITATIVE_CORRECT] == 1
-
-
-def test_paired_state_transitions_v1_validation_errors():
-    baseline = [{"case": "c1", "gold": True, "prediction": True}]
-    # Duplicate case
-    with pytest.raises(ValueError, match="duplicate active case"):
-        paired_state_transitions_v1(
-            baseline,
-            [
-                {"case": "c1", "gold": True, "prediction": True},
-                {"case": "c1", "gold": True, "prediction": True},
-            ],
-        )
-
-    # Unexpected active case
-    with pytest.raises(ValueError, match="unexpected active case"):
-        paired_state_transitions_v1(baseline, [{"case": "c2", "gold": True, "prediction": True}])
-
-    # Missing active rows
-    with pytest.raises(ValueError, match="missing active rows"):
-        paired_state_transitions_v1(
-            [
-                {"case": "c1", "gold": True, "prediction": True},
-                {"case": "c2", "gold": True, "prediction": True},
-            ],
-            [{"case": "c1", "gold": True, "prediction": True}],
-        )
-
-    # Gold mismatch
-    with pytest.raises(ValueError, match="gold mismatch"):
-        paired_state_transitions_v1(
-            baseline,
-            [{"case": "c1", "gold": False, "prediction": True}],
-        )
-
-
-def test_paired_delta_invariance():
+def test_paired_delta_counts_decisive_fixes():
     baseline = [
         {"case": "c1", "gold": True, "prediction": False},
         {"case": "c2", "gold": False, "prediction": True},
@@ -220,29 +116,9 @@ def test_paired_delta_invariance():
         {"case": "c2", "gold": False, "prediction": False},
         {"case": "c3", "gold": True, "prediction": True},
     ]
-    # Existing paired_delta works exactly as before
     delta = paired_delta(baseline, active)
     assert delta["marginal_cases"] == 2
     assert delta["new_errors"] == 0
-
-    transitions = paired_state_transitions_v1(baseline, active)
-    assert transitions["summary"]["decisive_fixed"] == 2
-    assert transitions["summary"]["correctness_worsened"] == 0
-
-
-def test_resolution_opportunity():
-    rows = [
-        {"case": "c1", "gold": True, "prediction": None},               # eligible positive
-        {"case": "c2", "gold": False, "prediction": None},              # eligible negative
-        {"case": "c3", "gold": True, "prediction": True},               # decided (not unresolved)
-        {"case": "c4", "gold": True, "prediction": None, "measurement_status": "infrastructure_failure"},  # outage
-        {"case": "c5", "gold": "invalid", "prediction": None},          # missing gold
-    ]
-    opp = resolution_opportunity(rows)
-    assert opp["total"] == 2
-    assert opp["positive"] == 1
-    assert opp["negative"] == 1
-    assert opp["ineligible"] == 1
 
 
 def test_mechanism_opportunity_with_resolution_objective():

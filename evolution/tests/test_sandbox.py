@@ -22,7 +22,6 @@ marked and kept few, because each one costs a process launch.
 from __future__ import annotations
 
 import copy
-import textwrap
 
 import pytest
 

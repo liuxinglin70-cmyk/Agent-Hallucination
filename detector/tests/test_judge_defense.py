@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from detector.defense import run_defense
 from detector.judge import run_judge
 from detector.provider import ProviderError

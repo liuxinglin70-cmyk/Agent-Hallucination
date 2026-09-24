@@ -16,7 +16,6 @@ from detector.packet import (
     EVENT_WINDOW_PROJECTION_SCHEMA,
     PacketError,
     build_packet,
-    event_source_mapping,
     project_event_window,
 )
 
@@ -104,20 +103,6 @@ def test_project_event_window_missing_anchor():
     packet = _sample_packet()
     with pytest.raises(PacketError, match="anchor event 'non_existent' not found"):
         project_event_window(packet, anchor_event_id="non_existent")
-
-
-def test_event_source_mapping():
-    packet = _sample_packet()
-    mapping = event_source_mapping(packet)
-    assert len(mapping) == 6
-    assert "event_001" in mapping
-    assert mapping["event_001"]["role"] == "user"
-    assert mapping["event_001"]["has_tool_calls"] is False
-    assert mapping["event_001"]["has_content"] is True
-
-    assert mapping["event_002"]["role"] == "assistant"
-    assert mapping["event_002"]["has_tool_calls"] is True
-    assert mapping["event_002"]["tool_names"] == ["fetch_balance"]
 
 
 def test_scoped_semantic_layer1_static_applicability_not_met():

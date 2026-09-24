@@ -38,7 +38,6 @@ from evolution.contracts import append_jsonl, read_jsonl, save_json
 EPISODIC_SCHEMA = "evolution.experience.episodic.v1"
 PROCEDURAL_SCHEMA = "evolution.experience.procedural.v1"
 IMPROVEMENT_SCHEMA = "evolution.experience.improvement.v1"
-UNIT_DRIFT_SCHEMA = "evolution.experience.unit_drift.v1"
 
 EPISODIC_NAME = "episodic.jsonl"
 PROCEDURAL_NAME = "procedural.jsonl"
@@ -46,7 +45,6 @@ IMPROVEMENT_NAME = "improvement.jsonl"
 RECALL_NAME = "recall.json"
 CORRECTION_NAME = "episode_corrections.jsonl"
 CORRECTION_SCHEMA = "evolution.experience.correction.v1"
-UNIT_DRIFT_NAME = "unit_drift.jsonl"
 
 DEFAULT_RECALL_LIMIT = 3
 
@@ -63,7 +61,6 @@ def memory_paths(root: str | Path) -> dict[str, Path]:
         "improvement": root / IMPROVEMENT_NAME,
         "recall": root / RECALL_NAME,
         "corrections": root / CORRECTION_NAME,
-        "unit_drift": root / UNIT_DRIFT_NAME,
     }
 
 
@@ -318,47 +315,6 @@ def load_improvements(root: str | Path) -> list[dict[str, Any]]:
     return records
 
 
-def record_unit_drift(
-    root: str | Path,
-    *,
-    unit_id: str,
-    cycle: int,
-    status: str,
-    delta_net: int,
-    marginal_cases: int = 0,
-    fired_rate: float = 0.0,
-    drift_detected: bool = False,
-    reason: str = "",
-) -> dict[str, Any]:
-    """Record longitudinal drift or degradation observation for a deployed unit."""
-    paths = _ensure(root)
-    record = {
-        "schema_version": UNIT_DRIFT_SCHEMA,
-        "unit_id": str(unit_id),
-        "cycle": int(cycle),
-        "status": str(status),
-        "delta_net": int(delta_net),
-        "marginal_cases": int(marginal_cases),
-        "fired_rate": float(fired_rate),
-        "drift_detected": bool(drift_detected),
-        "reason": str(reason),
-    }
-    append_jsonl(paths["unit_drift"], record)
-    return record
-
-
-def load_unit_drift(root: str | Path) -> list[dict[str, Any]]:
-    paths = memory_paths(root)
-    if not paths["unit_drift"].is_file():
-        return []
-    records = read_jsonl(paths["unit_drift"])
-    for number, record in enumerate(records, start=1):
-        schema = record.get("schema_version")
-        if schema != UNIT_DRIFT_SCHEMA:
-            raise ValueError(
-                f"unit drift store record {number} has unsupported schema {schema!r}"
-            )
-    return records
 
 
 # ----------------------------------------------------------------------
@@ -469,19 +425,15 @@ __all__ = [
     "PROCEDURAL_NAME",
     "PROCEDURAL_SCHEMA",
     "RECALL_NAME",
-    "UNIT_DRIFT_NAME",
-    "UNIT_DRIFT_SCHEMA",
     "episodic_attempts",
     "load_episodes",
     "load_improvements",
     "load_procedures",
-    "load_unit_drift",
     "memory_paths",
     "memory_summary",
     "recall",
     "record_episode",
     "record_improvement",
     "record_procedure",
-    "record_unit_drift",
     "write_recall",
 ]

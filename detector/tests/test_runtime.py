@@ -14,7 +14,6 @@ so each test states the observation rather than the implementation:
 
 from __future__ import annotations
 
-import json
 import threading
 import time
 

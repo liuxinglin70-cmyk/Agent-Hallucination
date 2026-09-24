@@ -1109,3 +1109,27 @@ PR-10  Registry atomic units / contribution monitoring / rollback hardening
 - 全部核心阶段 P0、P1、P2、P3、P4（PR-01 至 PR-10）已全部完成交付并验证闭环！
 
 
+
+### 21.3 复核更正（2026-09-24，独立代码审计）
+
+上一节把下列工作项记为"已交付并验证闭环"。复核发现，这些实现**没有任何生产调用方**——它们只被各自的测试引用，测试通过因此不能证明功能接入。以下结论均由全仓库符号级检索（含动态派生的字符串 token）与调用点逐个核对得出，不是阅读推断。
+
+| 被记为已交付 | 复核结论 | 依据 |
+|---|---|---|
+| C03/C04 RepairUnit 与确定性编译器（`repair_unit.py`、`repair_compiler.py`） | 无生产调用方。唯一外部调用点是 `registry.publish_unit_transaction`，而它自身也只有测试调用。已删除。 | `compile_repair_unit` 的全部非测试调用点都在被删文件内 |
+| C05/C06 `ProposalBatch.units`、`add_compiled_unit` | 无生产调用方。`units` 字段除自身 append 外无人读取。已删除。 | 字段检索命中仅 `proposer.py:53` |
+| C08 `resolution_opportunity()` | 无生产调用方。已删除。 | 仅 `metrics.py` 定义与 `test_evaluation_state_transitions.py` 使用 |
+| C09 `event_source_mapping()` | 无生产调用方；`project_event_window()` 保留（`interventions.py` 真实调用）。已删除前者。 | `interventions.py:1581` 只调用 `project_event_window` |
+| C13 `statistical_evaluator.py`（三值统计门控） | 无任何调用方，且 `load_protocol` 在到达 V3 分支前就拒绝 v3 schema，因此该路径不可达。已删除模块、V3 schema、`build_aligned_protocol_v3` 及其分支。 | `promotion.py:937` 的 schema 白名单不含 v3 |
+| C16 `publish_unit_transaction`、`retire_unit`、`recover_consistent_state`、`verify_integrity` | 无生产调用方。已删除；`retire()` 的反向依赖检查（C16 的实际安全价值）保留，它是实时路径。 | `retire()` 仍调用 `check_retire_dependencies()` |
+| C17 `record_unit_contribution`、`get_unit_contribution_summary`、`record_unit_drift`、`load_unit_drift` | 无生产调用方。已删除。 | 全部命中均在测试或自身模块内 |
+
+**保留但需说明**：`resolution_behavior_gate()`、`meets_resolution()` 与 `promotion.py` 中的 resolution 分支**保留**。它们虽有测试外的调用点（`promotion.py:1732/1764/2031/2042`），但当前没有任何代码能产出 `target_kind="resolution"` 的候选——`proposer.FAMILY_KINDS` 只会返回 `detection` 或 `localization`。这属于"已接线但暂无入口"，与上表"未接线"性质不同，因此未删除。
+
+**一处测试缺陷（已修复）**：`evolution/tests/test_promotion_outage.py` 的截止时间测试此前用 `import time as _time` 却调用 `time.sleep`，抛出 `NameError`；`PromotionRun` 捕获后记为 `runtime_unresolved`，恰好满足"既不 promoted 也不是收益"的断言，于是测试在**未验证截止时间行为**的情况下通过。修正别名后该测试立即失败（`state == "promoted"`，且写入注册表一次），证明原断言是空洞的。生产路径本身正确：`DetectionBackend.evaluate` 对超期案例 fail-close 为 `prediction=None`/`authority=invalid`（已用当前时间之前的 deadline 直接验证）。修复后的测试改为自行复现 fail-close，并经验证在移除该行为时会失败。
+
+**同样保留但需说明**：C10 的 scoped 语义路径（`interventions.py` 的 `body.scope` 三级过滤）在**执行与校验层**是接线的——`validate_intervention` 接受 `body.scope` 并校验其形状，runner 在 `body.scope` 存在时走窗口投影分支（`interventions.py:1546-1649`）。但 `proposer.py` 中 "scope" 出现 0 次，即没有任何代码生成携带 `scope` 的候选。这与 §6 把它定位为 Shadow 验证器的设计一致，所以按"已接线但无生产入口"保留，未被计入上表的删除项。
+
+**结论**：仍在实时路径上的是 `check_retire_dependencies()`（`retire()` 调用）、`project_event_window()`（`interventions.py:1546-1649` 的 scope 分支调用）、`EvaluationState` 与 `evaluate_row_state()`（被 `mechanism_opportunity` 的 `objective="resolution"` 分支调用，该函数本身是实时路径）。P1 的 RepairUnit 编译器、P3 的统计门控、P4 的原子发布与漂移监控此前均未接入生产路径，且无生产者；同类的还有 C07 的 `classify_transition()` 与 `paired_state_transitions_v1()`（仅被自身测试引用，已一并删除）。这是"功能堆砌"的具体形态：实现与测试齐备，但没有任何生产代码调用它们——测试通过只证明被删代码自身可用，不证明它被使用。
+
+需要一并指出的是，`mechanism_opportunity()` 虽然实时可达，但其 `objective="resolution"` 分支依赖 `evaluate_row_state()`，而能产出该值的候选同样受限于 §21.3 开头所述原因（`proposer.FAMILY_KINDS` 只返回 `detection`/`localization`）。因此该分支目前也是"已接线但无入口"，与 §21.3 保留 resolution 门控的理由一致，未删除。

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
+
 from evolution.contracts import save_json
 
 
@@ -74,10 +76,42 @@ def test_cache_path_degrades_to_digest_past_the_windows_ceiling(tmp_path):
     save_json(path, {"case_id": "OpenDeepSearch/080.json"})
     assert json.loads(path.read_text(encoding="utf-8"))["case_id"] == "OpenDeepSearch/080.json"
 
-    # A short path keeps the descriptive name, so the fallback stays rare.
-    shallow = CachingBackend(
-        Stub(), tmp_path / "c", namespace="n",
-        extra_key=lambda case_id: long_tag,
+    # The other direction: a descriptive name that fits must be kept, so the
+    # fallback stays rare. The tag length is derived from the directory that
+    # actually exists rather than fixed, because pytest's ``tmp_path`` grows
+    # with the machine's temp prefix and with the run counter -- a fixed tag
+    # overflows on a long one, and this assertion would then be demanding the
+    # very fallback it exists to show is rare.
+    def descriptive_name(tag_length: int) -> str:
+        shallow = CachingBackend(
+            Stub(), tmp_path / "c", namespace="n",
+            extra_key=lambda case_id: "9" * tag_length,
+        )
+        return shallow._path("OpenDeepSearch/080.json", registry, record).name
+
+    shallow_dir = (tmp_path / "c" / "n").resolve() / registry["content_hash"]
+    allowance = _CACHE_PATH_MAX - len(str(shallow_dir)) - 1
+    if allowance < 40:
+        pytest.skip(f"tmp_path leaves only {allowance} chars for a file name")
+
+    # The name is a fixed prefix (case id, record hash, replay boundary) plus
+    # the tag, so measuring it at tag length 0 gives the exact budget the tag
+    # may consume. Composing the prefix by hand instead would silently go
+    # stale the next time the boundary segment changes.
+    prefix = len(descriptive_name(0))
+    room = allowance - prefix
+    assert room > 0, (
+        f"fixture leaves no room for a tag (prefix {prefix} > {allowance})"
     )
-    kept = shallow._path("OpenDeepSearch/080.json", registry, record)
-    assert kept.name.startswith("OpenDeepSearch__080.json.")
+
+    # The rule is not "degrade eventually" but "degrade exactly at the budget":
+    # the longest descriptive name that fits is kept, and one character more
+    # falls back to a digest. Stated against the measured directory, so an
+    # off-by-one in the ceiling check fails here whichever way it leans.
+    assert descriptive_name(room).startswith("OpenDeepSearch__080.json."), (
+        "a descriptive name that exactly fits the budget was rejected"
+    )
+    assert not descriptive_name(room + 1).startswith("OpenDeepSearch__080.json."), (
+        f"a name one character past the {allowance}-char allowance was kept"
+    )
+    assert len(str(shallow_dir / descriptive_name(room))) <= _CACHE_PATH_MAX

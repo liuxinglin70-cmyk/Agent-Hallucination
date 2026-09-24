@@ -436,12 +436,6 @@ def conflict_report(
     return report
 
 
-def conflicted_ids(sources: Sequence[Mapping[str, Any]]) -> frozenset[str]:
-    return frozenset(
-        evidence_id
-        for conflict in conflict_report(sources)
-        for evidence_id in conflict["evidence_ids"]
-    )
 
 
 def relevant_conflicts(
@@ -611,7 +605,6 @@ __all__ = [
     "build_snapshot",
     "citation_error",
     "conflict_report",
-    "conflicted_ids",
     "evidence_ids",
     "excerpt_sha256",
     "independence_groups",

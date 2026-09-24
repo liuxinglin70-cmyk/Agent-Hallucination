@@ -16,8 +16,6 @@ import pytest
 
 from detector.result import RESULT_SCHEMA
 from experiments.plan import (
-    DEFAULT_MEASUREMENT,
-    ExperimentPlan,
     load_measurement,
     load_plan,
 )

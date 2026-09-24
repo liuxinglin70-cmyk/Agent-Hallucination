@@ -63,7 +63,7 @@ from detector.config import load_config
 from detector.dataset import load_case
 from detector.evaluation import binary_metrics, evaluate_run
 from detector.packet import build_packet, validate_record
-from detector.runner import record_case, run_batch, safe_case_id  # noqa: F401
+from detector.runner import run_batch, safe_case_id
 
 REPORT_SCHEMA = "detector.baseline_report.v1"
 DEFAULT_MANIFEST = ROOT / "datasets" / "protocols" / "development_exposure.json"

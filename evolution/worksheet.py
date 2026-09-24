@@ -102,11 +102,6 @@ def _judge_parsed(result: Mapping[str, Any]) -> Mapping[str, Any]:
     return (result.get("proof") or {}).get("judge") or {}
 
 
-def _upgrade_status(result: Mapping[str, Any]) -> str:
-    statuses = result.get("stage_status") or {}
-    return str((statuses.get("causal_upgrade") or {}).get("state") or "")
-
-
 def _coverage(result: Mapping[str, Any]) -> dict[str, Any] | None:
     proof = result.get("proof") or {}
     coverage = proof.get("causal_upgrade_coverage")

@@ -31,8 +31,6 @@ from evolution.development import (
     development_report,
     plan_reaches,
 )
-from evolution.mechanisms import infer_mechanism
-
 
 def mechanism(
     *,
