@@ -850,6 +850,18 @@ def behavior_gate(
                 behavior_events=behavior_events,
                 behavior_event_kind=behavior_event_kind,
             )
+    elif polarity == "resolution":
+        flips = delta.get("flips") or {}
+        resolved = int(flips.get("U->T") or 0) + int(flips.get("U->F") or 0)
+        if resolved <= 0 or int(delta.get("tp_lost") or 0) > 0 or int(delta.get("fp_added") or 0) > 0:
+            return _policy_fail(
+                "target polarity mismatch: resolution claim but no resolved cases or "
+                "authoritative correctness harmed",
+                delta=delta,
+                fired_rate=rate,
+                behavior_events=behavior_events,
+                behavior_event_kind=behavior_event_kind,
+            )
     else:
         return _policy_fail(f"unknown target polarity {polarity!r}")
 
@@ -952,6 +964,76 @@ def localization_behavior_gate(
     return _policy_pass(
         delta=delta,
         fired_rate=fired_rate(candidate_rows, intervention_id),
+        behavior_events=behavior_events,
+        behavior_event_kind=behavior_event_kind,
+    )
+
+
+def resolution_behavior_gate(
+    candidate: Mapping[str, Any],
+    *,
+    baseline_rows: Sequence[Mapping[str, Any]],
+    candidate_rows: Sequence[Mapping[str, Any]],
+    config: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Whether a candidate claiming resolution actually resolves an unresolved case.
+
+    Checks:
+    1. Fired rate > 0 on the resolution evaluation set (if behavior_require_fired).
+    2. Zero health regressions.
+    3. At least one previously unresolved case is converted to authoritative correct (U->T or U->F).
+    4. No previously correct decisions are harmed (tp_lost == 0, fp_added == 0).
+    """
+    gate_cfg = config.get("gates") or {}
+    intervention_id = str(candidate.get("intervention_id") or "")
+    intervention_type = str(candidate.get("type") or candidate.get("intervention_type") or "")
+
+    rate = fired_rate(candidate_rows, intervention_id)
+    if bool(gate_cfg.get("behavior_require_fired", True)) and rate <= 0.0:
+        return _policy_fail(
+            "claim behavior mismatch: intervention never fired on resolution cases",
+            fired_rate=rate,
+        )
+
+    behavior_events, behavior_event_kind = deployment_events(
+        candidate_rows, intervention_id, intervention_type,
+    )
+
+    delta = paired_delta(list(baseline_rows), list(candidate_rows))
+    if int(delta.get("health_regressed") or 0) > 0:
+        return _policy_fail(
+            f"runtime health regressed on {delta['health_regressed']} case(s)",
+            delta=delta,
+            fired_rate=rate,
+            behavior_events=behavior_events,
+            behavior_event_kind=behavior_event_kind,
+        )
+
+    flips = delta.get("flips") or {}
+    resolved = int(flips.get("U->T") or 0) + int(flips.get("U->F") or 0)
+    if resolved <= 0:
+        return _policy_fail(
+            "resolution claim resolved no unresolved case to authoritative correct",
+            delta=delta,
+            fired_rate=rate,
+            behavior_events=behavior_events,
+            behavior_event_kind=behavior_event_kind,
+        )
+
+    if int(delta.get("tp_lost") or 0) > 0 or int(delta.get("fp_added") or 0) > 0:
+        return _policy_fail(
+            "resolution claim harmed existing authoritative decisions "
+            f"(tp_lost={delta.get('tp_lost', 0)}, fp_added={delta.get('fp_added', 0)})",
+            delta=delta,
+            fired_rate=rate,
+            behavior_events=behavior_events,
+            behavior_event_kind=behavior_event_kind,
+        )
+
+    return _policy_pass(
+        delta=delta,
+        fired_rate=rate,
+        behavior_note=f"resolved_correct={resolved}",
         behavior_events=behavior_events,
         behavior_event_kind=behavior_event_kind,
     )
@@ -1171,6 +1253,40 @@ def meets_m(
     return (not failures), failures
 
 
+def meets_resolution(
+    delta: Mapping[str, Any],
+    *,
+    config: Mapping[str, Any],
+) -> tuple[bool, list[str]]:
+    """Resolution admission rule over precomputed paired delta.
+
+    Requires at least min_resolved_cases (default 1) to transition from unresolved to correct,
+    with zero new errors allowed (or <= m_new_errors_allowed),
+    zero new unresolved added, zero health regressions, and no TP lost or FP added.
+    """
+    gate_cfg = config.get("gates") or {}
+    failures = []
+    minimum = max(0, int(gate_cfg.get("resolution_min_resolved_cases", 1)))
+    flips = delta.get("flips") or {}
+    resolved = int(flips.get("U->T") or 0) + int(flips.get("U->F") or 0)
+
+    if resolved < minimum:
+        failures.append(f"resolved_correct={resolved} < {minimum}")
+
+    allowed_new_errors = int(gate_cfg.get("m_new_errors_allowed", 0))
+    if int(delta.get("new_errors") or 0) > allowed_new_errors:
+        failures.append(f"new_errors={delta['new_errors']} > {allowed_new_errors}")
+    if int(delta.get("unresolved_added") or 0) > 0:
+        failures.append(f"unresolved_added={delta['unresolved_added']}")
+    if int(delta.get("health_regressed") or 0) > 0:
+        failures.append(f"health_regressed={delta['health_regressed']}")
+    if int(delta.get("tp_lost") or 0) > 0:
+        failures.append(f"tp_lost={delta['tp_lost']}")
+    if int(delta.get("fp_added") or 0) > 0:
+        failures.append(f"fp_added={delta['fp_added']}")
+    return (not failures), failures
+
+
 def defect_candidates() -> list[dict[str, Any]]:
     """Static gate-audit defects with cycle-independent identity.
 
@@ -1232,6 +1348,8 @@ __all__ = [
     "localization_behavior_gate",
     "meets_localization",
     "meets_m",
+    "meets_resolution",
+    "resolution_behavior_gate",
     "structural_gate",
     "harmlessness_gate",
     "behavior_gate",

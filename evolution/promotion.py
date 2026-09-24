@@ -63,7 +63,9 @@ from evolution.gates import (
     localization_behavior_gate,
     meets_localization,
     meets_m,
+    meets_resolution,
     requires_fresh_evaluation,
+    resolution_behavior_gate,
     sentinel_coverage,
     structural_gate,
 )
@@ -949,7 +951,7 @@ def load_protocol(
             "promotion protocol changed after it was frozen; the file no "
             "longer hashes to the value recorded at freeze time"
         )
-    if schema == alignment.ALIGNED_PROTOCOL_SCHEMA:
+    if schema in {alignment.ALIGNED_PROTOCOL_SCHEMA, alignment.ALIGNED_PROTOCOL_V3_SCHEMA}:
         try:
             alignment.verify_alignment(protocol)
             if protocol["case_digests"] != alignment.data_digests(dataset_root, protocol["cases"]):
@@ -1725,6 +1727,15 @@ class PromotionRun:
                             gold_steps=self.protocol.get("gold_steps") or {},
                         )
                     )
+                elif kind == "resolution":
+                    member_behavior[str(artifact.get("intervention_id"))] = (
+                        resolution_behavior_gate(
+                            artifact,
+                            baseline_rows=[*control_protection, *control_benefit],
+                            candidate_rows=[*candidate_protection, *candidate_benefit],
+                            config=self.config,
+                        )
+                    )
                 else:
                     member_behavior[str(artifact.get("intervention_id"))] = (
                         behavior_gate(
@@ -1749,6 +1760,8 @@ class PromotionRun:
             if behavior.get("passed") and "m" in self.stages:
                 if target_kind == "detection":
                     passed, failures = meets_m(detection, config=self.config)
+                elif target_kind == "resolution":
+                    passed, failures = meets_resolution(detection, config=self.config)
                 else:
                     passed, failures = meets_localization(
                         localization,
@@ -2012,8 +2025,12 @@ class PromotionRun:
                 verdict = {"passed": detection_behavior["passed"] or local_behavior["passed"],
                            "reason": "; ".join(v["reason"] for v in (detection_behavior, local_behavior) if not v["passed"]),
                            "detection": detection_behavior, "localization": local_behavior}
+            elif kind == "localization":
+                verdict = local_behavior
+            elif kind == "resolution":
+                verdict = resolution_behavior_gate(entry, baseline_rows=control_gain, candidate_rows=active_gain, config=self.config)
             else:
-                verdict = local_behavior if kind == "localization" else detection_behavior
+                verdict = detection_behavior
             member_behavior[str(entry["intervention_id"])] = verdict
         passed = all(item["passed"] for item in member_behavior.values())
         report["gates"]["behavior"] = {"passed": passed, "members": member_behavior}
@@ -2021,6 +2038,8 @@ class PromotionRun:
             return finish("promotion_rejected", "candidate_no_effect", "candidate did not improve its declared objective on mechanism gain cases")
         if objective == "detection":
             passed, reasons = meets_m(detection, config=self.config)
+        elif objective == "resolution":
+            passed, reasons = meets_resolution(detection, config=self.config)
         else:
             passed, reasons = meets_localization(localization, config=self.config, detection_delta=detection, target_kind=objective)
         report["gates"]["m"] = {"passed": passed, "reason": "; ".join(reasons), "delta": detection, "localization_delta": localization}
