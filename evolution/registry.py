@@ -34,7 +34,7 @@ class LibraryLimitError(ValueError):
 
 
 class ActiveRegistry:
-    def __init__(self, registry_dir: str | Path) -> None:
+    def __init__(self, registry_dir: str | Path, *, auto_recover: bool = False) -> None:
         self.dir = Path(registry_dir)
         self.dir.mkdir(parents=True, exist_ok=True)
         (self.dir / SNAPSHOTS_DIR).mkdir(parents=True, exist_ok=True)
@@ -45,12 +45,74 @@ class ActiveRegistry:
         self._lock = threading.RLock()
         expected_hash = str(self._state.get("active_hash") or "")
         if expected_hash and expected_hash != self.registry_hash:
-            raise RuntimeError(
-                "registry active/state mismatch: "
-                f"active={self.registry_hash}, state={expected_hash}"
-            )
+            if auto_recover:
+                self.recover_consistent_state()
+            else:
+                raise RuntimeError(
+                    "registry active/state mismatch: "
+                    f"active={self.registry_hash}, state={expected_hash}"
+                )
         if not self.active_path.exists():
             self._atomic_write(self.active_path, empty_registry())
+
+    def verify_integrity(self) -> dict[str, Any]:
+        """Check active/state consistency and snapshots validity."""
+        expected_hash = str(self._state.get("active_hash") or "")
+        try:
+            on_disk_entries = self._load_entries()
+            disk_registry = make_registry(on_disk_entries)
+            disk_hash = str(disk_registry.get("content_hash") or "")
+        except Exception:
+            disk_hash = ""
+        is_consistent = bool(expected_hash and (expected_hash == disk_hash))
+        missing_snapshots = []
+        for s in self._state.get("snapshots") or []:
+            f = s.get("file")
+            if f and not (self.dir / SNAPSHOTS_DIR / f).is_file():
+                missing_snapshots.append(f)
+        return {
+            "consistent": is_consistent,
+            "active_hash": disk_hash,
+            "expected_hash": expected_hash,
+            "missing_snapshots": missing_snapshots,
+            "valid": is_consistent and not missing_snapshots,
+        }
+
+    def recover_consistent_state(self) -> dict[str, Any]:
+        """Auto-heal corrupted active.json by locating and restoring the latest valid snapshot."""
+        with self._lock:
+            snapshots = list(self._state.get("snapshots") or [])
+            for snap in reversed(snapshots):
+                f = snap.get("file")
+                if not f:
+                    continue
+                path = self.dir / SNAPSHOTS_DIR / f
+                if path.is_file():
+                    try:
+                        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+                        entries = validate_registry(payload, require_executable_bounds=True)
+                        validated = make_registry(entries)
+                        self._atomic_write(self.active_path, validated)
+                        self._entries = entries
+                        restored_hash = str(validated.get("content_hash") or "")
+                        self._state["active_hash"] = restored_hash
+                        self._state.setdefault("recovery_events", []).append({
+                            "timestamp": time.time(),
+                            "restored_snapshot": f,
+                            "restored_hash": restored_hash,
+                            "reason": "auto_healed_active_state_mismatch",
+                        })
+                        self._save_state()
+                        return validated
+                    except Exception:
+                        continue
+
+            empty = empty_registry()
+            self._atomic_write(self.active_path, empty)
+            self._entries = []
+            self._state["active_hash"] = str(empty.get("content_hash") or "")
+            self._save_state()
+            return empty
 
     @staticmethod
     def _atomic_write(path: Path, payload: Any) -> None:
@@ -293,6 +355,181 @@ class ActiveRegistry:
             return [
                 str(entry.get("intervention_id") or "") for entry in retired
             ]
+
+    def publish_unit_transaction(
+        self,
+        unit: Any,
+        *,
+        cycle: int,
+        reason: str,
+        protocol_hash: str = "",
+        approved_policy_version: str = "v3",
+        library_cfg: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Publish a RepairUnit or CompiledUnit atomically with transaction manifest."""
+        with self._lock:
+            unit_id = getattr(unit, "unit_id", None) or getattr(unit, "unit_hash", None)
+            if unit_id is None and isinstance(unit, Mapping):
+                unit_id = unit.get("unit_id") or unit.get("unit_hash")
+
+            interventions = []
+            if hasattr(unit, "entries"):
+                interventions = list(unit.entries)
+            elif hasattr(unit, "interventions"):
+                interventions = list(unit.interventions)
+            elif isinstance(unit, Mapping) and "entries" in unit:
+                interventions = list(unit["entries"])
+            elif isinstance(unit, Mapping) and "interventions" in unit:
+                interventions = list(unit["interventions"])
+            elif hasattr(unit, "target") or (isinstance(unit, Mapping) and "target" in unit):
+                from evolution.repair_compiler import compile_repair_unit
+                unit_dict = unit.to_dict() if hasattr(unit, "to_dict") else unit
+                target_dict = unit_dict.get("target") or {}
+                confirmed = {
+                    "mechanism_id": target_dict.get("mechanism_id", "default_mech"),
+                    "objective": target_dict.get("objective", "detection"),
+                }
+                compiled = compile_repair_unit(unit_dict, confirmed_mechanism=confirmed)
+                unit_id = unit_id or compiled.unit_hash
+                interventions = list(compiled.entries)
+
+            if not unit_id:
+                raise ValueError("a valid unit or unit dict with unit_id is required")
+
+            new_ids = {str(item.get("intervention_id") or "") for item in interventions}
+            combined = [e for e in self._entries if str(e.get("intervention_id") or "") not in new_ids]
+            combined.extend(interventions)
+
+            problems = self.check_limits(combined, library_cfg=library_cfg)
+            if problems:
+                raise LibraryLimitError("; ".join(problems))
+
+            payload = make_registry(combined)
+            previous_hash = self.registry_hash
+            snapshot_name = f"cycle{int(cycle):03d}_{unit_id}_{time.strftime('%Y%m%d_%H%M%S')}_{uuid4().hex[:8]}.json"
+            snapshot_path = self.dir / SNAPSHOTS_DIR / snapshot_name
+
+            manifest_info = {
+                "unit_id": unit_id,
+                "protocol_hash": protocol_hash,
+                "approved_policy_version": approved_policy_version,
+                "member_ids": sorted(new_ids),
+                "published_at": time.time(),
+            }
+
+            self._atomic_write(snapshot_path, payload)
+            self._atomic_write(self.active_path, payload)
+            self._entries = deepcopy(combined)
+
+            self._state["cycle"] = int(cycle)
+            self._state["active_hash"] = str(payload.get("content_hash") or "")
+            self._state.setdefault("snapshots", []).append({
+                "cycle": int(cycle),
+                "file": snapshot_name,
+                "hash": str(payload.get("content_hash") or ""),
+                "previous_hash": previous_hash,
+                "reason": str(reason),
+                "entries": [str(e.get("intervention_id") or "") for e in combined],
+                "manifest": manifest_info,
+            })
+
+            units_dict = self._state.setdefault("units", {})
+            unit_record = units_dict.setdefault(unit_id, {
+                "unit_id": unit_id,
+                "admitted_cycle": int(cycle),
+                "status": "active",
+                "member_ids": sorted(new_ids),
+                "protocol_hash": protocol_hash,
+                "policy_version": approved_policy_version,
+                "contribution_history": [],
+            })
+            unit_record["status"] = "active"
+            unit_record["admitted_cycle"] = int(cycle)
+            unit_record["member_ids"] = sorted(new_ids)
+
+            self._save_state()
+            return payload
+
+    def retire_unit(
+        self,
+        unit_id: str,
+        *,
+        cycle: int,
+        library_cfg: Mapping[str, Any] | None = None,
+    ) -> list[str]:
+        """Atomically retire all member interventions belonging to a unit."""
+        with self._lock:
+            unit_record = (self._state.get("units") or {}).get(unit_id)
+            if unit_record is not None and unit_record.get("member_ids"):
+                target_ids = list(unit_record["member_ids"])
+            else:
+                target_ids = [
+                    str(e.get("intervention_id") or "") for e in self._entries
+                    if str(e.get("intervention_id") or "").startswith(unit_id)
+                    or str(e.get("unit_id") or "") == unit_id
+                ]
+
+            if not target_ids:
+                return []
+
+            retired = self.retire(target_ids, cycle=cycle, library_cfg=library_cfg)
+            if unit_record is not None:
+                unit_record["status"] = "retired"
+                unit_record["retired_cycle"] = int(cycle)
+                self._save_state()
+            return retired
+
+    def record_unit_contribution(
+        self,
+        unit_id: str,
+        net_correct: int,
+        *,
+        cycle: int,
+        marginal: int = 0,
+        fired_rate: float = 0.0,
+    ) -> None:
+        """Record longitudinal performance tracking for a deployed unit."""
+        with self._lock:
+            unit_record = self._state.setdefault("units", {}).setdefault(unit_id, {
+                "unit_id": unit_id,
+                "admitted_cycle": int(cycle),
+                "status": "active",
+                "member_ids": [],
+                "contribution_history": [],
+            })
+            history = unit_record.setdefault("contribution_history", [])
+            existing = next((item for item in history if int(item.get("cycle") or 0) == int(cycle)), None)
+            payload = {
+                "cycle": int(cycle),
+                "net_correct": int(net_correct),
+                "marginal_cases": int(marginal),
+                "fired_rate": float(fired_rate),
+            }
+            if existing is None:
+                history.append(payload)
+            else:
+                existing.update(payload)
+            self._save_state()
+
+    def get_unit_contribution_summary(self, unit_id: str) -> dict[str, Any] | None:
+        """Get summary of lifespan, cumulative contributions, and status for a unit."""
+        unit_record = (self._state.get("units") or {}).get(unit_id)
+        if unit_record is None:
+            return None
+        history = unit_record.get("contribution_history") or []
+        cum_correct = sum(int(item.get("net_correct") or 0) for item in history)
+        cum_marginal = sum(int(item.get("marginal_cases") or 0) for item in history)
+        cycles_tracked = len(history)
+        return {
+            "unit_id": unit_id,
+            "status": unit_record.get("status", "unknown"),
+            "admitted_cycle": unit_record.get("admitted_cycle"),
+            "retired_cycle": unit_record.get("retired_cycle"),
+            "cycles_tracked": cycles_tracked,
+            "cumulative_net_correct": cum_correct,
+            "cumulative_marginal": cum_marginal,
+            "history": list(history),
+        }
 
     def restore(
         self,
