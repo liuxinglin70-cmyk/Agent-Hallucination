@@ -422,6 +422,75 @@ def test_patrol_bootstrap_recovers_missed_failure_family(tmp_path, monkeypatch):
     assert report["marginal_selection"]["selected"] == ["IV-1-001"]
 
 
+def test_cycle_blocks_no_family_claim_when_patrol_is_unmeasured(tmp_path, monkeypatch):
+    """An outage-only patrol cannot complete as though it found no failures."""
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    config["audit"]["enabled"] = False
+    config["budget"]["patrol_cases"] = 2
+    config["budget"]["stable_failure_rerun_cases"] = 2
+    split = EvolutionSplit(
+        name="synthetic",
+        pool=cases,
+        sentinel=cases[:4],
+        gain=cases[4:12],
+        patrol_pool=cases[12:],
+        mini=True,
+    )
+    engine = EvolutionEngine(
+        config,
+        backend=MockDetectorBackend(),
+        split=split,
+        mini=True,
+        proposer=OfflineProposer(),
+    )
+    monkeypatch.setattr(
+        engine.split, "patrol_sample", lambda cycle, n: cases[12:14],
+    )
+
+    def outage_patrol(_arms, patrol_cases):
+        rows = [{
+            "case": case,
+            "gold": engine.gold_map[case],
+            "prediction": None,
+            "state": "unresolved",
+            "authority": "invalid",
+            "responsible_step": None,
+            "responsible_step_kind": None,
+            "measurement": "infrastructure_failure",
+            "failure_reasons": [{"code": "provider_error"}],
+            "result": {
+                "schema_version": "detector.detection_result.v1",
+                "state": "unresolved",
+                "decision_authority": "invalid",
+                "runtime_valid": False,
+                "authority_failure_reasons": [{"code": "provider_error"}],
+                "stage_status": {},
+            },
+            "backend": "mock",
+        } for case in patrol_cases]
+        return rows, rows, {}
+
+    monkeypatch.setattr(engine, "_patrol_arms", outage_patrol)
+    report = engine.run_cycle(1)
+
+    assert report["state"] == "blocked_patrol_measurement"
+    assert report["patrol"]["measurement_coverage"] == {
+        "cases": 4,
+        "authoritative": 2,
+        "unmeasured": 2,
+        "unmeasured_cases": cases[12:14],
+        "status_counts": {
+            "infrastructure_failure": 2,
+            "authoritative": 2,
+        },
+    }
+    assert "cannot be concluded" in report["proposal_summary"]["empty_proposal_reason"]
+    assert report["proposals"] == []
+    assert report["gates"] == []
+    assert report["ledger_integrity"]["valid"] is True
+
+
 def test_joint_l1_l2_candidates_are_only_admitted_together(tmp_path):
     cases = _make_dataset(tmp_path / "data", n=20)
     config = _config(tmp_path)

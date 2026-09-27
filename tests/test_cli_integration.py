@@ -77,3 +77,82 @@ def test_detect_batch_evaluate_through_http(tmp_path):
         server.shutdown()
         thread.join(timeout=5)
         server.server_close()
+
+
+def test_batch_cli_returns_nonzero_after_fatal_provider_error(tmp_path):
+    """A recorded 401 is a failed measurement, not a successful CLI run."""
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            body = json.dumps({"error": {
+                "message": "Invalid authentication credentials",
+                "type": "invalid_request_error",
+            }}).encode()
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        endpoint = f"http://127.0.0.1:{server.server_port}/v1"
+        route = {
+            "endpoint": endpoint,
+            "model": "local-test-model",
+            "api_key_env": "CLI_AUTH_FAILURE_KEY",
+            "votes": 1,
+            "vote_topup": 0,
+            "timeout_seconds": 10,
+            "total_timeout_seconds": 10,
+            "transport_retries": 0,
+        }
+        config = tmp_path / "config.json"
+        config.write_text(json.dumps({
+            "provider": route,
+            "case_timeout_seconds": 30,
+        }), encoding="utf-8")
+        data = tmp_path / "data"
+        data.mkdir()
+        for name in ("one.json", "two.json"):
+            (data / name).write_text(json.dumps({
+                "question": "What is 2 + 2?",
+                "history": [{"step": 1, "role": "assistant", "content": "4"}],
+                "is_hallucination": False,
+                "true_answer": "4",
+            }), encoding="utf-8")
+        cases = tmp_path / "cases.json"
+        cases.write_text('["one.json", "two.json"]', encoding="utf-8")
+        env = {
+            **os.environ,
+            "CLI_AUTH_FAILURE_KEY": "local-test-only",
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONUTF8": "1",
+            "DETECTOR_ENDPOINT": endpoint,
+            "DETECTOR_API_KEY_ENV": "CLI_AUTH_FAILURE_KEY",
+        }
+        result = subprocess.run(
+            [sys.executable, "-m", "detector", "batch",
+             "--dataset-root", str(data), "--cases-file", str(cases),
+             "--runs-root", str(tmp_path / "runs"), "--run-id", "unauthorized",
+             "--config", str(config), "--workers", "1"],
+            cwd=ROOT, env=env, capture_output=True, text=True,
+            encoding="utf-8", timeout=60,
+        )
+        assert result.returncode == 2, result.stdout + result.stderr
+        summary = json.loads(
+            (tmp_path / "runs/unauthorized/summary.json").read_text(encoding="utf-8")
+        )
+        assert summary["stop"]["error_type"] == "authentication_error"
+        assert summary["measurement"]["status_counts"]["fatal_provider"] == 1
+        assert summary["measurement"]["not_started"] == 1
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+        server.server_close()

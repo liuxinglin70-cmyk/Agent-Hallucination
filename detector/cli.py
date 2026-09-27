@@ -19,7 +19,14 @@ from detector.config import load_config
 from detector.interventions import load_intervention_registry
 from detector.dataset import project_record
 from detector.evaluation import evaluate_run
+from detector.measurement import measurement_status
 from detector.runner import DEFAULT_RUNS_ROOT, new_run_id, run_batch
+
+
+_FAILED_MEASUREMENT_STATUSES = frozenset({
+    "fatal_provider", "infrastructure_failure", "invalid_envelope",
+    "not_started",
+})
 
 
 def _load_json(path: str) -> Any:
@@ -57,7 +64,7 @@ def cmd_detect(args: argparse.Namespace) -> int:
         f"authority={result.get('decision_authority')} "
         f"responsible_step={result.get('responsible_step')}",
     )
-    return 0
+    return 2 if measurement_status(result) in _FAILED_MEASUREMENT_STATUSES else 0
 
 
 def cmd_batch(args: argparse.Namespace) -> int:
@@ -83,7 +90,14 @@ def cmd_batch(args: argparse.Namespace) -> int:
         workers=args.workers,
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
-    return 0
+    measurement = summary.get("measurement") or {}
+    status_counts = measurement.get("status_counts") or {}
+    failed_rows = any(
+        int(status_counts.get(status, 0) or 0) > 0
+        for status in _FAILED_MEASUREMENT_STATUSES
+    )
+    incomplete = int(measurement.get("not_started", 0) or 0) > 0
+    return 2 if summary.get("stop") or failed_rows or incomplete else 0
 
 
 def cmd_evaluate(args: argparse.Namespace) -> int:

@@ -1102,11 +1102,13 @@ PR-10  Registry atomic units / contribution monitoring / rollback hardening
 | **P1-PR04 / 评估侧状态细分与 Resolution 机制** | **C07**：在 `evolution/metrics.py` 中定义 `EvaluationState`（涵盖 `authoritative_correct/wrong`、`semantic_unresolved_healthy`、`degraded`、`infrastructure_failure`、`fatal_provider`、`not_started`、`invalid_envelope` 8 态），实现行状态确定性推导 `evaluate_row_state()`、迁移分类 `classify_transition()` 及完整迁移矩阵 `paired_state_transitions_v1()`，严格保持原 `paired_delta()` 返回值与历史不变；<br>**C08**：在 `detector/interventions.py` 中扩展 `TARGET_KINDS` 支持 `resolution`，在 `evolution/metrics.py` 中实现 `resolution_opportunity()` 机会资格审查，并升级 `mechanism_opportunity()` 原生支持 `objective="resolution"`（将健康语义未决与故障解耦，避免误报为不可测）。 | `detector/interventions.py`<br>`evolution/metrics.py`<br>`evolution/tests/test_evaluation_state_transitions.py` | `pytest evolution/tests/test_evaluation_state_transitions.py` PASS（9 项全通）<br>`pytest evolution/tests/test_mechanism_opportunity.py` PASS（14 项全通）<br>`pytest tests/test_repository.py` PASS（21 项全通） |
 | **P2-PR05~07 / 局部 Scope 投影与语义 Shadow 验证** | **C09**：在 `detector/packet.py` 中实现只读因果事件窗口投影 `project_event_window()` 与来源映射 `event_source_mapping()`，支持因果边界闭包与补救/交付检测，严格不泄漏 Gold；<br>**C10**：在 `detector/interventions.py` 中实现 `scoped_semantic_v1` 适配器与 3 层过滤流水线（Layer 1 静态特征适用性、Layer 2 窗口完整性依赖闭包、Layer 3 语义执行与工件校验），未触发或窗口不完整绝不产生模型调用；<br>**C11**：在 `detector/defense.py` 与 `adjudication.py` 中规范受控证据消费路径，严格执行 `terminal_authority="evidence_only"`，严禁将 `abstained` 篡改转化为权威定罪或放行。 | `detector/packet.py`<br>`detector/interventions.py`<br>`detector/tests/test_scoped_semantic_projection.py` | `pytest detector/tests/test_scoped_semantic_projection.py` PASS（8 项全通）<br>`pytest detector/tests/test_interventions.py` PASS（20 项全通）<br>`pytest tests/test_repository.py` PASS（21 项全通） |
 | **P3-PR08~09 / 统计测量与 V3 正式晋升协议** | **C13**：创建 `evolution/statistical_evaluator.py`，实现案例级聚类因果净效应估计 `cluster_cases_paired_delta()`（`tau_c`, `lcb_tau_c`, `delta_fp`, `ucb_delta_fp`, `delta_fn`, `ucb_delta_fn`）与重复 A/B 框架，并实现三值统计门控 `statistical_gate_evaluate()`（输出 `PASS / FAIL / INCONCLUSIVE`，区分样本不足、健康回归、有害损伤与显著增益）；<br>**C14**：在 `evolution/promotion_alignment.py` 中实现 `build_aligned_protocol_v3()` 与增强 `verify_alignment()`，支持事前冻结预注册统计参数（`alpha_g`, `alpha_h`, `delta_min`, `epsilon_fp`, `epsilon_fn`, `min_effective_sample_size`）与参数自哈希校验，严格防篡改与开发数据重叠隔离；<br>**C15**：在 `evolution/gates.py` 中实现 `resolution_behavior_gate()` 与 `meets_resolution()`，在 `evolution/promotion.py` 中统一适配 `objective="resolution"` 路径。 | `evolution/statistical_evaluator.py`<br>`evolution/promotion_alignment.py`<br>`evolution/gates.py`<br>`evolution/promotion.py`<br>`evolution/tests/test_statistical_evaluator.py` | `pytest evolution/tests/test_statistical_evaluator.py` PASS（11 项全通）<br>`pytest evolution/tests/test_promotion_alignment.py` PASS（30 项全通）<br>`pytest evolution/tests/test_promotion.py` PASS（29 项全通）<br>`pytest tests/test_repository.py` PASS（21 项全通） |
-| **P4-PR10 / 长期治理与原子事务发布** | **C16**：在 `evolution/registry.py` 中实现 Unit 级原子事务发布 `publish_unit_transaction()`（清单指纹、依赖闭包、配额校验及快照原子切换）与原子安全退役 `retire_unit()`，实现文件损坏自愈恢复 `recover_consistent_state()` 与一致性核验 `verify_integrity()`；<br>**C17**：在 `evolution/registry.py` 实现 Unit 长期边际效用与生命周期监控（`record_unit_contribution`, `get_unit_contribution_summary`），在 `evolution/memory.py` 实现 `record_unit_drift` 与 `load_unit_drift`（`UNIT_DRIFT_SCHEMA`）；<br>**C18**：全库实现规范、无冗余代码与零循环依赖，文档与进度追踪（Section 21）全面更新同步。 | `evolution/registry.py`<br>`evolution/memory.py`<br>`evolution/tests/test_registry_atomic_units.py` | `pytest evolution/tests/test_registry_atomic_units.py` PASS（7 项全通）<br>`pytest tests/test_repository.py` PASS（21 项全通）<br>全仓库测试集 1175 项测试 100% 全部通过 |
+| **P4-PR10 / 长期治理与原子事务发布** | **C16**：在 `evolution/registry.py` 中实现 Unit 级原子事务发布 `publish_unit_transaction()`（清单指纹、依赖闭包、配额校验及快照原子切换）与原子安全退役 `retire_unit()`，实现文件损坏自愈恢复 `recover_consistent_state()` 与一致性核验 `verify_integrity()`；<br>**C17**：在 `evolution/registry.py` 实现 Unit 长期边际效用与生命周期监控（`record_unit_contribution`, `get_unit_contribution_summary`），在 `evolution/memory.py` 实现 `record_unit_drift` 与 `load_unit_drift`（`UNIT_DRIFT_SCHEMA`）；<br>**C18**：全库实现规范、无冗余代码与零循环依赖，文档与进度追踪（Section 21）全面更新同步。 | `evolution/registry.py`<br>`evolution/memory.py`<br>`evolution/tests/test_registry_atomic_units.py` | `pytest evolution/tests/test_registry_atomic_units.py` PASS（7 项全通）<br>`pytest tests/test_repository.py` PASS（21 项全通）<br>~~全仓库测试集 1175 项测试 100% 全部通过~~ **已失效**：该读数属于本行实现尚未被裁撤时的代码状态；§21.3 的独立审计删除了本行大部分实现，当前全仓库读数为 **1128 passed / 0 failed / 0 skipped**（`artifacts/latest/pytest.log`）。此处保留原数字并划除，是因为它曾被当作交付证据引用过，直接改写会抹掉"证据对应哪个代码状态"这条线索。 |
 
 ### 21.2 待交付工作项 (In Progress / Backlog)
 
-- 全部核心阶段 P0、P1、P2、P3、P4（PR-01 至 PR-10）已全部完成交付并验证闭环！
+- ~~全部核心阶段 P0、P1、P2、P3、P4（PR-01 至 PR-10）已全部完成交付并验证闭环！~~ **该结论已被 §21.3 的独立代码审计推翻**：按"有生产调用方"的标准复核后，P1 的 RepairUnit 编译器、P3 的统计门控与 V3 协议、P4 的原子发布／退役／自愈／漂移监控均无调用方且无生产者，已删除。当前**仍在实时路径上**的只有 `check_retire_dependencies()`、`project_event_window()` 的 scope 分支、`EvaluationState` / `evaluate_row_state()`。
+- **首个 693 例真实基线：已完成**（见 §21.4）。这是原"第一阶段"的目标，现已取得全量真实读数。
+- **仍未开始**：`RepairUnit` 统一干预抽象与局部语义执行器的落地（原优化方案 §6 的 S0–S2 路线），因为其前置实现已被裁撤，需要先决定是否按"有生产入口"的标准重建。
 
 
 
@@ -1133,3 +1135,24 @@ PR-10  Registry atomic units / contribution monitoring / rollback hardening
 **结论**：仍在实时路径上的是 `check_retire_dependencies()`（`retire()` 调用）、`project_event_window()`（`interventions.py:1546-1649` 的 scope 分支调用）、`EvaluationState` 与 `evaluate_row_state()`（被 `mechanism_opportunity` 的 `objective="resolution"` 分支调用，该函数本身是实时路径）。P1 的 RepairUnit 编译器、P3 的统计门控、P4 的原子发布与漂移监控此前均未接入生产路径，且无生产者；同类的还有 C07 的 `classify_transition()` 与 `paired_state_transitions_v1()`（仅被自身测试引用，已一并删除）。这是"功能堆砌"的具体形态：实现与测试齐备，但没有任何生产代码调用它们——测试通过只证明被删代码自身可用，不证明它被使用。
 
 需要一并指出的是，`mechanism_opportunity()` 虽然实时可达，但其 `objective="resolution"` 分支依赖 `evaluate_row_state()`，而能产出该值的候选同样受限于 §21.3 开头所述原因（`proposer.FAMILY_KINDS` 只返回 `detection`/`localization`）。因此该分支目前也是"已接线但无入口"，与 §21.3 保留 resolution 门控的理由一致，未删除。
+
+### 21.4 里程碑：首个 693 例全量真实基线已完成（2026-09-27）
+
+原"第一阶段：冻结并产出首个 693 例真实基线"**已达成**。本节只记录里程碑状态与关键读数，完整实验叙述、逐轮重测过程与命令见[实验日志](docs/experiment-log.md)；两处不得互相替代。
+
+| 项目 | 读数 |
+|---|---|
+| 运行 | `full693-20260924T143024Z`；run-id `full693-g0` |
+| 报告生成 | 2026-09-27T09:37:18+08:00，`artifacts/full693-20260924T143024Z/measurement/g0/baseline_report.json` |
+| 覆盖 | manifest 653/653，missing 0、重复 0、路径冲突 0 |
+| 权威覆盖 | 651 authoritative、2 degraded_judge_only、0 invalid |
+| 权威判定准确率 | 0.7527（n=651）；全终局口径 0.7519（n=653） |
+| 混淆矩阵 | TP=291、FP=34、FN=127、TN=199（权威口径） |
+| 逐步定位 | 114/419 = 0.2721（内容步 77/166=0.4639；动作步 37/126=0.2937） |
+| 墙钟 | 2026-09-25 09:32:49 → 2026-09-27 09:37:18，约 48 小时 04 分（含 8 轮未决重测） |
+| Token | 报告口径 41,050,704（下界，171 次 attempt 无 usage 元数据）；含重试累计约 53.5M |
+| 协议边界 | 回顾性内部评估；`development_exposure.json` 覆盖全部 693 例，**不主张对未见数据的泛化** |
+
+**该里程碑证明了什么**：框架能在全量真实语料上完成端到端测量，覆盖、权威分层与失败分类的账目自洽；得到了一份可复算的基线条数（含按来源、按 gold、按步性质的分解）。
+
+**该里程碑没有证明什么**：没有任何证据表明自进化提升了检测能力。随附的 3 轮自进化运行以 0 准入结束，`active_registry` 为空，因此按运行计划**未启动 g1 对比批次**——`measurement/` 下只有 `g0` 一个批次。基线读数与演化效果是两件事，不得互相引证。
