@@ -26943,41 +26943,57 @@ manifest 653 例，逐案结果 653 个，`missing=0`、`extra=0`、重复 `case
 
 `proposal_summary.empty_proposal_reason`：`stable failure families exist but the proposer drafted no valid candidate`。
 
-### 34.5.3 分析：0 准入的六个机制性原因
+### 34.5.3 分析：0 准入的八个机制性原因
 
 **(1) 评估集里的毒丸案例：`Magentic_One/049`。** 这是干净样本（gold=false，10 步），但**每一轮都在测量中失败**，`authority=degraded_judge_only`。它同时命中三处：是 sentinel/gain 评估集成员、是 `gain_opportunity` 的 `precision` 收益点之一、是唯一无法诚实测量的行。后果是 C1/C2 的 D001 候选被判"从未在 S∪G 上触发"并附加"1 例无法诚实测量，拒绝不可归因于候选"。也就是说**候选不是因为它自己不好被否的**，而是被一个测不出来的样本挡住了。C1 的 D002 分到了另一份 12 例配对（`Magentic_One/049` 那次是权威的 `verified_clean`），才拿到可读的 delta。
 
-**(2) 收益点与开发目标不是同一问题。** 开发循环针对的失败族是 `FAM-fn-judge_false_no_recall_candidates`（judge 判 clean 的漏报）与 `FAM-fn-judge_false_upgrade_no_upgrade`（升级阶段未升级）。但 6 个 gain 机会点是 `OpenDeepSearch/088`（Planning/Fact Derive）、`Magentic_One/049`（干净样本）、`OpenManus/064`、`Octotools/030`、`OpenDeepSearch/002`、`OpenDeepSearch/063`（Retrieval/Summarize Misalign）。候选被 LLM 生成时瞄准的是前者，行为门却在后者上考它。**系统能聚类失败机制，却把候选送到不匹配的考场上。** 这正是 D001 "从未触发"的根源：它的谓词要匹配"最终散文自认执行失败"，而这批 gain 案例里没有这种形态。
+**(2) 起草集与评估集不相交，候选必须从 2 例泛化到 12 例。** 候选的谓词是从 patrol 失败族的**成员案例**起草的（D001 的谓词要匹配"最终散文自认执行失败"，取证自 `BFCL/062` 与 `OpenDeepSearch/086`），而行为门要求它在 **S ∪ G 的 12 例**上触发才算数。这两个集合按划分设计**完全不相交**（pool 30 = sentinel 6 + gain 6 + patrol 18）。不把评估集喂给提案器是**正确的防泄漏设计**，但它有一个结构后果：**候选要把从 2 例拟合出的触发条件泛化到 12 例从未见过的案例上**，否则 `fired_rate=0`、行为门直接否决。C1/C2 的 D001 都是这个形态（`intervention never fired on S union G`）。所以"从未触发"不是模型没想出候选，而是**在 2 例证据上拟合出的谓词天然难以泛化**。修法应是扩大并多样化起草证据（或允许在更多同族案例上起草），**不是**把评估集暴露给提案器。
 
-**(3) 极低的准入带宽。** 配置同时要求：结构 jaccard ≤ 0.72、无害门 0 新 FN／0 新 FP／0 新未决且保护下限 2 TP + 2 TN、行为门 `require_fired`、边际门 ≥1 边际案例且 0 新错误。而可用评估面只有 sentinel 6 + gain 6 = 12 例（patrol 18 例不参与门控）。在 12 例上要求"至少 1 个边际改善且 0 个新错误"，等价于要求候选在极小样本上做到零噪声命中。**C1 的 D002 其实达成了 `correctness_improved 1 / correctness_worsened 0 / new_errors 0`，仍被 polarity 判据否决**——因为它声称 recall 却只增加了一个 `T->F`（precision 方向）的修正。判据本身自洽（防止"改口径冒充收益"），但结果表明：在 12 例面上，一个真做了正确修正的候选也可能因方向与声明不符而被拒。
+**(2b) 收益点本身是异质的。** 6 个 gain 机会点跨 4 个类别、含 2 个干净样本：`OpenDeepSearch/088`（Planning/Fact Derive）、`Magentic_One/049`（干净）、`OpenManus/064`（Human-Interaction）、`Octotools/030`（Reasoning）、`OpenDeepSearch/002`（干净）、`OpenDeepSearch/063`（Retrieval/Summarize Misalign）。要求**单个**谓词同时在这 6 例上产生正向边际，等于要求一个谓词覆盖 4 类失败加 2 个干净样本，这与失败族"按机制聚类"的粒度不匹配。`gain_opportunity` 把不同族的收益机会合并成一个 6 例考场，是第二个结构性错配。
+
+**(3) 极低的准入带宽。** 配置同时要求：结构 jaccard ≤ 0.72、无害门 0 新 FN／0 新 FP／0 新未决且保护下限 2 TP + 2 TN、行为门 `require_fired`、边际门 ≥1 边际案例且 0 新错误。而可用评估面只有 sentinel 6 + gain 6 = 12 例（patrol 18 例不参与门控）。在 12 例上要求"至少 1 个边际改善且 0 个新错误"，等价于要求候选在极小样本上做到零噪声命中。**C1 的 D002 其实达成了 `correctness_improved 1 / correctness_worsened 0 / new_errors 0 / decisive_fixed 1`，仍被 polarity 判据否决**——因为它声称 recall 却只增加了一个 `T->F`（precision 方向）的修正。判据本身自洽（防止"改口径冒充收益"），但结果表明：在 12 例面上，一个真做了正确修正的候选也可能因方向与声明不符而被拒。
 
 **(4) L1 的邻居保护过强。** `Camel/048` 在三个 cycle 里共被记为邻居退化 **3 次**（C1 与 `Magentic_One/050` 并列、C2、C3），且它是**两个机制的 8 例共同邻居集成员**（每个机制每轮都把同一批 8 例当邻居）。`require_normal_neighbors=2` 要求候选不损伤 2 个正常邻居，而 `Camel/048` 反复成为退化点。若该案例本身处于判定边界，它实际起到了**一票否决器**的作用：6 个机制-轮次组合里，有 3 次的 v001 因它被拒。开发阶段做了正确的过滤，但代价是三个 cycle 的候选几乎全部在门前就死了——本轮**没有任何候选真正走到正式晋升测量**。
 
-**(5) Cycle 3 的预算饥饿。** C3 的两个机制中，第二个（`M-dcd34940c9d8`）因为 `llm_calls` 预算（3 次/cycle）已被第一个机制用尽而**没有获得任何提案调用**（`provider_called=false`）。第一个机制调用了 LLM 但未产出合法候选。于是 C3 的候选产出为 0，且**第二个机制从未被真正尝试**。这不是"模型想不出候选"，而是"预算在尝试之前就花完了"。
+**(5) Cycle 3 的预算耗尽。** C3 的 `llm_calls` 预算为 3 次/cycle，实际消耗为：第一个机制 1 次（被调用、成功、32,857 token，但未产出合法候选），第二个机制 2 次（产出 v001，因 `Camel/048` 退化在 L1 被拒）。预算恰好用尽后，第二个机制的最后一次起草被拒，记录为 `provider_called=false` + `reason: "llm_calls budget exhausted for this cycle"`。因此 C3 的 0 候选不是"模型尝试后失败"，而是**预算在尝试之前耗尽**：第二个机制只跑了 1 个版本（对比 C1/C2 都跑出了可冻结的 v001/v002），没有获得修复机会。注意这与 `no_candidates` 的字面含义容易混淆，读日志时须结合 `stopped_note`。
 
-**(6) 三轮看到了完全相同的失败族。** C1/C2/C3 的 `proposal_summary.stable_families` 逐字相同（4 个族），三轮的 patrol 案例列表**逐字相同**（18 例，`patrol_sample` 每轮给出同一批），`gain_opportunity` 三轮都是 `{recall:1, precision:1}`。由于 registry 三轮为空，`harness` 摘要变化只是 M/C 组件的版本记录（C1 digest `17f69102d5a3` → C2 `bef3d26500a5` → C3 `6003bc56907e`），**检测器行为没有任何变化**。所以三轮不是"三次独立探索"，而是**同一状态上重复了三次同样的搜索**，得到同样的失败族、同样的候选方向、同样的拒绝。系统没有从失败中收敛出新方向，`memory/episodic.jsonl` 记录的拒绝证据（含 `reason` 中的 `[case]` 占位符——注意它已被脱敏）没有被用于改变提案策略。
+**(6) 三轮看到了完全相同的失败族。** C1/C2/C3 的 `proposal_summary.stable_families` 逐字相同（4 个族），三轮的 patrol 案例列表**逐字相同**（18 例，`patrol_sample` 每轮给出同一批），`gain_opportunity` 三轮都是 `{recall:1, precision:1}`。由于 registry 三轮为空，`harness` 摘要变化只是 M/C 组件的版本记录（C1 digest `17f69102d5a3` → C2 `bef3d26500a5` → C3 `6003bc56907e`），**检测器行为没有任何变化**。所以三轮不是"三次独立探索"，而是**同一状态上重复了三次同样的搜索**，得到同样的失败族、同样的候选方向、同样的拒绝。
+
+至于"拒绝记忆为何没能改变下一轮"，机制是精确的：`memory/episodic.jsonl` 落盘了 7 条拒绝证据，抑制路径也确实接线（`engine.py:3648` 在起草前调用 `set_rejection_feedback`）。但 `proposer.py::_proposal_fingerprint`（988 行）对候选按结构化谓词键、或 `text_boundary` 的 **hook + packet_features + directive 全文**做指纹。于是本轮 4 条拒绝里：
+- **3 条被标 `not_evaluable=true`**（C1-D001、C2-D001、C2-D002），`set_rejection_feedback` 故意**不**把它们计入 `rejected_keys`——设计意图正确（"没测成"不等于"被证伪"，见 `memory.py:195-205` 与 `engine.py:1495-1520` 的注释），但后果是只要 `Magentic_One/049` 的测量阻塞存在，同一机制就可以无限重试。
+- **唯一 1 条真证伪（C1-D002）确实进了 `rejected_keys`**，但其指纹含 directive 全文；C2 的 LLM 起草了**措辞不同的新 directive**，指纹不匹配，于是逃过抑制、得到同类拒绝（polarity mismatch）。
+
+根因因此是**`not_evaluable` 占主导 + 指纹按文本全文匹配（改写即逃逸）**，而不是"记忆未接线"。附带发现：`memory.py:388-389` 的 `falsified_intervention_ids` / `unevaluable_intervention_ids` 被计算但**无任何生产消费方**（仅自身模块与 `test_experience_stores.py` 引用），与 §21.3 记录的"无调用方"问题同类。
+
+**(7) 定位族三轮从未被开发。** 这一点在全文中容易被忽略：patrol 每轮同时识别出 **2 个 detection 族与 2 个 localization 族**，但 `_all_families`（`engine.py:2991`）先返回 detection、后返回 localization，而 `max_mechanisms_per_cycle=2` 按顺序取前两个，于是**两个 localization 族在三个 cycle 里被连续跳过 6 次**（`skipped` 理由逐字相同）。这不是随机遗漏，而是**固定的排序 + 上限**导致定位方向从未进入开发循环。而基线数据显示定位恰是最大短板（见 §34.2），检测器在这一维度的改进通道实际处于关闭状态。
 
 ### 34.5.4 这一轮证明了什么、没证明什么
 
 **证明了**：
-1. L0/L1 开发循环**接线成功且真实生效**——三个 cycle 共产生 5 次 L1 拒绝（`Camel/048` 等邻居退化、目标未改进、新错误），这些候选**没有**进入昂贵的双臂晋升测量。与 §30 报告的"毛坯候选直接冲门、62 分钟实测后被拒"相比，门前过滤确实工作。
+1. L0/L1 开发循环**接线成功且真实生效**——三个 cycle 共产生 7 个版本、其中 3 个在 L1 被拒（`Camel/048` 等邻居退化、目标未改进、新错误），这些候选**没有**进入昂贵的双臂晋升测量。与 §30 报告的"毛坯候选直接冲门、62 分钟实测后被拒"相比，门前过滤确实工作。
 2. 四门（STRUCTURAL / HARMLESSNESS / BEHAVIOR / M）的判据在真实数据上可执行，且拒绝理由**可归因、可读**（每条 rejection 都带 delta 与具体案例名）。
-3. 失败机制聚类在真实语料上稳定（三轮同样是 4 个族）。
-4. 测量完整性防线有效：不可测量的行没有被当作"已证伪"，而是显式标注 `not_evaluated` 并注明"拒绝不可归因于候选"。
+3. 失败机制聚类在真实语料上稳定（三轮同样是 4 个族，2 detection + 2 localization）。
+4. 测量完整性防线有效：不可测量的行没有被当作"已证伪"，而是显式标注 `not_evaluated` 并注明"拒绝不可归因于候选"；缺陷注入审计两次都按预期拦截（结构缺陷被 STRUCTURAL 拦、极性缺陷被 BEHAVIOR 拦）。
 
 **没有证明**：
-1. **没有任何证据表明自进化能提升检测能力**——0 准入，registry 为空，g1 未启动，validation 的 10 例配对翻转完全为 0。
+1. **没有任何证据表明自进化能提升检测能力**——0 准入，registry 为空，g1 未启动，validation 的 10 例配对翻转完全为 0（`F->F 5 / T->T 5`）。
 2. **未能证明候选生成质量已达标**——唯一走到行为门的两个候选（C1-D002 方向不符、C2-D002 引入未决）都未通过；C3 连候选都没产出。
 3. **未能暴露 registry 的长期治理能力**——因为没有准入过任何单元，`net_contribution_history`、快照链、漂移监控全部为空跑。
+4. **未能检验定位方向的改进能力**——两个 localization 族在三轮中被连续跳过 6 次（见 34.5.3(7)），而定位恰是基线最大短板。
 
 ### 34.5.5 下一步的最小改动建议（按证据强度排序）
 
-1. **处理 `Magentic_One/049`**：它是当前唯一同时污染 sentinel、gain 与可测性的案例。要么给它配置重试/放宽单例预算，要么把它从 gain 机会点中移出并记录原因。在此之前，任何新 cycle 都会重复 C1/C2 的失败形态。
-2. **让收益点与开发目标对齐**：把 gain 机会点按失败族筛选，而不是固定 6 例。当前候选瞄准的族与考场不一致，D001 的"从未触发"是结构性问题，不是模型问题。
-3. **重新标定 12 例评估面的门控带宽**：在 n=12 上要求"≥1 边际且 0 新错误"隐含极高假阴性率。可考虑扩大 gain 面（成本可控），或在报告里区分"候选被否"与"候选未被测成"。
-4. **给 `Camel/048` 做边界诊断**：它在 3 轮中 4 次成为唯一退化点。若确认它处于判定边界，应把"边界样本"从邻居保护集中区分出来，否则它会持续充当一票否决器。
-5. **修 C3 的预算饥饿**：`llm_calls=3` 与 `max_mechanisms_per_cycle=2` 的组合会让第二个机制在无调用的情况下被丢弃。要么提高预算，要么在预算不足时明确记录"未尝试"而非 `no_candidates`（现在的记录会让读者以为模型尝试过且失败）。
-6. **让拒绝记忆真的影响下一轮提案**：`episodic.jsonl` 已落盘拒绝证据（含 `treatment_routes`），但三轮提案方向未变。若 `proposal_memory` 的 `procedures=4` 已喂给提案器（`proposal_memory_used.supplied=true`），则说明喂进去也没有改变输出——这本身值得单独排查。
+自进化结果的完整分析（含逐轮记录、七个结构性发现与修复建议表）见 [自进化结果分析报告](self-evolution-analysis-20260927.md)。要点：
+
+1. **P0｜处理 `Magentic_One/049`**：它是唯一同时污染可测性与评估集的案例，并直接制造了 3 条 `not_evaluable` 拒绝。要么配置重试/放宽单例预算，要么把它从 gain 机会点移出并记录原因。在此之前任何新 cycle 都会重复本轮的失败形态。
+2. **P0｜抑制 `not_evaluable` 的无条件重试**：给"因测量阻塞而不可评估"的机制设重试上限或阻塞标记，否则同一机制可无限重试。
+3. **P0｜让定位方向至少被开发一次**：放宽 `max_mechanisms_per_cycle`，或让 detection/localization 族交替优先（当前固定排序使其连续 6 次被跳过）。
+4. **P1｜抑制键改粗粒度**：从 directive 全文指纹改为机制级/极性级，避免改写措辞即逃逸。
+5. **P1｜扩大起草证据面**：让候选从更多同族案例起草，缓解"2 例 → 12 例"的泛化鸿沟（**而不是**把评估集暴露给提案器）。
+6. **P1｜收益点按失败族筛选**：当前 6 例 gain 跨 4 类加 2 个干净样本，与失败族的机制粒度不匹配。
+7. **P2｜重新标定 12 例评估面的门控带宽**，并在报告中区分"候选被否"与"候选未被测成"。
+8. **P2｜给 `Camel/048` 做边界诊断**：它在 6 个机制-轮次组合中 3 次成为唯一退化点，事实上一票否决。
+9. **P3｜清理无消费方的记忆字段**：`memory.py:388-389` 的两个 id 列表已计算但无生产消费方，要么接入抑制决策，要么删除。
 
 ## 34.6 本轮修复的工程项
 
