@@ -405,6 +405,60 @@ def test_cli_offline_mode_runs_without_credentials(tmp_path, monkeypatch):
     assert OfflineDetector is not None
 
 
+def test_token_total_is_flagged_as_a_lower_bound_when_attempts_omit_usage(tmp_path):
+    """A spend figure that silently drops failed attempts is not the spend.
+
+    Provider attempts that die in transport report no counters, so their tokens
+    never reach the sum. Reporting the sum alone invites reading it as the
+    cost; the report has to say which attempts were unaccounted for, or a run
+    with more outages looks cheaper than one with fewer.
+    """
+    report = _run(tmp_path)
+    usage = report["usage"]
+    # The offline fake reports no provider usage at all, which is the extreme
+    # case of this gap: the total exists, and it is a floor over a stated count.
+    assert "attempts_without_usage" in usage
+    assert "total_is_lower_bound" in usage
+    if usage["attempts_without_usage"]:
+        assert usage["total_is_lower_bound"] is True
+        assert "lower bound" in usage["scope"] or "at or above" in usage["scope"]
+    else:
+        assert usage["total_is_lower_bound"] is False
+
+
+def test_usage_lower_bound_counts_attempts_that_reported_nothing(tmp_path):
+    """The count comes from ``execution.usage_missing_attempts``, per case.
+
+    Written against a hand-built run tree rather than the fake: the fake takes
+    the branch above, and a field that only ever reads zero would pass while
+    measuring nothing.
+    """
+    runs = tmp_path / "runs" / "gap" / "cases" / safe_case_id("BFCL/000.json")
+    runs.mkdir(parents=True)
+    (runs / "result.json").write_text(json.dumps({
+        "case_id": "BFCL/000.json",
+        "state": "verified_error",
+        "execution": {
+            "provider_attempts": 20,
+            "usage_missing_attempts": 12,
+            "usage": {"prompt_tokens": 100, "completion_tokens": 50,
+                      "total_tokens": 150},
+        },
+        "providers": {
+            "judge": {"usage_total": {"prompt_tokens": 100,
+                                      "completion_tokens": 50,
+                                      "total_tokens": 150}},
+        },
+    }), encoding="utf-8")
+    report = baseline.usage_report(
+        runs_root=tmp_path / "runs", run_id="gap", cases=["BFCL/000.json"],
+    )
+    assert report["attempts_without_usage"] == 12
+    assert report["cases_with_missing_usage"] == 1
+    assert report["total_is_lower_bound"] is True
+    assert report["total_tokens"] == 150
+
+
 def test_dry_run_reports_undecided_rows_by_cause(tmp_path):
     """``unresolved`` in the metrics is not the same as "no answer at all".
 

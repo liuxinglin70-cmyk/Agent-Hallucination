@@ -304,9 +304,45 @@ def test_experiment_cli_preserves_optional_cycle_default(tmp_path, monkeypatch):
     seen = []
     monkeypatch.setattr(cli, "load_config", lambda _: {"work_root": str(tmp_path)})
     monkeypatch.setattr(cli, "EvolutionEngine", lambda *a, **k: SimpleNamespace(
-        run_experiment=lambda cycles: seen.append(cycles) or {"cycles": []}))
+        run_experiment=lambda cycles: seen.append(cycles) or {
+            "cycles": [], "cycles_requested": 3, "cycles_completed": 3,
+            "stopped_early": False,
+        }, close=lambda: None))
     assert cli.cmd_experiment(SimpleNamespace(config=None, backend=None, mini=True, cycles=None)) == 0
     assert seen == [None]
+
+
+@pytest.mark.parametrize(
+    "state, expected",
+    [("completed", 0), ("frozen_after_defect_injection_audit", 2),
+     ("blocked_evaluation_preflight", 2),
+     ("blocked_patrol_measurement", 2)],
+)
+def test_cycle_cli_exit_code_matches_cycle_state(monkeypatch, state, expected):
+    monkeypatch.setattr(cli, "load_config", lambda _: {})
+    monkeypatch.setattr(cli, "_apply_mechanism_binding", lambda config, _args: config)
+    monkeypatch.setattr(cli, "EvolutionEngine", lambda *a, **k: SimpleNamespace(
+        run_cycle=lambda _cycle, **_kwargs: {"state": state}, close=lambda: None))
+    args = SimpleNamespace(
+        config=None, backend=None, mini=True, cycle=1, resume=False,
+    )
+
+    assert cli.cmd_cycle(args) == expected
+
+
+def test_experiment_cli_fails_when_a_cycle_stops_early(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "load_config", lambda _: {"work_root": str(tmp_path)})
+    monkeypatch.setattr(cli, "EvolutionEngine", lambda *a, **k: SimpleNamespace(
+        run_experiment=lambda _cycles: {
+            "cycles": [{"state": "frozen_after_defect_injection_audit"}],
+            "cycles_requested": 1, "cycles_completed": 0,
+            "stopped_early": True,
+        }, close=lambda: None))
+    args = SimpleNamespace(
+        config=None, backend=None, mini=False, cycles=1, resume=False,
+    )
+
+    assert cli.cmd_experiment(args) == 2
 
 
 def test_governance_cli_preserves_optional_cycle_default(monkeypatch):

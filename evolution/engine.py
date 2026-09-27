@@ -1067,6 +1067,7 @@ class EvolutionEngine:
         audit: Mapping[str, Any] | None = None,
         patrol: Mapping[str, Any] | None = None,
         provider_stage: bool = False,
+        state: str = "blocked_evaluation_preflight",
     ) -> dict[str, Any]:
         instrument = self._instrument_report(
             baseline_gain=baseline_gain or (), gate_reports=(), admitted_ids=set(),
@@ -1083,7 +1084,7 @@ class EvolutionEngine:
                               unmeasurable_polarities=[])
         instrument["instrument_limited"] = True
         report = {
-            "cycle": cycle, "state": "blocked_evaluation_preflight",
+            "cycle": cycle, "state": state,
             # Neither path ran: the round stopped before drafting, so there is
             # no batch whose route could be described. Named explicitly rather
             # than omitted, so a reader can tell "no path was taken" from "this
@@ -3487,6 +3488,28 @@ class EvolutionEngine:
         worksheet["route_failures"] = route_failure_summary(
             route_failure_records,
         )
+        patrol_measurement_counts: dict[str, int] = {}
+        for row in patrol_rows:
+            status = str(row.get("measurement") or "missing")
+            patrol_measurement_counts[status] = (
+                patrol_measurement_counts.get(status, 0) + 1
+            )
+        unmeasured_patrol_cases = sorted({
+            str(row.get("case") or "")
+            for row in patrol_rows
+            if (
+                str(row.get("measurement") or "") != "authoritative"
+                or str(row.get("authority") or "") != "authoritative"
+                or row.get("prediction") is None
+            )
+        } - {""})
+        worksheet["measurement_coverage"] = {
+            "cases": len(patrol_rows),
+            "authoritative": len(patrol_rows) - len(unmeasured_patrol_cases),
+            "unmeasured": len(unmeasured_patrol_cases),
+            "unmeasured_cases": unmeasured_patrol_cases,
+            "status_counts": patrol_measurement_counts,
+        }
         self._ledger("patrol", {
             "cycle": cycle,
             "cases": patrol_cases,
@@ -3524,8 +3547,45 @@ class EvolutionEngine:
         preflight = {"sentinel": coverage, "blocked_families": blocked_families,
                      "gain_opportunity": instrument["gain_opportunity"],
                      "gain_measured": instrument["gain_measured"],
-                     "unmeasured_gain_cases": instrument["unmeasured_gain_cases"]}
+                     "unmeasured_gain_cases": instrument["unmeasured_gain_cases"],
+                     "patrol_measurement": worksheet["measurement_coverage"]}
         self._ledger("evaluation_preflight", {"cycle": cycle, **preflight})
+        if (
+            not diagnosed_families
+            and not capability_gaps
+            and unmeasured_patrol_cases
+        ):
+            reason = (
+                "patrol inconclusive: "
+                f"{len(unmeasured_patrol_cases)} of {len(patrol_rows)} case(s) "
+                "were not measured authoritatively; the absence of a stable "
+                "failure family cannot be concluded"
+            )
+            report = self._stop_preflight(
+                cycle,
+                {**preflight, "reason": reason},
+                baseline_gain=baseline_gain,
+                audit=audit,
+                patrol=worksheet,
+                provider_stage=active_fresh,
+                state="blocked_patrol_measurement",
+            )
+            report["capability_backlog"] = self.record_capability_gaps(
+                cycle, capability_gaps,
+            )
+            report["capability_plan"] = capability_plan
+            if capability_plan.get("gaps"):
+                record_gaps(
+                    self.gap_store, cycle=cycle,
+                    gaps=capability_plan["gaps"],
+                )
+            report["route_failures"] = self.record_route_failures(
+                cycle=cycle,
+                diagnosed_families=diagnosed_families,
+                gate_reports=(),
+            )
+            self._save_cycle_report(cycle, report)
+            return report
         if diagnosed_families and not proposal_families and proposal_batch is None:
             reason = "no diagnosed failure direction has repair opportunities in gain"
             if not instrument["gain_measured"]:

@@ -82,9 +82,15 @@ def cmd_cycle(args: argparse.Namespace) -> int:
         backend=backend,
         mini=bool(args.mini),
     )
-    report = engine.run_cycle(int(args.cycle), **({"resume": True} if getattr(args, "resume", False) else {}))
+    try:
+        report = engine.run_cycle(
+            int(args.cycle),
+            **({"resume": True} if getattr(args, "resume", False) else {}),
+        )
+    finally:
+        engine.close()
     _print_json(report)
-    return 0
+    return 0 if report.get("state") == "completed" else 2
 
 
 def cmd_experiment(args: argparse.Namespace) -> int:
@@ -93,10 +99,28 @@ def cmd_experiment(args: argparse.Namespace) -> int:
         config["proposer"]["mode"] = "offline"
     backend = _mock_backend(config) if args.backend == "mock" else None
     engine = EvolutionEngine(config, backend=backend, mini=bool(args.mini))
-    report = engine.run_experiment(args.cycles, **({"resume": True} if getattr(args, "resume", False) else {}))
+    try:
+        report = engine.run_experiment(
+            args.cycles,
+            **({"resume": True} if getattr(args, "resume", False) else {}),
+        )
+    finally:
+        engine.close()
     out = resolve_path(config["work_root"]) / "reports" / "experiment.json"
     save_json(out, report)
     _print_json(report)
+    if report.get("stopped_early"):
+        return 2
+    requested = report.get("cycles_requested")
+    completed = report.get("cycles_completed")
+    if requested is not None and completed is not None:
+        if int(completed) < int(requested):
+            return 2
+    if any(
+        item.get("state") != "completed"
+        for item in report.get("cycles") or ()
+    ):
+        return 2
     if args.mini and report.get("mini_effect") and not report["mini_effect"].get("passed"):
         return 2
     return 0

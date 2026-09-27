@@ -260,6 +260,27 @@ def _fold_usage(total: dict[str, Any], usage: Mapping[str, Any]) -> None:
             total[str(key)] = total.get(str(key), 0) + value
 
 
+def _case_usage_missing(runs_root: Path, run_id: str, case: str) -> int:
+    """Provider attempts of one case that returned no usage metadata.
+
+    A transport failure can burn provider tokens and still report nothing, so
+    these attempts are absent from ``_case_usage`` rather than zero inside it.
+    Counted separately, because the difference between "this case cost nothing"
+    and "this case's cost was not reported" is the difference between a total
+    and a lower bound.
+    """
+    path = runs_root / run_id / "cases" / safe_case_id(case) / "result.json"
+    if not path.exists():
+        return 0
+    try:
+        result = json.loads(path.read_text(encoding="utf-8-sig"))
+    except ValueError:
+        return 0
+    execution = result.get("execution") or {}
+    value = execution.get("usage_missing_attempts")
+    return int(value) if isinstance(value, (int, float)) else 0
+
+
 def usage_report(
     *,
     runs_root: str | Path,
@@ -274,11 +295,23 @@ def usage_report(
     of its sample minutes and move the workers=8 work floor between 9.4h and
     21.3h. A measurement whose cost is unknown is a measurement that cannot be
     scheduled.
+
+    The total is a floor, not the spend: attempts that failed in transport
+    report no counters at all, and their tokens are missing from the sum rather
+    than counted as zero. ``attempts_without_usage`` carries that count so a
+    reader can see the total is a lower bound instead of having to reconstruct
+    it from the per-case files.
     """
     runs_root = Path(runs_root)
     per_case: list[dict[str, Any]] = []
     total: dict[str, Any] = {}
+    missing_attempts = 0
+    cases_with_missing: list[str] = []
     for case in cases:
+        missing = _case_usage_missing(runs_root, run_id, case)
+        if missing:
+            missing_attempts += missing
+            cases_with_missing.append(case)
         usage = _case_usage(runs_root, run_id, case)
         if usage is None:
             continue
@@ -306,6 +339,18 @@ def usage_report(
                 ),
                 default=None,
             )
+        ),
+        "attempts_without_usage": missing_attempts,
+        "cases_with_missing_usage": len(cases_with_missing),
+        "total_is_lower_bound": bool(missing_attempts),
+        "scope": (
+            f"Sum of provider counters actually returned. {missing_attempts} "
+            "provider attempt(s) across "
+            f"{len(cases_with_missing)} case(s) returned no usage metadata "
+            "(transport failures), so the true spend is at or above this total."
+            if missing_attempts
+            else "Sum of provider counters actually returned; every attempt "
+                 "reported usage metadata."
         ),
         "per_case": per_case,
     }
