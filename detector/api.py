@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from pathlib import Path
 from typing import Any, Mapping
 
 from detector.adjudication import adjudicate
 from detector.config import load_config, validate_config
+from detector.identity import build_execution_identity, digest, source_identity
 from detector.defense import _parse_defense, _validate_defense_evidence, run_defense
 from detector.evidence import (
     snapshot_digest,
@@ -44,10 +43,6 @@ _FROZEN_STAGE_HOOKS: dict[str, frozenset[str]] = {
     "tracer_result": frozenset({"tracer.system"}),
     "defense_result": frozenset({"defense.pre", "defense.system"}),
 }
-
-
-def _packet_hash(packet: Mapping[str, Any]) -> str:
-    return hashlib.sha256(json.dumps(packet, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
 def _judge_negative_needs_recall(
@@ -118,7 +113,7 @@ def _validate_frozen_stages(
     if not isinstance(frozen, Mapping):
         raise ValueError("frozen stage replay payload must be an object")
     normalized = dict(frozen)
-    if frozen.get("packet_hash") and frozen["packet_hash"] != _packet_hash(packet):
+    if frozen.get("packet_hash") and frozen["packet_hash"] != digest(packet):
         raise ValueError("frozen stages belong to a different packet")
     judge_result, judge_status = _frozen_stage(frozen, "judge")
     if judge_result.get("ok"):
@@ -758,7 +753,15 @@ class Detector:
             hearing_facts=hearing_facts,
             predicate_conviction_verdicts=plan.predicate_conviction_verdicts,
         )
-        provenance: dict[str, Any] = {"packet_hash": _packet_hash(packet)}
+        provenance: dict[str, Any] = {
+            "packet_hash": digest(packet),
+            "execution_identity": build_execution_identity(
+                source=source_identity("detector"), config=self.config,
+                record=record, packet=packet, evidence=attached_snapshot,
+                registry=effective_interventions,
+                replay=frozen_stages if frozen_stages is not None else frozen_judge,
+            ),
+        }
         if attached_snapshot is not None:
             provenance["evidence_snapshot_digest"] = snapshot_digest(
                 attached_snapshot

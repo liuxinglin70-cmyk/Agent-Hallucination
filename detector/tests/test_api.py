@@ -304,10 +304,10 @@ def test_recall_trigger_forces_recall_net_for_unanimous_clean_judge(
     detector = Detector(CONFIG, require_credentials=False)
     frozen = None
     if replay:
-        from detector.api import _packet_hash
+        from detector.identity import digest
         from detector.packet import build_packet
         frozen = {"judge_result": judge_result, "judge_status": judge_status,
-                  "packet_hash": _packet_hash(build_packet(sample_record)), "hearings": []}
+                  "packet_hash": digest(build_packet(sample_record)), "hearings": []}
         def unexpected_judge(**kwargs):
             raise AssertionError("paired recall must not redraw judge")
         monkeypatch.setattr("detector.api.run_judge", unexpected_judge)

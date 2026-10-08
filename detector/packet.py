@@ -11,7 +11,7 @@ import ast
 from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
-from detector.runtime import digest
+from detector.identity import digest
 
 PACKET_SCHEMA = "detector.packet.v1"
 EVENT_WINDOW_PROJECTION_SCHEMA = "detector.event_window_projection.v2"

@@ -5,7 +5,6 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from contextvars import ContextVar, copy_context
 from datetime import datetime, timezone
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -41,22 +40,6 @@ def atomic_json(path: str | Path, payload: Any) -> None:
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
-
-
-def digest(value: Any) -> str:
-    return hashlib.sha256(json.dumps(
-        value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str,
-    ).encode("utf-8")).hexdigest()
-
-
-def source_identity(*packages: str) -> str:
-    root = Path(__file__).resolve().parent.parent
-    values = {}
-    for package in packages or ("detector",):
-        for path in sorted((root / package).rglob("*.py")):
-            if "tests" not in path.parts and "__pycache__" not in path.parts:
-                values[path.relative_to(root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
-    return digest(values)
 
 
 @contextmanager

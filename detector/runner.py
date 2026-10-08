@@ -29,7 +29,6 @@ that answer.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 import time
@@ -38,6 +37,9 @@ from typing import Any, Mapping, Sequence
 from detector.api import Detector
 from detector.config import load_config
 from detector.dataset import load_case
+from detector.identity import build_execution_identity, digest, source_identity
+from detector.interventions import load_intervention_registry
+from detector.packet import build_packet
 from detector.measurement import (
     fatal_failure,
     measurement_status,
@@ -54,16 +56,14 @@ from detector.runtime import (
     bounded_map,
     current_control,
     deadline_scope,
-    digest,
     exclusive_writer,
     remaining_seconds,
     run_scope,
-    source_identity,
     utc_now,
 )
 
 DEFAULT_RUNS_ROOT = Path("artifacts/detector/runs")
-RUN_SCHEMA = "detector.run_manifest.v2"
+RUN_SCHEMA = "detector.run_manifest.v3"
 SUMMARY_SCHEMA = "detector.run_summary.v2"
 
 
@@ -80,11 +80,6 @@ def safe_case_id(case_id: str) -> str:
 
 def _write_json(path: Path, payload: Any) -> None:
     atomic_json(path, payload)
-
-
-def _fingerprint(value: Any) -> str:
-    canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _case_set_digest(cases: Sequence[str]) -> str:
@@ -231,7 +226,7 @@ def _manifest_identity(manifest: Mapping[str, Any]) -> dict[str, Any]:
     return {
         key: manifest[key] for key in (
             "schema_version", "run_id", "cases", "case_set_digest",
-            "config_hash", "interventions_hash",
+            "config_hash", "interventions_hash", "source_identity", "execution_identities",
         ) if key in manifest
     }
 
@@ -271,8 +266,19 @@ def run_batch(
             raise ValueError(
                 f"case ids collide in result path {safe!r}: {previous!r} and {case_id!r}"
             )
-    config = config or load_config()
+    config = config if config is not None else load_config()
     detector = Detector(config)
+    config = detector.config
+    if interventions is None and config.get("intervention_registry"):
+        interventions = load_intervention_registry(config["intervention_registry"])
+    source = source_identity("detector")
+    execution_identities = {}
+    for case in cases:
+        record, _gold = load_case(dataset_root, case)
+        execution_identities[case] = build_execution_identity(
+            source=source, config=config, record=record,
+            packet=build_packet(record), registry=interventions,
+        )
     run_id = run_id or new_run_id()
     run_dir = Path(runs_root) / run_id
     case_root = run_dir / "cases"
@@ -282,21 +288,17 @@ def run_batch(
         "run_id": run_id,
         "cases": list(cases),
         "case_set_digest": _case_set_digest(cases),
-        "config_hash": _fingerprint(config),
-        "interventions_hash": (
-            str(interventions.get("content_hash") or _fingerprint(interventions))
-            if interventions is not None else None
-        ),
+        "config_hash": digest(config),
+        "interventions_hash": digest(interventions),
+        "source_identity": source,
+        "execution_identities": execution_identities,
     }
     with exclusive_writer(run_dir):
         previous_manifest: dict[str, Any] | None = None
         if manifest_path.exists():
             raw_previous = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
             previous_manifest = raw_previous if isinstance(raw_previous, dict) else None
-            # A v1 manifest has no case_set_digest; comparing the shared subset
-            # keeps an older run resumable instead of refusing it on a field it
-            # could not have carried.
-            if previous_manifest and _manifest_identity(previous_manifest) != identity:
+            if not previous_manifest or _manifest_identity(previous_manifest) != identity:
                 raise ValueError(
                     f"run {run_id!r} already exists with a different manifest"
                 )
@@ -318,7 +320,6 @@ def run_batch(
             "started_at": utc_now(),
             "workers": int(workers),
             "deadline_seconds": deadline_seconds,
-            "source_identity": source_identity("detector", "evolution"),
             "dataset_root": str(dataset_root),
         }
         _write_json(manifest_path, manifest)
@@ -335,6 +336,13 @@ def run_batch(
                 return {"case": case_id, "result": _not_started(case_id),
                         "elapsed_seconds": 0.0, "source": "not_started"}
             effective_control.check()
+            record, _gold = load_case(dataset_root, case_id)
+            execution_identity = build_execution_identity(
+                source=source, config=config, record=record,
+                packet=build_packet(record), registry=interventions,
+            )
+            if execution_identity != execution_identities[case_id]:
+                raise ValueError(f"case {case_id!r} changed after run identity was established")
             out_path = case_root / safe_case_id(case_id) / "result.json"
             if out_path.exists():
                 result = json.loads(out_path.read_text(encoding="utf-8-sig"))
@@ -343,21 +351,26 @@ def run_batch(
                         f"cached result at {out_path} belongs to "
                         f"{result.get('case_id')!r}, not {case_id!r}"
                     )
-                if _cached_envelope_is_reusable(
-                    result, retry_unresolved=retry_unresolved,
-                ):
+                reusable = _cached_envelope_is_reusable(result, retry_unresolved=retry_unresolved)
+                if (result.get("provenance") or {}).get("execution_identity") != execution_identity:
+                    raise ValueError(f"cached result execution identity mismatch: {case_id}")
+                if reusable:
                     print(f"  [{case_id}] reused cached {result.get('state')} row",
                           flush=True)
                     return {"case": case_id, "result": result, "elapsed_seconds": 0.0,
                             "source": "cached"}
                 print(f"  [{case_id}] re-running cached {result.get('state')} row",
                       flush=True)
-            record, _gold = load_case(dataset_root, case_id)
             started = time.monotonic()
             result = detect_with_transport_retry(
                 detector, record, case_id=case_id,
                 interventions=interventions,
             )
+            observed_identity = (result.get("provenance") or {}).get("execution_identity")
+            if observed_identity is not None and observed_identity != execution_identity:
+                raise ValueError(f"detector execution identity changed during case {case_id!r}")
+            result["provenance"] = {**(result.get("provenance") or {}),
+                                    "execution_identity": execution_identity}
             elapsed = round(time.monotonic() - started, 1)
             case_dir = case_root / safe_case_id(case_id)
             index = _previous_attempts(case_dir) + 1

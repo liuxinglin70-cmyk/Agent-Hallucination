@@ -303,3 +303,64 @@ def test_run_batch_retry_unresolved_replaces_the_row(tmp_path, monkeypatch):
     )
     assert cached["state"] == "verified_clean"
     assert cached["decision_authority"] == "authoritative"
+
+
+@pytest.mark.parametrize("changed", ["source", "record"])
+def test_resume_refuses_changed_execution_inputs(tmp_path, monkeypatch, changed):
+    monkeypatch.setattr("detector.runner.Detector", _CountingDetector)
+    data = _write_dataset(tmp_path / "data")
+    kwargs = dict(dataset_root=data, cases=["a.json"], run_id="r",
+                  runs_root=tmp_path / "runs", config={"version": 1}, workers=1)
+    monkeypatch.setattr("detector.runner.source_identity", lambda *args: "source-one")
+    run_batch(**kwargs)
+    manifest = (tmp_path / "runs/r/run.json").read_bytes()
+    result = (tmp_path / "runs/r/cases/a.json/result.json").read_bytes()
+    if changed == "source":
+        monkeypatch.setattr("detector.runner.source_identity", lambda *args: "source-two")
+    else:
+        (data / "a.json").write_text(json.dumps({"question": "different task",
+                                               "history": [{"content": "a"}]}), encoding="utf-8")
+    with pytest.raises(ValueError, match="different manifest"):
+        run_batch(**kwargs)
+    assert (tmp_path / "runs/r/run.json").read_bytes() == manifest
+    assert (tmp_path / "runs/r/cases/a.json/result.json").read_bytes() == result
+
+
+def test_resume_refuses_a_cached_row_without_execution_identity(tmp_path, monkeypatch):
+    monkeypatch.setattr("detector.runner.Detector", _FakeDetector)
+    kwargs = dict(dataset_root=_write_dataset(tmp_path / "data"), cases=["a.json"],
+                  run_id="r", runs_root=tmp_path / "runs", config={"version": 1}, workers=1)
+    run_batch(**kwargs)
+    cached = tmp_path / "runs/r/cases/a.json/result.json"
+    cached.write_text(json.dumps(_envelope("a.json")), encoding="utf-8")
+    with pytest.raises(ValueError, match="execution identity"):
+        run_batch(**kwargs)
+
+
+def test_resume_binds_effective_config_and_artifact_content(tmp_path, monkeypatch):
+    class EffectiveDetector(_FakeDetector):
+        def __init__(self, config):
+            super().__init__({**config, "resolved_model": "model-one"})
+    monkeypatch.setattr("detector.runner.Detector", EffectiveDetector)
+    scorer = tmp_path / "scorer.bin"
+    scorer.write_bytes(b"one")
+    kwargs = dict(dataset_root=_write_dataset(tmp_path / "data"), cases=["a.json"],
+                  run_id="r", runs_root=tmp_path / "runs",
+                  config={"causal_audit": {"scorer_artifact": str(scorer)}}, workers=1)
+    run_batch(**kwargs)
+    scorer.write_bytes(b"two")
+    with pytest.raises(ValueError, match="different manifest"):
+        run_batch(**kwargs)
+
+
+def test_batch_does_not_overwrite_a_detector_identity_mismatch(tmp_path, monkeypatch):
+    class MismatchedDetector(_FakeDetector):
+        def detect(self, record, *, case_id, interventions=None):
+            result = super().detect(record, case_id=case_id, interventions=interventions)
+            result["provenance"] = {"execution_identity": {"digest": "different"}}
+            return result
+    monkeypatch.setattr("detector.runner.Detector", MismatchedDetector)
+    with pytest.raises(ValueError, match="execution identity changed"):
+        run_batch(dataset_root=_write_dataset(tmp_path / "data"), cases=["a.json"],
+                  run_id="r", runs_root=tmp_path / "runs", config={}, workers=1)
+    assert not (tmp_path / "runs/r/cases/a.json/result.json").exists()
