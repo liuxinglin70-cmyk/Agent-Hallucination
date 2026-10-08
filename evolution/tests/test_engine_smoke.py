@@ -2302,16 +2302,26 @@ def test_mechanisms_carry_normal_neighbours_from_the_patrol(tmp_path):
     assert not (set(neighbours) & members)
 
 
-@pytest.mark.parametrize("damage,expected", [(False, "unchanged"), (True, "regressed")])
-def test_localization_unit_records_benefit_set_outcome_even_when_behavior_fails(tmp_path, damage, expected):
+@pytest.mark.parametrize("replacement", [False, True])
+@pytest.mark.parametrize("kind,missed", [("localization", False), ("joint", False), ("joint", True)])
+@pytest.mark.parametrize("after,damage,expected", [(3, False, "unchanged"), (3, True, "regressed"), (1, False, "improved")])
+def test_localization_unit_records_benefit_set_outcome_in_ordinary_replay(tmp_path, replacement, kind, missed, after, damage, expected):
     import copy
     cases = _make_dataset(tmp_path / "data", n=20)
     split = EvolutionSplit(name="synthetic", pool=cases, sentinel=cases[:4],
                            gain=cases[4:12], patrol_pool=cases[12:], mini=True)
-    engine = EvolutionEngine(_config(tmp_path), backend=MockDetectorBackend(), split=split, mini=True)
+    config = _config(tmp_path)
+    if replacement:
+        config['coverage_response'] = {'mode': 'strict', 'policies': {'localization': 'replacement'}}
+    engine = EvolutionEngine(config, backend=MockDetectorBackend(), split=split, mini=True)
+    measured = cases[12:] if replacement else split.gain
+    target_index = 12 if replacement else 4
+    preserve_index = 14 if replacement else 6
+    if replacement:
+        engine.set_replacement_gain_cases(measured)
     candidate = _scanner_candidate(family="FAM-loc-test")
     candidate["hook"] = "tracer.system"
-    candidate["claim"]["target_kind"] = "localization"
+    candidate["claim"]["target_kind"] = kind
     candidate.pop("content_hash")
     identifier = candidate["intervention_id"]
     baseline = []
@@ -2320,31 +2330,49 @@ def test_localization_unit_records_benefit_set_outcome_even_when_behavior_fails(
         baseline.append({
             "case": case, "gold": gold, "prediction": gold,
             "authority": "authoritative", "state": "verified_error" if gold else "verified_clean",
-            "responsible_step": 2 if i == 4 else 1 if gold else None,
+            "responsible_step": 2 if i == target_index else 1 if gold else None,
             "result": {"runtime_valid": True, "decision_authority": "authoritative",
                        "stage_status": {}, "proof": {}},
         })
+    if missed:
+        baseline[target_index]['prediction'] = False
+        baseline[target_index]['state'] = 'verified_clean'
+        expected = 'regressed' if damage else 'improved'
     active = copy.deepcopy(baseline)
-    active[4]["responsible_step"] = 3
+    active[target_index]['prediction'] = True
+    active[target_index]['state'] = 'verified_error'
+    active[target_index]["responsible_step"] = after
     if damage:
-        active[6]["responsible_step"] = 2
+        active[preserve_index]["responsible_step"] = 2
     for row in active:
         row["result"]["proof"] = {"deployment": {"fired": [
             {"intervention_id": identifier, "event": "text_injected"}
         ]}}
     class Arms:
+        def __init__(self):
+            self.calls = 0
         def run(self, requested, **kwargs):
-            assert requested == [*split.sentinel, *split.gain]
-            return [row for row in active if row["case"] in requested]
+            self.calls += 1
+            assert requested == [*split.sentinel, *measured]
+            source = baseline if replacement and self.calls == 1 else active
+            return [row for row in source if row["case"] in requested]
     unit = engine._run_unit(candidate, partners=[], active_entries=[],
-                            active_rows=baseline[:12], arms=Arms(), audit=True)
-    assert unit["behavior"]["passed"] is False
-    assert unit["m"] is None
+                            active_rows=baseline[:12], arms=Arms())
+    assert unit["behavior"]["passed"] is (after == 1)
+    if after == 1:
+        assert unit["m"]["passed"] is True
+    else:
+        assert unit["m"] is None
     assert unit["target_outcome"]["status"] == expected
     assert unit["target_outcome"]["delta_basis"] == "benefit_set"
+    assert unit["measurement_gain_cases"] == measured
+    assert unit["localization_opportunities"]["improvable"] == (0 if missed else 1)
+    if replacement:
+        assert unit["coverage_response"]["replacement_has_coverage"] is True
     recorded = engine.record_route_failures(
         cycle=1, diagnosed_families=[{"failure_family": "FAM-loc-test",
                                      "mechanism": {"mechanism_id": "M-loc-test"}}],
         gate_reports=[unit],
     )
-    assert recorded["observed"] == (0 if damage else 1)
+    assert recorded["observed"] == (1 if expected == "unchanged" else 0)
+    engine.close()

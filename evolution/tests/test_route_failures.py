@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from evolution.metrics import target_outcome
+from evolution.metrics import target_outcome, target_opportunity
 
 from evolution.route_failures import (
     REPEAT_OBSERVATION_THRESHOLD,
@@ -293,6 +293,13 @@ def test_each_objective_records_only_measured_unchanged_outcomes(kind):
     )
     assert observation["evidence"]["target_kind"] == kind
     assert observation["evidence"]["delta_basis"] == "benefit_set"
+
+
+@pytest.mark.parametrize("kind,expected", [("detection", 1), ("localization", 0), ("joint", 1)])
+def test_joint_opportunity_can_come_from_a_detection_repair(kind, expected):
+    assert target_opportunity(target_kind=kind, polarity="recall",
+                              detection={"recall": 1, "precision": 0},
+                              localization={"improvable": 0}) == expected
 
 
 @pytest.mark.parametrize("flips,harm,status", [({"U->T": 1}, 0, "improved"),

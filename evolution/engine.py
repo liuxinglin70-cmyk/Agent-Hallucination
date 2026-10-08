@@ -966,6 +966,8 @@ class EvolutionEngine:
             for direction, value in gain_opportunity(rows).items()
             if value > 0
         )
+        if localization_opportunity(rows, gold_steps=self.gold_step_map)["improvable"] > 0:
+            available.append("localization")
         if bool(self._replacement_gain_cases):
             return {
                 "kind": "replacement",
@@ -2676,6 +2678,8 @@ class EvolutionEngine:
         polarity = str(
             (candidate.get("claim") or {}).get("target_polarity") or ""
         )
+        kind = candidate_target_kind(candidate)
+        coverage_direction = "localization" if kind in {"localization", "joint"} else polarity
         sentinel = list(self.split.sentinel)
         control = (
             fresh_control_rows if fresh and fresh_control_rows is not None
@@ -2683,6 +2687,11 @@ class EvolutionEngine:
         )
         control_g = _subset_rows(control, self.split.gain)
         opportunity = gain_opportunity(control_g)
+        localization_opportunities = localization_opportunity(control_g, gold_steps=self.gold_step_map)
+        primary_opportunity = target_opportunity(
+            target_kind=kind, polarity=polarity, detection=opportunity,
+            localization=localization_opportunities,
+        )
         # Mechanism-level opportunity applies only when an evaluator binding was
         # supplied for this run. Cycles that carry no binding keep the polarity
         # reading exactly as before: the framework has no evaluator-confirmed
@@ -2693,8 +2702,8 @@ class EvolutionEngine:
         # Decide coverage before spending a candidate arm, including candidates
         # supplied explicitly or partners with a different declared polarity.
         response = (
-            self._coverage_response(polarity, control_g)
-            if polarity and opportunity.get(polarity) == 0
+            self._coverage_response(coverage_direction, control_g)
+            if coverage_direction and primary_opportunity == 0
             else None
         )
         measurement_gain = list(self.split.gain)
@@ -2714,18 +2723,28 @@ class EvolutionEngine:
             control_g = _subset_rows(control, measurement_gain)
             replacement_opportunity = gain_opportunity(control_g)
             response["replacement_opportunity"] = replacement_opportunity
+            replacement_localization = localization_opportunity(control_g, gold_steps=self.gold_step_map)
+            response["replacement_localization_opportunity"] = replacement_localization
             response["replacement_has_coverage"] = (
-                int(replacement_opportunity.get(polarity) or 0) > 0
+                (target_opportunity(target_kind=kind, polarity=polarity,
+                                    detection=replacement_opportunity,
+                                    localization=replacement_localization) or 0) > 0
             )
         baseline_s = _subset_rows(control, sentinel)
         coverage = sentinel_coverage(baseline_s, self.config)
         measured_opportunities = gain_opportunity(control_g)
+        localization_opportunities = localization_opportunity(control_g, gold_steps=self.gold_step_map)
+        primary_opportunity = target_opportunity(
+            target_kind=kind, polarity=polarity, detection=measured_opportunities,
+            localization=localization_opportunities,
+        )
         unavailable = [
-            str((entry.get("claim") or {}).get("target_polarity") or "")
+            candidate_target_kind(entry) + ":" + str((entry.get("claim") or {}).get("target_polarity") or "")
             for entry in unit_entries
-            if measured_opportunities.get(
-                str((entry.get("claim") or {}).get("target_polarity") or ""),
-                sum(measured_opportunities.values()),
+            if target_opportunity(
+                target_kind=candidate_target_kind(entry),
+                polarity=str((entry.get("claim") or {}).get("target_polarity") or ""),
+                detection=measured_opportunities, localization=localization_opportunities,
             ) == 0
         ]
         if not coverage["evaluable"] or (unavailable and not audit) or (
@@ -2759,7 +2778,8 @@ class EvolutionEngine:
                 "candidate": dict(candidate),
                 "partners": [dict(entry) for entry in partners],
                 "fresh": fresh,
-                "gain_opportunities": opportunity,
+                "gain_opportunities": measured_opportunities,
+                "localization_opportunities": localization_opportunities,
                 "mechanism_opportunity": mechanism_reading,
                 "measurement_gain_cases": measurement_gain,
                 "coverage_response": response,
@@ -2774,7 +2794,6 @@ class EvolutionEngine:
             [*sentinel, *measurement_gain], registry=registry, fresh=fresh,
         )
         candidate_s = _subset_rows(candidate_rows, sentinel)
-        kind = candidate_target_kind(candidate)
         control_g = _subset_rows(control, measurement_gain)
         candidate_g = _subset_rows(candidate_rows, measurement_gain)
         delta = paired_delta(
@@ -2873,14 +2892,14 @@ class EvolutionEngine:
                             status="not_evaluable",
                             reason=f"{response['note']}; {response['failure_reason']}",
                         )
-                elif opportunity.get(polarity) == 0 and not passed:
+                elif primary_opportunity == 0 and not passed:
                     # Strict policy: record the rejection as unmeasured rather
                     # than as a failed claim, admission blocked as before.
                     m.update(
                         evaluable=False,
                         status="not_evaluated",
                         reason=(
-                            f"no {polarity} repair opportunities in gain; "
+                            f"no {coverage_direction} repair opportunities in gain; "
                             "claim was not measured (admission remains blocked)"
                         ),
                     )
@@ -2975,14 +2994,14 @@ class EvolutionEngine:
             "candidate": dict(candidate),
             "partners": [dict(entry) for entry in partners],
             "fresh": fresh,
-            "gain_opportunities": opportunity,
+            "gain_opportunities": measured_opportunities,
             "mechanism_opportunity": mechanism_reading,
             "measurement_gain_cases": measurement_gain,
             "coverage_response": response,
             "candidate_rows": _summarise_rows(candidate_rows),
             "target_outcome": member_outcomes[intervention_id],
             "member_target_outcomes": member_outcomes,
-            "localization_opportunities": localization_opportunity(control_g, gold_steps=self.gold_step_map),
+            "localization_opportunities": localization_opportunities,
             "unmeasured_cases": unmeasured,
             "harmlessness": _mark_unstable(_mark_unmeasured(harmlessness)),
             "behavior": _mark_unmeasured(behavior),

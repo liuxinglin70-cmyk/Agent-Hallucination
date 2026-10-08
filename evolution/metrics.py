@@ -244,8 +244,14 @@ def target_opportunity(
     detection: Mapping[str, Any], localization: Mapping[str, Any] | None = None,
 ) -> int | None:
     """The reported benefit-set opportunities for the declared objective."""
-    if target_kind in {"localization", "joint"}:
+    if target_kind == "localization":
         value = (localization or {}).get("improvable")
+    elif target_kind == "joint":
+        counts = [detection.get("recall"), detection.get("precision"),
+                  (localization or {}).get("improvable")]
+        if any(type(count) is not int or count < 0 for count in counts):
+            return None
+        value = sum(counts)
     elif polarity == "boundary":
         if not all(type(detection.get(key)) is int for key in ("recall", "precision")):
             return None
