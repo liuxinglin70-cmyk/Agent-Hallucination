@@ -166,7 +166,13 @@ engine、backends、promotion、interventions 仍承担较多职责，后续物�
 
 **现有代码事实**：`api.py::_judge_negative_needs_recall` 根据多票一致性和置信度决定部分阴性是否需要 Recall；`Detector._detect` 的 `negative_needs_recall` 还接受现有部署干预与适用证据快照触发；一旦进入 Recall，仍需 `run_causal_upgrade`、独立听证的 Tracer/Defense 和 `adjudicate`。阳性 Tracer 已支持输入单项指控，但尚无逐步困惑度或后续反事实推演的标准输入。
 
-**拟议改造，不是已上线功能**：基于 `packet.py` 的规范事件和局部投影构造只读风险画像、Top-K 候选及有来源的因果传播链。初判阳性时将证据引入 `run_step_tracer` 以检查首次错误步骤；初判阴性时仅当出现可核实的具体偏差且满足预算/校准条件，才把它作为 `negative_needs_recall` 的额外触发因素，继续经过原有 Recall/Upgrade/Defense/Adjudication。**异常分数不能定罪；反事实模型推演不能冒充真实工具回放或事实来源**。强一致阴性的默认快路径应保持可用。
+`causal_contracts.py`、`step_uncertainty.py` 和 `causal_graph.py` 实现第一批只读诊断。Detector 在非 off 模式于基础终态生成后输出 `proof.causal_diagnostics`：StepRiskProfile、Top-K 与 mandatory 候选、DependencyGraph 和 CausalProjection。默认 off 不计算诊断；当前分支不增加 provider 调用，也不改变基础阶段和判决。
+
+风险排序优先采用 calculator 字面算术的局部偏差、相同 entity/attribute/unit/time 的显式字段冲突候选，以及未核验内容。机械缺失动作保留轨迹级 null locus。字段冲突是 hypothesis，工具观察不自动归责；缺失/未知 role 不记为零风险，teacher-forced PPL 明确 unsupported。算术核验仅支持可精确表示的字面四则运算，不执行工具代码，不把局部结果当作任务级违规证明。
+
+依赖图确认 packet 内同一交互的 call/result 结构，以及显式 source_ref、绑定字段和值匹配且来源在前的声明消费。该验证证明记录声明的字段复制关系，不证明来源事实或材料性。没有来源的自然语言、仅文字相似、未解析/歧义引用和同次参数引用后续观察均不能取得因果验证。投影纳入远距离祖先、真实后缀和交付锚点；节点/边/深度/字符预算或依赖缺失使 closure_state 保持 unknown，记录遗漏并返回独立内容副本。
+
+**待接通**：有界因果审计执行器、阳性听证的同 claim Tracer 上下文及受校准策略约束的阴性复审。阴性复审仍须经过 Recall/Upgrade/Defense/Adjudication。异常分数不能定罪，模型反事实不能充当工具回放；强一致阴性的默认路径保持现有行为。
 
 **双任务反馈**：`evolution/worksheet.py`、`mechanisms.py` 和 `proposer.py` 可在开发侧消费不含部署标签泄漏的因果诊断，将漏检、误报、首次步骤晚判、证据缺失、已纠正及多错误歧义区分处理；保留原始 L0/L1、四门准入、双指标配对与不可测状态。现有 `detector/provider.py` 没有对原 Agent 步骤计算 teacher-forced PPL 的接口，首期“疑惑度”应明确写作语义风险代理。
 
