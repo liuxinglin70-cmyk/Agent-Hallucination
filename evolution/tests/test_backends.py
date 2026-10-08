@@ -51,6 +51,79 @@ def _backend():
     return backend
 
 
+def test_baseline_remeasures_changed_record_with_the_same_case_id():
+    backend = _backend()
+    first = {"question": "first", "history": [{"role": "assistant", "content": "answer"}]}
+    changed = {**first, "question": "changed"}
+    backend.run_case(first, case_id="case")
+    backend.run_case(first, case_id="case")
+    backend.run_case(changed, case_id="case")
+    assert len(backend.detector.calls) == 2
+
+
+def test_cache_binds_registry_contents_and_checks_stored_input_identity(tmp_path):
+    import json
+    from evolution.backends import CachingBackend
+
+    class Stub:
+        name = "stub"
+        calls = 0
+
+        def run_case(self, record, *, case_id, registry=None, gold=None):
+            self.calls += 1
+            return {"case_id": case_id, "decision_authority": "authoritative",
+                    "provenance": {"interventions_hash": registry["content_hash"]},
+                    "proof": {"value": self.calls}}
+
+    stub = Stub()
+    backend = CachingBackend(stub, tmp_path)
+    record = {"question": "first", "history": [{"role": "assistant", "content": "answer"}]}
+    registry = {"content_hash": "declared", "interventions": [{"hook": "judge.post", "body": "first"}]}
+    backend.run_case(record, case_id="case", registry=registry)
+    backend.run_case(record, case_id="case", registry=registry)
+    changed = {**registry, "interventions": [{"hook": "judge.post", "body": "changed"}]}
+    backend.run_case(record, case_id="case", registry=changed)
+    assert stub.calls == 2
+    target = backend._path("case", registry, record)
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    if "identity" in payload:
+        payload["identity"]["record"] = "forged"
+    else:
+        payload["proof"]["value"] = "forged"
+    target.write_text(json.dumps(payload), encoding="utf-8")
+    backend.run_case(record, case_id="case", registry=registry)
+    assert stub.calls == 3
+
+
+def test_baseline_identity_binds_effective_config_and_snapshot_contents():
+    backend = _backend()
+    record = {"question": "q", "history": [{"role": "assistant", "content": "a"}]}
+    backend.detector.config = {"route": {"model": "first"}}
+    snapshot = {"sources": [{"excerpt": "first"}]}
+    backend._evidence_provider = lambda case_id: snapshot
+    backend._evidence_cache = {}
+    backend.detector.detect = lambda *args, **kwargs: {"provenance": {}, "proof": {}}
+    first = backend._baseline(record, case_id="case")
+    first["proof"]["caller_mutation"] = True
+    assert "caller_mutation" not in backend._baseline(record, case_id="case")["proof"]
+    backend.detector.config["route"]["model"] = "second"
+    changed_config = backend._baseline(record, case_id="case")
+    assert first["provenance"]["backend_execution_identity"] != changed_config["provenance"]["backend_execution_identity"]
+    snapshot["sources"][0]["excerpt"] = "changed"
+    changed_evidence = backend._baseline(record, case_id="case")
+    assert changed_config["provenance"]["backend_execution_identity"] != changed_evidence["provenance"]["backend_execution_identity"]
+
+
+def test_mock_cache_keeps_oracle_label_in_its_test_identity(tmp_path):
+    from evolution.backends import CachingBackend, MockDetectorBackend
+    backend = CachingBackend(MockDetectorBackend(), tmp_path)
+    record = {"question": "q", "history": [{"role": "assistant", "content": "a"}]}
+    first = backend.run_case(record, case_id="case", gold=True)
+    changed = backend.run_case(record, case_id="case", gold=False)
+    assert first["incident_occurred"] is True
+    assert changed["incident_occurred"] is False
+
+
 def _scanner_candidate():
     return make_intervention(
         intervention_id="IV-S",
@@ -343,9 +416,14 @@ def test_frozen_stages_reject_invalid_hearing_rows():
 
 
 def test_run_case_fail_closes_on_empty_envelope():
+    from evolution.backends import backend_execution_identity
+    from detector.interventions import build_intervention_registry
     backend = _backend()
     record = {"question": "q", "history": [{"role": "assistant", "content": "a"}]}
     backend._base_results["case"] = {
+        "provenance": {"backend_execution_identity": backend_execution_identity(
+            backend, record, case_id="case", registry=build_intervention_registry([]),
+        )},
         "proof": {},
         "stage_status": {"judge": {"state": "not_run"}},
     }

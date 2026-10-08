@@ -61,7 +61,7 @@ Packet 的 `packet_reference_index` 统一事件和实际工具交互的引用�
 
 Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recaller.assemble_upgraded_candidates` 从已校验候选及升级行生成按步骤排序的完整听证列表，单数项由该列表派生，回放不信任传入的派生字段。
 
-`detector.identity` 提供规范有限 JSON 摘要、源码/声明工件摘要和 `execution_identity.v1`。Detector 的 provenance 与批次 `run_manifest.v3` 使用同一规则；清单绑定实际有效配置和逐例 record/packet/registry/工件，恢复时验证源码与逐例输入，缓存结果必须携带相同 execution identity。新运行拒绝缺少身份的旧清单/缓存，不回写补造旧身份。源码摘要排除测试与文档；审计和演化侧完整身份接线仍在实施。
+`detector.identity` 提供规范有限 JSON 摘要、源码/声明工件摘要和 `execution_identity.v1`。Detector 的 provenance 与批次 `run_manifest.v3` 使用同一规则；清单绑定实际有效配置和逐例 record/packet/registry/工件，恢复时验证源码与逐例输入。演化 backend 复用同一输入构造规则，绑定 detector/evolution 源码、有效配置、record/packet、适用 evidence 与实际 registry/replay。内存基线核验 backend_execution_identity，并以独立副本返回。缓存 entry.v2 核验完整身份和结果摘要，目录由 registry 内容生成；缺身份的旧缓存重测，历史证据不回写。缓存中的 Mock gold 只属于测试 oracle 身份，不进入 Detector 输入。源码摘要排除测试与文档；harness/checkpoint、审计和演化侧其余摘要迁移仍在实施。
 
 批次 `run_summary.v3` 分别记录 requested/returned/not_started/missing，completed 只统计实际返回的非 not_started 行。工作线程登记完成结果，调度器中断后仍保留已提交案例；没有返回行的已开始案例记为 missing，不写成阴性或未开始。重复及额外案例行拒绝进入汇总。
 

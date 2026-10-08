@@ -55,7 +55,8 @@ def test_cache_path_degrades_to_digest_past_the_windows_ceiling(tmp_path):
         Stub(), nested, namespace="detector-stage-replay-bound-hearings",
         extra_key=lambda case_id: long_tag,
     )
-    directory = backend.cache_dir / registry["content_hash"]
+    from detector.identity import digest
+    directory = backend.cache_dir / digest(registry)
     path = backend._path("OpenDeepSearch/080.json", registry, record)
     # The fixture must reproduce the geometry: the descriptive name would
     # overflow while the directory itself fits with room for the temp file.
@@ -89,7 +90,7 @@ def test_cache_path_degrades_to_digest_past_the_windows_ceiling(tmp_path):
         )
         return shallow._path("OpenDeepSearch/080.json", registry, record).name
 
-    shallow_dir = (tmp_path / "c" / "n").resolve() / registry["content_hash"]
+    shallow_dir = (tmp_path / "c" / "n").resolve() / digest(registry)
     allowance = _CACHE_PATH_MAX - len(str(shallow_dir)) - 1
     if allowance < 40:
         pytest.skip(f"tmp_path leaves only {allowance} chars for a file name")

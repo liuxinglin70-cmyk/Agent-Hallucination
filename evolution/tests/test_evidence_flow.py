@@ -110,6 +110,8 @@ def test_a_baseline_recorded_under_other_evidence_is_not_reused():
 
 
 def test_a_baseline_recorded_under_the_same_evidence_is_reused():
+    from evolution.backends import backend_execution_identity
+    from detector.interventions import build_intervention_registry
     detector = _RecordingDetector()
     snapshot = _snapshot()
     from detector.evidence import snapshot_digest
@@ -119,6 +121,9 @@ def test_a_baseline_recorded_under_the_same_evidence_is_reused():
     backend._base_results[CASE] = {
         "state": "verified_clean", "decision_authority": "authoritative",
         "provenance": {"packet_hash": "hash",
+                       "backend_execution_identity": backend_execution_identity(
+                           backend, {"question": "q", "history": [{"step": 1}]},
+                           case_id=CASE, registry=build_intervention_registry([])),
                        "evidence_snapshot_digest": digest},
         "proof": {}, "stage_status": {},
     }

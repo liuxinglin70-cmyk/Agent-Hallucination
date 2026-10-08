@@ -10,6 +10,7 @@ budget; its results are marked ``backend=mock`` in every report.
 from __future__ import annotations
 
 import json
+import copy
 import hashlib
 import os
 import sys
@@ -26,6 +27,7 @@ from detector.interventions import (
     build_intervention_registry,
     compile_runtime_plan,
 )
+from detector.identity import build_execution_identity, digest, source_identity
 from detector.measurement import measurement_status
 from detector.packet import build_packet
 from detector.result import prediction_state
@@ -208,16 +210,26 @@ def _hooks_of(registry: Mapping[str, Any] | None) -> list[str]:
     })
 
 
-def _content_derived_key(registry: Mapping[str, Any] | None) -> bool:
-    """Whether ``registry_key`` was computed from the entries themselves.
-
-    ``make_registry`` stamps ``content_hash``; ``registry_key`` falls back to
-    the literal ``"unsigned"`` when it is absent. Only the fallback leaves the
-    hook set unrecorded, so only then does the cache name need to carry it.
-    """
-    return bool(registry) and bool(
-        str(registry.get("content_hash") or "").strip()
-    ) and str(registry.get("content_hash")) != "unsigned"
+def backend_execution_identity(
+    backend: Any, record: Mapping[str, Any], *, case_id: str,
+    registry: Mapping[str, Any] | None = None, replay: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    detector = getattr(backend, "detector", None)
+    config = getattr(detector, "config", {})
+    evidence_for = getattr(backend, "evidence_for", None)
+    evidence = evidence_for(case_id) if callable(evidence_for) else None
+    identity = build_execution_identity(
+        source=source_identity("detector", "evolution"), config=config,
+        record=record, packet=build_packet(record), evidence=evidence,
+        registry=registry, replay=replay,
+    )
+    payload = {
+        "schema_version": "evolution.backend_execution_identity.v1",
+        "case_id": str(case_id), "backend": backend.name, "inputs": identity,
+        "mock": {"base": getattr(backend, "base_predictions", None),
+                 "overrides": getattr(backend, "overrides", None)},
+    }
+    return {**payload, "digest": digest(payload)}
 
 
 def _unresolved_backend_result(
@@ -481,24 +493,14 @@ class LiveDetectorBackend(DetectionBackend):
         return validate_registry(registry, require_executable_bounds=True)
 
     def _baseline(self, record: Mapping[str, Any], *, case_id: str) -> dict[str, Any]:
+        identity = backend_execution_identity(
+            self, record, case_id=case_id, registry=build_intervention_registry([]),
+        )
         cached = self._base_results.get(str(case_id))
-        if cached is not None:
-            recorded = str(
-                (cached.get("provenance") or {}).get(
-                    "evidence_snapshot_digest"
-                ) or ""
-            )
-            active = self.evidence_for(case_id)
-            active_digest = ""
-            if active is not None:
-                from detector.evidence import snapshot_digest
-
-                active_digest = snapshot_digest(active)
-            if recorded == active_digest:
-                return cached
-            # A baseline recorded under different evidence is not a control
-            # for this run: drop it and measure a fresh one instead of
-            # silently comparing against another input.
+        if cached is not None and (cached.get("provenance") or {}).get(
+            "backend_execution_identity"
+        ) == identity:
+            return copy.deepcopy(cached)
         snapshot = self.evidence_for(case_id)
         result = self.detector.detect(
             record,
@@ -508,7 +510,9 @@ class LiveDetectorBackend(DetectionBackend):
                 {"evidence": snapshot} if snapshot is not None else {}
             )) else {}),
         )
-        self._base_results[str(case_id)] = dict(result)
+        result["provenance"] = {**(result.get("provenance") or {}),
+                                "backend_execution_identity": identity}
+        self._base_results[str(case_id)] = copy.deepcopy(result)
         return result
 
     @staticmethod
@@ -709,9 +713,7 @@ class LiveDetectorBackend(DetectionBackend):
                 record, case_id=case_id, interventions=registry,
                 **evidence_kwargs,
             )
-        baseline = self._base_results.get(str(case_id))
-        if baseline is None:
-            baseline = self._baseline(record, case_id=case_id)
+        baseline = self._baseline(record, case_id=case_id)
         frozen_stages = self._frozen_stages(baseline, hooks)
         if not frozen_stages:
             # With a settled baseline stage always freezable, an empty
@@ -986,14 +988,7 @@ class MockDetectorBackend(DetectionBackend):
 _CACHE_PATH_MAX = 250
 _CACHE_TEMP_NAME = ".tmp-XXXXXXXX.json"
 _DIGEST_NAME_WIDTH = 16
-# Cache names carry the replay boundary, and every character spent there is one
-# the descriptive name cannot use before it degrades to a bare digest. Eight
-# hex characters are enough because of what the key can discriminate: a result
-# is filed under the registry that produced it, and the boundary is a pure
-# function of that registry's hooks, so two entries can only differ in boundary
-# if they differ in registry -- and then the registry key already separates
-# them. A shorter key costs a longer key's safety only for an input that cannot
-# occur, and buys readable cache filenames for every real case.
+# Reports use a short boundary label; cache reuse verifies the full input identity.
 _BOUNDARY_KEY_WIDTH = 8
 
 
@@ -1027,20 +1022,8 @@ class CachingBackend(DetectionBackend):
         tag = ""
         if self._extra_key is not None:
             tag = "." + str(self._extra_key(case_id))
-        # The registry key pins which entries ran. A content-derived key
-        # already implies the replay boundary, because the boundary is a pure
-        # function of those entries' hooks -- so the boundary is named
-        # explicitly only when the key is *not* content-derived, which is the
-        # one case where two different hook sets would otherwise share a
-        # directory. Adding it unconditionally would shorten the descriptive
-        # filename budget for every case to re-state something already pinned.
-        directory = self.cache_dir / registry_key(registry)
-        boundary = ""
-        if not _content_derived_key(registry):
-            boundary = ".b" + str(
-                replay_boundary(_hooks_of(registry))["boundary_key"]
-            )
-        name = f"{safe_case}.{record_hash}{boundary}{tag}.json"
+        directory = self.cache_dir / digest(registry)
+        name = f"{safe_case}.{record_hash}{tag}.json"
         # The name carries case id, record hash and evidence tag, so a
         # snapshot-tagged case under a nested work root can cross the ceiling
         # while its neighbours fit. Past the budget the name becomes a digest
@@ -1070,43 +1053,48 @@ class CachingBackend(DetectionBackend):
         registry: Mapping[str, Any] | None = None,
         gold: bool | None = None,
     ) -> dict[str, Any]:
+        replay = None
+        if isinstance(self.backend, LiveDetectorBackend) and (registry or {}).get("interventions"):
+            hooks = set(_hooks_of(registry))
+            if "judge.system" not in hooks:
+                baseline = self.backend._baseline(record, case_id=case_id)
+                replay = self.backend._frozen_stages(baseline, hooks)
+        identity = {
+            "schema_version": "evolution.cache_identity.v2",
+            "execution": backend_execution_identity(
+                self.backend, record, case_id=case_id, registry=registry, replay=replay,
+            ),
+            "namespace": self.cache_dir.name,
+            "mock_gold": gold if isinstance(self.backend, MockDetectorBackend) else None,
+            "extra": str(self._extra_key(case_id)) if self._extra_key is not None else None,
+        }
         path = self._path(case_id, registry, record)
         if path.exists():
             try:
-                result = json.loads(path.read_text(encoding="utf-8-sig"))
-            except (OSError, ValueError):
-                result = None
-            if result is not None and result.get("decision_authority") != "authoritative":
-                # Run-scoped journals retain failures for paired comparisons;
-                # cross-cycle caches must not make a transient outage permanent.
-                result = None
-            if result is not None:
-                expected_registry_hash = str(
-                    (registry or {}).get("content_hash") or ""
+                envelope = json.loads(path.read_text(encoding="utf-8-sig"))
+                result = envelope.get("result") if isinstance(envelope, Mapping) else None
+                valid = (
+                    isinstance(envelope, Mapping)
+                    and envelope.get("schema_version") == "evolution.cache_entry.v2"
+                    and envelope.get("identity") == identity
+                    and isinstance(result, Mapping)
+                    and envelope.get("result_digest") == digest(result)
+                    and result.get("decision_authority") == "authoritative"
+                    and str(result.get("case_id") or "") == str(case_id)
                 )
-                result_registry_hash = str(
-                    (result.get("provenance") or {}).get(
-                        "interventions_hash"
-                    ) or ""
-                )
-                if (
-                    str(result.get("case_id") or "") != str(case_id)
-                    or result_registry_hash != expected_registry_hash
-                ):
-                    result = None
-            if result is not None:
-                # Keep the real backend's frozen-judge baseline in sync with the
-                # cached baseline arm, otherwise paired replay would compare the
-                # candidate against a different judge roll.
+            except (OSError, ValueError, TypeError):
+                valid = False
+            if valid:
                 base_results = getattr(self.backend, "_base_results", None)
                 if isinstance(base_results, dict) and not (registry or {}).get("interventions"):
-                    base_results[str(case_id)] = dict(result)
+                    base_results[str(case_id)] = copy.deepcopy(result)
                 return result
         result = self.backend.run_case(
             record, case_id=case_id, registry=registry, gold=gold,
         )
         if result.get("decision_authority") == "authoritative":
-            save_json(path, result)
+            save_json(path, {"schema_version": "evolution.cache_entry.v2", "identity": identity,
+                             "result": result, "result_digest": digest(result)})
         return result
 
     def evaluate_fresh(self, cases: Sequence[str], **kwargs: Any) -> list[dict[str, Any]]:
@@ -1228,7 +1216,7 @@ def make_backend(
         provider = evidence_provider or build_evidence_provider(config)
         backend = LiveDetectorBackend(config, evidence_provider=provider)
         namespace = "detector-" + CACHE_FORMAT + "-" + fingerprint({
-            "detector_config": file_digest(config.get("detector_config")),
+            "detector_config": digest(backend.detector.config),
             "dataset_root": str(resolve_path(config["dataset_root"])),
             "source": source_digest(),
             "cache_scope": config.get("diagnostic_cache_scope"),
