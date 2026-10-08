@@ -236,6 +236,21 @@ def test_usage_scope_collects_per_request_observations():
     assert observations[1]["usage"] is None
 
 
+def test_nested_usage_scopes_collect_into_the_parent_once_on_failure():
+    with usage_scope() as case:
+        record_request({"purpose": "direct", "usage": {"total_tokens": 1}})
+        with pytest.raises(ValueError, match="broken parser"):
+            with usage_scope() as attempt:
+                with usage_scope() as stage:
+                    record_request({"purpose": "vote", "usage": {"total_tokens": 5}})
+                record_request({"purpose": "repair", "usage": None})
+                raise ValueError("broken parser")
+    assert len(stage) == 1
+    assert len(attempt) == 2
+    assert len(case) == 3
+    assert [item["purpose"] for item in case] == ["direct", "vote", "repair"]
+
+
 def test_record_request_outside_a_scope_is_a_no_op():
     record_request({"purpose": "judge"})  # must not raise
 

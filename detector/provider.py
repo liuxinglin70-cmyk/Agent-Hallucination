@@ -13,7 +13,6 @@ Key behaviour (a deliberate fix over the old detector):
 from __future__ import annotations
 
 import base64
-import contextvars
 import json
 import os
 import subprocess
@@ -27,14 +26,6 @@ from urllib import request as urlrequest
 from contextlib import nullcontext
 from detector.runtime import (
     RunStopped, current_control, current_deadline, deadline_scope, record_request,
-)
-
-# A whole-detection wall-clock deadline, set by the detector around one
-# ``detect`` call and honoured by every provider call inside it. Each stage
-# still keeps its own per-call budget, but the shared deadline prevents one
-# case from stacking many serial stage budgets into unbounded runtime.
-_CASE_DEADLINE: contextvars.ContextVar[float | None] = contextvars.ContextVar(
-    "detector_case_deadline", default=None,
 )
 
 _DIRECT_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))

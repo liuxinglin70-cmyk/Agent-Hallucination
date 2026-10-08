@@ -131,12 +131,15 @@ def current_control() -> RunControl | None:
 
 @contextmanager
 def usage_scope() -> Iterator[list[dict[str, Any]]]:
+    parent = _USAGE.get()
     observations: list[dict[str, Any]] = []
     token = _USAGE.set(observations)
     try:
         yield observations
     finally:
         _USAGE.reset(token)
+        if parent is not None:
+            parent.extend(observations)
 
 
 def record_request(observation: Mapping[str, Any]) -> None:

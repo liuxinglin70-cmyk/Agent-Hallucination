@@ -22,7 +22,8 @@ from detector.interventions import (
 from detector.judge import _parse_judge, run_judge
 from detector.packet import build_packet, validate_record
 from detector.predicate_context import judge_predicate_context
-from detector.provider import ProviderError, accumulate_usage, case_deadline_ctx
+from detector.provider import ProviderError, case_deadline_ctx
+from detector.measurement import request_execution
 from detector.runtime import usage_scope, utc_now
 import time
 from detector.recaller import (
@@ -319,17 +320,10 @@ class Detector:
                     "authority_failure_reasons": [{"component": exc.route_name, "code": exc.error_type, **exc.as_dict()}],
                     "provenance": {},
                 }
-            usage: dict[str, Any] = {}
-            for observation in observations:
-                if isinstance(observation.get("usage"), Mapping):
-                    accumulate_usage(usage, observation["usage"])
-            result["execution"] = {
-                "schema_version": "detector.execution.v1", "started_at": started_at,
-                "finished_at": utc_now(), "elapsed_seconds": time.perf_counter() - started,
-                "requests": observations, "provider_attempts": len(observations),
-                "usage": usage or None,
-                "usage_missing_attempts": sum(o.get("usage") is None for o in observations),
-            }
+            result["execution"] = request_execution(
+                observations, started_at=started_at, finished_at=utc_now(),
+                elapsed_seconds=time.perf_counter() - started,
+            )
             return result
 
     def _detect(

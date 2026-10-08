@@ -30,10 +30,11 @@ that answer.
 from __future__ import annotations
 
 import json
+import copy
 from pathlib import Path
 import threading
 import time
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from detector.api import Detector
 from detector.config import load_config
@@ -47,6 +48,8 @@ from detector.measurement import (
     needs_remeasurement,
     result_usage,
     retry_in_run,
+    request_execution,
+    case_execution,
 )
 from detector.provider import accumulate_usage, case_deadline_ctx
 from detector.result import RESULT_SCHEMA
@@ -61,6 +64,7 @@ from detector.runtime import (
     remaining_seconds,
     run_scope,
     utc_now,
+    usage_scope,
 )
 
 DEFAULT_RUNS_ROOT = Path("artifacts/detector/runs")
@@ -120,6 +124,7 @@ def detect_with_transport_retry(
     case_id: str,
     interventions: Mapping[str, Any] | None = None,
     attempts: int = 3,
+    attempt_observer: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Whole-detection retry for outage-shaped results.
 
@@ -131,21 +136,49 @@ def detect_with_transport_retry(
     budget is also not retried in this run -- see ``retry_in_run``.
     """
     result: dict[str, Any] = {}
-    if attempts <= 1:
-        return detector.detect(record, case_id=case_id, interventions=interventions)
-    # One case budget covers every attempt. Without this wrapper each retry
-    # re-opened ``case_timeout_seconds`` on its own, so "one case budget" was
-    # really "three case budgets" -- a 1h case could occupy a worker for 3h and
-    # still be recorded as a single case's elapsed time.
+    completed: list[dict[str, Any]] = []
+    started = time.perf_counter()
+    started_at = utc_now()
+    # All attempts consume the same case deadline.
     with case_deadline_ctx(
         (detector.config or {}).get("case_timeout_seconds")
     ):
-        for _ in range(max(1, int(attempts))):
-            result = detector.detect(
-                record, case_id=case_id, interventions=interventions,
-            )
+        for number in range(1, max(1, int(attempts)) + 1):
+            attempt_started = time.perf_counter()
+            attempt_started_at = utc_now()
+            result = {}
+            failure: BaseException | None = None
+            with usage_scope() as requests:
+                try:
+                    result = detector.detect(record, case_id=case_id, interventions=interventions)
+                except BaseException as exc:
+                    failure = exc
+            execution = result.get("execution")
+            if requests or not isinstance(execution, Mapping):
+                execution = request_execution(
+                    requests, started_at=attempt_started_at, finished_at=utc_now(),
+                    elapsed_seconds=time.perf_counter() - attempt_started,
+                )
+                if not requests and failure is None:
+                    legacy = result_usage(result)
+                    execution.update(usage=legacy["usage"], provider_attempts=legacy["attempts"],
+                                     usage_missing_attempts=legacy["missing_attempts"], usage_source=legacy["source"])
+            attempt = copy.deepcopy({
+                "attempt": number, "execution": execution,
+                "result": {key: value for key, value in result.items() if key != "execution"},
+                "error": {"type": type(failure).__name__, "message": str(failure)} if failure else None,
+            })
+            completed.append(attempt)
+            if attempt_observer is not None:
+                attempt_observer(attempt)
+            if failure is not None:
+                raise failure
             if not retry_in_run(result):
-                return result
+                break
+    result["execution"] = case_execution(
+        completed, started_at=started_at, finished_at=utc_now(),
+        elapsed_seconds=time.perf_counter() - started,
+    )
     return result
 
 
@@ -325,6 +358,7 @@ def run_batch(
         }
         _write_json(manifest_path, manifest)
         returned_rows: dict[str, dict[str, Any]] = {}
+        partial_executions: dict[str, dict[str, Any]] = {}
         started_cases: set[str] = set()
         progress_lock = threading.Lock()
         stop_reason: dict[str, Any] = {}
@@ -373,9 +407,28 @@ def run_batch(
                 print(f"  [{case_id}] re-running cached {result.get('state')} row",
                       flush=True)
             started = time.monotonic()
+            execution_started_at = utc_now()
+            case_dir = case_root / safe_case_id(case_id)
+            index = _previous_attempts(case_dir) + 1
+            case_attempt_id = _attempt_id(index)
+            completed_attempts: list[Mapping[str, Any]] = []
+
+            def preserve_attempt(attempt: Mapping[str, Any]) -> None:
+                completed_attempts.append(attempt)
+                execution = case_execution(
+                    completed_attempts, started_at=execution_started_at, finished_at=utc_now(),
+                    elapsed_seconds=time.monotonic() - started,
+                )
+                with progress_lock:
+                    partial_executions[case_id] = execution
+                _write_json(case_dir / "attempts" / case_attempt_id / "case_attempts"
+                            / f"{attempt['attempt']:03d}" / "attempt.json", attempt)
+
+            _write_json(case_dir / "input.json", record)
             result = detect_with_transport_retry(
                 detector, record, case_id=case_id,
                 interventions=interventions,
+                attempt_observer=preserve_attempt,
             )
             observed_identity = (result.get("provenance") or {}).get("execution_identity")
             if observed_identity is not None and observed_identity != execution_identity:
@@ -383,12 +436,10 @@ def run_batch(
             result["provenance"] = {**(result.get("provenance") or {}),
                                     "execution_identity": execution_identity}
             elapsed = round(time.monotonic() - started, 1)
-            case_dir = case_root / safe_case_id(case_id)
-            index = _previous_attempts(case_dir) + 1
             record_case(
                 runs_root=runs_root, run_id=run_id, case_id=case_id,
                 input_record=record, result=result, elapsed_seconds=elapsed,
-                attempt_id=_attempt_id(index),
+                attempt_id=case_attempt_id,
             )
             row = register({"case": case_id, "result": result, "elapsed_seconds": elapsed,
                             "source": "measured"})
@@ -431,12 +482,14 @@ def run_batch(
                 _write_json(run_dir / "summary.json", _summarize(
                     run_id=run_id, cases=list(cases), rows=list(returned_rows.values()),
                     started_cases=started_cases,
+                    partial_executions=partial_executions,
                     manifest=manifest, stop_reason=stop_reason,
                 ))
                 raise
         summary = _summarize(
             run_id=run_id, cases=list(cases), rows=list(returned_rows.values()),
             started_cases=started_cases,
+            partial_executions=partial_executions,
             manifest=manifest, stop_reason=stop_reason,
         )
         _write_json(run_dir / "summary.json", summary)
@@ -451,6 +504,7 @@ def _summarize(
     manifest: Mapping[str, Any],
     stop_reason: Mapping[str, Any],
     started_cases: Sequence[str] | set[str] | None = None,
+    partial_executions: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     expected = set(map(str, cases))
     by_case = {str(row["case"]): row for row in rows}
@@ -469,6 +523,7 @@ def _summarize(
     states: dict[str, int] = {}
     usage: dict[str, Any] = {}
     usage_missing = 0
+    usage_unknown_cases = 0
     elapsed = 0.0
     for row in rows:
         result = row["result"]
@@ -481,6 +536,16 @@ def _summarize(
         if isinstance(reading.get("usage"), Mapping):
             accumulate_usage(usage, reading["usage"])
         usage_missing += int(reading.get("missing_attempts") or 0)
+        usage_unknown_cases += reading.get("missing_attempts") is None
+    for case, execution in (partial_executions or {}).items():
+        if case in by_case:
+            continue
+        reading = result_usage({"execution": execution})
+        if isinstance(reading.get("usage"), Mapping):
+            accumulate_usage(usage, reading["usage"])
+        usage_missing += int(reading.get("missing_attempts") or 0)
+        usage_unknown_cases += reading.get("missing_attempts") is None
+        elapsed += float(execution.get("elapsed_seconds") or 0.0)
     if missing and not stop_reason:
         stop_reason = {
             "error_type": "incomplete_batch",
@@ -512,6 +577,7 @@ def _summarize(
             "deadline_seconds": manifest.get("deadline_seconds"),
             "usage": usage or None,
             "usage_missing_attempts": usage_missing,
+            "usage_unknown_cases": usage_unknown_cases,
             "peak_provider_inflight": getattr(current_control(), "peak_requests", None),
         },
         "stop": dict(stop_reason),

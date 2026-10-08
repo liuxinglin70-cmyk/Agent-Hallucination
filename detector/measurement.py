@@ -1,7 +1,7 @@
 """Measurement health and cost, independent of detector decision semantics."""
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 from detector.provider import FATAL_PROVIDER_ERRORS, accumulate_usage
 from detector.result import RESULT_SCHEMA, prediction_state
 
@@ -105,6 +105,49 @@ def needs_remeasurement(result: Mapping[str, Any]) -> bool:
     if status == "invalid_envelope":
         return False
     return status in {"infrastructure_failure", "fatal_provider", "not_started"}
+
+
+def request_execution(
+    requests: Sequence[Mapping[str, Any]], *, started_at: str, finished_at: str,
+    elapsed_seconds: float,
+) -> dict[str, Any]:
+    usage: dict[str, Any] = {}
+    for request in requests:
+        if isinstance(request.get("usage"), Mapping):
+            accumulate_usage(usage, request["usage"])
+    return {
+        "schema_version": "detector.execution.v1", "started_at": started_at,
+        "finished_at": finished_at, "elapsed_seconds": elapsed_seconds,
+        "requests": list(requests), "provider_attempts": len(requests),
+        "usage": usage or None,
+        "usage_missing_attempts": sum(request.get("usage") is None for request in requests),
+    }
+
+
+def case_execution(
+    attempts: Sequence[Mapping[str, Any]], *, started_at: str, finished_at: str,
+    elapsed_seconds: float,
+) -> dict[str, Any]:
+    usage: dict[str, Any] = {}
+    requests: list[dict[str, Any]] = []
+    counts: list[int | None] = []
+    missing: list[int | None] = []
+    for number, attempt in enumerate(attempts, start=1):
+        execution = attempt["execution"]
+        if isinstance(execution.get("usage"), Mapping):
+            accumulate_usage(usage, execution["usage"])
+        counts.append(execution.get("provider_attempts"))
+        missing.append(execution.get("usage_missing_attempts"))
+        requests.extend({**request, "case_attempt": number}
+                        for request in execution.get("requests") or ())
+    return {
+        "schema_version": "detector.execution.v2", "started_at": started_at,
+        "finished_at": finished_at, "elapsed_seconds": elapsed_seconds,
+        "case_attempts": list(attempts), "requests": requests,
+        "provider_attempts": sum(counts) if all(type(value) is int for value in counts) else None,
+        "usage": usage or None,
+        "usage_missing_attempts": sum(missing) if all(type(value) is int for value in missing) else None,
+    }
 
 
 def result_usage(result: Mapping[str, Any]) -> dict[str, Any]:

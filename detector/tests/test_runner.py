@@ -5,7 +5,7 @@ import json
 import pytest
 
 from detector.result import RESULT_SCHEMA
-from detector.runner import run_batch, safe_case_id
+from detector.runner import detect_with_transport_retry, run_batch, safe_case_id
 from detector.runner import _summarize
 
 
@@ -76,6 +76,68 @@ def _envelope(case_id, *, state="verified_clean", authority="authoritative"):
         "evidence_health": {},
         "provenance": {},
     }
+
+
+def test_whole_case_retry_retains_every_attempt_and_cost():
+    class Retried(_FakeDetector):
+        def detect(self, record, *, case_id, interventions=None):
+            self.calls += 1
+            result = _envelope(case_id, state="unresolved" if self.calls == 1 else "verified_clean",
+                               authority="invalid" if self.calls == 1 else "authoritative")
+            result["proof"]["attempt_output"] = self.calls
+            result["execution"] = {"schema_version": "detector.execution.v1",
+                "requests": [{"purpose": "judge", "attempt": 1, "usage": {"total_tokens": self.calls * 5}}],
+                "provider_attempts": 1, "usage": {"total_tokens": self.calls * 5},
+                "usage_missing_attempts": 0, "elapsed_seconds": 0.01}
+            return result
+    result = detect_with_transport_retry(Retried({}), {}, case_id="a")
+    assert result["execution"]["usage"]["total_tokens"] == 15
+    assert result["execution"]["provider_attempts"] == 2
+    assert len(result["execution"]["case_attempts"]) == 2
+    assert result["execution"]["case_attempts"][0]["result"]["proof"]["attempt_output"] == 1
+
+
+def test_retry_counts_nested_official_detector_requests_once(monkeypatch):
+    from detector.api import Detector
+    from detector.runtime import record_request
+    from detector.tests.test_api import CONFIG
+    detector = Detector(CONFIG, require_credentials=False)
+    calls = []
+    def detect(record, *, case_id, **kwargs):
+        calls.append(case_id)
+        record_request({"purpose": "judge", "usage": {"total_tokens": 5}})
+        record_request({"purpose": "repair", "usage": None})
+        return _envelope(case_id, state="unresolved" if len(calls) == 1 else "verified_clean",
+                         authority="invalid" if len(calls) == 1 else "authoritative")
+    monkeypatch.setattr(detector, "_detect", detect)
+    result = detect_with_transport_retry(detector, {}, case_id="a")
+    assert result["execution"]["provider_attempts"] == 4
+    assert result["execution"]["usage_missing_attempts"] == 2
+    assert result["execution"]["usage"]["total_tokens"] == 10
+    assert [request["case_attempt"] for request in result["execution"]["requests"]] == [1, 1, 2, 2]
+
+
+@pytest.mark.parametrize("failure", [ValueError("broken parser"), KeyboardInterrupt("cancelled")])
+def test_failed_attempt_cost_is_persisted_before_a_program_error(tmp_path, monkeypatch, failure):
+    from detector.runtime import record_request
+    class Crashed(_FakeDetector):
+        def detect(self, record, *, case_id, interventions=None):
+            self.calls += 1
+            record_request({"purpose": "judge", "usage": {"total_tokens": 5}})
+            if self.calls == 2:
+                raise failure
+            return _envelope(case_id, state="unresolved", authority="invalid")
+    monkeypatch.setattr("detector.runner.Detector", Crashed)
+    with pytest.raises(type(failure)) as raised:
+        run_batch(dataset_root=_write_dataset(tmp_path / "data"), cases=["a.json"],
+                  runs_root=tmp_path / "runs", run_id="r", config={}, workers=1)
+    assert raised.value is failure
+    attempts = list((tmp_path / "runs/r/cases/a.json/attempts").glob("*/case_attempts/*/attempt.json"))
+    assert len(attempts) == 2
+    assert json.loads(sorted(attempts)[-1].read_text(encoding="utf-8"))["error"]["type"] == type(failure).__name__
+    summary = json.loads((tmp_path / "runs/r/summary.json").read_text(encoding="utf-8"))
+    assert summary["measurement"]["usage"]["total_tokens"] == 10
+    assert summary["measurement"]["missing"] == 1
 
 
 def test_safe_case_id():
