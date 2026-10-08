@@ -6,6 +6,8 @@
 
 - [实验结果与证据索引](docs/results/README.md)：已完成结果、待执行计划、原始报告和账本归档。
 
+- [疑惑度与因果轨迹审计优化设计](docs/uncertainty-guided-causal-audit-design-20261008.md)：拟议的快慢审计、定位反哺检测、代码接入点及验收方案（尚未实现）。
+- [组会汇报｜疑惑度反哺检测](docs/group-meeting-uncertainty-causal-feedback-20261008.md)：可直接讨论的简明方案与决策点。
 - [核心技术文档](docs/technical-solution.md)：系统模型、模块职责、合同、审查结论和维护规则。
 - [实验日志](docs/experiment-log.md)：历史实验、数值、失败、更正、旧方案及来源摘要。
 - [检测器 vs AgentHallu 论文基线对比](docs/detector-vs-agenthallu-baseline-20260927.md)：653 例全量基线与论文 13 个单模型基线的判定／定位对比，含可比性限制。

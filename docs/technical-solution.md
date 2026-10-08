@@ -1,6 +1,8 @@
 # 核心技术文档
 
-更新：2026-09-24。本文描述当前实现及约束；历史实验、旧方案和数值统一见 [实验日志](experiment-log.md)。
+更新：2026-10-08（补充拟议方向，原有实现叙述保持不变）。本文描述当前实现及约束；历史实验、旧方案和数值统一见 [实验日志](experiment-log.md)。
+
+> **研究方向补充（未实现）**：详见 [疑惑度引导的双向因果轨迹审计技术设计](uncertainty-guided-causal-audit-design-20261008.md)，简明版见 [2026-10-08 组会汇报](group-meeting-uncertainty-causal-feedback-20261008.md)。
 
 ## 🧭 仓库边界
 
@@ -135,6 +137,16 @@ flowchart TD
 一次冗余梳理移除了没有生产调用方的代码：RepairUnit 声明与编译器、统计评估器、注册表单笔事务、注册表自愈、单元漂移记录、`event_source_mapping` 与 `resolution_opportunity`。它们此前只被各自的测试引用，`promotion.py` 中通向其中的分支在任何候选上都无法到达。保留的 `retire()` 反向依赖检查是实时的：它仍会拒绝单独退役被现役 Guard 消费的证据项。
 
 engine、backends、promotion、interventions 仍承担较多职责，后续物理拆包需逐接口迁移。本次保持公开 API 和冻结身份合同，先统一职责边界及输出入口。真实模型重复波动、定位标注歧义、机械谓词误报风险仍需实测与语义审计，不能用测试数量替代。
+
+## 🧪 待研究：疑惑度定位如何反哺幻觉检测（2026-10-08）
+
+**现有代码事实**：`api.py::_judge_negative_needs_recall` 根据多票一致性和置信度决定部分阴性是否需要 Recall；`Detector._detect` 的 `negative_needs_recall` 还接受现有部署干预与适用证据快照触发；一旦进入 Recall，仍需 `run_causal_upgrade`、独立听证的 Tracer/Defense 和 `adjudicate`。阳性 Tracer 已支持输入单项指控，但尚无逐步困惑度或后续反事实推演的标准输入。
+
+**拟议改造，不是已上线功能**：基于 `packet.py` 的规范事件和局部投影构造只读风险画像、Top-K 候选及有来源的因果传播链。初判阳性时将证据引入 `run_step_tracer` 以检查首次错误步骤；初判阴性时仅当出现可核实的具体偏差且满足预算/校准条件，才把它作为 `negative_needs_recall` 的额外触发因素，继续经过原有 Recall/Upgrade/Defense/Adjudication。**异常分数不能定罪；反事实模型推演不能冒充真实工具回放或事实来源**。强一致阴性的默认快路径应保持可用。
+
+**双任务反馈**：`evolution/worksheet.py`、`mechanisms.py` 和 `proposer.py` 可在开发侧消费不含部署标签泄漏的因果诊断，将漏检、误报、首次步骤晚判、证据缺失、已纠正及多错误歧义区分处理；保留原始 L0/L1、四门准入、双指标配对与不可测状态。现有 `detector/provider.py` 没有对原 Agent 步骤计算 teacher-forced PPL 的接口，首期“疑惑度”应明确写作语义风险代理。
+
+**实施顺序与验收**：先旁路影子审计（不改变判决）；然后配对验证 Tracer 定位收益；再独立验证阴性复核对 FN/FP 的影响；最后研究结构化反馈的跨轮自进化净收益。所有新增 prompt、scorer、依赖投影及后端工件须纳入缓存身份和冻结回放一致性校验。完整风险、分阶段文件改动、消融与预算见[技术优化设计](uncertainty-guided-causal-audit-design-20261008.md)。
 
 ## 🛠️ 运行和维护
 
