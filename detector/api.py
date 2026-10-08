@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from detector.adjudication import adjudicate
-from detector.config import load_config
+from detector.config import load_config, validate_config
 from detector.defense import _parse_defense, _validate_defense_evidence, run_defense
 from detector.evidence import (
     snapshot_digest,
@@ -234,7 +234,7 @@ class Detector:
         component_executor_factory: Any | None = None,
     ) -> None:
         self.config = (
-            config if config is not None
+            validate_config(config, require_credentials=require_credentials) if config is not None
             else load_config(require_credentials=require_credentials)
         )
         registry_path = self.config.get("intervention_registry")

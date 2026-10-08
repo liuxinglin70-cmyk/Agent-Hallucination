@@ -178,7 +178,7 @@ def test_frozen_recall_preserves_snapshot_citations_through_hearing(monkeypatch)
         }}, {"stage": "defense", "state": "ok", "view": "complete"}
     monkeypatch.setattr("detector.api.run_step_tracer", tracer)
     monkeypatch.setattr("detector.api.run_defense", defense)
-    result = Detector(CONFIG).detect(
+    result = Detector(CONFIG, require_credentials=False).detect(
         LISETTE_RECORD, evidence=snapshot(), frozen_stages=frozen,
     )
     assert result["state"] == "verified_error"
@@ -284,12 +284,12 @@ def test_snapshot_reopens_the_scan_for_a_unanimous_clean_judge(
         recall=RECALL_WITH_CANDIDATE, upgrade=UPGRADE_NONE,
     )
     # Without a snapshot the unanimous clean judge skips the scan.
-    Detector(config).detect(LISETTE_RECORD, case_id="x")
+    Detector(config, require_credentials=False).detect(LISETTE_RECORD, case_id="x")
     assert "recall_snapshot" not in seen
 
     # With one, the scan runs and reads the snapshot.
     seen.clear()
-    Detector(config).detect(
+    Detector(config, require_credentials=False).detect(
         LISETTE_RECORD, case_id="x", evidence=snapshot(),
     )
     assert seen["recall_snapshot"]["schema_version"] == EVIDENCE_SCHEMA
@@ -301,7 +301,7 @@ def test_snapshot_reaches_recall_and_upgrade_stages(monkeypatch):
         recall=RECALL_WITH_CANDIDATE, upgrade=UPGRADE_NONE,
     )
     snap = snapshot()
-    result = Detector(CONFIG).detect(LISETTE_RECORD, case_id="x", evidence=snap)
+    result = Detector(CONFIG, require_credentials=False).detect(LISETTE_RECORD, case_id="x", evidence=snap)
     assert seen["recall_snapshot"]["schema_version"] == EVIDENCE_SCHEMA
     assert seen["upgrade_snapshot"]["schema_version"] == EVIDENCE_SCHEMA
     assert result["proof"]["external_evidence"]["sources"][0]["evidence_id"] == "E1"
@@ -313,7 +313,7 @@ def test_no_snapshot_keeps_stage_calls_unchanged(monkeypatch):
         monkeypatch, _judge(positive=False),
         recall=RECALL_WITH_CANDIDATE, upgrade=UPGRADE_NONE,
     )
-    result = Detector(CONFIG).detect(LISETTE_RECORD, case_id="x")
+    result = Detector(CONFIG, require_credentials=False).detect(LISETTE_RECORD, case_id="x")
     assert seen["recall_snapshot"] is None
     assert seen["upgrade_snapshot"] is None
     assert result["proof"]["external_evidence"] is None
@@ -351,7 +351,7 @@ def test_upgrade_hearing_carries_citations_to_defense(monkeypatch):
         }}, {"stage": "defense", "state": "ok", "attempts": 0,
              "view": "complete", "warnings": []}),
     )
-    result = Detector(CONFIG).detect(
+    result = Detector(CONFIG, require_credentials=False).detect(
         LISETTE_RECORD, case_id="x", evidence=snapshot(),
     )
     assert seen["defense_snapshot"]["schema_version"] == EVIDENCE_SCHEMA
@@ -364,7 +364,7 @@ def test_invalid_snapshot_is_refused_before_any_call(sample_record):
     called = {"judge": 0}
 
     with pytest.raises(Exception):
-        Detector(CONFIG).detect(
+        Detector(CONFIG, require_credentials=False).detect(
             sample_record, case_id="x",
             evidence={"schema_version": EVIDENCE_SCHEMA, "query": {}},
         )
@@ -394,7 +394,7 @@ def test_unrelated_snapshot_is_recorded_but_not_applied(monkeypatch):
         monkeypatch, judge_result,
         recall=RECALL_WITH_CANDIDATE, upgrade=UPGRADE_NONE,
     )
-    result = Detector(config).detect(
+    result = Detector(config, require_credentials=False).detect(
         UNRELATED_RECORD, case_id="x", evidence=snapshot(),
     )
     # The scan was not reopened, and no stage received the snapshot.
@@ -415,7 +415,7 @@ def test_matching_snapshot_is_marked_applied(monkeypatch):
         monkeypatch, _judge(positive=False),
         recall=RECALL_WITH_CANDIDATE, upgrade=UPGRADE_NONE,
     )
-    result = Detector(CONFIG).detect(
+    result = Detector(CONFIG, require_credentials=False).detect(
         LISETTE_RECORD, case_id="x", evidence=snapshot(),
     )
     assert result["provenance"]["evidence_applied"] is True
@@ -437,7 +437,7 @@ def test_frozen_recall_replay_is_refused_with_an_active_snapshot():
         },
     }
     with pytest.raises(ValueError, match="frozen stage replay is refused"):
-        Detector(CONFIG).detect(
+        Detector(CONFIG, require_credentials=False).detect(
             LISETTE_RECORD, case_id="x", frozen_stages=frozen,
             evidence=snapshot(),
         )
@@ -453,7 +453,7 @@ def test_judge_only_freeze_is_compatible_with_a_snapshot(monkeypatch):
         monkeypatch, judge_result,
         recall=RECALL_WITH_CANDIDATE, upgrade=UPGRADE_NONE,
     )
-    result = Detector(CONFIG).detect(
+    result = Detector(CONFIG, require_credentials=False).detect(
         LISETTE_RECORD, case_id="x", frozen_stages=frozen,
         evidence=snapshot(),
     )

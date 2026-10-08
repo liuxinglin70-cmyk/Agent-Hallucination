@@ -440,7 +440,7 @@ def test_detector_detect_writes_proof_deployment(sample_record, monkeypatch):
             },
         ),
     ])
-    result = Detector(CONFIG).detect(
+    result = Detector(CONFIG, require_credentials=False).detect(
         sample_record, case_id="x", interventions=registry,
     )
     deployment = result["proof"]["deployment"]
@@ -490,7 +490,7 @@ def test_frozen_judge_replay_skips_judge_provider(sample_record, monkeypatch):
     monkeypatch.setattr("detector.api.run_judge", fail_judge)
     monkeypatch.setattr("detector.api.run_recall_scan", fake_recall)
     monkeypatch.setattr("detector.api.run_causal_upgrade", fake_upgrade)
-    result = Detector(CONFIG).detect(
+    result = Detector(CONFIG, require_credentials=False).detect(
         sample_record, case_id="x", frozen_judge=frozen,
     )
     assert result["state"] == "verified_clean"
@@ -524,7 +524,7 @@ def test_frozen_judge_refuses_judge_hook_intervention(sample_record):
         hook="judge.system",
     )])
     with pytest.raises(ValueError):
-        Detector(CONFIG).detect(
+        Detector(CONFIG, require_credentials=False).detect(
             sample_record, case_id="x", interventions=registry,
             frozen_judge=frozen,
         )
@@ -562,7 +562,7 @@ def test_frozen_replay_refuses_masked_later_stage(sample_record):
         hook="scanner.system",
     )])
     with pytest.raises(ValueError, match="mask"):
-        Detector(CONFIG).detect(
+        Detector(CONFIG, require_credentials=False).detect(
             sample_record, case_id="x", interventions=registry,
             frozen_stages=frozen,
         )
@@ -579,7 +579,7 @@ def test_frozen_judge_rejects_invalid_contract(sample_record):
         "judge_status": {"stage": "judge", "state": "ok"},
     }
     with pytest.raises(ValueError, match="frozen judge_result contract"):
-        Detector(CONFIG).detect(sample_record, frozen_judge=frozen)
+        Detector(CONFIG, require_credentials=False).detect(sample_record, frozen_judge=frozen)
 
 
 def test_loader_requires_content_hash(tmp_path):
