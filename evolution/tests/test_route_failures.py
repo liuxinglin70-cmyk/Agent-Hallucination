@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import pytest
 
+from evolution.metrics import target_outcome
+
 from evolution.route_failures import (
     REPEAT_OBSERVATION_THRESHOLD,
     ROUTE_FAILURE_SCHEMA,
@@ -58,6 +60,7 @@ def fired_but_unchanged() -> tuple[dict, dict, dict]:
     }
     delta = {
         "flips": {"F->F": 4, "T->T": 2},
+        "paired_n": 6,
         "marginal_cases": 0,
         "correctness_improved": 0,
         "tp_lost": 0,
@@ -67,6 +70,15 @@ def fired_but_unchanged() -> tuple[dict, dict, dict]:
         "health_regressed": 0,
     }
     return candidate(), behavior, delta
+
+
+def _outcome(entry, delta, localization=None):
+    claim = entry['claim']
+    return target_outcome(
+        target_kind=claim.get('target_kind', 'detection'),
+        polarity=claim['target_polarity'], delta_basis='benefit_set',
+        detection_delta=delta, localization_delta=localization,
+    )
 
 
 # --------------------------------------------------------------------------
@@ -161,7 +173,7 @@ def test_fired_but_unchanged_is_an_insufficiency_observation():
     observation = insufficiency_evidence(
         candidate=entry,
         behavior=behavior,
-        gain_delta=delta,
+        outcome=_outcome(entry, delta),
         opportunity=6,
         substantive_rejection=True,
     )
@@ -191,7 +203,7 @@ def test_insufficiency_is_not_recorded_for_anything_else(mutate, reason):
     assert insufficiency_evidence(
         candidate=entry,
         behavior=behavior,
-        gain_delta=delta,
+        outcome=_outcome(entry, delta),
         opportunity=6,
         substantive_rejection=True,
     ) is None, reason
@@ -202,18 +214,18 @@ def test_insufficiency_requires_a_measurable_opportunity_and_a_substantive_rejec
     # No repairable case in the measured set: the route was never given a
     # chance to repair anything, so its failure says nothing about the route.
     assert insufficiency_evidence(
-        candidate=entry, behavior=behavior, gain_delta=delta,
+        candidate=entry, behavior=behavior, outcome=_outcome(entry, delta),
         opportunity=0, substantive_rejection=True,
     ) is None
     # An unevaluable rejection is not a substantive one.
     assert insufficiency_evidence(
-        candidate=entry, behavior=behavior, gain_delta=delta,
+        candidate=entry, behavior=behavior, outcome=_outcome(entry, delta),
         opportunity=6, substantive_rejection=False,
     ) is None
     # A transient outage leaves behaviour unmeasurable.
     assert insufficiency_evidence(
         candidate=entry, behavior={**behavior, "fired_rate": 0.0},
-        gain_delta=delta, opportunity=6, substantive_rejection=True,
+        outcome=_outcome(entry, delta), opportunity=6, substantive_rejection=True,
     ) is None
 
 
@@ -221,7 +233,7 @@ def test_precision_and_boundary_polarities_are_read_correctly():
     entry, behavior, delta = fired_but_unchanged()
     precision = insufficiency_evidence(
         candidate={**entry, "claim": {"target_polarity": "precision"}},
-        behavior=behavior, gain_delta=delta, opportunity=4,
+        behavior=behavior, outcome=_outcome({**entry, "claim": {"target_polarity": "precision"}}, delta), opportunity=4,
         substantive_rejection=True,
     )
     assert precision is not None
@@ -229,16 +241,85 @@ def test_precision_and_boundary_polarities_are_read_correctly():
     assert insufficiency_evidence(
         candidate={**entry, "claim": {"target_polarity": "precision"}},
         behavior=behavior,
-        gain_delta={**delta, "flips": {"T->F": 1}, "marginal_cases": 1,
-                    "correctness_improved": 1},
+        outcome=_outcome({**entry, "claim": {"target_polarity": "precision"}}, {**delta, "flips": {"T->F": 1}, "marginal_cases": 1,
+                    "correctness_improved": 1}),
         opportunity=4, substantive_rejection=True,
     ) is None
     # An unknown polarity is not scored rather than guessed.
     assert insufficiency_evidence(
         candidate={**entry, "claim": {"target_polarity": "unknown"}},
-        behavior=behavior, gain_delta=delta, opportunity=4,
+        behavior=behavior, outcome=_outcome({**entry, "claim": {"target_polarity": "unknown"}}, delta), opportunity=4,
         substantive_rejection=True,
     ) is None
+
+
+@pytest.mark.parametrize("kind", ["localization", "joint"])
+@pytest.mark.parametrize("readings", [{"joint_improved": 0, "joint_broken": 1},
+                                    {"joint_improved": 1, "joint_broken": 0}, {}])
+def test_localization_gain_harm_or_missing_readings_are_not_route_insufficiency(kind, readings):
+    entry, behavior, delta = fired_but_unchanged()
+    entry["claim"]["target_kind"] = kind
+    localization = ({
+        "n": 6, "localizable_n": 6,
+        "joint_delta": readings.get("joint_improved", 0) - readings.get("joint_broken", 0),
+        **readings,
+    } if readings else None)
+    assert insufficiency_evidence(
+        candidate=entry, behavior=behavior, outcome=_outcome(entry, delta, localization),
+        opportunity=6, substantive_rejection=True,
+    ) is None
+
+
+def test_empty_delta_is_unmeasured_instead_of_unchanged():
+    entry, behavior, _ = fired_but_unchanged()
+    assert insufficiency_evidence(
+        candidate=entry, behavior=behavior, outcome=_outcome(entry, {}), opportunity=6,
+        substantive_rejection=True,
+    ) is None
+
+
+@pytest.mark.parametrize("kind", ["detection", "localization", "joint", "resolution"])
+def test_each_objective_records_only_measured_unchanged_outcomes(kind):
+    entry, behavior, delta = fired_but_unchanged()
+    entry["claim"]["target_kind"] = kind
+    localization = {"n": 6, "localizable_n": 6, "joint_improved": 0,
+                    "joint_broken": 0, "joint_delta": 0}
+    outcome = _outcome(entry, delta, localization)
+    assert outcome["status"] == "unchanged"
+    observation = insufficiency_evidence(
+        candidate=entry, behavior=behavior, outcome=outcome, opportunity=6,
+        substantive_rejection=True,
+    )
+    assert observation["evidence"]["target_kind"] == kind
+    assert observation["evidence"]["delta_basis"] == "benefit_set"
+
+
+@pytest.mark.parametrize("flips,harm,status", [({"U->T": 1}, 0, "improved"),
+                                             ({"U->F": 1}, 0, "improved"),
+                                             ({"U->T": 1}, 1, "regressed"),
+                                             ({}, 0, "unchanged")])
+def test_resolution_outcome_preserves_resolution_gain_and_harm(flips, harm, status):
+    entry, _, delta = fired_but_unchanged()
+    entry["claim"]["target_kind"] = "resolution"
+    outcome = _outcome(entry, {**delta, "flips": flips, "new_errors": harm})
+    assert outcome["status"] == status
+
+
+@pytest.mark.parametrize("fault", ["missing", "boolean_count", "negative_count", "different_set"])
+def test_invalid_objective_readings_are_unmeasured(fault):
+    entry, _, delta = fired_but_unchanged()
+    entry["claim"]["target_kind"] = "localization"
+    localization = {"n": 6, "localizable_n": 6, "joint_improved": 0,
+                    "joint_broken": 0, "joint_delta": 0}
+    if fault == "missing":
+        delta.pop("health_regressed")
+    elif fault == "boolean_count":
+        delta["new_errors"] = False
+    elif fault == "negative_count":
+        localization["joint_broken"] = -1
+    else:
+        localization["n"] = 5
+    assert _outcome(entry, delta, localization)["status"] == "unmeasured"
 
 
 # --------------------------------------------------------------------------

@@ -1,32 +1,8 @@
-"""Route falsification memory: a route that fired and changed nothing.
+"""Route observations derived from measured objective outcomes.
 
-The framework already records *why* a candidate was rejected, and it already
-counts how often an intervention fired. Neither answers the question a
-capability planner has to answer: for this mechanism, does this treatment route
-actually repair anything?
-
-Attempt 5 of the pilot answered it the hard way. A tracer directive was
-generated, the hook fired, the reasoning demonstrably changed, and the
-responsible step was still wrong. "Can be triggered" did not imply "can
-repair", and nothing in the repository remembered that.
-
-This store remembers it. An entry means: on this mechanism, through this route,
-the candidate reached the runtime and moved observable behaviour, and the target
-outcome did not improve and was not harmed. That is a negative capability
-observation -- not a rejection reason, not a gate verdict, and never a score.
-
-Two disciplines keep it from over-claiming:
-
-* every recorded condition is checked against the same readings the BEHAVIOR
-  gate used (fired rate, type-specific behaviour event, paired delta), so an
-  infrastructure outage, an unmeasured claim, or a harmful candidate cannot be
-  filed as insufficiency;
-* one observation is not a falsification. The plan's condition includes "at
-  least one targeted revision", and revision lineage arrives with the
-  development loop (P0.3). Until then the store records what happened and
-  ``route_failure_state`` admits a falsification only after two independent
-  observations on the same mechanism and route -- or immediately when a caller
-  can attest a revision, which is the condition the plan actually asks for.
+A route is insufficient only after its hook fires and changes the promised
+behavior, while a measurable outcome records neither benefit nor harm.
+Repeated independent observations or a targeted revision admit falsification.
 """
 
 from __future__ import annotations
@@ -149,43 +125,11 @@ def _int(value: Any) -> int:
         return 0
 
 
-def _target_unchanged(delta: Mapping[str, Any], polarity: str) -> bool:
-    """Whether the measured outcome failed to improve, without any harm.
-
-    Read as "nothing got better and nothing got worse": a candidate that
-    improved some other case is not a clean insufficiency observation, and a
-    candidate that broke a case is a regression rather than a route that cannot
-    repair the mechanism.
-    """
-    flips = delta.get("flips") or {}
-    if polarity == "recall":
-        gain = _int(flips.get("F->T"))
-    elif polarity == "precision":
-        gain = _int(flips.get("T->F"))
-    else:
-        # A boundary claim is scorable only by a decisive correction, and
-        # ``correctness_improved`` is zero whenever no case became correct.
-        gain = _int(delta.get("correctness_improved"))
-    harm = any(
-        _int(delta.get(key))
-        for key in (
-            "tp_lost", "fp_added", "new_errors", "unresolved_added",
-            "health_regressed",
-        )
-    )
-    return (
-        gain == 0
-        and _int(delta.get("correctness_improved")) == 0
-        and _int(delta.get("marginal_cases")) <= 0
-        and not harm
-    )
-
-
 def insufficiency_evidence(
     *,
     candidate: Mapping[str, Any],
     behavior: Mapping[str, Any] | None,
-    gain_delta: Mapping[str, Any] | None,
+    outcome: Mapping[str, Any] | None,
     opportunity: int,
     substantive_rejection: bool,
 ) -> dict[str, Any] | None:
@@ -207,12 +151,16 @@ def insufficiency_evidence(
     events = _int(behavior.get("behavior_events"))
     if fired_rate <= 0.0 or events <= 0:
         return None
-    if not isinstance(gain_delta, Mapping):
+    if not isinstance(outcome, Mapping):
         return None
     polarity = str((candidate.get("claim") or {}).get("target_polarity") or "")
     if polarity not in {"recall", "precision", "boundary"}:
         return None
-    if not _target_unchanged(gain_delta, polarity):
+    if (
+        outcome.get("measurable") is not True or outcome.get("status") != "unchanged"
+        or outcome.get("target_polarity") != polarity
+        or outcome.get("target_kind") != str((candidate.get("claim") or {}).get("target_kind") or "detection")
+    ):
         return None
     return {
         "route": route,
@@ -223,8 +171,9 @@ def insufficiency_evidence(
             "behavior_event": str(behavior.get("behavior_event_kind") or ""),
             "target_outcome_changed": 0,
             "target_polarity": polarity,
+            "target_kind": outcome["target_kind"],
             "gain_opportunities": int(opportunity),
-            "delta_basis": "benefit_set",
+            "delta_basis": outcome["delta_basis"],
         },
     }
 

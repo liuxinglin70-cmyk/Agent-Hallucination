@@ -239,6 +239,88 @@ def confusion_rows(
     return rows
 
 
+def target_opportunity(
+    *, target_kind: str, polarity: str,
+    detection: Mapping[str, Any], localization: Mapping[str, Any] | None = None,
+) -> int | None:
+    """The reported benefit-set opportunities for the declared objective."""
+    if target_kind in {"localization", "joint"}:
+        value = (localization or {}).get("improvable")
+    elif polarity == "boundary":
+        if not all(type(detection.get(key)) is int for key in ("recall", "precision")):
+            return None
+        value = detection["recall"] + detection["precision"]
+    else:
+        value = detection.get(polarity)
+    return value if type(value) is int and value >= 0 else None
+
+
+def target_outcome(
+    *, target_kind: str, polarity: str, delta_basis: str,
+    detection_delta: Mapping[str, Any] | None,
+    localization_delta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Read objective-specific benefit and harm from one measured case set."""
+    outcome = {
+        "target_kind": target_kind, "target_polarity": polarity,
+        "delta_basis": delta_basis, "measurable": False,
+        "status": "unmeasured", "target_gain": None, "harm": {},
+    }
+    if target_kind not in {"detection", "localization", "joint", "resolution"}:
+        return outcome
+    if polarity not in {"recall", "precision", "boundary"} or not delta_basis:
+        return outcome
+    if not isinstance(detection_delta, Mapping):
+        return outcome
+    required = (
+        "paired_n", "correctness_improved", "tp_lost", "fp_added", "new_errors",
+        "unresolved_added", "health_regressed", "marginal_cases",
+    )
+    if any(type(detection_delta.get(key)) is not int for key in required):
+        return outcome
+    if detection_delta["paired_n"] <= 0 or any(
+        detection_delta[key] < 0 for key in required if key != "marginal_cases"
+    ):
+        return outcome
+    flips = detection_delta.get("flips")
+    if not isinstance(flips, Mapping) or any(
+        type(value) is not int or value < 0 for value in flips.values()
+    ):
+        return outcome
+    harm = {key: detection_delta[key] for key in (
+        "tp_lost", "fp_added", "new_errors", "unresolved_added", "health_regressed",
+    )}
+    detection_gain = detection_delta["correctness_improved"]
+    if target_kind == "resolution":
+        gain = flips.get("U->T", 0) + flips.get("U->F", 0)
+    elif target_kind in {"localization", "joint"}:
+        if not isinstance(localization_delta, Mapping) or any(
+            type(localization_delta.get(key)) is not int
+            for key in ("n", "localizable_n", "joint_improved", "joint_broken", "joint_delta")
+        ):
+            return outcome
+        if (
+            localization_delta["n"] != detection_delta["paired_n"]
+            or not 0 < localization_delta["localizable_n"] <= localization_delta["n"]
+            or localization_delta["joint_improved"] < 0
+            or localization_delta["joint_broken"] < 0
+        ):
+            return outcome
+        gain = localization_delta["joint_improved"]
+        harm["joint_broken"] = localization_delta["joint_broken"]
+    else:
+        gain = (
+            flips.get("F->T", 0) if polarity == "recall" else
+            flips.get("T->F", 0) if polarity == "precision" else detection_gain
+        )
+    improved = gain > 0 or detection_gain > 0 or detection_delta["marginal_cases"] > 0
+    status = "regressed" if any(harm.values()) else "improved" if improved else "unchanged"
+    return {
+        **outcome, "measurable": True, "status": status, "target_gain": gain,
+        "detection_gain": detection_gain, "harm": harm,
+    }
+
+
 def binary_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     decisive = [row for row in rows if row.get("prediction") is not None]
     if not decisive:
@@ -1090,6 +1172,7 @@ def paired_localization_delta(
     *,
     gold_steps: Mapping[str, Any] | None = None,
     unstable_cases: Collection[str] | None = None,
+    expected_cases: Collection[str] | None = None,
 ) -> dict[str, Any]:
     """Joint detection-and-localization delta over a frozen case batch.
 
@@ -1109,7 +1192,7 @@ def paired_localization_delta(
     twice does not have to be counted as a gain. Nothing is subtracted.
     """
     gold_steps = dict(gold_steps or {})
-    paired = confusion_rows(baseline_rows, active_rows)
+    paired = confusion_rows(baseline_rows, active_rows, expected_cases=expected_cases)
     base_by_case = {str(row.get("case") or ""): row for row in baseline_rows}
     active_by_case = {str(row.get("case") or ""): row for row in active_rows}
     rows: list[dict[str, Any]] = []
@@ -1430,4 +1513,6 @@ __all__ = [
     "row_responsible_step",
     "source_deltas",
     "source_of",
+    "target_outcome",
+    "target_opportunity",
 ]

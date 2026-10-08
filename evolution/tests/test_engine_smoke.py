@@ -2153,7 +2153,7 @@ def test_cycle_records_route_insufficiency_end_to_end(tmp_path):
     assert behavior["behavior_event_kind"] == "text_injected"
 
     recorded = report["route_failures"]
-    assert recorded["observed"] == 1
+    assert recorded["observed"] == 1, report["gates"][0].get("target_outcome")
     assert recorded["appended"] == 1
     entry = recorded["state"]["observed_only"][0]
     assert entry["route"] == "recall_directive"
@@ -2300,3 +2300,51 @@ def test_mechanisms_carry_normal_neighbours_from_the_patrol(tmp_path):
     }
     # A neighbour is the healthy counterpart of a member, never the same case.
     assert not (set(neighbours) & members)
+
+
+@pytest.mark.parametrize("damage,expected", [(False, "unchanged"), (True, "regressed")])
+def test_localization_unit_records_benefit_set_outcome_even_when_behavior_fails(tmp_path, damage, expected):
+    import copy
+    cases = _make_dataset(tmp_path / "data", n=20)
+    split = EvolutionSplit(name="synthetic", pool=cases, sentinel=cases[:4],
+                           gain=cases[4:12], patrol_pool=cases[12:], mini=True)
+    engine = EvolutionEngine(_config(tmp_path), backend=MockDetectorBackend(), split=split, mini=True)
+    candidate = _scanner_candidate(family="FAM-loc-test")
+    candidate["hook"] = "tracer.system"
+    candidate["claim"]["target_kind"] = "localization"
+    candidate.pop("content_hash")
+    identifier = candidate["intervention_id"]
+    baseline = []
+    for i, case in enumerate(cases):
+        gold = i % 2 == 0
+        baseline.append({
+            "case": case, "gold": gold, "prediction": gold,
+            "authority": "authoritative", "state": "verified_error" if gold else "verified_clean",
+            "responsible_step": 2 if i == 4 else 1 if gold else None,
+            "result": {"runtime_valid": True, "decision_authority": "authoritative",
+                       "stage_status": {}, "proof": {}},
+        })
+    active = copy.deepcopy(baseline)
+    active[4]["responsible_step"] = 3
+    if damage:
+        active[6]["responsible_step"] = 2
+    for row in active:
+        row["result"]["proof"] = {"deployment": {"fired": [
+            {"intervention_id": identifier, "event": "text_injected"}
+        ]}}
+    class Arms:
+        def run(self, requested, **kwargs):
+            assert requested == [*split.sentinel, *split.gain]
+            return [row for row in active if row["case"] in requested]
+    unit = engine._run_unit(candidate, partners=[], active_entries=[],
+                            active_rows=baseline[:12], arms=Arms(), audit=True)
+    assert unit["behavior"]["passed"] is False
+    assert unit["m"] is None
+    assert unit["target_outcome"]["status"] == expected
+    assert unit["target_outcome"]["delta_basis"] == "benefit_set"
+    recorded = engine.record_route_failures(
+        cycle=1, diagnosed_families=[{"failure_family": "FAM-loc-test",
+                                     "mechanism": {"mechanism_id": "M-loc-test"}}],
+        gate_reports=[unit],
+    )
+    assert recorded["observed"] == (0 if damage else 1)

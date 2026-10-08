@@ -77,6 +77,8 @@ from evolution.metrics import (
     row_responsible_step,
     row_responsible_step_kind,
     source_deltas,
+    target_outcome,
+    target_opportunity,
 )
 from evolution.proposer import ProposalBatch, infer_joint_groups, make_proposer
 from evolution.registry import ActiveRegistry, load_active_registry
@@ -256,8 +258,12 @@ def gate_rejection_is_unevaluable(
         delta = verdict.get("delta") or {}
         return not (delta.get("new_errors") or delta.get("health_regressed"))
     polarity = str((candidate.get("claim") or {}).get("target_polarity") or "")
-    opportunities = report.get("gain_opportunities") or {}
-    if opportunities.get(polarity) != 0:
+    opportunity = target_opportunity(
+        target_kind=candidate_target_kind(candidate), polarity=polarity,
+        detection=report.get("gain_opportunities") or {},
+        localization=report.get("localization_opportunities"),
+    )
+    if opportunity != 0:
         return False
     delta = verdict.get("delta") or {}
     return not (delta.get("new_errors") or delta.get("health_regressed"))
@@ -2250,34 +2256,19 @@ class EvolutionEngine:
             behavior = report.get("behavior") or {}
             if behavior.get("passed"):
                 continue
-            # A boundary claim is scorable where either direction has a
-            # repairable case, so its opportunity is the sum. Reading only the
-            # polarity key left `boundary` at zero forever -- every boundary
-            # candidate was invisible to this store, which is exactly the route
-            # the pilot's tracer directive kept re-proposing.
-            opportunities = report.get("gain_opportunities") or {}
             polarity = str(
                 (candidate.get("claim") or {}).get("target_polarity") or ""
             )
-            if polarity in opportunities:
-                opportunity = int(opportunities.get(polarity) or 0)
-            else:
-                opportunity = int(sum(
-                    value for value in opportunities.values()
-                    if isinstance(value, int)
-                ))
-            # The gain delta is the measured outcome on the benefit set, which
-            # is why ``insufficiency_evidence`` reads a "benefit_set" basis:
-            # an unchanged outcome there is the moment the route failed to
-            # repair anything, not merely a gate that stayed closed.
-            gain_delta = ((report.get("m") or {}).get("delta")) or (
-                (report.get("behavior") or {}).get("delta")
+            opportunity = target_opportunity(
+                target_kind=candidate_target_kind(candidate), polarity=polarity,
+                detection=report.get("gain_opportunities") or {},
+                localization=report.get("localization_opportunities"),
             )
             observation = insufficiency_evidence(
                 candidate=candidate,
                 behavior=behavior,
-                gain_delta=gain_delta,
-                opportunity=opportunity,
+                outcome=report.get("target_outcome"),
+                opportunity=opportunity or 0,
                 substantive_rejection=not bool(
                     gate_rejection_is_unevaluable(
                         gate="behavior",
@@ -2783,6 +2774,21 @@ class EvolutionEngine:
             [*sentinel, *measurement_gain], registry=registry, fresh=fresh,
         )
         candidate_s = _subset_rows(candidate_rows, sentinel)
+        kind = candidate_target_kind(candidate)
+        control_g = _subset_rows(control, measurement_gain)
+        candidate_g = _subset_rows(candidate_rows, measurement_gain)
+        delta = paired_delta(
+            control_g, candidate_g, unstable_cases=unstable_cases,
+            expected_cases=measurement_gain,
+        )
+        localization_delta = (
+            paired_localization_delta(
+                control_g, candidate_g, gold_steps=self.gold_step_map,
+                unstable_cases=unstable_cases, expected_cases=measurement_gain,
+            )
+            if any(candidate_target_kind(entry) in {"localization", "joint"}
+                   for entry in unit_entries) else None
+        )
         # Rows that could not be measured honestly (provider failure, deadline,
         # non-authoritative terminal) manufacture "regressions" the moment a
         # gate compares them: unresolved counts as incorrect, so an arm that
@@ -2790,6 +2796,14 @@ class EvolutionEngine:
         # no failing verdict on this unit can be stored as a falsification, and
         # so admission stays fail-closed instead of passing on partial rows.
         unmeasured = sorted(_unmeasurable_cases([*control, *candidate_rows]))
+        member_outcomes = {
+            str(entry.get("intervention_id") or ""): target_outcome(
+                target_kind=candidate_target_kind(entry),
+                polarity=str((entry.get("claim") or {}).get("target_polarity") or ""),
+                delta_basis="benefit_set", detection_delta=None if unmeasured else delta,
+                localization_delta=localization_delta,
+            ) for entry in unit_entries
+        }
         harmlessness = harmlessness_gate(
             baseline_rows=baseline_s,
             candidate_rows=candidate_s,
@@ -2807,7 +2821,6 @@ class EvolutionEngine:
             # which a tracer directive deliberately leaves alone, so scoring a
             # localization claim there would report "never fired" or "no
             # marginal gain" for a claim that did exactly what it promised.
-            kind = candidate_target_kind(candidate)
             for member in [*partners, dict(candidate)]:
                 member_id = str(member.get("intervention_id") or "")
                 member_behavior[member_id] = (
@@ -2828,23 +2841,7 @@ class EvolutionEngine:
                 )
             behavior = member_behavior[intervention_id]
             if all(verdict["passed"] for verdict in member_behavior.values()):
-                control_g = _subset_rows(control, measurement_gain)
-                candidate_g = _subset_rows(candidate_rows, measurement_gain)
-                delta = paired_delta(
-                    control_g, candidate_g,
-                    unstable_cases=(
-                        None if unstable_cases is None
-                        else list(unstable_cases)
-                    ),
-                )
                 if kind in {"localization", "joint"}:
-                    localization_delta = paired_localization_delta(
-                        control_g, candidate_g, gold_steps=self.gold_step_map,
-                        unstable_cases=(
-                            None if unstable_cases is None
-                            else list(unstable_cases)
-                        ),
-                    )
                     passed, failures = meets_localization(
                         localization_delta,
                         config=self.config,
@@ -2983,6 +2980,9 @@ class EvolutionEngine:
             "measurement_gain_cases": measurement_gain,
             "coverage_response": response,
             "candidate_rows": _summarise_rows(candidate_rows),
+            "target_outcome": member_outcomes[intervention_id],
+            "member_target_outcomes": member_outcomes,
+            "localization_opportunities": localization_opportunity(control_g, gold_steps=self.gold_step_map),
             "unmeasured_cases": unmeasured,
             "harmlessness": _mark_unstable(_mark_unmeasured(harmlessness)),
             "behavior": _mark_unmeasured(behavior),
@@ -4018,6 +4018,8 @@ class EvolutionEngine:
                 "gain_opportunities": unit["gain_opportunities"],
                 "mechanism_opportunity": unit.get("mechanism_opportunity"),
                 "measurement_gain_cases": unit["measurement_gain_cases"],
+                "target_outcome": unit.get("target_outcome"),
+                "localization_opportunities": unit.get("localization_opportunities"),
                 "coverage_response": unit.get("coverage_response"),
             })
             # A joint unit's outcome belongs to every member; the member the
@@ -4051,6 +4053,8 @@ class EvolutionEngine:
             report.update({
                 "harmlessness": unit["harmlessness"],
                 "behavior": (unit.get("member_behavior") or {}).get(identifier),
+                "target_outcome": (unit.get("member_target_outcomes") or {}).get(identifier),
+                "localization_opportunities": unit.get("localization_opportunities"),
                 "m": unit["m"],
                 "fresh": unit["fresh"],
                 "candidate_rows": unit["candidate_rows"],
