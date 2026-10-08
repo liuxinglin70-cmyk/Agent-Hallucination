@@ -85,6 +85,41 @@ def action_predicates() -> dict:
     }
 
 
+def test_contract_only_omission_is_a_hypothesis():
+    cases = [
+        member(name="one", contracts=["required_action"], predicates={
+            "required_action_present": "not_applicable",
+        }),
+        member(name="two", contracts=["required_action"], predicates={
+            "required_action_present": "not_applicable",
+        }),
+    ]
+    mechanism = infer_mechanism(
+        "FAM-fn-judge_false_upgrade_no_upgrade-contract",
+        members=cases,
+        member_cases=["A/001.json", "B/002.json"],
+    )
+    assert mechanism["task_obligation"]["kind"] == "required_action"
+    assert mechanism["observed_deviation"]["kind"] == "unclassified"
+    assert mechanism["status"] == "hypothesis"
+    assert mechanism["confidence_basis"] == "contract_only"
+
+
+def test_mixed_mechanism_identity_does_not_depend_on_member_order():
+    cases = [
+        member(name="action", predicates=action_predicates()),
+        member(name="verbatim", predicates=verbatim_predicates()),
+    ]
+    kwargs = {"member_cases": ["A/001.json", "B/002.json"]}
+    left = infer_mechanism("FAM-fn-judge_false_no_recall_candidates-mixed",
+                           members=cases, **kwargs)
+    right = infer_mechanism("FAM-fn-judge_false_no_recall_candidates-mixed",
+                            members=list(reversed(cases)), **kwargs)
+    assert left["status"] == right["status"] == "ambiguous"
+    assert left["mechanism_id"] == right["mechanism_id"]
+    assert left["signature"] == right["signature"]
+
+
 def family(
     *,
     family_id: str = "FAM-fn-judge_false_no_recall_candidates-abc",

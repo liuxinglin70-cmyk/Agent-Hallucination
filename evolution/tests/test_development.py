@@ -542,7 +542,9 @@ def test_loop_records_lineage_and_freezes_the_passing_version(tmp_path):
     frozen = developer.freeze("v002")
     assert frozen["version_id"] == "v002"
     assert frozen["mechanism_id"] == "M-dev"
-    assert frozen["route"] == "recall_trigger"
+    assert frozen["route"] == "recall_directive"
+    assert result["planned_route"] == "recall_trigger"
+    assert result["versions"][1]["route_replanned"] is True
     assert frozen["candidate"]["intervention_id"] == "IV-1-001"
 
 

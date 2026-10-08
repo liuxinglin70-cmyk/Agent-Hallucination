@@ -29,6 +29,7 @@ from typing import Any, Mapping, Sequence
 from evolution.backends import (
     CACHE_FORMAT,
     DetectionBackend,
+    LiveDetectorBackend,
     file_digest,
     fingerprint,
     make_backend,
@@ -111,6 +112,7 @@ from evolution.route_failures import (
     insufficiency_evidence,
     load_route_failures,
     record_route_failures,
+    route_of,
     route_failure_summary,
 )
 from evolution.splits import (
@@ -291,6 +293,84 @@ def terminal_classification(
     ):
         return "not_evaluated"
     return "rejected"
+
+
+def evaluation_summary(report: Mapping[str, Any]) -> dict[str, Any]:
+    """Separate measurement, mechanism evidence and observed utility.
+
+    This is diagnostic state derived from the same formal gate rows. It does
+    not grant admission or reinterpret a failed claim as a successful one.
+    """
+    candidate = report.get("candidate") or {}
+    structural = report.get("structural") or {}
+    harmlessness = report.get("harmlessness") or {}
+    behavior = report.get("behavior") or {}
+    marginal = report.get("m") or {}
+    delta = behavior.get("delta") or marginal.get("delta") or {}
+    mechanism_opportunity = report.get("mechanism_opportunity")
+    polarity = str((candidate.get("claim") or {}).get("target_polarity") or "")
+    unmeasured = list(report.get("unmeasured_cases") or ())
+    coverage_missing = (
+        isinstance(mechanism_opportunity, Mapping)
+        and mechanism_opportunity.get("evaluable") is False
+    )
+    no_measurement = bool(unmeasured) or any(
+        verdict.get("infrastructure_failure") or verdict.get("stability_limited")
+        for verdict in (harmlessness, behavior, marginal)
+    )
+    if structural.get("passed") is False:
+        state, next_action = "invalid_candidate", "revise_contract"
+    elif no_measurement:
+        state, next_action = "measurement_pending", "retest_frozen_candidate"
+    elif coverage_missing or (
+        not report.get("candidate_rows") and report.get("coverage_response")
+    ):
+        state, next_action = "coverage_missing", "add_mechanism_matched_validation"
+    elif (
+        polarity == "recall"
+        and behavior.get("passed") is False
+        and float(behavior.get("fired_rate") or 0.0) > 0.0
+        and int(behavior.get("behavior_events") or 0) > 0
+        and int((delta.get("flips") or {}).get("T->F") or 0) > 0
+        and not int(delta.get("new_errors") or 0)
+        and not int(delta.get("health_regressed") or 0)
+    ):
+        state, next_action = "secondary_hypothesis", "validate_secondary_benefit"
+    elif behavior.get("passed") and marginal.get("passed") and harmlessness.get("passed"):
+        state, next_action = "qualified", "consider_admission"
+    else:
+        state, next_action = "claim_unconfirmed", "revise_or_investigate"
+    measurable = state not in {"measurement_pending", "coverage_missing"} and bool(
+        report.get("candidate_rows")
+    )
+    utility = None
+    if measurable and delta:
+        flips = delta.get("flips") or {}
+        localization = marginal.get("localization_delta") or {}
+        utility = {
+            **(_feedback_delta(delta) or {}),
+            "tp_gain": int(flips.get("F->T") or 0),
+            "fp_removed": int(flips.get("T->F") or 0),
+            "tp_lost": int(delta.get("tp_lost") or 0),
+            "fp_added": int(delta.get("fp_added") or 0),
+            "joint_improved": int(localization.get("joint_improved") or 0),
+            "joint_broken": int(localization.get("joint_broken") or 0),
+        }
+    return {
+        "state": state,
+        "measurable": measurable,
+        "mechanism_supported": (
+            None if not measurable else
+            False if behavior.get("passed") is False else
+            True if mechanism_opportunity is not None and behavior.get("passed") else
+            None
+        ),
+        "protected": (
+            bool(harmlessness.get("passed")) if measurable else None
+        ),
+        "utility_delta": utility,
+        "next_action": next_action,
+    }
 
 
 COVERAGE_POLICY_MODES = ("strict", "replacement", "replacement_or_skip")
@@ -1530,7 +1610,6 @@ class EvolutionEngine:
         family_id = str(family.get("failure_family") or "")
         actionability = family.get("actionability") or {}
         polarity = str(actionability.get("polarity") or "")
-        routes = [str(item) for item in actionability.get("routes") or ()]
         recorded: list[dict[str, Any]] = []
         for version in result.get("versions") or ():
             status = str(version.get("status") or "")
@@ -1544,6 +1623,7 @@ class EvolutionEngine:
                 str(item) for item in (l1.get("reasons") or ())
             )
             unevaluable = bool(l1.get("unmeasurable"))
+            actual_route = route_of(candidate)
             # The reason travels into the next round's drafting prompt through
             # memory recall, so it is redacted here: an L1 reason names the
             # cases it scored, and case identifiers must not cross into
@@ -1564,7 +1644,7 @@ class EvolutionEngine:
                 ),
                 intervention_type=str(candidate.get("type") or ""),
                 hook=str(candidate.get("hook") or ""),
-                treatment_routes=routes,
+                treatment_routes=[actual_route] if actual_route else [],
                 unevaluable=unevaluable,
             )
             recorded.append({
@@ -1917,12 +1997,36 @@ class EvolutionEngine:
             previous = list(getattr(proposer, "rejection_feedback", []))
             if hasattr(proposer, "set_rejection_feedback"):
                 feedback = list(previous)
+                l1 = diagnosis.get("l1") or {}
+                targets = [str(case) for case in _mechanism.get("member_cases") or ()]
+                neighbors = [str(case) for case in _mechanism.get("normal_neighbors") or ()]
+                aliases = {
+                    **{case: f"target_{index + 1}" for index, case in enumerate(targets)},
+                    **{case: f"normal_{index + 1}" for index, case in enumerate(neighbors)},
+                }
+                def case_refs(key: str) -> list[str]:
+                    return [aliases.get(str(case), "unlisted_case") for case in l1.get(key) or ()]
+
                 feedback.append({
                     "gate": "DEVELOPMENT",
                     "type": parent.get("type"),
                     "hook": parent.get("hook"),
                     "candidate": dict(parent),
-                    "delta": None,
+                    "parent_program": {
+                        "type": parent.get("type"),
+                        "hook": parent.get("hook"),
+                        "body": dict(parent.get("body") or {}),
+                    },
+                    "development_diagnosis": {
+                        "version_id": diagnosis.get("version_id"),
+                        "target_improved": case_refs("target_improved"),
+                        "target_unchanged": case_refs("target_unchanged"),
+                        "target_regressed": case_refs("target_regressed"),
+                        "neighbor_regressed": case_refs("neighbor_regressed"),
+                        "fired_cases": case_refs("fired_cases"),
+                        "reason_codes": list(l1.get("reason_codes") or ()),
+                    },
+                    "delta": _feedback_delta(l1.get("delta")),
                     "reason": "; ".join(
                         str(item) for item in (diagnosis.get("reasons") or ())
                     ) or f"{mechanism_id} version {diagnosis.get('version_id')} failed development",
@@ -3798,6 +3902,14 @@ class EvolutionEngine:
         # to be *reported*: a frozen replay is a known zero, a provider stage
         # with only one roll is an unknown.
         provider_stage_round = bool(active_fresh or has_provider_stage)
+        if isinstance(self.backend, LiveDetectorBackend):
+            # A frozen judge does not freeze scanner, upgrade, tracer or
+            # defense.  Downstream hooks can still issue live provider
+            # requests, so an unrerolled comparison cannot claim zero jitter.
+            provider_stage_round = provider_stage_round or any(
+                str(entry.get("hook") or "") != "adjudicate.guard"
+                for entry in [*self.registry.entries, *proposals]
+            )
         if proposals and has_provider_stage:
             # Provider-stage hooks cannot replay a frozen baseline, so their
             # matched control is a fresh roll of the active registry. The
@@ -3904,6 +4016,7 @@ class EvolutionEngine:
                 "candidate_rows": unit["candidate_rows"],
                 "unmeasured_cases": unit.get("unmeasured_cases") or [],
                 "gain_opportunities": unit["gain_opportunities"],
+                "mechanism_opportunity": unit.get("mechanism_opportunity"),
                 "measurement_gain_cases": unit["measurement_gain_cases"],
                 "coverage_response": unit.get("coverage_response"),
             })
@@ -3942,9 +4055,13 @@ class EvolutionEngine:
                 "fresh": unit["fresh"],
                 "candidate_rows": unit["candidate_rows"],
                 "gain_opportunities": unit["gain_opportunities"],
+                "mechanism_opportunity": unit.get("mechanism_opportunity"),
                 "measurement_gain_cases": unit["measurement_gain_cases"],
                 "coverage_response": unit.get("coverage_response"),
             })
+
+        for report in gate_reports:
+            report["evaluation"] = evaluation_summary(report)
 
         # One combination arm when several units qualify on their own; this
         # is the only additional sweep the protocol needs. A unit whose
@@ -4001,6 +4118,8 @@ class EvolutionEngine:
                         "gain_opportunities": report.get("gain_opportunities"),
                         "behavior_delta": _feedback_delta((report.get("behavior") or {}).get("delta")),
                         "behavior_note": (report.get("behavior") or {}).get("behavior_note"),
+                        "evaluation_state": (report.get("evaluation") or {}).get("state"),
+                        "next_action": (report.get("evaluation") or {}).get("next_action"),
                         "not_evaluable": gate_rejection_is_unevaluable(
                             gate=gate,
                             verdict=verdict,

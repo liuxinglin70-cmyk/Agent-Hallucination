@@ -824,6 +824,7 @@ def test_an_empty_draft_reports_the_proposers_own_reason(tmp_path):
     assert spent["stopped"] == "no_candidates"
     assert spent["stopped_note"]["stopped_reason"] == "budget_exhausted"
     assert "budget" in spent["stopped_note"]["reason"]
+    assert spent["budget"]["used"]["provider_calls"] == 0
 
     silent = developer.develop(
         lambda *a, **k: ProposalBatch(notes=[{
@@ -834,10 +835,12 @@ def test_an_empty_draft_reports_the_proposers_own_reason(tmp_path):
         }]), cycle=1,
     )
     assert silent["stopped_note"]["stopped_reason"] == "no_draft_returned"
+    assert silent["budget"]["used"]["provider_calls"] == 1
 
     # A caller that injects a bare list has no notes, and that is reported as
     # absent rather than invented.
     bare = developer.develop(lambda *a, **k: [], cycle=1)
     assert bare["stopped"] == "no_candidates"
     assert bare["stopped_note"] == {}
+    assert bare["budget"]["used"]["provider_calls"] == 2
     assert development_report(bare)["stopped_note"] == {}

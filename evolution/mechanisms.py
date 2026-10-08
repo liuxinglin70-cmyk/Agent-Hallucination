@@ -75,9 +75,9 @@ DEVIATION_KINDS = (
     "unclassified",
 )
 
-# Obligation -> deviation. The obligation says what was required, the deviation
-# says how the delivery departed from it; deriving the second from the first
-# keeps the two readings from contradicting each other.
+# Obligation -> deviation when a matching case-level predicate observed a
+# violation. A declared contract alone establishes what was required, not
+# whether the delivery departed from it.
 _DEVIATION_BY_OBLIGATION = {
     "completion_claim": "false_completion",
     "required_action": "omission",
@@ -438,9 +438,18 @@ def _deviation_for(
         return "missing_step" if local_state == "step_missing" else "mislocation"
     if no_task_deviation:
         return "none"
-    if obligation in _DEVIATION_BY_OBLIGATION:
-        return _DEVIATION_BY_OBLIGATION[obligation]
     predicates = (member or {}).get("predicates") or {}
+    evidence_field = {
+        "completion_claim": "final_delivery_present",
+        "required_action": "required_action_present",
+        "verbatim_content": "verbatim_fidelity",
+    }.get(obligation)
+    if obligation == "completion_claim" and _norm(
+        predicates.get("final_delivery_present")
+    ) == "missing":
+        return "false_completion"
+    if evidence_field and _norm(predicates.get(evidence_field)) in _VIOLATION_VERDICTS:
+        return _DEVIATION_BY_OBLIGATION[obligation]
     if _norm(predicates.get("evidence_refs_resolve")) in _VIOLATION_VERDICTS:
         return "unsupported_claim"
     return "unclassified"
@@ -720,11 +729,15 @@ def infer_mechanism(
     )
     signatures = [reading_signature(item) for item in readings]
     unique = sorted(set(signatures))
-    chosen = signatures[0]
+    # A mixed family's identity must not depend on the order in which patrol
+    # happened to return its members.  Keep the representative reading tied to
+    # the canonical signature rather than always taking the first member.
+    chosen = unique[0]
+    representative = readings[signatures.index(chosen)]
     mechanism = _assemble(
         family_id,
         objective=objective,
-        reading=readings[0],
+        reading=representative,
         path_signature=path_signature,
     )
     mechanism["mechanism_id"] = mechanism_key(mechanism)
@@ -736,8 +749,21 @@ def infer_mechanism(
         status, basis = "hypothesis", "path_only"
     elif total <= 1:
         status, basis = "single_case_research_only", "structural"
-    elif unanimous:
+    elif unanimous and (
+        objective == "localization"
+        or all(
+            any(
+                binding.startswith("predicate.")
+                for binding in reading.get("obligation_bindings") or ()
+            )
+            for reading in readings
+        )
+    ):
         status, basis = "confirmed", "multi_case"
+    elif unanimous:
+        # Agreement between judge contract labels establishes an obligation,
+        # but does not independently establish that the agent violated it.
+        status, basis = "hypothesis", "contract_only"
     else:
         status, basis = "ambiguous", "mixed"
     mechanism["status"] = status

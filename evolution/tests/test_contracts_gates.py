@@ -559,6 +559,10 @@ def test_llm_proposer_uses_rejection_feedback_and_blocks_echo(monkeypatch):
 
     def fake_provider_call(**kwargs):
         assert "new_fp" in kwargs["user"]
+        assert '"parent_program"' in kwargs["user"]
+        assert '"development_diagnosis"' in kwargs["user"]
+        assert '"target_1"' in kwargs["user"]
+        assert '"evaluation_state": "secondary_hypothesis"' in kwargs["user"]
         assert "A/001.json" not in kwargs["user"]
         return {"interventions": [{
             "type": rejected["type"],
@@ -580,6 +584,11 @@ def test_llm_proposer_uses_rejection_feedback_and_blocks_echo(monkeypatch):
         "gate": "HARMLESSNESS",
         "reason": "sentinel harmlessness violation: new_fp=1",
         "delta": {"new_fp": 1},
+        "parent_program": {"type": rejected["type"], "hook": rejected["hook"],
+                           "body": rejected["body"]},
+        "development_diagnosis": {"target_improved": ["target_1"]},
+        "evaluation_state": "secondary_hypothesis",
+        "next_action": "validate_secondary_benefit",
     }])
     batch = instance.propose([{
         "failure_family": "FAM-fn-test",

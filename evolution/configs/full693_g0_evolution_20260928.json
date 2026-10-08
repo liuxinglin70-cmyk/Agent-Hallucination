@@ -1,0 +1,66 @@
+{
+  "schema_version": "evolution.framework.v1",
+  "detector_config": "detector/configs/autodl.json",
+  "dataset_root": "datasets/raw/agenthallu/AgentHallu",
+  "mini_split_manifest": "datasets/protocols/evolution_g0_reuse_20260928.json",
+  "split_manifest": null,
+  "historical_development_manifests": [],
+  "work_root": "artifacts/evo693_20260928",
+  "registry_dir": "artifacts/evo693_20260928/registry",
+  "ledger_path": "artifacts/evo693_20260928/ledger.jsonl",
+  "harness_dir": "artifacts/evo693_20260928/harness",
+  "memory_root": "artifacts/evo693_20260928/memory",
+  "cycles": 3,
+  "split": {
+    "seed": 20260928,
+    "mini_pool_size": 554,
+    "sentinel_positives": 12,
+    "sentinel_negatives": 12,
+    "mini_gain_size": 96,
+    "mini_gain_min_positives": 35,
+    "mini_gain_min_negatives": 35
+  },
+  "budget": {
+    "patrol_cases": 150,
+    "stable_failure_rerun_cases": 40,
+    "llm_calls": 15,
+    "max_proposals": 6,
+    "max_admits": 2,
+    "cycle_timeout_seconds": 129600
+  },
+  "development": {
+    "enabled": true,
+    "max_mechanisms_per_cycle": 3,
+    "max_versions_per_mechanism": 3,
+    "max_provider_calls": 5,
+    "max_l1_cases": 80,
+    "require_normal_neighbors": 4,
+    "allow_action_class_change": true
+  },
+  "archive": {"on": "cycle_end"},
+  "gates": {
+    "structural_jaccard_threshold": 0.72,
+    "harmlessness_new_fn_allowed": 0,
+    "harmlessness_new_fp_allowed": 0,
+    "harmlessness_new_unresolved_allowed": 0,
+    "harmlessness_min_protected_tp": 4,
+    "harmlessness_min_protected_tn": 4,
+    "behavior_require_fired": true,
+    "m_min_marginal_cases": 1,
+    "m_new_errors_allowed": 0,
+    "localization_min_joint_cases": 1,
+    "localization_joint_broken_allowed": 0
+  },
+  "backend": {"name": "detector", "workers": 8, "cache": true},
+  "proposer": {
+    "mode": "llm",
+    "max_output_tokens": 32768,
+    "thinking_level": "",
+    "max_repair_calls": 1
+  },
+  "mini_effect": {
+    "min_marginal_cases": 1,
+    "max_new_errors": 0,
+    "max_unresolved_added": 0
+  }
+}

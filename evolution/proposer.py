@@ -540,9 +540,13 @@ class LLMProposer:
                     "gate": item.get("gate"),
                     "reason": redact_case_ids(item.get("reason")),
                     "delta": item.get("delta"),
+                    "parent_program": item.get("parent_program"),
+                    "development_diagnosis": item.get("development_diagnosis"),
                     "gain_opportunities": item.get("gain_opportunities"),
                     "behavior_delta": item.get("behavior_delta"),
                     "behavior_note": item.get("behavior_note"),
+                    "evaluation_state": item.get("evaluation_state"),
+                    "next_action": item.get("next_action"),
                     "not_evaluable": item.get("not_evaluable", False),
                     "combination": [
                         {

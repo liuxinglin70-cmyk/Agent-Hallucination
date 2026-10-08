@@ -328,6 +328,11 @@ def test_loop_on_revision_sees_the_previous_verdict(tmp_path):
     # The parent travels with the feedback, so the revision is a revision of a
     # named candidate rather than a fresh guess.
     assert second["feedback"][0].get("candidate")
+    revision = second["feedback"][0]
+    assert revision["parent_program"]["body"] == revision["candidate"]["body"]
+    assert revision["delta"] is not None
+    assert revision["development_diagnosis"]["version_id"] == "v001"
+    assert "target_improved" in revision["development_diagnosis"]
     # Both versions are recorded, and the second is a child of the first.
     versions = report["development"]["runs"][0]["versions"]
     assert [item["version_id"] for item in versions] == ["v001", "v002"]
@@ -366,6 +371,9 @@ def test_loop_on_carries_the_frozen_version_into_the_gates(tmp_path):
     assert run["selected_version_id"] == "v001"
     assert run["versions"][-1]["l0_passed"] is True
     assert run["versions"][-1]["l1_passed"] is True
+    assert run["versions"][-1]["route"] == "recall_directive"
+    assert run["route"] == "recall_directive"
+    assert run["planned_route"] != run["route"]
     assert run["frozen"]["version_id"] == "v001"
     # The candidate that reached the gates is the frozen version, under the id
     # the drafter assigned -- not a second draft drawn afterwards.
@@ -379,6 +387,8 @@ def test_loop_on_carries_the_frozen_version_into_the_gates(tmp_path):
     ).read_text(encoding="utf-8"))
     assert sidecar["schema_version"] == DEVELOPMENT_SCHEMA
     assert sidecar["status"] == "frozen"
+    assert sidecar["action_class"] == "recall_directive"
+    assert sidecar["route_replanned"] is True
 
 
 def test_development_ids_are_unique_across_mechanisms(tmp_path):

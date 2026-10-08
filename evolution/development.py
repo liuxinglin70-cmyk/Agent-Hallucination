@@ -43,6 +43,7 @@ from evolution.gates import arm_has_infrastructure_failure
 from evolution.metrics import paired_delta
 from evolution.mechanisms import repair_requirements
 from evolution.metamorphic import admission_error
+from evolution.route_failures import route_of
 
 DEVELOPMENT_SCHEMA = "evolution.candidate_development.v1"
 
@@ -138,9 +139,9 @@ class DevelopmentBudget:
 
         Its unit is a call, not a case: the L1 replay's cost is capped
         separately by ``max_l1_cases``, and what this cap bounds is the number
-        of model calls the loop may make while it revises. Charged once per
-        draft attempt, so a proposer that is asked and returns nothing still
-        spends what it cost.
+        of actual provider requests reported by the proposer, including its
+        internal format repairs. An empty model response still costs a call;
+        a preflight refusal does not.
         """
         self.provider_calls += int(count)
 
@@ -762,10 +763,20 @@ class CandidateDeveloper:
                 drafted.candidates
                 if hasattr(drafted, "candidates") else (drafted or ())
             )
-            # The draft itself is what costs a model call, whatever it returns,
-            # so the charge lands before the empty-batch check: a proposer that
-            # is asked and answers with nothing still consumed its call.
-            self.budget.spend_provider()
+            # Charge actual provider requests, including internal repair
+            # requests.  A refusal before calling the provider must not appear
+            # as a successful network call in the development ledger.  Legacy
+            # proposers without notes retain the one-call accounting.
+            notes = getattr(drafted, "notes", None)
+            calls = (
+                sum(
+                    note.get("provider_called") is True
+                    for note in notes if isinstance(note, Mapping)
+                )
+                if notes is not None else 1
+            )
+            if calls:
+                self.budget.spend_provider(calls)
             if not batch:
                 # "No candidate was drafted" is one word for three different
                 # situations: the proposer's own call budget was already spent,
@@ -779,6 +790,7 @@ class CandidateDeveloper:
                 stopped_note = _batch_reason(drafted)
                 break
             candidate = dict(batch[0])
+            actual_route = route_of(candidate) or "unknown"
             version_id = self.graph.new_version_id()
             l0 = check_l0(
                 candidate,
@@ -853,7 +865,7 @@ class CandidateDeveloper:
                 if self.l1_runner is not None:
                     self.budget.l1_cases_used += self._replay_cost()
             record = self.graph.record(
-                route or "development",
+                actual_route,
                 version_id,
                 candidate,
                 parent=parent,
@@ -863,7 +875,8 @@ class CandidateDeveloper:
                     "capability_plan": self.capability_plan.get(
                         "classification", "",
                     ),
-                    "route": route,
+                    "route": actual_route,
+                    "planned_route": route,
                 }],
                 evaluation=None,
                 verdict={"l0": l0, "l1": l1},
@@ -874,7 +887,9 @@ class CandidateDeveloper:
                 "schema_version": DEVELOPMENT_SCHEMA,
                 "mechanism_id": self._mechanism_id(),
                 "parent_version_id": parent_version_id,
-                "action_class": route,
+                "action_class": actual_route,
+                "planned_route": route,
+                "route_replanned": actual_route != route,
                 "status": status,
                 "l0": l0,
                 "l1": l1,
@@ -898,6 +913,9 @@ class CandidateDeveloper:
                 "parent_version_id": parent_version_id,
                 "status": status,
                 "candidate_hash": record.get("candidate_hash"),
+                "route": actual_route,
+                "planned_route": route,
+                "route_replanned": actual_route != route,
                 "l0": l0,
                 "l1": l1,
             }
@@ -948,7 +966,8 @@ class CandidateDeveloper:
         return {
             "schema_version": DEVELOPMENT_SCHEMA,
             "mechanism_id": self._mechanism_id(),
-            "route": route,
+            "route": (route_of(selected_candidate) or "unknown") if selected_candidate else route,
+            "planned_route": route,
             "cycle": int(cycle),
             "versions": versions,
             "selected_version_id": selected,
@@ -1035,6 +1054,7 @@ def development_report(result: Mapping[str, Any]) -> dict[str, Any]:
         "schema_version": DEVELOPMENT_SCHEMA,
         "mechanism_id": result.get("mechanism_id"),
         "route": result.get("route"),
+        "planned_route": result.get("planned_route"),
         "cycle": result.get("cycle"),
         "status": result.get("status"),
         "stopped": result.get("stopped"),
@@ -1044,6 +1064,9 @@ def development_report(result: Mapping[str, Any]) -> dict[str, Any]:
                 "version_id": item.get("version_id"),
                 "parent_version_id": item.get("parent_version_id"),
                 "status": item.get("status"),
+                "route": item.get("route"),
+                "planned_route": item.get("planned_route"),
+                "route_replanned": item.get("route_replanned"),
                 "l0_passed": bool((item.get("l0") or {}).get("passed")),
                 "l1_passed": bool((item.get("l1") or {}).get("passed")),
                 "unmeasured": bool((item.get("l1") or {}).get("unmeasurable")),
