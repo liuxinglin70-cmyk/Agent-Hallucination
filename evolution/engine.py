@@ -30,10 +30,8 @@ from evolution.backends import (
     CACHE_FORMAT,
     DetectionBackend,
     LiveDetectorBackend,
-    file_digest,
-    fingerprint,
+    backend_runtime_identity,
     make_backend,
-    source_digest,
 )
 from evolution.config import ensure_dirs, load_config, resolve_path
 from detector.runtime import exclusive_writer
@@ -43,7 +41,7 @@ from evolution.contracts import (
     redact_case_ids,
     save_json,
 )
-from detector.config import detector_env_fingerprint
+from detector.identity import digest, source_identity, artifact_digest
 from detector.dataset import gold_fields
 from evolution.gates import (
     arm_has_infrastructure_failure,
@@ -1342,6 +1340,7 @@ class EvolutionEngine:
             config=self.config,
             registry=self.registry.registry,
             memory_root=self.memory_root,
+            runtime_identity=backend_runtime_identity(self.backend, cases=self.split.pool),
             cycle=cycle,
             parent_digest=parent,
         )
@@ -2429,8 +2428,8 @@ class EvolutionEngine:
                 ),
                 "cache_version": CACHE_FORMAT,
             },
-            "source": source_digest(),
-            "detector_config": file_digest(self.config.get("detector_config")),
+            "source": source_identity("detector", "evolution"),
+            "runtime_identity": backend_runtime_identity(self.backend, cases=self.split.pool),
             # The verdict is produced by the gates, so the gate thresholds are
             # part of its identity: reusing a verdict recorded under different
             # thresholds would certify gates that never ran in that form.
@@ -2449,16 +2448,9 @@ class EvolutionEngine:
             "coverage_response": dict(self.config.get("coverage_response") or {}),
             "replacement_gain_cases": sorted(self._replacement_gain_cases),
             "records": {
-                case: file_digest(Path(self.config["dataset_root"]) / case)
+                case: artifact_digest(Path(self.config["dataset_root"]) / case)
                 for case in [*self.split.sentinel, *self.split.gain]
             },
-            # The provider routes are part of the identity of every verdict the
-            # audit produces: the same code under a different model is a
-            # different measurement. The key list is the detector's own
-            # (``detector.config.DETECTOR_ENV_KEYS``), not a second copy of it,
-            # so a new override cannot be added to the resolver and stay
-            # invisible here.
-            "provider_routes": detector_env_fingerprint(),
         }
         cache_path = (
             self.paths["reports"] / "defect_audit_verdict.json"
@@ -2471,7 +2463,7 @@ class EvolutionEngine:
                 cached = None
         if (
             cached is not None
-            and cached.get("fingerprint") == fingerprint(fingerprint_payload)
+            and cached.get("fingerprint") == digest(fingerprint_payload)
         ):
             self._ledger("audit", {
                 "cycle": cycle,
@@ -2628,7 +2620,7 @@ class EvolutionEngine:
             # without ever re-measuring. That is the same defect as reading
             # "not measured" as "falsified" (see §32.3), one layer up.
             save_json(cache_path, {
-                "fingerprint": fingerprint(fingerprint_payload),
+                "fingerprint": digest(fingerprint_payload),
                 "passed": verdict["passed"],
                 "frozen": verdict["frozen"],
                 "reports": reports,
@@ -3321,20 +3313,18 @@ class EvolutionEngine:
         if started and not resume:
             raise RuntimeError(f"cycle {cycle} has already started; use --resume, not a new search")
         report_path = self.paths["cycles"] / f"cycle{cycle:03d}.json"
+        contract = {"schema_version": "evolution.cycle_contract.v2", "cycle": cycle, "config": digest(self.config), "source": source_identity("detector", "evolution"),
+                    "runtime_identity": backend_runtime_identity(self.backend, cases=self.split.pool),
+                    "split": split_manifest_report(self.split),
+                    "data": {case: artifact_digest(Path(self.config["dataset_root"]) / case) for case in self.split.pool}}
         if resume and report_path.exists():
             report = json.loads(report_path.read_text(encoding="utf-8"))
             if any(r["event"] == "cycle_completed" and r["payload"].get("cycle") == cycle for r in self.ledger.read()):
+                CycleJournal.load_state(
+                    self.paths["root"] / "checkpoints" / f"cycle{cycle:03d}" / "checkpoint.json", contract,
+                )
                 self.cycle_reports.append(report)
                 return report
-        contract = {"cycle": cycle, "config": fingerprint(self.config), "source": source_digest(),
-                    "detector_config": file_digest(self.config.get("detector_config")),
-                    # The provider routes are part of the machinery, not of the
-                    # data: a checkpoint written under model A may not be
-                    # resumed under model B, or the arms already recorded would
-                    # be attributed to the wrong measurement conditions.
-                    "detector_env": detector_env_fingerprint(),
-                    "split": split_manifest_report(self.split),
-                    "data": {case: file_digest(Path(self.config["dataset_root"]) / case) for case in self.split.pool}}
         # The contract deliberately excludes the registry hash: a cycle that
         # committed its own admission and then died must still be resumable.
         # The registry it started from is recorded separately and re-applied
@@ -5490,8 +5480,8 @@ def run_full_self_evolution(
             "evolution_cases": len(evolution_ids),
             "evaluation_cases": len(final_ids),
             "initial_registry_hash": engine.registry.registry_hash,
-            "source_digest": source_digest(),
-            "detector_config_digest": file_digest(cfg.get("detector_config")),
+            "source_digest": source_identity("detector", "evolution"),
+            "runtime_identity": backend_runtime_identity(engine.backend),
         })
     cycle_reports = []
     for path in sorted(engine.paths["cycles"].glob("cycle*.json")):

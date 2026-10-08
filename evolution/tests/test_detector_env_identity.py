@@ -161,9 +161,9 @@ def test_cycle_checkpoint_contract_carries_the_detector_environment(tmp_path):
         CycleJournal(tmp_path / "cycle001", changed, resume=True)
 
 
-def test_cycle_writes_the_detector_environment_into_its_contract(tmp_path):
-    """The engine's own contract, read back from the checkpoint on disk."""
-    from evolution.backends import MockDetectorBackend
+def test_cycle_writes_actual_backend_identity_into_its_contract(tmp_path):
+    """The engine pins its constructed backend rather than raw environment values."""
+    from evolution.backends import MockDetectorBackend, backend_runtime_identity
     from evolution.engine import EvolutionEngine
     from evolution.splits import EvolutionSplit
     from evolution.tests.test_engine_smoke import _config, _make_dataset
@@ -182,7 +182,7 @@ def test_cycle_writes_the_detector_environment_into_its_contract(tmp_path):
         (tmp_path / "work" / "checkpoints" / "cycle001" / "checkpoint.json")
         .read_text(encoding="utf-8")
     )["contract"]
-    assert contract["detector_env"] == detector_env_fingerprint()
+    assert contract["runtime_identity"] == backend_runtime_identity(engine.backend)
 
 
 def test_swapping_the_model_between_cycles_misses_the_cache(tmp_path, monkeypatch):

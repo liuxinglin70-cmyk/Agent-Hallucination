@@ -12,7 +12,7 @@ import json
 import threading
 import time
 
-from evolution.backends import fingerprint
+from detector.identity import digest
 from evolution.contracts import save_json
 
 
@@ -32,21 +32,12 @@ class CycleJournal:
         if self.path.exists():
             if not resume:
                 raise RuntimeError("cycle checkpoint exists; use --resume")
-            self.state = json.loads(self.path.read_text(encoding="utf-8"))
-            if self.state["contract"] != contract:
-                raise RuntimeError("resume fingerprint mismatch (code/config/data/split/registry changed)")
-            if self.state.get("proposing") and "proposal" not in self.state:
-                raise RuntimeError(
-                    "proposal call interrupted before persistence; refusing a "
-                    "new proposal draw for the same cycle. This refusal is "
-                    "deliberate: re-drawing would be additional proposal search "
-                    "on an already-fixed patrol. Recover by starting a new "
-                    "work_root/registry_dir/ledger_path for a fresh cycle."
-                )
+            self.state = self.load_state(self.path, contract)
         else:
             if resume:
                 raise RuntimeError("no checkpoint: historical incomplete cycles cannot be reconstructed")
             self.state = {
+                "schema_version": "evolution.cycle_checkpoint.v2",
                 "contract": contract, "status": "started", "used_seconds": 0.0,
             }
         if registry_before is not None and "registry_before" not in self.state:
@@ -57,6 +48,25 @@ class CycleJournal:
         self.previous_seconds = float(self.state.get("used_seconds", 0))
         self.save()
 
+    @staticmethod
+    def load_state(path: Path, contract: dict) -> dict:
+        if not path.exists():
+            raise RuntimeError("no checkpoint: historical incomplete cycles cannot be reconstructed")
+        state = json.loads(path.read_text(encoding="utf-8"))
+        if state.get("schema_version") != "evolution.cycle_checkpoint.v2":
+            raise RuntimeError("unsupported cycle checkpoint schema")
+        if state["contract"] != contract:
+            raise RuntimeError("resume fingerprint mismatch (code/config/data/split/registry changed)")
+        if state.get("proposing") and "proposal" not in state:
+            raise RuntimeError(
+                "proposal call interrupted before persistence; refusing a "
+                "new proposal draw for the same cycle. This refusal is "
+                "deliberate: re-drawing would be additional proposal search "
+                "on an already-fixed patrol. Recover by starting a new "
+                "work_root/registry_dir/ledger_path for a fresh cycle."
+            )
+        return state
+
     def save(self, **updates):
         with self.lock:
             self.state.update(updates)
@@ -64,21 +74,21 @@ class CycleJournal:
             save_json(self.path, self.state)
 
     def evaluate(self, cases, *, registry, fresh, evaluate, kwargs):
-        arm = fingerprint({"registry": registry, "fresh": fresh})
+        arm = digest({"registry": registry, "fresh": fresh})
 
         def one(case):
-            path = self.directory / "arms" / arm[:20] / (fingerprint(case)[:20] + ".json")
+            path = self.directory / "arms" / arm[:20] / (digest(case)[:20] + ".json")
             if path.exists():
                 envelope = json.loads(path.read_text(encoding="utf-8"))
                 if (envelope["arm"] != arm or envelope["row"]["case"] != case
-                        or fingerprint(envelope["row"]) != envelope["row_hash"]):
+                        or digest(envelope["row"]) != envelope["row_hash"]):
                     raise RuntimeError("checkpoint observation integrity failure")
                 return envelope["row"]
             result = evaluate([case], **{**kwargs, "workers": 1})
             if len(result) != 1 or result[0]["case"] != case:
                 raise RuntimeError("backend returned an incomplete case observation")
             row = result[0]
-            save_json(path, {"arm": arm, "row": row, "row_hash": fingerprint(row)})
+            save_json(path, {"arm": arm, "row": row, "row_hash": digest(row)})
             self.save()
             return row
 

@@ -8,7 +8,7 @@
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
 | 本轮已完成 | M00/M02 已验收；B01/B02/B03/B04/B09 关闭；M01 配置/Detector/批次身份已审查；B05 关闭（7f91c3e）；B07 已关闭（9c40b5c），51 项回归、2 项 CLI 回环及独立 19 项/81 个覆盖分区通过；B10/B11 已关闭（9dbf358），87 项回归与独立 17 项通过；B14 outcome 真源已审查（d14e5f9）；B13 已关闭（9b3bac0），观察期关闭/重开与解决记录幂等已审查 |
 | 代码实施 | 2/18 个工作包已验收；M01/M04/M06/M08/M15/M16 实施中，已修子任务见缺陷表；因果新功能及完整模块集成尚未完成 |
-| 下一工作包 | M15 普通定位/联合提前机会已审查；M04/B06 整例尝试成本记录已关闭，继续 M01 演化身份，供 M16 独立观察身份消费 |
+| 下一工作包 | M01 backend/cache 已审查，harness/checkpoint/审计身份已实现待审查；接续 M03/M07 引用合同，供因果功能消费 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
 | 更新时间 | 2026-10-08，Asia/Shanghai |
 
@@ -175,7 +175,7 @@ evolution/
 | ID | 工作包 | 前置 | 预计人日 | 状态 | 最新证据/提交/审查 |
 |---|---|---|---:|---|---|
 | M00 | 离线验证、合同基线、静态清理机制 | 本台账 | 1–2 | 已验收 | 4000669；4fcffecc/68845067：code_only 1020、AST/三 CLI 检查退出 0；平台 97f55299/8f21461a 52 通过；独立只读审查 review_4000669（12 项反例通过，无阻断） |
-| M01 | 配置与执行身份真源 | M00 | 2–3 | 实施中 | config.validate_config 为文件/直接配置唯一入口，causal 块保留且默认 off；数字范围/未知键/工件缺失验证；c58a147 配置独立 69 项通过；identity.py 已供 packet/api/runner 共用，B05 三项反例修复后 detector/repository/offline/backend/env 共 469 通过、5 未选，AST 67 文件通过；演化 backend baseline/cache 已绑定实际配置、record/packet、evidence、registry/replay 与完整源码；2 项旧缓存反例先失败后通过，扩展 143 项通过及新增 oracle 用例修正后 backend 20 项通过，AST 67 文件通过，待固定提交审查；harness/checkpoint 迁移未完成 |
+| M01 | 配置与执行身份真源 | M00 | 2–3 | 实施中 | config.validate_config 为文件/直接配置唯一入口，causal 块保留且默认 off；数字范围/未知键/工件缺失验证；c58a147 配置独立 69 项通过；identity.py 已供 packet/api/runner 共用，B05 三项反例修复后 detector/repository/offline/backend/env 共 469 通过、5 未选，AST 67 文件通过；演化 backend baseline/cache 已绑定实际配置、record/packet、evidence、registry/replay 与完整源码；eb49756：2 项旧缓存反例先失败后通过，扩展 143 项及 backend 20 项、独立 34 项/3 个篡改缓存反例通过；harness.v2/checkpoint.v2/审计消费实际 backend runtime 身份，完成报告复用的 3 个漂移反例先失败后通过，扩展 133 项及最终相关 55 项/AST 67 文件通过，待审查；晋升协议历史摘要/preflight 迁移未完成 |
 | M02 | Packet、投影、事件引用规范 | M00 | 2–3 | 已验收 | 565f191；detector 326、跨包 41、AST 66 文件通过；独立 review_offline_review 39 项通过，无阻断；window v2 技术合同已同步 |
 | M03 | 外部证据、谓词与引用权限 | M02 | 1–2 | 未开始 | — |
 | M04 | Provider、并发、预算、取消、请求记录 | M00 | 2–3 | 实施中 | B04 修复前 4 个反例失败，复用 bounded_map 后 runtime/voting/judge/provider 共 58 通过；B06 已关闭（a2fed20），execution.v2 与逐次落盘通过相关 82 项/批次失败 15 项/平台 3 项及独立 51 项/多票反例；完整共享预算继续实施 |
@@ -494,9 +494,9 @@ python -m experiments --help
 
 四项检查点（就地覆盖）：
 
-- **当前任务**：逐模块完成本期重构及因果接口；M01 演化 backend/cache 实际输入身份已实现，接续 harness/checkpoint 迁移。
-- **进度**：2/18 工作包已验收（M00/M02）；B01/B02/B03/B04/B05/B06/B07/B09/B10/B11/B13/B14 已关闭。ce6777d 普通/替换定位及联合单位 136 项回归、独立 18 项通过。B06 a2fed20：82 项相关、15 项批次失败、3 项平台及独立 51 项/三票并发反例通过。M01 backend/cache 两项缓存反例先失败后通过，扩展 143 项通过，新增 oracle 用例修正后 backend 20 项通过，AST 67 文件通过，待审查。M01/M04/M06/M08/M15/M16 仍实施中。
-- **下一步**：提交并有限审查 M01 backend/cache 身份；迁移 harness/checkpoint 的规范摘要与真实配置，随后接续 M03/M07 引用合同。M16 独立观察消费实际测量身份，不按 cycle 补造。
+- **当前任务**：逐模块完成本期重构及因果接口；M01 backend/cache 已审查，harness/checkpoint/审计的实际运行身份已实现，接续 M03/M07 引用合同。
+- **进度**：2/18 工作包已验收（M00/M02）；B01/B02/B03/B04/B05/B06/B07/B09/B10/B11/B13/B14 已关闭。B06 a2fed20：82 项相关、15 项批次失败、3 项平台及独立 51 项/三票并发反例通过。M01 eb49756：baseline/cache 独立 34 项及 3 个篡改缓存反例通过；harness.v2/checkpoint.v2/审计已用规范完整摘要和实际配置/工件/快照身份，完成报告恢复 3 个漂移反例先失败后通过，扩展 133 项及最终相关 55 项/AST 67 文件通过，待固定提交审查。M01/M04/M06/M08/M15/M16 仍实施中。
+- **下一步**：提交并有限审查 harness/checkpoint 身份迁移；建立 M03 统一轨迹引用验证入口并修 M07/B12 scoped semantic 缺引用补造和越范围引用。晋升协议/preflight 旧摘要消费者待对应入口迁移，M16 观察身份不按 cycle 补造。
 - **未定事项**：M08 成本按 invocation/attempt/lifetime 分离、路径及存储事务尚未完成；M17 包资源分发与跨平台能力待实际入口验证；本期不运行模型实验。用户允许子代理审查，要求优先重构、避免扩大护栏和审查工程。
 
 ## 12. 本期最终完成与延期项

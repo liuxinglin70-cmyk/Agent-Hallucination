@@ -124,6 +124,17 @@ def test_mock_cache_keeps_oracle_label_in_its_test_identity(tmp_path):
     assert changed["incident_occurred"] is False
 
 
+def test_runtime_identity_binds_selected_snapshot_contents():
+    from evolution.backends import backend_runtime_identity
+    backend = _backend()
+    snapshot = {"sources": [{"excerpt": "first"}]}
+    backend._evidence_provider = lambda case_id: snapshot
+    backend._evidence_cache = {}
+    first = backend_runtime_identity(backend, cases=["case"])
+    snapshot["sources"][0]["excerpt"] = "changed"
+    assert backend_runtime_identity(backend, cases=["case"]) != first
+
+
 def _scanner_candidate():
     return make_intervention(
         intervention_id="IV-S",

@@ -12,6 +12,7 @@ import copy
 
 import pytest
 
+from evolution.backends import backend_runtime_identity, MockDetectorBackend
 from evolution.config import load_config
 from evolution.harness import (
     COMPONENT_KEYS,
@@ -32,12 +33,30 @@ def _config():
 
 def _manifest(config=None, *, cycle=1, parent=None, memory_root=None):
     return build_manifest(
+        runtime_identity=backend_runtime_identity(MockDetectorBackend()),
         config=config or _config(),
         registry=None,
         memory_root=memory_root,
         cycle=cycle,
         parent_digest=parent,
     )
+
+
+def test_manifest_uses_full_finite_canonical_digests():
+    manifest = _manifest()
+    assert len(manifest["digest"]) == 64
+    assert all(len(component["digest"]) == 64 for component in manifest["components"].values())
+    config = _config()
+    config["budget"]["invalid"] = float("nan")
+    with pytest.raises(ValueError):
+        _manifest(config)
+
+
+def test_old_harness_schema_cannot_describe_a_new_generation():
+    manifest = _manifest()
+    manifest["schema_version"] = "evolution.harness.v1"
+    with pytest.raises(ValueError, match="schema"):
+        verify_manifest(manifest)
 
 
 def test_manifest_has_all_five_components_and_verifies():
@@ -91,6 +110,7 @@ def test_tools_component_tracks_the_registry():
     registry = make_registry([entry])
     manifest = build_manifest(
         config=_config(), registry=registry, memory_root=None, cycle=1,
+        runtime_identity=backend_runtime_identity(MockDetectorBackend()),
     )
     component = component_payload(manifest, "T")
     assert component["intervention_ids"] == ["IV-1-001"]

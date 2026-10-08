@@ -7,6 +7,52 @@ from evolution.checkpoint import CycleJournal
 from evolution.contracts import empty_registry
 
 
+def test_checkpoint_rejects_old_schema_without_rewriting_it(tmp_path):
+    path = tmp_path / "checkpoint.json"
+    original = b'{"contract": {}, "status": "started"}'
+    path.write_bytes(original)
+    with pytest.raises(RuntimeError, match="schema"):
+        CycleJournal(tmp_path, {}, resume=True)
+    assert path.read_bytes() == original
+
+
+@pytest.mark.parametrize("drift", ["config", "backend", "record"])
+def test_completed_cycle_resume_checks_execution_contract_before_reusing_report(tmp_path, drift):
+    from evolution.backends import MockDetectorBackend
+    from evolution.engine import EvolutionEngine
+    from evolution.proposer import ProposalBatch
+    from evolution.splits import EvolutionSplit
+    from evolution.tests.test_engine_smoke import _config, _make_dataset
+
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    config["audit"]["enabled"] = False
+    split = EvolutionSplit(name="synthetic", pool=cases, sentinel=cases[:4],
+                           gain=cases[4:12], patrol_pool=cases[12:], mini=True)
+    backend = MockDetectorBackend()
+    engine = EvolutionEngine(config, backend=backend, split=split, mini=True)
+    try:
+        report = engine.run_cycle(1, proposal_batch=ProposalBatch(candidates=[], joint_groups=[], notes=[]))
+        assert report["state"] == "completed"
+        assert engine.run_cycle(1, resume=True) == report
+        checkpoint = tmp_path / "work" / "checkpoints" / "cycle001" / "checkpoint.json"
+        before = checkpoint.read_bytes()
+        if drift == "config":
+            engine.config["cycles"] += 1
+        elif drift == "backend":
+            backend.base_predictions[cases[0]] = False
+        else:
+            path = tmp_path / "data" / cases[0]
+            record = json.loads(path.read_text(encoding="utf-8"))
+            record["question"] = "changed synthetic task"
+            path.write_text(json.dumps(record), encoding="utf-8")
+        with pytest.raises(RuntimeError, match="fingerprint mismatch"):
+            engine.run_cycle(1, resume=True)
+        assert checkpoint.read_bytes() == before
+    finally:
+        engine.close()
+
+
 def test_resume_keeps_completed_and_unresolved_observations(tmp_path):
     calls = []
     def evaluate(cases, **kwargs):

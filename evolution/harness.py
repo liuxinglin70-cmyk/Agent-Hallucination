@@ -1,32 +1,4 @@
-"""The harness manifest: H_t = (G, C, T, M, R) as a loadable artifact.
-
-The design document represents a generation of the system as a five-component
-tuple:
-
-* **G** workflow and state transitions
-* **C** context construction and information compression
-* **T** tools and skill implementations
-* **M** retrievable experience and skill memory
-* **R** routing, budget and stopping policy
-
-Until now that tuple existed only in prose. Nothing in the repository could
-answer "what exactly is version t?" or "what changed between t and t+1?", and
-a round's result could not be attributed to a component. This module makes the
-tuple a checkable artifact.
-
-Two properties matter more than completeness:
-
-1. **Derived, not asserted.** Every component is read out of the code and
-   configuration that actually run. If a stage entry point is renamed or a
-   context budget disappears, building the manifest fails instead of recording
-   a stale description.
-2. **Verifiable after the fact.** Each component carries a digest over its own
-   payload, and the manifest carries a digest over the components. Loading a
-   manifest re-derives those digests, so an edited manifest is detected rather
-   than silently trusted.
-
-A manifest is a description, never a score: it participates in no gate.
-"""
+"""Derived G/C/T/M/R harness manifests with verified component and generation identities."""
 
 from __future__ import annotations
 
@@ -34,10 +6,10 @@ import importlib
 from pathlib import Path
 from typing import Any, Mapping
 
-from evolution.backends import fingerprint
+from detector.identity import digest, source_identity
 from evolution.contracts import load_json, save_json
 
-HARNESS_SCHEMA = "evolution.harness.v1"
+HARNESS_SCHEMA = "evolution.harness.v2"
 HARNESS_FILENAME = "harness.json"
 HARNESS_HISTORY_NAME = "harness_history.jsonl"
 
@@ -115,14 +87,12 @@ def verify_workflow() -> dict[str, str]:
 
 
 def _workflow_component() -> dict[str, Any]:
-    from evolution.backends import source_digest
-
     from detector.interventions import HOOKS, INTERVENTION_TYPES
 
     return {
         "stages": list(WORKFLOW_STAGES),
         "entrypoints": verify_workflow(),
-        "source_digest": source_digest(),
+        "source_digest": source_identity("detector", "evolution"),
         "intervention_types": sorted(INTERVENTION_TYPES),
         "hooks": sorted(HOOKS),
         "execution_graph_rewrite": False,
@@ -173,9 +143,10 @@ def _memory_component(memory_root: str | Path | None) -> dict[str, Any]:
     return {"configured": True, "stores": summary}
 
 
-def _policy_component(config: Mapping[str, Any]) -> dict[str, Any]:
+def _policy_component(config: Mapping[str, Any], runtime_identity: Mapping[str, Any]) -> dict[str, Any]:
     """R: routing, budget and stopping policy, as configured."""
     return {
+        "runtime_identity": dict(runtime_identity),
         "patrol_registry": str(config.get("patrol_registry") or "active"),
         "cycles": int(config.get("cycles") or 0),
         "budget": dict(config.get("budget") or {}),
@@ -190,7 +161,7 @@ def _policy_component(config: Mapping[str, Any]) -> dict[str, Any]:
 def _component(version: str, payload: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "version": version,
-        "digest": fingerprint(dict(payload)),
+        "digest": digest(dict(payload)),
         "payload": dict(payload),
     }
 
@@ -200,6 +171,7 @@ def build_manifest(
     config: Mapping[str, Any],
     registry: Mapping[str, Any] | None,
     memory_root: str | Path | None,
+    runtime_identity: Mapping[str, Any],
     cycle: int = 0,
     parent_digest: str | None = None,
 ) -> dict[str, Any]:
@@ -209,7 +181,7 @@ def build_manifest(
         "C": _component("detector.context.v1", _context_component()),
         "T": _component("detector.tools.v1", _tools_component(registry)),
         "M": _component("evolution.memory.v1", _memory_component(memory_root)),
-        "R": _component("evolution.policy.v1", _policy_component(config)),
+        "R": _component("evolution.policy.v2", _policy_component(config, runtime_identity)),
     }
     manifest: dict[str, Any] = {
         "schema_version": HARNESS_SCHEMA,
@@ -218,7 +190,7 @@ def build_manifest(
         "components": components,
         "registry_hash": str((registry or {}).get("content_hash") or ""),
     }
-    manifest["digest"] = fingerprint(_digest_payload(manifest))
+    manifest["digest"] = digest(_digest_payload(manifest))
     return manifest
 
 
@@ -263,13 +235,13 @@ def verify_manifest(manifest: Mapping[str, Any]) -> dict[str, Any]:
         payload = component.get("payload")
         if not isinstance(payload, Mapping):
             raise ValueError(f"harness component {key} has no payload object")
-        recomputed = fingerprint(dict(payload))
+        recomputed = digest(dict(payload))
         if str(component.get("digest") or "") != recomputed:
             raise ValueError(
                 f"harness component {key} digest mismatch: "
                 f"recorded={component.get('digest')}, recomputed={recomputed}"
             )
-    expected = fingerprint(_digest_payload(manifest))
+    expected = digest(_digest_payload(manifest))
     if str(manifest.get("digest") or "") != expected:
         raise ValueError(
             f"harness manifest digest mismatch: recorded={manifest.get('digest')}, "
@@ -387,7 +359,7 @@ def _changed_top_level_keys(
     keys = set(before) | set(after)
     changed = []
     for key in sorted(keys):
-        if fingerprint(before.get(key)) != fingerprint(after.get(key)):
+        if digest(before.get(key)) != digest(after.get(key)):
             changed.append(str(key))
     return changed
 

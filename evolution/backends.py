@@ -20,14 +20,13 @@ from typing import Any, Iterable, Mapping, Sequence
 
 from detector.api import Detector
 from detector.config import (
-    detector_env_fingerprint,
     load_config as load_detector_config,
 )
 from detector.interventions import (
     build_intervention_registry,
     compile_runtime_plan,
 )
-from detector.identity import build_execution_identity, digest, source_identity
+from detector.identity import build_execution_identity, digest, source_identity, artifact_digest as declared_artifact_digest
 from detector.measurement import measurement_status
 from detector.packet import build_packet
 from detector.result import prediction_state
@@ -210,24 +209,42 @@ def _hooks_of(registry: Mapping[str, Any] | None) -> list[str]:
     })
 
 
+def backend_runtime_identity(backend: Any, *, cases: Sequence[str] = ()) -> dict[str, Any]:
+    underlying = getattr(backend, "backend", backend)
+    config = getattr(getattr(underlying, "detector", None), "config", {})
+    scorer = (config.get("causal_audit") or {}).get("scorer_artifact")
+    evidence_for = getattr(underlying, "evidence_for", None)
+    payload = {
+        "schema_version": "evolution.backend_runtime_identity.v1",
+        "source": source_identity("detector", "evolution"),
+        "backend": underlying.name, "effective_config": digest(config),
+        "artifacts": {"scorer": declared_artifact_digest(scorer)} if scorer is not None else {},
+        "evidence": {str(case): digest(evidence_for(str(case))) for case in sorted(cases)}
+        if callable(evidence_for) else {},
+        "mock": {"base": getattr(underlying, "base_predictions", None),
+                 "overrides": getattr(underlying, "overrides", None)},
+    }
+    return {**payload, "digest": digest(payload)}
+
+
 def backend_execution_identity(
     backend: Any, record: Mapping[str, Any], *, case_id: str,
     registry: Mapping[str, Any] | None = None, replay: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     detector = getattr(backend, "detector", None)
     config = getattr(detector, "config", {})
+    runtime_identity = backend_runtime_identity(backend)
     evidence_for = getattr(backend, "evidence_for", None)
     evidence = evidence_for(case_id) if callable(evidence_for) else None
     identity = build_execution_identity(
-        source=source_identity("detector", "evolution"), config=config,
+        source=runtime_identity["source"], config=config,
         record=record, packet=build_packet(record), evidence=evidence,
         registry=registry, replay=replay,
     )
     payload = {
         "schema_version": "evolution.backend_execution_identity.v1",
         "case_id": str(case_id), "backend": backend.name, "inputs": identity,
-        "mock": {"base": getattr(backend, "base_predictions", None),
-                 "overrides": getattr(backend, "overrides", None)},
+        "runtime": runtime_identity,
     }
     return {**payload, "digest": digest(payload)}
 
@@ -1018,7 +1035,7 @@ class CachingBackend(DetectionBackend):
         record: Mapping[str, Any],
     ) -> Path:
         safe_case = str(case_id).replace("/", "__").replace("\\", "__")
-        record_hash = fingerprint(record)
+        record_hash = digest(record)[:12]
         tag = ""
         if self._extra_key is not None:
             tag = "." + str(self._extra_key(case_id))
@@ -1177,7 +1194,7 @@ def evidence_namespace(
     corpus = load_corpus(resolve_path(str(block["corpus"]))) if block.get("corpus") else None
     return {
         "enabled": True,
-        "corpus": file_digest(
+        "corpus": declared_artifact_digest(
             resolve_path(str(block["corpus"])) / "corpus.json"
         ) if block.get("corpus") else "none",
         "cases": sorted(str(key) for key in (block.get("cases") or {})),
@@ -1186,10 +1203,10 @@ def evidence_namespace(
             for doc in (corpus["documents"] if corpus else [])
         },
         "pins": {
-            str(key): file_digest(resolve_path(str(path)))
+            str(key): declared_artifact_digest(resolve_path(str(path)))
             for key, path in (block.get("cases") or {}).items()
         },
-        "questions": fingerprint(block.get("questions") or {}),
+        "questions": digest(block.get("questions") or {}),
     }
 
 
@@ -1208,27 +1225,20 @@ def make_backend(
             base_predictions=mock_base,
             overrides=mock_overrides,
         )
-        namespace = "mock-" + CACHE_FORMAT + "-" + fingerprint({
+        namespace = "mock-" + CACHE_FORMAT + "-" + digest({
             "base": mock_base or {},
             "overrides": mock_overrides or {},
-        })
+        })[:12]
     elif name == "detector":
         provider = evidence_provider or build_evidence_provider(config)
         backend = LiveDetectorBackend(config, evidence_provider=provider)
-        namespace = "detector-" + CACHE_FORMAT + "-" + fingerprint({
+        namespace = "detector-" + CACHE_FORMAT + "-" + digest({
             "detector_config": digest(backend.detector.config),
             "dataset_root": str(resolve_path(config["dataset_root"])),
-            "source": source_digest(),
+            "source": source_identity("detector", "evolution"),
             "cache_scope": config.get("diagnostic_cache_scope"),
             "evidence": evidence_namespace(config, provider),
-            # The model, endpoint, temperature and the rest of the provider
-            # route come from ``DETECTOR_*`` overrides that ``resolve_route``
-            # reads at load time, so they are part of what a cached row
-            # measures. Without them a run under model B was served the rows
-            # model A produced -- same work root, same cache directory, no
-            # visible difference in any report.
-            "detector_env": detector_env_fingerprint(),
-        })
+        })[:12]
     else:
         raise ValueError(f"unknown evolution backend {name!r}")
     if bool(backend_cfg.get("cache", True)):
@@ -1407,6 +1417,8 @@ __all__ = [
     "REPLAY_STAGES",
     "artifact_digest",
     "artifact_manifest",
+    "backend_execution_identity",
+    "backend_runtime_identity",
     "replay_boundary",
     "CachingBackend",
     "DetectionBackend",
