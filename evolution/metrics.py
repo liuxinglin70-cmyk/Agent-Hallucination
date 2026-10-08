@@ -171,35 +171,46 @@ def evaluate_row_state(row: Mapping[str, Any]) -> str:
 
 
 
+class PairedCoverageError(ValueError):
+    """The measured arms do not cover the declared case set exactly once."""
+
+
 def confusion_rows(
     baseline_rows: Sequence[Mapping[str, Any]],
     active_rows: Sequence[Mapping[str, Any]],
     *,
     case_key: str = "case",
+    expected_cases: Collection[str] | None = None,
 ) -> list[dict[str, Any]]:
     base: dict[str, Mapping[str, Any]] = {}
     for row in baseline_rows:
         case = str(row.get(case_key) or "")
         if not case:
-            raise ValueError("paired metrics received a row without a case id")
+            raise PairedCoverageError("paired metrics received a row without a case id")
         if case in base:
-            raise ValueError(f"duplicate baseline case in paired metrics: {case}")
+            raise PairedCoverageError(f"duplicate baseline case in paired metrics: {case}")
         if row.get("gold") is not True and row.get("gold") is not False:
             raise ValueError(
                 f"paired metrics baseline gold is not boolean for case {case}"
             )
         base[case] = row
+    expected = set(expected_cases) if expected_cases is not None else set(base)
+    if set(base) != expected:
+        raise PairedCoverageError(
+            f"paired metrics baseline coverage mismatch: missing={sorted(expected - set(base))}, "
+            f"unexpected={sorted(set(base) - expected)}"
+        )
     active_seen: set[str] = set()
     rows: list[dict[str, Any]] = []
     for active in active_rows:
         case = str(active.get(case_key) or "")
         if not case:
-            raise ValueError("paired metrics received a row without a case id")
+            raise PairedCoverageError("paired metrics received a row without a case id")
         if case in active_seen:
-            raise ValueError(f"duplicate active case in paired metrics: {case}")
+            raise PairedCoverageError(f"duplicate active case in paired metrics: {case}")
         active_seen.add(case)
         if case not in base:
-            raise ValueError(
+            raise PairedCoverageError(
                 f"paired metrics received unexpected active case: {case}"
             )
         baseline = base[case]
@@ -221,7 +232,7 @@ def confusion_rows(
         })
     missing = sorted(set(base) - active_seen)
     if missing:
-        raise ValueError(
+        raise PairedCoverageError(
             "paired metrics missing active rows for case(s): "
             f"{missing[:5]}"
         )
@@ -273,6 +284,7 @@ def paired_delta(
     active_rows: Sequence[Mapping[str, Any]],
     *,
     unstable_cases: Collection[str] | None = None,
+    expected_cases: Collection[str] | None = None,
 ) -> dict[str, Any]:
     """Paired confusion delta for the same case set.
 
@@ -297,7 +309,7 @@ def paired_delta(
     and ``stability_applicable`` is false, so callers that have no reroll --
     frozen replays, promotion's cached arms -- keep their exact meaning.
     """
-    paired = confusion_rows(baseline_rows, active_rows)
+    paired = confusion_rows(baseline_rows, active_rows, expected_cases=expected_cases)
     base_correct = sum(
         1 for r in paired
         if r["baseline_prediction"] is not None

@@ -102,6 +102,8 @@ flowchart TD
     retain --> next
 ```
 
+L1 开发回放要求两臂恰好覆盖预定 target∪neighbor，每例各一行；配对指标模块统一验证覆盖和布尔 gold/prediction。覆盖缺失、非法读值和不健康运行归为未测，delta 留空，版本不能冻结。已知 gold step 时，定位回退只计基线原本精确命中而候选失去命中的案例；wrong→wrong 保持未改善。
+
 ### 模块职责
 
 | 模块组 | 文件 | 职责 |

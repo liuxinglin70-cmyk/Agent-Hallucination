@@ -40,7 +40,7 @@ from evolution.contracts import (
     structured_key,
 )
 from evolution.gates import arm_has_infrastructure_failure
-from evolution.metrics import paired_delta
+from evolution.metrics import PairedCoverageError, paired_delta, row_responsible_step
 from evolution.mechanisms import repair_requirements
 from evolution.metamorphic import admission_error
 from evolution.route_failures import route_of
@@ -342,43 +342,29 @@ def check_l1(
     localization: bool = False,
     gold_steps: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Targeted development replay: did the target move, and did neighbours hold.
-
-    Every condition is required, and they are deliberately not netted against
-    each other: an improvement on the target that breaks a neighbour is not a
-    partially good candidate, it is a candidate that must not be frozen. The
-    plan states this as the first negative integration test (§15.4).
-
-    The firing requirement comes from the same place: a candidate whose hook
-    never reached the runtime produced no evidence about the mechanism, so
-    "the target did not improve" would be the wrong reading of its failure.
-
-    A *target* case that regresses is the same kind of failure as a neighbour
-    that regresses, and is scored with the same function. The target set is
-    what this intervention claims to keep working and improve; reading only the
-    neighbours let a version that repaired one member of a two-case family
-    while losing the other pass L1 -- and with a two-member family, one lost
-    true positive is half the target set. ``target_unchanged`` stays what it
-    was: a case that neither improved nor regressed is not an improvement, so
-    it is still a reason to refuse the version ("no target case improved"),
-    but it is not by itself a regression. The regression and the paired delta
-    are also reported under their own names, so a reader can tell "this broke
-    something the baseline had right" from "this simply did not help".
-
-    ``gold_steps`` is the evaluator-side annotation. A localization target is
-    scored against it, not against "the step changed": a candidate that moves a
-    wrong step to a different wrong step has repaired nothing, and only the
-    annotation can tell the two apart (the same distinction the formal
-    localization gate draws).
-    """
+    """Score a complete targeted replay without netting gains against regressions."""
     gold_steps = dict(gold_steps or {})
+    try:
+        delta = paired_delta(
+            baseline_rows, candidate_rows,
+            expected_cases=set(target_cases) | set(neighbor_cases),
+        )
+    except PairedCoverageError as exc:
+        return _unmeasured_l1(target_cases, str(exc), "coverage_error")
+    except ValueError as exc:
+        return _unmeasured_l1(target_cases, str(exc), "invalid_measurement")
+    unhealthy = (
+        arm_has_infrastructure_failure(baseline_rows)
+        or arm_has_infrastructure_failure(candidate_rows)
+    )
+    if unhealthy:
+        return _unmeasured_l1(target_cases, unhealthy)
     baseline_by_case = {
         str(row.get("case") or ""): row for row in baseline_rows
     }
     candidate_by_case = {
         str(row.get("case") or ""): row for row in candidate_rows
     }
-    delta = paired_delta(list(baseline_rows), list(candidate_rows))
 
     target_improved: list[str] = []
     target_unchanged: list[str] = []
@@ -401,11 +387,6 @@ def check_l1(
         ):
             neighbor_regressed.append(str(case))
 
-    # The target cases get the same regression reading as the neighbours, and
-    # under their own name: ``target_regressed`` and ``neighbor_regressed``
-    # answer different questions (did this candidate damage what it claimed to
-    # fix, versus did it damage something unrelated) and a reader that had to
-    # tell them apart by looking at case ids could not.
     target_regressed: list[str] = []
     for case in target_cases:
         base = baseline_by_case.get(str(case)) or {}
@@ -470,10 +451,19 @@ def check_l1(
         "fired_cases": fired_cases,
         "delta": delta,
         "reasons": reasons,
-        # Machine-readable half of ``reasons``, in the same order. The archive
-        # reads this key to answer "how did this fail" without parsing prose,
-        # and until now the producer of L1 never wrote it.
         "reason_codes": reason_codes,
+    }
+
+
+def _unmeasured_l1(
+    target_cases: Sequence[str], reason: str, code: str = "unmeasurable",
+) -> dict[str, Any]:
+    return {
+        "level": "L1", "passed": False, "unmeasurable": True,
+        "reasons": [f"unmeasurable: {reason}"], "reason_codes": [code],
+        "target_improved": [], "target_unchanged": list(target_cases),
+        "target_regressed": [], "neighbor_regressed": [], "fired_cases": [],
+        "delta": {},
     }
 
 
@@ -543,7 +533,10 @@ def _case_improved(
             # from a differently wrong one, so no localization improvement can
             # be claimed. The caller passes the annotation whenever it has it.
             return False
-        return _step(candidate) == annotated and _step(baseline) != annotated
+        return (
+            row_responsible_step(candidate) == annotated
+            and (base_prediction is not True or row_responsible_step(baseline) != annotated)
+        )
     if gold is None:
         return False
     if base_prediction == gold:
@@ -572,12 +565,15 @@ def _case_regressed(
             # With the annotation, the question is whether a case the baseline
             # localized correctly still does.
             return (
-                candidate_prediction is not True
-                or _step(candidate) != annotated
+                row_responsible_step(baseline) == annotated
+                and (candidate_prediction is not True
+                     or row_responsible_step(candidate) != annotated)
             )
         # A conviction that stops naming a step is a localization regression
         # even though the binary decision is unchanged.
-        return candidate_prediction is not True or _step(candidate) is None
+        return row_responsible_step(baseline) is not None and (
+            candidate_prediction is not True or row_responsible_step(candidate) is None
+        )
     if gold is None:
         return False
     if base_prediction != gold:
@@ -594,16 +590,6 @@ def _step_of(value: Any) -> int | None:
     except (TypeError, ValueError):
         return None
     return step if step > 0 else None
-
-
-def _step(row: Mapping[str, Any]) -> int | None:
-    value = row.get("responsible_step")
-    if value is None:
-        value = (row.get("result") or {}).get("responsible_step")
-    try:
-        return int(value) if value is not None else None
-    except (TypeError, ValueError):
-        return None
 
 
 class CandidateDeveloper:
@@ -818,29 +804,8 @@ class CandidateDeveloper:
                 except DevelopmentUnmeasurable as exc:
                     baseline_rows, candidate_rows = [], []
                     unmeasurable = str(exc.reason)
-                if not unmeasurable and (
-                    not baseline_rows or not candidate_rows
-                ):
-                    unmeasurable = "no development measurement available"
-                if not unmeasurable:
-                    unmeasurable = (
-                        arm_has_infrastructure_failure(baseline_rows)
-                        or arm_has_infrastructure_failure(candidate_rows)
-                    )
                 if unmeasurable:
-                    l1 = {
-                        "level": "L1",
-                        "passed": False,
-                        "unmeasurable": True,
-                        "reasons": [f"unmeasurable: {unmeasurable}"],
-                        "reason_codes": ["unmeasurable"],
-                        "target_improved": [],
-                        "target_unchanged": list(self.target_cases),
-                        "target_regressed": [],
-                        "neighbor_regressed": [],
-                        "fired_cases": [],
-                        "delta": {},
-                    }
+                    l1 = _unmeasured_l1(self.target_cases, unmeasurable)
                 else:
                     l1 = check_l1(
                         baseline_rows=baseline_rows,

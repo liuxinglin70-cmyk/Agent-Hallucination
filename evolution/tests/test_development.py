@@ -483,6 +483,67 @@ def test_l1_localization_needs_the_annotation_to_claim_an_improvement():
     assert result["passed"] is False
 
 
+def test_l1_cannot_pass_when_both_arms_omit_the_expected_neighbor():
+    result = check_l1(
+        baseline_rows=[row("target", arm="baseline", gold=True, prediction=False)],
+        candidate_rows=[row("target", arm="candidate", gold=True, prediction=True)],
+        target_cases=["target"], neighbor_cases=["neighbor"],
+    )
+    assert result["passed"] is False
+    assert result["unmeasurable"] is True
+    assert result["target_improved"] == []
+    assert result["delta"] == {}
+    assert "coverage_error" in result["reason_codes"]
+
+
+@pytest.mark.parametrize("fault", ["single_missing", "duplicate", "extra", "invalid_gold"])
+def test_l1_reports_invalid_measurements_without_scoring_them(fault):
+    baseline = [row("target", arm="baseline", gold=True, prediction=False),
+                row("neighbor", arm="baseline", gold=False, prediction=False)]
+    active = [row("target", arm="candidate", gold=True, prediction=True),
+              row("neighbor", arm="candidate", gold=False, prediction=False)]
+    if fault == "single_missing":
+        active.pop()
+    elif fault == "duplicate":
+        active.append(active[0])
+    elif fault == "extra":
+        active.append(row("extra", arm="candidate", gold=False, prediction=False))
+    else:
+        active[0]["gold"] = "true"
+    result = check_l1(baseline_rows=baseline, candidate_rows=active,
+                      target_cases=["target"], neighbor_cases=["neighbor"])
+    assert result["passed"] is False
+    assert result["unmeasurable"] is True
+    assert result["delta"] == {}
+
+
+@pytest.mark.parametrize("before,after,regressed", [(2, 2, False), (2, 4, False),
+                                                  (2, 5, False), (5, 4, True)])
+def test_l1_localization_regression_requires_a_baseline_gold_hit(before, after, regressed):
+    baseline = [row("repair", arm="baseline", gold=True, prediction=True, step=1),
+                row("preserve", arm="baseline", gold=True, prediction=True, step=before)]
+    active = [row("repair", arm="candidate", gold=True, prediction=True, step=3),
+              row("preserve", arm="candidate", gold=True, prediction=True, step=after)]
+    result = check_l1(baseline_rows=baseline, candidate_rows=active,
+                      target_cases=["repair", "preserve"], neighbor_cases=[],
+                      localization=True, gold_steps={"repair": 3, "preserve": 5})
+    assert result["target_regressed"] == (["preserve"] if regressed else [])
+    assert result["passed"] is (not regressed)
+
+
+def test_developer_keeps_incomplete_coverage_unmeasured_and_cannot_freeze(tmp_path):
+    def runner(cases, *, candidate, plan):
+        return [row("A/001.json", arm="baseline", gold=True, prediction=False),
+                row("A/001.json", arm="candidate", gold=True, prediction=True,
+                    proof=fired("IV-1-001"))]
+    developer = _developer(tmp_path, l1_runner=runner)
+    result = developer.develop(lambda *args: [candidate()], cycle=1, max_versions=1)
+    assert result["versions"][0]["status"] == "unmeasured"
+    assert result["selected_version_id"] == ""
+    with pytest.raises(ValueError, match="not ready_for_freeze"):
+        developer.freeze("v001")
+
+
 # --------------------------------------------------------------------------
 # The loop: lineage, budget, and freeze
 # --------------------------------------------------------------------------
