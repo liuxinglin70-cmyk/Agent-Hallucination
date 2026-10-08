@@ -217,6 +217,7 @@ def test_record_request_outside_a_scope_is_a_no_op():
 # --------------------------------------------------------------------------
 
 
+@pytest.mark.platform
 def test_exclusive_writer_refuses_a_second_process(tmp_path):
     """Two processes on one work_root overwrote each other's run state.
 

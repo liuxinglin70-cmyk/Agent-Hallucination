@@ -19,6 +19,8 @@ These tests lock the reading that closes that hole. What must hold:
 
 from __future__ import annotations
 
+import pytest
+
 from evolution.metrics import protection_repair
 
 
@@ -83,6 +85,7 @@ def test_going_unresolved_is_not_a_regression_but_is_reported():
     assert repair["unresolved_added"] == 1
 
 
+@pytest.mark.local_data
 def test_repair_reading_matches_the_archived_run():
     """Pin the real reading that motivated the change.
 

@@ -102,6 +102,7 @@ def _protocol(tmp_path: Path, *, roles: dict[str, str], gold_steps: dict | None 
         workers=2,
         timeout_seconds=600,
         reason="test",
+        framework_config={"registry_dir": str(tmp_path / "registry")},
     )
     # load_protocol re-derives labels from the dataset; the offline harness
     # supplies them directly so the batch never touches the raw corpus.
@@ -815,12 +816,14 @@ def test_refreezing_the_same_batch_at_a_new_path_is_refused(tmp_path):
             tmp_path / name, batch_path=batch, roles=roles, gold=gold,
             detector_config=detector_config, workers=2, reason="first",
             ledger=ledger,
+            framework_config={"registry_dir": str(tmp_path / "registry")},
         )
     with pytest.raises(PromotionProtocolError) as exc:
         freeze_protocol(
             tmp_path / "protocol_again.json", batch_path=batch, roles=roles,
             gold=gold, detector_config=detector_config, workers=2,
             reason="retry", ledger=ledger,
+            framework_config={"registry_dir": str(tmp_path / "registry")},
         )
     assert "already frozen" in str(exc.value)
     # The refusal is recorded, not silently absorbed: the ledger still verifies.
@@ -872,6 +875,7 @@ def test_replacing_a_learned_artifact_refuses_the_frozen_protocol(tmp_path):
         protocol_path, batch_path=batch, roles=roles, gold=gold,
         detector_config=detector_config, workers=2,
         artifact_paths=[weights],
+        framework_config={"registry_dir": str(tmp_path / "registry")},
     )
     frozen = json.loads(protocol_path.read_text(encoding="utf-8"))
     assert frozen["artifact_manifest"]["artifacts"][str(weights)]
@@ -901,6 +905,7 @@ def test_a_protocol_without_learned_artifacts_records_that_explicitly(tmp_path):
     protocol = freeze_protocol(
         tmp_path / "protocol.json", batch_path=batch, roles=roles, gold=gold,
         detector_config=detector_config, workers=2,
+        framework_config={"registry_dir": str(tmp_path / "registry")},
     )
     manifest = protocol["artifact_manifest"]
     assert manifest["artifacts"] == {}

@@ -9,11 +9,12 @@ said which was which.
 
 from __future__ import annotations
 
+from dataclasses import replace
 import json
-from pathlib import Path
 
 import pytest
 
+from detector.runner import safe_case_id
 from detector.result import RESULT_SCHEMA
 from experiments.plan import (
     load_measurement,
@@ -21,8 +22,6 @@ from experiments.plan import (
 )
 from experiments.report import StageReport, summarize_stage
 from experiments.runner import paired_sample, plan_status
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _result(case_id, *, state="verified_clean", authority="authoritative",
@@ -227,33 +226,52 @@ def test_report_writing_is_json_round_trippable(tmp_path):
     assert again["coverage"] == payload["coverage"]
 
 
+@pytest.fixture
+def measured_runs(tmp_path):
+    plan = load_plan()
+    cases = ["Synthetic/a.json", "Synthetic/b.json", "Synthetic/c.json"]
+    plan = replace(plan, measurement=replace(plan.measurement, cases=cases))
+    runs = tmp_path / "runs"
+    data = tmp_path / "data"
+    for case in cases:
+        record = data / case
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text(json.dumps({"question": "2+2", "history": [], "is_hallucination": False}), encoding="utf-8")
+    for arm, measured in (("g0", cases[:2]), ("g0_roll2", cases[1:])):
+        for case in measured:
+            folder = runs / arm / "cases" / safe_case_id(case)
+            folder.mkdir(parents=True)
+            (folder / "result.json").write_text(json.dumps(_result(case)), encoding="utf-8")
+    return plan, runs, data
+
+
 # --------------------------------------------------------------------------
 # pairing is decided by measurement, and the bias is stated
 # --------------------------------------------------------------------------
 
 
-def test_paired_sample_uses_only_cases_both_arms_measured():
+def test_paired_sample_uses_only_cases_both_arms_measured(measured_runs):
     """Pairing requires the same case on both sides, by construction."""
-    plan = load_plan()
-    sample = paired_sample(plan, REPO_ROOT / "artifacts/baseline/runs",
+    plan, runs, _ = measured_runs
+    sample = paired_sample(plan, runs,
                            ["g0", "g0_roll2"])
     assert sample["size"] > 0
     assert sample["size"] <= min(sample["arms"].values())
     assert all(case in plan.measurement.cases for case in sample["common"])
 
 
-def test_paired_sample_says_what_conditioning_on_measurement_costs():
+def test_paired_sample_says_what_conditioning_on_measurement_costs(measured_runs):
     """The common set is difficulty-biased; the report must not hide that."""
-    plan = load_plan()
-    sample = paired_sample(plan, REPO_ROOT / "artifacts/baseline/runs",
+    plan, runs, _ = measured_runs
+    sample = paired_sample(plan, runs,
                            ["g0", "g0_roll2"])
     assert "biased" in sample["note"]
     assert "not by their verdicts" in sample["note"]
 
 
-def test_plan_status_lists_the_arms_that_do_not_exist_yet():
-    plan = load_plan()
-    status = plan_status(plan, REPO_ROOT / "artifacts/baseline/runs")
+def test_plan_status_lists_the_arms_that_do_not_exist_yet(measured_runs):
+    plan, runs, _ = measured_runs
+    status = plan_status(plan, runs)
     assert status["arms"]["g0"]["exists"] is True
     assert status["arms"]["g1"]["exists"] is False
     assert status["shared_prefix"] is not None
@@ -279,18 +297,20 @@ def test_two_rolls_of_one_registry_are_recognised_as_noise():
     assert _shared_registry(plan, ["g0", "g1"]) is False
 
 
-def test_the_paired_command_labels_a_same_registry_pair_as_noise():
+def test_the_paired_command_labels_a_same_registry_pair_as_noise(measured_runs, monkeypatch):
     """The CLI must not print an effect verdict it is not entitled to."""
     from experiments.__main__ import main
     import io
     import contextlib
 
-    plan = load_plan()
+    plan, runs, data = measured_runs
+    monkeypatch.setattr("experiments.__main__.load_plan", lambda **_: plan)
     from experiments.runner import _shared_registry
     assert _shared_registry(plan, ["g0", "g0_roll2"]) is True
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer):
-        code = main(["paired", "--arm", "g0", "--arm", "g0_roll2"])
+        code = main(["paired", "--arm", "g0", "--arm", "g0_roll2",
+                     "--runs-root", str(runs), "--dataset-root", str(data)])
     assert code == 0
     payload = json.loads(buffer.getvalue())
     assert payload["reading"] == "noise_floor"

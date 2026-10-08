@@ -33,5 +33,8 @@ addopts = "--import-mode=importlib"
 pythonpath = ["."]
 junit_family = "xunit2"
 markers = [
+    "code_only: synthetic inputs and temporary fixtures; no raw data or historical run outputs",
+    "local_data: read-only local corpus or evidence validation",
+    "platform: loopback HTTP, subprocess, locking, sandbox or installation checks",
     "slow: launches a real subprocess to prove a resource limit holds; kept in the default run because the limit is only credible when it is exercised",
 ]

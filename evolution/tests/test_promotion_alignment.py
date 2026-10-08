@@ -513,6 +513,7 @@ def test_mechanism_bound_candidate_cannot_be_used_with_a_v1_protocol(tmp_path):
         gold={case: GOLD[case] for case in GAIN + PROTECTION},
         detector_config=detector_config,
         workers=1,
+        framework_config={"registry_dir": str(tmp_path / "registry")},
     )
     v1["loaded_from"] = str(tmp_path / "v1.json")
     v1["resolved_cases"] = sorted(GAIN + PROTECTION)

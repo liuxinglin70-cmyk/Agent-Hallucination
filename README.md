@@ -27,7 +27,7 @@ python -m pip install -e ".[test]"
 python -m detector --help
 python -m evolution --help
 python -m experiments --help
-python scripts/verify.py
+python scripts/verify.py --scope code_only
 ```
 
 真实检测需要本地模型服务凭据，会产生模型调用：

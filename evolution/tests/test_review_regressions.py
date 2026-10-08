@@ -105,7 +105,8 @@ def test_freezing_twice_without_a_ledger_still_guards_one_path(tmp_path):
     gold = {"A/001.json": True, "A/002.json": False, "C/001.json": True,
             "C/002.json": True, "E/001.json": False, "E/002.json": False}
     kwargs = dict(batch_path=batch, roles=roles, gold=gold,
-                  detector_config=detector_config, workers=2)
+                  detector_config=detector_config, workers=2,
+                  framework_config={"registry_dir": str(tmp_path / "registry")})
     freeze_protocol(tmp_path / "protocol.json", **kwargs)
     with _pytest.raises(PromotionProtocolError) as exc:
         freeze_protocol(tmp_path / "protocol.json", **kwargs)

@@ -827,9 +827,12 @@ def test_development_never_measures_on_formal_gain_cases(tmp_path):
         patrol_pool=cases[8:], mini=True,
     )
     config = load_config()
-    config["dataset_root"] = str(tmp_path)
+    config.update({"dataset_root": str(tmp_path), "work_root": str(tmp_path / "work"),
+                   "registry_dir": str(tmp_path / "registry"),
+                   "ledger_path": str(tmp_path / "ledger.jsonl"),
+                   "harness_dir": str(tmp_path / "harness"), "memory_root": str(tmp_path / "memory")})
     engine = EvolutionEngine(config, split=split, mini=True)
-    with pytest.raises(ValueError, match="formal evaluation cases"):
+    with engine, pytest.raises(ValueError, match="formal evaluation cases"):
         engine.develop_rows(
             [cases[4]], candidate=candidate(), split=split,
         )

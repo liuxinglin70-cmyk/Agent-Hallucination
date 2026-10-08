@@ -6,9 +6,9 @@
 |---|---|
 | 当前任务 | 逐模块重构现有框架、修复根因缺陷、实现疑惑度与因果审计功能；本期仅代码工作 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | 仓库只读审查、部分缺陷纯内存复现、Pristine 核对、模块/离线验收设计及三路方案审查，已处理所提文案问题 |
-| 代码实施 | 0/18 个工作包验收完成；本轮没有修改业务代码 |
-| 下一工作包 | M00：建立可复用的离线验证入口，捕获现有代码行为和缺陷回归 |
+| 本轮已完成 | 实施基线 d3028b2；离线护栏、验证分组、隔离报告和 AST 入口实施中；首轮 code_only 1019 通过，AST 检出 B09 |
+| 代码实施 | 0/18 个工作包验收完成；M00 实施与复核中，B09 无消费者重复定义已删除 |
+| 下一工作包 | M00：完成平台验证及固定反例；先清理 AST 已检出的 B09，再进入根因修复 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
 | 更新时间 | 2026-10-08，Asia/Shanghai |
 
@@ -93,7 +93,7 @@ Python 的真源标注使用合法的 `# SOURCE: <symbol>`，只指向符号，�
 | B06 | `runner.py:147–153`、`api.py:348–373`：整例重试只返回最后一次 execution，早期请求与 token 遗失 | case 级统一 attempt journal 与成本归并，不覆盖早期尝试 | M04/M08 | 已复现，待修 |
 | B07 | `runner.py:445–459`：completed 从已有 rows 再减包含 missing 的 not_started；1 row/3 requested 得 -1 | 从预期案例和实际终态集合定义各计数，确保分母守恒 | M08 | 已复现，待修 |
 | B08 | `experiments/__main__.py:159` 默认 g0；`runner.py:76–86` 仅直接识别 empty，默认入口报需 registry | arm 名称按 `ExperimentPlan.arms` 解析，一处处理角色和 registry | M17 | 已复现，待修 |
-| B09 | `evolution/metrics.py:1062,1097` 重复定义 `_step_kind_split`，后者覆盖前者且注明未使用 | 核销调用后删除被覆盖定义和无消费者 shim，保留实际指标真源 | M15 | 静态确认，待清理 |
+| B09 | AST 基线报告明确检出两个 `_step_kind_split`；全仓调用检索只有两个定义，无消费者 | 删除两个无消费者定义，保留实际 `_joint_kind_split` 真源 | M15 | 修复待验证；当前工作区 |
 | B10 | `development.py:375–402,562–563`：双臂同时漏掉预期 neighbor，目标改善仍能通过 L1 | 配对评分前要求两臂恰好覆盖 target∪neighbor；缺测独立返回 | M15 | 已复现，待修 |
 | B11 | `development.py:567–577`：gold step 已知时，wrong→same wrong 被计为 regression，即使另一 target 改善 | 回退按 baseline 原本命中→失去命中定义；检测/权威退化单独处理 | M15 | 已复现，待修 |
 | B12 | `interventions.py:1655`：scoped semantic refs 未验证存在/范围；空 refs 自动填满窗口 | 统一 executor 输出合同，引用必须由生产者提供并验证，不补造来源 | M07 | 静态确认，待修 |
@@ -174,7 +174,7 @@ evolution/
 
 | ID | 工作包 | 前置 | 预计人日 | 状态 | 最新证据/提交/审查 |
 |---|---|---|---:|---|---|
-| M00 | 离线验证、合同基线、静态清理机制 | 本台账 | 1–2 | 未开始 | — |
+| M00 | 离线验证、合同基线、静态清理机制 | 本台账 | 1–2 | 待审查 | 基线 code_only 1019/平台 52 通过（AST B09 导致整体退出 1）；数据边界暴露的 33 项夹具依赖已隔离，受影响 59 项回归通过；4fcffecc/68845067 完整代码组验证运行中 |
 | M01 | 配置与执行身份真源 | M00 | 2–3 | 未开始 | — |
 | M02 | Packet、投影、事件引用规范 | M00 | 2–3 | 未开始 | — |
 | M03 | 外部证据、谓词与引用权限 | M02 | 1–2 | 未开始 | — |
@@ -451,7 +451,7 @@ causal_recall_decision(audit, *, judge_result, policy, budget) -> dict
 
 已有测试起点：`detector/tests/test_api.py/test_packet.py/test_scoped_semantic_projection.py/test_terminal_authority.py/test_voting_hearings.py/test_provider.py/test_runtime.py`，`evolution/tests/test_backends.py/test_development.py/test_localization_objective.py/test_measurement_integrity.py/test_promotion_integrity.py/test_checkpoint.py` 和根目录跨包测试。实施时按受影响路径选择，不能只测新辅助函数。
 
-M00 将测试显式归为 `code_only`（合成/临时夹具、无真实数据）、`local_data`（只读原始数据/证据核验）和 `platform`（锁、worker、沙箱及安装环境）并注册标记。完整集合仍用于对应环境回归；不能用忽略失败代替分组。下面是分组和测试 guard 落地后的模板，本轮没有执行测试套件：
+M00 已将测试显式归为 `code_only`（合成/临时夹具、无真实数据）、`local_data`（只读原始数据/证据核验）和 `platform`（锁、worker、沙箱及安装环境）并注册标记。完整集合仍用于对应环境回归；不能用忽略失败代替分组。纯代码组拒绝访问仓库原始数据及历史 artifacts，子进程继承回环网络边界。验证入口：
 
 ```powershell
 python -m pytest -q -p no:cacheprovider -m code_only detector/tests/test_packet.py detector/tests/test_api.py
@@ -462,11 +462,11 @@ python -m evolution --help
 python -m experiments --help
 ```
 
-新验证命令的 CLI 名称由 M00 决定并就地更新，不能在实现之前声称命令可用。需要 JUnit/报告时输出到隔离 code_quality 目录。
+`python scripts/verify.py --scope code_only` 为默认纯代码入口；`--scope platform` 执行平台组，`--scope local_data` 执行只读本地数据核验及依赖本地数据的 Mock CLI 验证，`--scope all` 要求全部前置。报告写入 `artifacts/code_quality/<source_sha256>/<run_id>/`，记录命令、退出码、源码、环境和未运行分组。
 
 模块涉及的平台项单独执行并记录前置能力；数据/证据完整性项只有相关本地输入存在时运行。无筛选的全套 pytest 仅在全部所需数据/平台前置满足且禁公网护栏生效后执行。必要的平台验证受阻时模块保持待验收/阻塞，不因纯代码组通过就声称整包完成。
 
-当前 `scripts/verify.py` 没有真实模型测量，但要求完整 raw 数据并覆盖 `artifacts/latest`；本期不直接把它作为无条件验收入口。M00/M17 分离纯代码验证、本地数据完整性及环境能力项，保留必要功能，不复制第二套完整 verify。
+`scripts/verify.py` 已分离纯代码、本地数据和平台验证，默认不要求 raw 数据，不覆盖 `artifacts/latest`；原有 Mock/数据核验功能在显式本地数据范围保留。
 
 真实 `detector detect/batch`、`evolution experiment`、`experiments baseline`、live smoke、noise-floor、paired endpoint、研究轮及真实预检的调用不得在本期执行。CLI 功能测试只能使用明确 Fake/回环配置，不能落到默认真实 endpoint。
 
@@ -494,10 +494,10 @@ python -m experiments --help
 
 四项检查点（就地覆盖）：
 
-- **当前任务**：完成本期代码优化方案与持久实施入口。
-- **进度**：计划、模块审查、部分纯内存复现和三路方案审查完成；业务代码尚未实施，全部工作包未验收。
-- **下一步**：从 M00 建立隔离离线验证路径，固化高优先级最小回归；B09–B11、B13/B14 可提前修，后者分别归 M16 reducer 与 M15 outcome 真源。
-- **未定事项**：M17 的实际包分发需求、特定平台沙箱能力在对应代码包验证；没有等待实验的前置事项。
+- **当前任务**：完成本期代码重构、风险与因果接口；当前完成 M00 基础设施并进入已确认根因修复。
+- **进度**：基线提交 d3028b2；离线分组、网络/数据边界、独立报告、AST 已接通 verify 正式入口；历史运行依赖改为临时夹具，B09 两个无消费者定义删除；完整受保护代码组验证运行中。
+- **下一步**：收取 4fcffecc/68845067 验证终态并做有限独立审查；逐项修 B04、B01/B02、B03 与 B10/B11/B13/B14，然后推进配置/身份和新因果接口。
+- **未定事项**：M17 包资源分发与跨平台能力按实际入口验证；本期不运行模型实验。用户已允许子代理审查，并要求优先重构、避免扩大护栏和审查工程。
 
 ## 12. 本期最终完成与延期项
 
@@ -511,4 +511,4 @@ python -m experiments --help
 | 外部新轨迹、人工因果标注和独立泛化评估 | 保留研究设计引用，不启动采集或标注 |
 | 新行为生产激活与真实多轮准入 | 配置默认关闭；本期只以 Fake 验证完整接口和门 |
 
-本轮方案验证仅包括源文件审查、AST 检查、若干确定性内存复现及文档链接/结构检查。没有运行完整 pytest、没有扫描结果冒充清理完成、没有付费模型调用、没有重写历史原始证据。
+当前验证证据见 §6 和四项检查点；固定 Pristine 扫描器已验证与上游固定提交文本相同，selftest 通过，4fcffecc/pristine_00bf223e 报告记录 209 个文本命中。关键词命中不是删除依据；历史读者、保护门键和约束参数保留，各模块中的失效说明及无调用定义继续核销。没有真实模型请求，没有改写历史原始证据。

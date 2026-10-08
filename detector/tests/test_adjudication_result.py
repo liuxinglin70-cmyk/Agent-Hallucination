@@ -229,7 +229,7 @@ def test_result_envelope_and_prediction(sample_packet):
     assert prediction_state(output) is True
 
 
-def test_convict_mechanical_violation_promotes_clean_to_error(sample_packet):
+def test_convict_mechanical_violation_promotes_clean_to_error(sample_packet, synthetic_conviction_calibration):
     """The recall-side execution surface: a guard may convict on mechanical
     evidence even when no preliminary positive exists."""
     proof = adjudicate(
@@ -262,7 +262,7 @@ def test_convict_mechanical_violation_promotes_clean_to_error(sample_packet):
     )
 
 
-def test_convict_guard_localizes_to_delivered_anchor(sample_packet):
+def test_convict_guard_localizes_to_delivered_anchor(sample_packet, synthetic_conviction_calibration):
     """The conviction anchors on the delivered-answer event, not step 1."""
     proof = adjudicate(
         packet=sample_packet,

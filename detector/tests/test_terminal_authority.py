@@ -345,7 +345,7 @@ def test_evidence_only_row_forged_into_mechanical_evidence_cannot_convict():
     )
 
 
-def test_built_in_predicate_row_without_a_runner_still_convicts():
+def test_built_in_predicate_row_without_a_runner_still_convicts(synthetic_conviction_calibration):
     """Legacy rows (no ``runner`` field) keep the predicate-only semantics.
 
     A direct ``adjudicate`` call passes ``PREDICATE_CONVICTION_VERDICTS``, which

@@ -549,24 +549,12 @@ def test_every_experience_store_path_is_module_defined():
     assert GAP_STORE_NAME.endswith(".jsonl")
 
 
-def test_the_engine_writes_the_stores_it_declares():
-    """The engine's store attributes are the module constants, not literals."""
+def test_the_engine_writes_the_stores_it_declares(tmp_path):
     from evolution.engine import ROUTE_FAILURE_NAME
     from evolution.gaps import GAP_STORE_NAME
 
-    config, split, _cases = _workspace(pathlib.Path(".") / "artifacts" / "_storepath_probe")
-    try:
-        engine = EvolutionEngine(
-            config, backend=MockDetectorBackend(), split=split, mini=True,
-        )
-    finally:
-        import shutil
-
-        shutil.rmtree(engine.config["work_root"], ignore_errors=True)
-        shutil.rmtree(engine.config["registry_dir"], ignore_errors=True)
-        pathlib.Path("artifacts/_storepath_probe").exists() and shutil.rmtree(
-            "artifacts/_storepath_probe", ignore_errors=True,
-        )
+    config, split, _cases = _workspace(tmp_path)
+    engine = EvolutionEngine(config, backend=MockDetectorBackend(), split=split, mini=True)
     assert engine.gap_store.name == GAP_STORE_NAME
     assert engine.route_failure_store.name == ROUTE_FAILURE_NAME
     assert engine.component_store.name == "components"

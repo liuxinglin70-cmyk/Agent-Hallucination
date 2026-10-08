@@ -56,6 +56,7 @@ def local_server():
     thread.join(timeout=5)
 
 
+@pytest.mark.platform
 def test_isolated_transport_returns_error_status_instead_of_crashing(monkeypatch):
     # An error status is a provider answer: the worker must hand it back so the
     # caller can report "http <status>" and classify the failure, rather than

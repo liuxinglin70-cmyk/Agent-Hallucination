@@ -479,9 +479,11 @@ def _bare_packet():
     })
 
 
-def test_calibrated_predicate_can_still_convict(big_corpus):
+def test_calibrated_predicate_can_still_convict(big_corpus, monkeypatch):
     """The guard route keeps working for a predicate the record admits."""
     artifact = build_artifact(big_corpus)
+    monkeypatch.setattr("detector.conviction_calibration.default_calibration", lambda:
+                        ConvictionCalibration(artifact=artifact, corpus_root=big_corpus))
     plan = compile_runtime_plan(
         _mechanical_registry(),
         conviction_calibration=ConvictionCalibration(
@@ -539,7 +541,7 @@ def test_uncalibrated_predicate_cannot_convict_and_says_why(tmp_path, big_corpus
 
 
 def test_adjudicate_refuses_a_directly_supplied_row_for_an_uncalibrated_predicate(
-    big_corpus,
+    big_corpus, monkeypatch,
 ):
     """The second gate holds on its own.
 
@@ -549,6 +551,8 @@ def test_adjudicate_refuses_a_directly_supplied_row_for_an_uncalibrated_predicat
     between an unmeasured parser and a terminal ``authoritative`` error.
     """
     artifact = build_artifact(big_corpus)
+    monkeypatch.setattr("detector.conviction_calibration.default_calibration", lambda:
+                        ConvictionCalibration(artifact=artifact, corpus_root=big_corpus))
     refused = _sealed({
         **artifact,
         "predicates": {

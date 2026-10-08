@@ -106,6 +106,7 @@ def _freeze(tmp_path, cases, roles, gold, **kwargs):
         detector_config=_detector_config(tmp_path),
         workers=2,
         reason="test",
+        framework_config={"registry_dir": str(tmp_path / "registry")},
         **kwargs,
     )
 

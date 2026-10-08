@@ -156,7 +156,7 @@ Python ≥3.10，运行时标准库，测试依赖 pytest。默认配置为 dete
 
 ```bash
 python -m pytest -q
-python scripts/verify.py
+python scripts/verify.py --scope code_only
 python -m detector --help
 python -m evolution --help
 python -m experiments --help
@@ -164,6 +164,6 @@ python scripts/run_research_round.py --help
 python scripts/cost_model_693.py --json artifacts/cost_model_693.json
 ```
 
-verify.py 检查测试、入口、能力、mock 闭环、数据完整性和运行期间源码一致性，临时报告写入 artifacts/latest。成本工具从实验日志的命名 JSON 块读取冻结样本并保留 original_source；旧样本有选择偏差，不代表完整语料的最新成本。
+verify.py 默认执行 code_only（合成输入与临时夹具），可显式选择 platform（回环 HTTP、worker、锁、沙箱）、local_data（本地数据和证据完整性）或 all。所有测试禁公网，Python 子进程继承同一回环边界；code_only 拒绝访问原始数据及历史 artifacts。验证报告按源码摘要及独立运行 ID 写入 artifacts/code_quality，不覆盖历史报告；源码 AST 检查覆盖重复定义、包依赖边界和循环依赖。成本工具从实验日志的命名 JSON 块读取冻结样本并保留 original_source；旧样本有选择偏差，不代表完整语料的最新成本。
 
 新增实验先冻结输入、源码/配置身份、角色、预算和判据；结束后将日期、分母、结果、失败、中断、更正和成本追加到唯一实验日志。运行缓存不作为永久文档提交。算法文件按职责命名，日期放运行 ID；夹具只服务具体测试断言，不存放任意实验备份。
