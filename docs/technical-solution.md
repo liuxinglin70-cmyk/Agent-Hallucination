@@ -4,6 +4,8 @@
 
 > **研究方向补充（未实现）**：详见 [疑惑度引导的双向因果轨迹审计技术设计](uncertainty-guided-causal-audit-design-20261008.md)，简明版见 [2026-10-08 组会汇报](group-meeting-uncertainty-causal-feedback-20261008.md)。
 
+代码重构、缺陷修复及新功能的当前实施状态统一见根目录 [实施台账](../IMPLEMENTATION_PLAN.md)。本期采用离线代码验收，不开展真实模型实验；本文件仍只描述已实现合同。
+
 ## 🧭 仓库边界
 
 依赖方向为 `experiments → detector`、`evolution → detector`。检测器不导入进化框架；进化只能通过经过验证的 registry 干预检测。实验编排负责冻结执行计划、收集结果和评估，不能替代准入门。
@@ -17,7 +19,7 @@
 | datasets/protocols/ | 开发划分、测量协议、暴露记录 | 执行输入，不能作为旧日志删除 |
 | datasets/raw/ | 本地原始数据 | 不修改，由 integrity.json 校验 |
 | 各包 tests/、根 tests/ | 单元、跨包回归、必要夹具 | 不依赖旧 reports/output |
-| docs/ | 本文、唯一实验日志 | README 是入口，不新增平行进度文档 |
+| docs/ | 本文、研究设计和唯一实验日志 | README 是入口；代码实施进度只写根目录 IMPLEMENTATION_PLAN.md |
 | artifacts/ | 可生成的运行产物 | 不入 Git，旧缓存不能直接用于新代码 |
 
 ## 🔎 检测器模型

@@ -4,6 +4,7 @@
 
 ## 📚 文档
 
+- [代码优化实施台账](IMPLEMENTATION_PLAN.md)：逐模块重构、缺陷修复、因果审计实现、离线验收和当前进度；本期不开展实验。
 - [实验结果与证据索引](docs/results/README.md)：已完成结果、待执行计划、原始报告和账本归档。
 
 - [疑惑度与因果轨迹审计优化设计](docs/uncertainty-guided-causal-audit-design-20261008.md)：拟议的快慢审计、定位反哺检测、代码接入点及验收方案（尚未实现）。
