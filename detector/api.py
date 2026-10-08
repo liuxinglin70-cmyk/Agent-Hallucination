@@ -386,7 +386,8 @@ class Detector:
             str(entry.get("hook") or "") for entry in plan.entries
         }
 
-        frozen = frozen_judge if frozen_judge is not None else frozen_stages
+        replay_payload = frozen_judge if frozen_judge is not None else frozen_stages
+        frozen = replay_payload
         if frozen is not None and any(
             str(key).endswith(("_result", "_status")) for key in frozen
         ) and "judge_result" not in frozen:
@@ -759,7 +760,7 @@ class Detector:
                 source=source_identity("detector"), config=self.config,
                 record=record, packet=packet, evidence=attached_snapshot,
                 registry=effective_interventions,
-                replay=frozen_stages if frozen_stages is not None else frozen_judge,
+                replay=replay_payload,
             ),
         }
         if attached_snapshot is not None:
@@ -772,9 +773,8 @@ class Detector:
             provenance["interventions_hash"] = str(
                 effective_interventions.get("content_hash") or ""
             )
-        if frozen_judge is not None or frozen_stages is not None:
+        if replay_payload is not None:
             provenance["frozen_judge_replay"] = True
-            replay_payload = frozen_stages if frozen_stages is not None else frozen_judge
             frozen_keys = [
                 key for key in (replay_payload or {})
                 if key.endswith("_result")

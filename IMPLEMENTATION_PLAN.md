@@ -89,7 +89,7 @@ Python 的真源标注使用合法的 `# SOURCE: <symbol>`，只指向符号，�
 | B02 | frozen 仅重建单数项，未经验证的派生列表被优先消费 | recaller 的 assemble_upgraded_candidates 为 live/frozen 唯一组装规则；覆盖单/复数派生字段，按 corrected_step 排序，失败不产生阳性 | M06 | 关闭；e35f144，伪造列表反例修复、69 项相关回归及 37 项独立检查通过 |
 | B03 | 更早 target 不在 anchor 窗口，却报告 complete=true | 窗口覆盖 min(anchor,target) 到 max(anchor,target)，边界截断显式给原因 | M02 | 关闭；565f191，detector 326、跨包 41、独立 39 项通过；review_offline_review 无阻断 |
 | B04 | `runtime.py:232–238`：并行把非预期 `BaseException` 转 None，顺序却抛出；代码缺陷被当弃权 | 阶段显式转换可恢复弃权，运行时传播程序错误和中断 | M04 | 关闭；6733156，7 项异常/停止反例及相关 58 项回归；e35f144 独立审查无阻断（37 项通过） |
-| B05 | 批次 resume 只比较案例 ID/配置，源码和逐例内容改变仍复用 | run_manifest.v3 与逐例 execution_identity 同时绑定源码、有效配置、record/packet、registry 与声明工件；缓存缺身份拒绝；漂移在写清单前拒绝 | M01/M08 | 验证待审查；当前工作区，修复前 3 项反例失败，相关 469 项通过、5 未选 |
+| B05 | 批次 resume 只比较案例 ID/配置，源码和逐例内容改变仍复用 | run_manifest.v3 与逐例 execution_identity 同时绑定源码、有效配置、record/packet、registry 与声明工件；缓存缺身份拒绝；漂移在写清单前拒绝 | M01/M08 | 验证待审查；5a0bff8，相关 469 项通过、5 未选；独立审查发现双 replay 参数身份优先级不一致，当前工作区统一实际载荷选择后新增反例及相关 53 项通过 |
 | B06 | `runner.py:147–153`、`api.py:348–373`：整例重试只返回最后一次 execution，早期请求与 token 遗失 | case 级统一 attempt journal 与成本归并，不覆盖早期尝试 | M04/M08 | 已复现，待修 |
 | B07 | `runner.py:445–459`：completed 从已有 rows 再减包含 missing 的 not_started；1 row/3 requested 得 -1 | 从预期案例和实际终态集合定义各计数，确保分母守恒 | M08 | 已复现，待修 |
 | B08 | `experiments/__main__.py:159` 默认 g0；`runner.py:76–86` 仅直接识别 empty，默认入口报需 registry | arm 名称按 `ExperimentPlan.arms` 解析，一处处理角色和 registry | M17 | 已复现，待修 |
@@ -495,7 +495,7 @@ python -m experiments --help
 四项检查点（就地覆盖）：
 
 - **当前任务**：逐模块完成本期重构及因果接口；当前处理 M01 配置与执行身份。
-- **进度**：M00 与 B09 已验收（4000669，1020 代码/52 平台/12 独立反例）；B04（6733156）相关 58 项通过；B01/B02（e35f144）相关 69 项及独立 37 项通过；B01/B02/B04 已关闭。M02（565f191）已验收，独立 39 项通过。M01 配置 c58a147 独立 69 项通过；identity 接入 Detector/批次后相关 469 项通过，B05 待审查。
+- **进度**：M00 与 B09 已验收（4000669，1020 代码/52 平台/12 独立反例）；B04（6733156）相关 58 项通过；B01/B02（e35f144）相关 69 项及独立 37 项通过；B01/B02/B04 已关闭。M02（565f191）已验收，独立 39 项通过。M01 配置 c58a147 独立 69 项通过；identity 接入 Detector/批次后相关 469 项通过，B05 初次审查发现双 replay 参数身份选择不一致，已修源头并通过 53 项相关回归，待修正提交核销。
 - **下一步**：有限审查 B05 固定提交；继续 M01 演化身份、M08 分母/路径和 B06 请求记录，然后 B10/B11/B13/B14。
 - **未定事项**：M17 包资源分发与跨平台能力按实际入口验证；本期不运行模型实验。用户已允许子代理审查，并要求优先重构、避免扩大护栏和审查工程。
 

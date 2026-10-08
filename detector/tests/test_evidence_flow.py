@@ -265,6 +265,27 @@ def test_failed_frozen_upgrade_cannot_supply_a_positive_hearing():
     assert result["upgrade_result"]["upgraded_candidate"] is None
 
 
+def test_execution_identity_binds_the_replay_payload_actually_selected(monkeypatch):
+    from detector.identity import digest
+    primary = {"judge_result": _judge(), "judge_status": dict(JUDGE_STATUS)}
+    ignored = {"judge_result": _judge(), "upgrade_result": {"ignored": True}}
+    _install(monkeypatch, _judge(),
+             recall=({"ok": True, "candidates": []}, RECALL_WITH_CANDIDATE[1]),
+             upgrade=UPGRADE_NONE)
+    detector = Detector(CONFIG, require_credentials=False)
+    first = detector.detect(LISETTE_RECORD, frozen_judge=primary, frozen_stages=ignored)
+    identity = first["provenance"]["execution_identity"]
+    assert identity["replay"] == digest(primary)
+    assert first["provenance"]["frozen_stages"] == ["judge_result"]
+    ignored["upgrade_result"]["ignored"] = False
+    second = detector.detect(LISETTE_RECORD, frozen_judge=primary, frozen_stages=ignored)
+    assert second["provenance"]["execution_identity"] == identity
+    primary["judge_result"]["parsed"]["delivered_result"] = "changed delivery"
+    third = detector.detect(LISETTE_RECORD, frozen_judge=primary, frozen_stages=ignored)
+    assert third["proof"]["judge"]["delivered_result"] == "changed delivery"
+    assert third["provenance"]["execution_identity"]["digest"] != identity["digest"]
+
+
 def test_snapshot_reopens_the_scan_for_a_unanimous_clean_judge(
     monkeypatch,
 ):
