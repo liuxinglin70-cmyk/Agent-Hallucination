@@ -20,10 +20,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from detector.packet import PACKET_FEATURE_NAMES, packet_features, project_event_window
+from detector.packet import PACKET_FEATURE_NAMES, packet_features, project_event_window, packet_reference_error
 from detector.predicate_context import judge_predicate_context, validate_program_hook
 from detector.predicate_dsl import (
     PROGRAM_RUNNER,
@@ -1544,6 +1545,7 @@ class InterventionPlan:
         body = entry.get("body") or {}
         predicate = str(body.get("predicate") or "")
         scope_cfg = body.get("scope")
+        window_proj = None
 
         if isinstance(scope_cfg, Mapping):
             # Layer 1: Static applicability (§6.3)
@@ -1608,61 +1610,6 @@ class InterventionPlan:
                     "runner": "typed_semantic",
                 }
 
-            # Layer 3: Semantic Judgment (§6.3)
-            executor = self.semantic_executor
-            if executor is None:
-                raise ValueError(
-                    f"{intervention_id}: typed_semantic needs an executor; none was "
-                    "supplied to this detection call. A learned judgment cannot be "
-                    "simulated by the deterministic default."
-                )
-            declared = entry.get("artifact") or {}
-            actual = executor.identity()
-            for field in ("id", "digest"):
-                if not str(declared.get(field) or ""):
-                    raise ValueError(
-                        f"{intervention_id}: typed_semantic entry declares no "
-                        f"artifact.{field}"
-                    )
-                if str(declared.get(field)) != str(actual.get(field) or ""):
-                    raise ValueError(
-                        f"{intervention_id}: the executor loaded artifact "
-                        f"{actual.get(field)!r} but the entry pins "
-                        f"{declared.get(field)!r}; refusing to attribute results to "
-                        "an artifact that did not produce them"
-                    )
-
-            scoped_context = dict(context)
-            scoped_context["window_projection"] = window_proj
-            result = executor.judge(predicate, packet, scoped_context)
-            if not isinstance(result, Mapping):
-                raise ValueError(
-                    f"{intervention_id}: the semantic executor must return a mapping"
-                )
-            verdict = str(result.get("verdict") or "")
-            if verdict not in SEMANTIC_VERDICTS:
-                raise ValueError(
-                    f"{intervention_id}: semantic verdict {verdict!r} is outside the "
-                    f"declared vocabulary {sorted(SEMANTIC_VERDICTS)}"
-                )
-            return {
-                "schema_version": SCOPED_SEMANTIC_EVIDENCE_SCHEMA,
-                "predicate": predicate,
-                "scope_status": "applicable",
-                "verdict": verdict,
-                "anchor_event_ids": [anchor_event_id],
-                "target_event_ids": [scope_cfg["target_event"]] if scope_cfg.get("target_event") else [],
-                "evidence_refs": list(result.get("evidence_refs") or window_proj.get("event_ids") or []),
-                "blocking_reasons": list(result.get("blocking_reasons") or []),
-                "terminal_authority": TERMINAL_EVIDENCE_ONLY,
-                "executor_identity": {
-                    "artifact_id": actual.get("id"),
-                    "artifact_digest": actual.get("digest"),
-                },
-                "detail": str(result.get("detail") or ""),
-                "projection_hash": window_proj.get("projection_hash"),
-                "runner": "typed_semantic",
-            }
 
         executor = self.semantic_executor
         if executor is None:
@@ -1686,7 +1633,10 @@ class InterventionPlan:
                     f"{declared.get(field)!r}; refusing to attribute results to "
                     "an artifact that did not produce them"
                 )
-        result = executor.judge(predicate, packet, dict(context))
+        semantic_context = dict(context)
+        if window_proj is not None:
+            semantic_context["window_projection"] = window_proj
+        result = executor.judge(predicate, deepcopy(packet), deepcopy(semantic_context))
         if not isinstance(result, Mapping):
             raise ValueError(
                 f"{intervention_id}: the semantic executor must return a mapping"
@@ -1697,6 +1647,31 @@ class InterventionPlan:
                 f"{intervention_id}: semantic verdict {verdict!r} is outside the "
                 f"declared vocabulary {sorted(SEMANTIC_VERDICTS)}"
             )
+        if window_proj is not None:
+            refs = result.get("evidence_refs")
+            reference_error = packet_reference_error(
+                packet, refs, event_ids=window_proj["event_ids"], required=verdict != "abstained",
+            )
+            if reference_error:
+                raise ValueError(f"{intervention_id}: {reference_error}")
+            return {
+                "schema_version": SCOPED_SEMANTIC_EVIDENCE_SCHEMA,
+                "predicate": predicate,
+                "scope_status": "applicable",
+                "verdict": verdict,
+                "anchor_event_ids": [anchor_event_id],
+                "target_event_ids": [scope_cfg["target_event"]] if scope_cfg.get("target_event") else [],
+                "evidence_refs": list(refs),
+                "blocking_reasons": list(result.get("blocking_reasons") or []),
+                "terminal_authority": TERMINAL_EVIDENCE_ONLY,
+                "executor_identity": {
+                    "artifact_id": actual.get("id"),
+                    "artifact_digest": actual.get("digest"),
+                },
+                "detail": str(result.get("detail") or ""),
+                "projection_hash": window_proj.get("projection_hash"),
+                "runner": "typed_semantic",
+            }
         return {
             "predicate": predicate,
             "verdict": verdict,

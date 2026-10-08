@@ -34,8 +34,47 @@ class DummySemanticExecutor(SemanticExecutor):
         return {
             "verdict": "supported",
             "detail": "semantic check passed",
-            "evidence_refs": ["event_002"],
+            "evidence_refs": ["event_004"],
         }
+
+
+@pytest.mark.parametrize("refs", [None, [], "event_004", [4], ["event_999"], ["event_002"],
+                                 ["event_002_tool_01"], "mutate_scope", ["event_004"],
+                                 ["event_004_tool_01"], "abstain"])
+def test_scoped_semantic_validates_output_refs(refs):
+    class Executor(DummySemanticExecutor):
+        def judge(self, predicate, packet, context):
+            packet["events"][0]["content"] = "executor mutation"
+            if refs == "abstain":
+                return {"verdict": "abstained", "evidence_refs": []}
+            if refs == "mutate_scope":
+                context["window_projection"]["event_ids"].append("event_002")
+                return {"verdict": "supported", "evidence_refs": ["event_002"]}
+            return {"verdict": "supported", "evidence_refs": refs}
+
+    entry = {
+        "schema_version": INTERVENTION_SCHEMA, "intervention_id": "IV-SEM-REF",
+        "type": "evidence_check", "hook": "defense.pre",
+        "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
+        "body": {"predicate": "check_taxes", "runner": "typed_semantic",
+                 "output_verdicts": ["supported", "contradicted", "abstained"],
+                 "scope": {"anchor_event": "event_004", "window_before": 1, "window_after": 1}},
+        "artifact": {"id": "art-1", "digest": "dig-1"},
+        "claim": {"expected_behavior": "test", "target_polarity": "boundary"},
+        "provenance": {"cycle": 1, "failure_family": "fam", "failure_cases": ["c1", "c2"]},
+    }
+    plan = InterventionPlan([entry], semantic_executor=Executor())
+    packet = _sample_packet()
+    original_content = packet["events"][0]["content"]
+    if refs in (["event_004"], ["event_004_tool_01"], "abstain"):
+        evidence = plan.evidence_for("defense.pre", packet=packet)
+        assert evidence[0]["evidence_refs"] == ([] if refs == "abstain" else refs)
+        assert evidence[0]["terminal_authority"] == TERMINAL_EVIDENCE_ONLY
+    else:
+        with pytest.raises(ValueError, match="evidence_refs"):
+            plan.evidence_for("defense.pre", packet=packet)
+        assert plan.evidence == []
+    assert packet["events"][0]["content"] == original_content
 
 
 def _sample_packet() -> dict:

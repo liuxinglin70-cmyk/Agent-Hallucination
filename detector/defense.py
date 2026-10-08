@@ -18,7 +18,7 @@ from detector.interventions import InterventionPlan, empty_plan
 from detector.packet import (
     evidence_refs_support_step,
     packet_features,
-    packet_reference_index,
+    packet_reference_error,
     render_defense_view,
     render_judge_view,
 )
@@ -72,8 +72,6 @@ def _parse_defense(parsed: Any) -> tuple[dict | None, str]:
     refs = parsed.get("evidence_refs")
     if refs is None:
         refs = []
-    if not isinstance(refs, list) or any(not isinstance(x, str) for x in refs):
-        return None, "evidence_refs must be a list of event ids"
     if verdict == "refuted" and not refs:
         return None, "refuted requires at least one evidence reference"
     cited = parsed.get("evidence_citations")
@@ -102,10 +100,10 @@ def _validate_defense_evidence(
     snapshot: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, str]:
     """Require defense references to resolve to packet event/tool ids."""
-    valid_ids = packet_reference_index(packet)
-    refs = [str(ref) for ref in parsed.get("evidence_refs") or ()]
-    if any(ref not in valid_ids for ref in refs):
-        return None, "evidence_refs contains an unknown packet event"
+    refs = parsed.get("evidence_refs")
+    reference_error = packet_reference_error(packet, refs)
+    if reference_error:
+        return None, reference_error
     citation_error_message = citation_error(
         snapshot, parsed.get("evidence_citations") or [],
         where="defense",

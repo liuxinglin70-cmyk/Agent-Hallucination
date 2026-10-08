@@ -96,11 +96,11 @@ Python 的真源标注使用合法的 `# SOURCE: <symbol>`，只指向符号，�
 | B09 | AST 基线报告明确检出两个 `_step_kind_split`；全仓调用检索只有两个定义，无消费者 | 删除两个无消费者定义，保留实际 `_joint_kind_split` 真源 | M15 | 关闭；4000669，AST/1020 项回归及 review_4000669 核销 |
 | B10 | `development.py:375–402,562–563`：双臂同时漏掉预期 neighbor，目标改善仍能通过 L1 | 配对评分前要求两臂恰好覆盖 target∪neighbor；缺测独立返回 | M15 | 关闭；9dbf358，最小回归修复前 8 失败/2 通过，修复后相关 87 项、独立 17 项通过；review_offline_review 无阻断 |
 | B11 | `development.py:567–577`：gold step 已知时，wrong→same wrong 被计为 regression，即使另一 target 改善 | 回退按 baseline 原本命中→失去命中定义；检测/权威退化单独处理 | M15 | 关闭；9dbf358，最小回归修复前 8 失败/2 通过，修复后相关 87 项、独立 17 项通过；review_offline_review 无阻断 |
-| B12 | `interventions.py:1655`：scoped semantic refs 未验证存在/范围；空 refs 自动填满窗口 | 统一 executor 输出合同，引用必须由生产者提供并验证，不补造来源 | M07 | 静态确认，待修 |
+| B12 | scoped semantic refs 未验证存在/范围，空 refs 自动填满窗口；executor 可修改待校验投影 | packet_reference_error 为轨迹引用验证真源；正向 verdict 必须有真实窗口引用，executor 输入独立副本，移除重复 identity/vocabulary 执行代码 | M03/M07 | 修复待审查；7 种非法引用及修改窗口反例先失败后通过；detector 430 项、跨包 80 项及 AST 67 文件通过 |
 | B13 | `route_failures.py:325–327,405–427`：追加 resolution 后 reducer 跳过它，已解决路线仍 insufficient | 按顺序归约 observation/resolution，关闭当前观察 epoch，保留历史并允许后续重新开放 | M16 真源；M14 消费 | 关闭；9b3bac0，6 项反例修复前失败，相关 route/capability 62 项及独立 6 项/旧解决记录重放反例通过，无阻断；历史字节保留，独立 measurement identity 仍属 M16 未完成项 |
 | B14 | `route_failures.py:152–229`、`engine.py:2273–2275`：只读检测 delta，定位 joint_broken=1 被记为无改善无损伤 | outcome 明确 target_kind 与 delta basis；定位/联合损伤不能写为路线能力不足 | M15 真源；M14/M16 消费 | 关闭；d14e5f9，7 项反例先失败后通过，182 项扩展回归/AST 67 文件及独立 22 项通过，无新增阻断；普通/替换定位与联合机会迁移 ce6777d，136 项回归及独立 18 个正式单位入口用例通过 |
 
-B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fake 对象，无真实 provider、无历史测量写入。B12 当前仍受 evidence-only 权限约束，不能夸大为已证明直接越权定罪。
+B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fake 对象，无真实 provider、无历史测量写入。B12 修复保持 evidence-only 权限，反例证明引用和投影可信性缺陷，不声称直接越权定罪。
 
 ### 4.2 待验证风险与能力缺口
 
@@ -119,6 +119,7 @@ B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fak
 | R11 | result/elapsed 分两次提交，报告在 writer lock 释放后读 rows；缓存历史 usage 与本次 elapsed=0 混算 | 以单一不可变 attempt envelope 和固定清单读报告；成本按 invocation/attempt/lifetime 分开 | M04/M08/M17 |
 | R12 | measurement 未重算 digest；prefix 继承全量身份与 gold 计数 | 校验 schema/case set/digest，区分 parent_manifest_digest 与 selected_cases_digest 和子集统计 | M17 |
 | R13 | 多文件 registry 提交、route observation 独立性、promotion 返回/落盘状态一致性未充分证明 | 故障注入与独立 observation 身份测试，按实际证据决定修复 | M14/M15/M16 |
+| R14 | 64c1919 审查确认 runtime identity 只显式绑定 scorer；机械校准读取 DEFAULT_ARTIFACT/DEFAULT_CORPUS_ROOT，非 Python 内容未纳入身份 | M03 沿实际校准读者核验依赖，绑定实际使用工件及 corpus；不为未消费工件无条件使缓存失效 | M01/M03 |
 
 没有调用图、反例或复现支持的事项只能留在风险栏，不能声称 bug 已证实，更不能据此删除代码。
 
@@ -175,13 +176,13 @@ evolution/
 | ID | 工作包 | 前置 | 预计人日 | 状态 | 最新证据/提交/审查 |
 |---|---|---|---:|---|---|
 | M00 | 离线验证、合同基线、静态清理机制 | 本台账 | 1–2 | 已验收 | 4000669；4fcffecc/68845067：code_only 1020、AST/三 CLI 检查退出 0；平台 97f55299/8f21461a 52 通过；独立只读审查 review_4000669（12 项反例通过，无阻断） |
-| M01 | 配置与执行身份真源 | M00 | 2–3 | 实施中 | config.validate_config 为文件/直接配置唯一入口，causal 块保留且默认 off；数字范围/未知键/工件缺失验证；c58a147 配置独立 69 项通过；identity.py 已供 packet/api/runner 共用，B05 三项反例修复后 detector/repository/offline/backend/env 共 469 通过、5 未选，AST 67 文件通过；演化 backend baseline/cache 已绑定实际配置、record/packet、evidence、registry/replay 与完整源码；eb49756：2 项旧缓存反例先失败后通过，扩展 143 项及 backend 20 项、独立 34 项/3 个篡改缓存反例通过；harness.v2/checkpoint.v2/审计消费实际 backend runtime 身份，完成报告复用的 3 个漂移反例先失败后通过，扩展 133 项及最终相关 55 项/AST 67 文件通过，待审查；晋升协议历史摘要/preflight 迁移未完成 |
+| M01 | 配置与执行身份真源 | M00 | 2–3 | 实施中 | config.validate_config 为文件/直接配置唯一入口，causal 块保留且默认 off；数字范围/未知键/工件缺失验证；c58a147 配置独立 69 项通过；identity.py 已供 packet/api/runner 共用，B05 三项反例修复后 detector/repository/offline/backend/env 共 469 通过、5 未选，AST 67 文件通过；演化 backend baseline/cache 已绑定实际配置、record/packet、evidence、registry/replay 与完整源码；eb49756：2 项旧缓存反例先失败后通过，扩展 143 项及 backend 20 项、独立 34 项/3 个篡改缓存反例通过；harness.v2/checkpoint.v2/审计消费实际 backend runtime 身份，完成报告复用的 3 个漂移反例先失败后通过，64c1919：扩展 133 项及最终相关 55 项/AST 67 文件、独立 7 项通过，无新增阻断；隐式机械校准工件/corpus 及晋升协议历史摘要/preflight 迁移未完成 |
 | M02 | Packet、投影、事件引用规范 | M00 | 2–3 | 已验收 | 565f191；detector 326、跨包 41、AST 66 文件通过；独立 review_offline_review 39 项通过，无阻断；window v2 技术合同已同步 |
-| M03 | 外部证据、谓词与引用权限 | M02 | 1–2 | 未开始 | — |
+| M03 | 外部证据、谓词与引用权限 | M02 | 1–2 | 实施中 | packet_reference_error 已统一阶段/谓词/scoped semantic 的轨迹引用校验，工具引用使用实际 owner；外部 citation/DSL/校准输入身份继续核验 |
 | M04 | Provider、并发、预算、取消、请求记录 | M00 | 2–3 | 实施中 | B04 修复前 4 个反例失败，复用 bounded_map 后 runtime/voting/judge/provider 共 58 通过；B06 已关闭（a2fed20），execution.v2 与逐次落盘通过相关 82 项/批次失败 15 项/平台 3 项及独立 51 项/多票反例；完整共享预算继续实施 |
 | M05 | Judge/Recall/Tracer/Defense 阶段合同 | M03/M04 | 2–3 | 未开始 | — |
 | M06 | API、听证、冻结验证与回放 | M01/M02/M03/M05 | 3–4 | 实施中 | B01/B02 源头修复；evidence_flow/api/recaller/voting/upgrade/backend/localization 共 69 通过、17 未选；完整阶段 identity 与 hearing 编排未完成 |
-| M07 | 干预执行器和 scope 合同 | M02/M03/M04 | 2–3 | 未开始 | — |
+| M07 | 干预执行器和 scope 合同 | M02/M03/M04 | 2–3 | 实施中 | B12：scope refs 非空/存在/范围验证、executor packet/context 独立副本、去除重复 semantic 执行校验；detector 430 项/跨包 80 项/AST 67 文件通过，待审查；完整 executor 合同继续实施 |
 | M08 | 批处理、存储、恢复、成本和分母 | M01/M04/M06 | 2–3 | 实施中 | B05 已关闭（7f91c3e）；B07 已关闭（9c40b5c），相关 51 项、2 项 CLI 回环及独立覆盖分区通过；B06 已关闭（a2fed20），尝试 journal 与失败成本通过独立 51 项及多票反例；路径/存储一致性及 invocation/lifetime 成本继续实施 |
 | M09 | 风险画像与候选选择 | M01/M02/M03/M07 | 2–3 | 未开始 | — |
 | M10 | 实际依赖图与闭包 | M02/M03/M09 | 2–3 | 未开始 | — |
@@ -494,10 +495,10 @@ python -m experiments --help
 
 四项检查点（就地覆盖）：
 
-- **当前任务**：逐模块完成本期重构及因果接口；M01 backend/cache 已审查，harness/checkpoint/审计的实际运行身份已实现，接续 M03/M07 引用合同。
-- **进度**：2/18 工作包已验收（M00/M02）；B01/B02/B03/B04/B05/B06/B07/B09/B10/B11/B13/B14 已关闭。B06 a2fed20：82 项相关、15 项批次失败、3 项平台及独立 51 项/三票并发反例通过。M01 eb49756：baseline/cache 独立 34 项及 3 个篡改缓存反例通过；harness.v2/checkpoint.v2/审计已用规范完整摘要和实际配置/工件/快照身份，完成报告恢复 3 个漂移反例先失败后通过，扩展 133 项及最终相关 55 项/AST 67 文件通过，待固定提交审查。M01/M04/M06/M08/M15/M16 仍实施中。
-- **下一步**：提交并有限审查 harness/checkpoint 身份迁移；建立 M03 统一轨迹引用验证入口并修 M07/B12 scoped semantic 缺引用补造和越范围引用。晋升协议/preflight 旧摘要消费者待对应入口迁移，M16 观察身份不按 cycle 补造。
-- **未定事项**：M08 成本按 invocation/attempt/lifetime 分离、路径及存储事务尚未完成；M17 包资源分发与跨平台能力待实际入口验证；本期不运行模型实验。用户允许子代理审查，要求优先重构、避免扩大护栏和审查工程。
+- **当前任务**：逐模块完成本期重构及因果接口；M03 轨迹引用真源与 M07/B12 scoped semantic 引用/输入隔离已实现。
+- **进度**：2/18 工作包已验收（M00/M02）；B01/B02/B03/B04/B05/B06/B07/B09/B10/B11/B13/B14 已关闭。M01 backend/cache eb49756 独立 34 项/篡改反例通过；harness/checkpoint 64c1919 扩展 133 项、最终相关 55 项、独立 7 项通过。B12 七种非法引用及投影修改反例先失败后通过，detector 430 项、跨包 80 项及 AST 67 文件通过，待固定提交审查。M01/M03/M04/M06/M07/M08/M15/M16 仍实施中。
+- **下一步**：提交并有限审查 B12；继续 M03 外部 citation/DSL/机械校准身份核验，关闭 R14 隐式工件覆盖缺口，再接阶段合同与因果功能。
+- **未定事项**：M01 晋升协议/preflight 旧摘要消费者尚未迁移；M08 invocation/attempt/lifetime 成本、路径及存储事务尚未完成；M17 包资源分发待验证。本期不运行模型实验；用户要求优先代码重构，独立审查保持有限范围。
 
 ## 12. 本期最终完成与延期项
 

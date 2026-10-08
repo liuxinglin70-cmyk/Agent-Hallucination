@@ -40,7 +40,7 @@ import re
 from typing import Any, Iterable, Mapping
 
 from detector.packet import delivered_result as packet_delivered_result
-from detector.packet import packet_reference_index
+from detector.packet import packet_reference_index, packet_reference_error
 
 PREDICATE_VERDICTS: dict[str, frozenset[str]] = {
     "required_action_present": frozenset({
@@ -519,8 +519,14 @@ def predicate_verbatim_fidelity(
 def predicate_evidence_refs_resolve(
     packet: Mapping[str, Any], context: Mapping[str, Any]
 ) -> dict[str, Any]:
-    refs = context.get("evidence_refs") or []
-    refs = [str(ref) for ref in refs if str(ref)]
+    refs = context.get("evidence_refs")
+    refs = [] if refs is None else refs
+    reference_error = packet_reference_error(packet, refs)
+    if reference_error:
+        return {
+            "predicate": "evidence_refs_resolve", "verdict": "unresolved",
+            "detail": reference_error,
+        }
     if not refs:
         return {
             "predicate": "evidence_refs_resolve",
@@ -528,19 +534,12 @@ def predicate_evidence_refs_resolve(
             "detail": "no evidence refs supplied",
         }
     ids = packet_reference_index(packet)
-    unknown = [ref for ref in refs if ref not in ids]
-    if unknown:
-        return {
-            "predicate": "evidence_refs_resolve",
-            "verdict": "unresolved",
-            "detail": f"evidence refs not in packet: {unknown[:5]}",
-        }
     quote = _clean(context.get("quote") or context.get("root_cause_quote") or "")
     if quote:
         texts = _event_texts(packet)
-        ref_prefixes = {ref.rsplit("_tool_", 1)[0] for ref in refs}
+        ref_events = {ids[ref] for ref in refs}
         located = any(
-            row["event_id"] in ref_prefixes and quote in row["text"]
+            row["event_id"] in ref_events and quote in row["text"]
             for row in texts
         )
         if not located:

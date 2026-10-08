@@ -268,6 +268,24 @@ def packet_reference_index(packet: Mapping[str, Any]) -> dict[str, str]:
     return refs
 
 
+def packet_reference_error(
+    packet: Mapping[str, Any], refs: Any, *,
+    event_ids: Sequence[str] | None = None, required: bool = False,
+) -> str | None:
+    if not isinstance(refs, list) or any(not isinstance(ref, str) for ref in refs):
+        return "evidence_refs must be a list of strings"
+    if required and not refs:
+        return "evidence_refs is required"
+    owners = packet_reference_index(packet)
+    if any(ref not in owners for ref in refs):
+        return "evidence_refs contains an unknown packet event"
+    if event_ids is not None:
+        allowed = set(event_ids)
+        if any(owners[ref] not in allowed for ref in refs):
+            return "evidence_refs references events outside the selected scope"
+    return None
+
+
 def event_id_for_step(packet: Mapping[str, Any], step: int | None) -> str | None:
     """Return the canonical event id for a 1-based packet position."""
     if not isinstance(step, int) or isinstance(step, bool):
@@ -755,6 +773,7 @@ __all__ = [
     "evidence_refs_support_step",
     "packet_features",
     "packet_reference_index",
+    "packet_reference_error",
     "project_event_window",
     "render_defense_view",
     "render_full_view",

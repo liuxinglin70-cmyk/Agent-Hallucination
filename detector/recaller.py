@@ -25,7 +25,7 @@ from detector.packet import (
     evidence_refs_support_event,
     evidence_refs_support_step,
     packet_features,
-    packet_reference_index,
+    packet_reference_error,
     render_judge_view,
 )
 from detector.provider import raise_if_fatal
@@ -70,7 +70,6 @@ def _parse_candidates(
         parsed.get("candidates"), list
     ):
         return None, "recall output is not a candidates object"
-    universe = packet_reference_index(packet)
     candidates = []
     seen: set[str] = set()
     for index, raw in enumerate(parsed["candidates"], start=1):
@@ -85,15 +84,15 @@ def _parse_candidates(
         refs_raw = raw.get("evidence_refs")
         if refs_raw is None:
             refs_raw = []
-        if not isinstance(refs_raw, list) or any(
-            not isinstance(item, str) for item in refs_raw
-        ):
-            return None, f"candidate {candidate_id} evidence_refs must be a list"
-        refs = [str(x) for x in refs_raw if str(x)]
+        reference_error = packet_reference_error(packet, refs_raw)
+        if reference_error:
+            return None, f"candidate {candidate_id}: {reference_error}"
+        refs = list(refs_raw)
         if not claim or not locus:
             return None, f"candidate {candidate_id} needs claim and locus"
-        if locus not in universe or any(ref not in universe for ref in refs):
-            return None, f"candidate {candidate_id} references unknown event"
+        reference_error = packet_reference_error(packet, [locus], required=True)
+        if reference_error:
+            return None, f"candidate {candidate_id}: {reference_error}"
         if not evidence_refs_support_event(packet, refs, locus):
             return None, (
                 f"candidate {candidate_id} evidence_refs do not support its locus"

@@ -13,7 +13,7 @@ from detector.interventions import InterventionPlan, empty_plan
 from detector.packet import (
     evidence_refs_support_step,
     packet_features,
-    packet_reference_index,
+    packet_reference_error,
     render_judge_view,
 )
 from detector.provider import (
@@ -62,13 +62,9 @@ def _parse_judge(parsed: Any, packet: Mapping[str, Any]) -> tuple[dict | None, s
     refs = parsed.get("evidence_refs")
     if refs is None:
         refs = []
-    if not isinstance(refs, list) or any(
-        not isinstance(x, str) for x in refs
-    ):
-        return None, "evidence_refs must be a list of event ids"
-    valid_refs = packet_reference_index(packet)
-    if any(ref not in valid_refs for ref in refs):
-        return None, "evidence_refs contains an unknown packet event"
+    reference_error = packet_reference_error(packet, refs)
+    if reference_error:
+        return None, reference_error
     root_cause = parsed.get("root_cause")
     if flag:
         if not isinstance(step_value, int) or isinstance(step_value, bool):

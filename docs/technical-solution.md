@@ -65,6 +65,8 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 
 `backend_runtime_identity` 绑定已构造 backend 的有效配置、声明工件、Mock 参数及选定案例的实际证据快照；harness.v2、cycle_checkpoint.v2 和缺陷审计消费此身份并使用规范完整摘要。完成报告和中断检查点的恢复均经 CycleJournal.load_state 验证，输入漂移在写入前拒绝，旧 checkpoint/harness 不作为新运行复用。晋升冻结协议的历史摘要读者及 preflight 脚本迁移仍未完成。
 
+`packet_reference_error` 统一 Judge、Recall、Tracer、Defense、引用谓词和 scoped semantic 的轨迹引用类型、存在性及范围验证；外部 snapshot citation 仍由 evidence.citation_error 验证。scoped semantic 的 supported/contradicted 必须带生产者提供的非空引用，abstained 可明确提供空列表，运行时不填造窗口引用。工具引用按实际所属 event 核验窗口范围。semantic executor 接收 packet/context 的独立副本，校验使用未被 executor 修改的投影；artifact/vocabulary 校验只有一个执行路径，证据仍不获得定罪权限。
+
 批次 `run_summary.v3` 分别记录 requested/returned/not_started/missing，completed 只统计实际返回的非 not_started 行。工作线程登记完成结果，调度器中断后仍保留已提交案例；没有返回行的已开始案例记为 missing，不写成阴性或未开始。重复及额外案例行拒绝进入汇总。
 
 | 维度 | 合同 | 解释 |

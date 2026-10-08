@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 from detector.interventions import InterventionPlan, empty_plan
 from detector.packet import (evidence_refs_support_step, packet_features,
-                             packet_reference_index, render_judge_view)
+                             packet_reference_error, render_judge_view)
 from detector.provider import ProviderError, provider_call, raise_if_fatal
 from detector.semantics import TRACER_CONTRACT_REPAIR, TRACER_SYSTEM
 
@@ -26,15 +26,10 @@ def _parse_tracer(parsed: Any, packet: Mapping[str, Any]):
     reason = str(parsed.get("reason") or "").strip()
     if not quote or not referent or not reason:
         return None, "quote, referent and reason are required"
-    refs_raw = parsed.get("evidence_refs")
-    if not isinstance(refs_raw, list) or any(
-        not isinstance(item, str) for item in refs_raw
-    ):
-        return None, "evidence_refs must be a list of strings"
-    refs = [str(x) for x in refs_raw if str(x)]
-    valid_refs = packet_reference_index(packet)
-    if not refs or any(ref not in valid_refs for ref in refs):
-        return None, "evidence_refs must resolve to packet events"
+    refs = parsed.get("evidence_refs")
+    reference_error = packet_reference_error(packet, refs, required=True)
+    if reference_error:
+        return None, reference_error
     if not evidence_refs_support_step(packet, refs, step):
         return None, "evidence_refs do not support the traced step"
     return {
