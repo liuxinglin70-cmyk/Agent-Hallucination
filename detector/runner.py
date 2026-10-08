@@ -54,6 +54,7 @@ from detector.measurement import (
 from detector.provider import accumulate_usage, case_deadline_ctx
 from detector.result import RESULT_SCHEMA
 from detector.runtime import (
+    added_budget_scope,
     RunControl,
     RunStopped,
     atomic_json,
@@ -142,7 +143,7 @@ def detect_with_transport_retry(
     # All attempts consume the same case deadline.
     with case_deadline_ctx(
         (detector.config or {}).get("case_timeout_seconds")
-    ):
+    ), added_budget_scope((detector.config or {}).get("causal_audit")):
         for number in range(1, max(1, int(attempts)) + 1):
             attempt_started = time.perf_counter()
             attempt_started_at = utc_now()
@@ -152,6 +153,7 @@ def detect_with_transport_retry(
                 try:
                     result = detector.detect(record, case_id=case_id, interventions=interventions)
                 except BaseException as exc:
+                    result = getattr(exc, "base_detection_result", {})
                     failure = exc
             execution = result.get("execution")
             if requests or not isinstance(execution, Mapping):

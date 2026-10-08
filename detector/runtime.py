@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from copy import deepcopy
 from contextlib import contextmanager
 from contextvars import ContextVar, copy_context
 from datetime import datetime, timezone
@@ -13,11 +14,14 @@ import threading
 import time
 from typing import Any, Callable, Iterable, Iterator, Mapping, TypeVar
 
+from detector.identity import digest
+
 T = TypeVar("T")
 R = TypeVar("R")
 _DEADLINE: ContextVar[float | None] = ContextVar("execution_deadline", default=None)
 _CONTROL: ContextVar["RunControl | None"] = ContextVar("execution_control", default=None)
 _USAGE: ContextVar[list[dict[str, Any]] | None] = ContextVar("request_usage", default=None)
+_ADDED_BUDGET: ContextVar["AddedBudget | None"] = ContextVar("added_case_budget", default=None)
 _OWNERS: dict[str, tuple[int, int, Any]] = {}
 _OWNER_LOCK = threading.RLock()
 
@@ -146,6 +150,97 @@ def record_request(observation: Mapping[str, Any]) -> None:
     target = _USAGE.get()
     if target is not None:
         target.append(dict(observation))
+
+
+class AddedBudgetExceeded(RuntimeError):
+    def __init__(self, resource: str):
+        self.resource = resource
+        super().__init__(f"added case budget exhausted: {resource}")
+
+
+class AddedBudget:
+    """One admission budget across added hearings, repairs and case retries."""
+
+    def __init__(self, policy: Mapping[str, Any]):
+        self._policy = deepcopy(dict(policy))
+        self.policy_digest = digest(policy)
+        self.started: float | None = None
+        self.requests = 0
+        self.input_bytes = 0
+        self.output_tokens = 0
+        self._lock = threading.RLock()
+
+    def begin(self) -> None:
+        with self._lock:
+            if self.started is None:
+                self.started = time.monotonic()
+        self.check()
+
+    @property
+    def deadline(self) -> float | None:
+        limits = [value for value in (current_deadline(),
+                  self.started + self._policy["max_added_seconds_per_case"]
+                  if self.started is not None else None) if value is not None]
+        return min(limits) if limits else None
+
+    def check(self) -> None:
+        control = current_control()
+        if control is not None:
+            control.check()
+        deadline = self.deadline
+        if deadline is not None and time.monotonic() >= deadline:
+            raise AddedBudgetExceeded("time")
+
+    def reserve(self, *, system: str, user: str, output_tokens: int,
+                extra_input: Mapping[str, Any] | None = None) -> int:
+        with self._lock:
+            self.begin()
+            # UTF-8 bytes bound content without pretending to have the model tokenizer.
+            size = len(system.encode("utf-8")) + len(user.encode("utf-8"))
+            if extra_input is not None:
+                size += len(json.dumps(extra_input, ensure_ascii=False, allow_nan=False).encode("utf-8"))
+            if self.requests >= self._policy["max_added_provider_requests_per_case"]:
+                raise AddedBudgetExceeded("requests")
+            if self.input_bytes + size > self._policy["max_added_prompt_tokens_per_case"]:
+                raise AddedBudgetExceeded("input")
+            available = self._policy["max_added_output_tokens_per_case"] - self.output_tokens
+            cap = min(output_tokens, available)
+            if cap <= 0:
+                raise AddedBudgetExceeded("output")
+            self.requests += 1
+            self.input_bytes += size
+            self.output_tokens += cap
+            return cap
+
+    def snapshot(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "policy_digest": self.policy_digest, "reserved_requests": self.requests,
+                "reserved_input_bytes": self.input_bytes, "reserved_output_tokens": self.output_tokens,
+                "input_budget_method": "utf8_content_bytes_without_tokenizer",
+                "elapsed_seconds": max(0.0, time.monotonic() - self.started)
+                if self.started is not None else 0.0,
+            }
+
+
+@contextmanager
+def added_budget_scope(policy: Mapping[str, Any] | None) -> Iterator[AddedBudget | None]:
+    parent = _ADDED_BUDGET.get()
+    if parent is not None and (policy is None or parent.policy_digest != digest(policy)):
+        raise ValueError("added budget policy changed within one case")
+    if policy is None or policy.get("mode") == "off":
+        yield None
+        return
+    effective = parent or AddedBudget(policy)
+    token = _ADDED_BUDGET.set(effective)
+    try:
+        yield effective
+    finally:
+        _ADDED_BUDGET.reset(token)
+
+
+def current_added_budget() -> AddedBudget | None:
+    return _ADDED_BUDGET.get()
 
 
 def bounded_map(function: Callable[[T], R], items: Iterable[T], *, workers: int,

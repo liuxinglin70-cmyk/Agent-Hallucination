@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from copy import deepcopy
 from typing import Any, Mapping
 
 from detector.adjudication import adjudicate
 from detector.config import load_config, validate_config
-from detector.causal_graph import build_observed_dependencies, project_dependency_closure
+from detector.causal_audit import build_causal_diagnostics
 from detector.identity import build_execution_identity, digest, source_identity
 from detector.defense import _parse_defense, _validate_defense_evidence, run_defense
 from detector.evidence import (
@@ -26,7 +27,7 @@ from detector.packet import build_packet, event_id_for_step, validate_record
 from detector.predicate_context import judge_predicate_context
 from detector.provider import ProviderError, case_deadline_ctx
 from detector.measurement import request_execution
-from detector.runtime import usage_scope, utc_now
+from detector.runtime import added_budget_scope, current_added_budget, usage_scope, utc_now
 import time
 from detector.recaller import (
     _parse_candidates,
@@ -37,7 +38,6 @@ from detector.recaller import (
 )
 from detector.result import build_detection_output
 from detector.step_tracer import _parse_tracer, run_step_tracer
-from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates
 
 
 _FROZEN_STAGE_HOOKS: dict[str, frozenset[str]] = {
@@ -307,7 +307,8 @@ class Detector:
         """
         started = time.perf_counter()
         started_at = utc_now()
-        with usage_scope() as observations, case_deadline_ctx(self.config.get("case_timeout_seconds")):
+        with usage_scope() as observations, case_deadline_ctx(self.config.get("case_timeout_seconds")), \
+                added_budget_scope(self.config["causal_audit"]):
             try:
                 result = self._detect(
                     record, case_id=case_id, interventions=interventions,
@@ -323,6 +324,18 @@ class Detector:
                     "authority_failure_reasons": [{"component": exc.route_name, "code": exc.error_type, **exc.as_dict()}],
                     "provenance": {},
                 }
+                base = getattr(exc, "base_detection_result", None)
+                if base is not None:
+                    result["base_detection_result"] = deepcopy(base)
+                    result["audit_health"] = {"state": "execution_stopped", "error": exc.as_dict()}
+            except BaseException as exc:
+                base = getattr(exc, "base_detection_result", None)
+                if base is not None:
+                    base["execution"] = request_execution(
+                        observations, started_at=started_at, finished_at=utc_now(),
+                        elapsed_seconds=time.perf_counter() - started,
+                    )
+                raise
             result["execution"] = request_execution(
                 observations, started_at=started_at, finished_at=utc_now(),
                 elapsed_seconds=time.perf_counter() - started,
@@ -835,34 +848,24 @@ class Detector:
         proof["evidence"] = list(plan.evidence)
         proof["deployment"] = plan.deployment_summary()
         proof["external_evidence"] = snapshot
+        output = build_detection_output(
+            case_id=case_id, packet=packet, proof=proof, stage_status=stage_status,
+            providers=providers, provenance=provenance,
+        )
         causal_policy = self.config["causal_audit"]
         if causal_policy["mode"] != "off":
-            profile = build_step_risk_profile(
-                packet, policy=causal_policy,
-                context=judge_predicate_context(judge_parsed), snapshot=snapshot,
-            )
             mandatory = list(dict.fromkeys(eid for eid in (
                 event_id_for_step(packet, hearing.get("step")) for hearing in hearings
             ) if eid is not None))
-            candidates = select_causal_candidates(
-                profile, mandatory_event_ids=mandatory, policy=causal_policy,
-            )
-            graph = build_observed_dependencies(packet, policy=causal_policy)
-            projection = project_dependency_closure(
-                packet, candidates=candidates, graph=graph, policy=causal_policy,
-            )
-            proof["causal_diagnostics"] = {
-                "mode": causal_policy["mode"], "profile": profile,
-                "candidates": candidates, "graph": graph, "projection": projection,
-            }
-        return build_detection_output(
-            case_id=case_id,
-            packet=packet,
-            proof=proof,
-            stage_status=stage_status,
-            providers=providers,
-            provenance=provenance,
-        )
+            try:
+                output["proof"]["causal_diagnostics"] = build_causal_diagnostics(
+                    packet=packet, config=self.config, budget=current_added_budget(),
+                    mandatory_event_ids=mandatory, context=judge_predicate_context(judge_parsed), snapshot=snapshot,
+                )
+            except BaseException as exc:
+                exc.base_detection_result = deepcopy(output)
+                raise
+        return output
 
 
 _DEFAULT_DETECTOR: Detector | None = None

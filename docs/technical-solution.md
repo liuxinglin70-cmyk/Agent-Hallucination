@@ -166,13 +166,19 @@ engine、backends、promotion、interventions 仍承担较多职责，后续物�
 
 **现有代码事实**：`api.py::_judge_negative_needs_recall` 根据多票一致性和置信度决定部分阴性是否需要 Recall；`Detector._detect` 的 `negative_needs_recall` 还接受现有部署干预与适用证据快照触发；一旦进入 Recall，仍需 `run_causal_upgrade`、独立听证的 Tracer/Defense 和 `adjudicate`。阳性 Tracer 已支持输入单项指控，但尚无逐步困惑度或后续反事实推演的标准输入。
 
-`causal_contracts.py`、`step_uncertainty.py` 和 `causal_graph.py` 实现第一批只读诊断。Detector 在非 off 模式于基础终态生成后输出 `proof.causal_diagnostics`：StepRiskProfile、Top-K 与 mandatory 候选、DependencyGraph 和 CausalProjection。默认 off 不计算诊断；当前分支不增加 provider 调用，也不改变基础阶段和判决。
+`causal_contracts.py`、`step_uncertainty.py`、`causal_graph.py` 和 `causal_audit.py` 实现只读诊断及 shadow 审计。Detector 在非 off 模式于基础终态生成后输出 `proof.causal_diagnostics`：StepRiskProfile、Top-K 与 mandatory 候选、DependencyGraph、CausalProjection 和 CausalAudit。默认 off 不计算诊断；默认 deterministic_only 不增加 provider 调用。
 
 风险排序优先采用 calculator 字面算术的局部偏差、相同 entity/attribute/unit/time 的显式字段冲突候选，以及未核验内容。机械缺失动作保留轨迹级 null locus。字段冲突是 hypothesis，工具观察不自动归责；缺失/未知 role 不记为零风险，teacher-forced PPL 明确 unsupported。算术核验仅支持可精确表示的字面四则运算；数值转换前限制十进制数量级，运算中限制分子/分母位长，超限保持未知。不执行工具代码，不把局部结果当作任务级违规证明。
 
 依赖图确认 packet 内同一交互的 call/result 结构，以及显式 source_ref、绑定字段和值匹配且来源在前的声明消费。该验证证明记录声明的字段复制关系，不证明来源事实或材料性。没有来源的自然语言、仅文字相似、未解析/歧义引用和同次参数引用后续观察均不能取得因果验证。投影纳入远距离祖先、真实后缀和交付锚点；节点/边/深度/字符预算或依赖缺失使 closure_state 保持 unknown，记录遗漏并返回独立内容副本。
 
-**待接通**：有界因果审计执行器、阳性听证的同 claim Tracer 上下文及受校准策略约束的阴性复审。阴性复审仍须经过 Recall/Upgrade/Defense/Adjudication。异常分数不能定罪，模型反事实不能充当工具回放；强一致阴性的默认路径保持现有行为。
+`run_causal_audit` 重算局部算术证书及机械缺失动作。supported/refuted 仅描述证书的明确作用范围；材料性和因果角色未证明时保持 unknown，缺失动作不分摊给事件。局部算术修正不声称工具已重放或状态已改变，审计没有定罪权。开启 model_hypothesis 时通过现有 provider 执行一次有预算的慢审；输出要求闭合字段、枚举、可见 packet 引用及长度上限，合法模型解释仍只记为 hypothesis，不能升级确定性证书。
+
+`runtime.AddedBudget` 是每例新增预算的唯一持有者，Detector 和整例重试共用；嵌套调用不能重领或更换策略。诊断启动后时间额度与现有 case/run deadline 取更短者。请求前累计预留请求数、UTF-8 输入内容/声明选项的字节数和输出上限；没有 tokenizer 时这是保守估计，不承诺精确 token hard cap。慢审关闭内部 transport retry，实际请求/usage 仍由统一 usage_scope 记录，并在审计及整例 execution 中分别呈现范围，汇总只读取整例计数。
+
+可恢复 provider/合同失败或预算不足只改变诊断 health，保留基础终态和必需阶段健康。致命 provider 失败继续返回原有 invalid/unresolved 信封并附 `base_detection_result` 和停止原因；KeyboardInterrupt/RunStopped 等传播原异常，整例 attempt 记录保留已生成的基础证明和实际成本。
+
+**待接通**：阳性听证的同 claim Tracer 上下文及受校准策略约束的阴性复审。当前 tracer_context 配置产生审计诊断，尚不改变 Tracer 输入。阴性复审仍须经过 Recall/Upgrade/Defense/Adjudication。异常分数不能定罪，模型反事实不能充当工具回放；强一致阴性的默认路径保持现有行为。
 
 **双任务反馈**：`evolution/worksheet.py`、`mechanisms.py` 和 `proposer.py` 可在开发侧消费不含部署标签泄漏的因果诊断，将漏检、误报、首次步骤晚判、证据缺失、已纠正及多错误歧义区分处理；保留原始 L0/L1、四门准入、双指标配对与不可测状态。现有 `detector/provider.py` 没有对原 Agent 步骤计算 teacher-forced PPL 的接口，首期“疑惑度”应明确写作语义风险代理。
 
