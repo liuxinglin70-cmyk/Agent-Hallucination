@@ -27,6 +27,7 @@ from evolution.route_failures import (
     record_route_failures,
     resolve_route_failure,
     route_failure_state,
+    route_failure_summary,
     route_of,
     unit_route,
 )
@@ -423,8 +424,54 @@ def test_resolution_is_history_not_deletion(tmp_path):
     )
     records = load_route_failures(path)
     assert len(records) == 3
-    assert len(records) == 3
     assert any(record.get("kind") == "resolution" for record in records)
+    assert falsified_routes(records, "M-aaa") == {}
+    assert route_failure_summary(records)["pairs"] == 0
+
+
+@pytest.mark.parametrize("new_cycles,insufficient", [([], False), ([4], False), ([4, 5], True)])
+def test_resolution_closes_the_observation_epoch(tmp_path, new_cycles, insufficient):
+    path = tmp_path / "route_failures.jsonl"
+    for cycle in (1, 2):
+        record_route_failures(path, cycle=cycle, observations=[_observation()])
+    original = path.read_bytes()
+    resolve_route_failure(path, mechanism_id="M-aaa", route="tracer_directive",
+                          cycle=3, note="repaired")
+    for cycle in new_cycles:
+        record_route_failures(path, cycle=cycle, observations=[_observation()])
+    records = load_route_failures(path)
+    assert path.read_bytes().startswith(original)
+    state = route_failure_state(records)
+    entry = state.get(("M-aaa", "tracer_directive"))
+    if not new_cycles:
+        assert entry is None
+    else:
+        assert entry["observations"] == len(new_cycles)
+        assert entry["cycles"] == new_cycles
+        assert entry["insufficient"] is insufficient
+
+
+def test_resolution_is_scoped_and_duplicate_observations_do_not_count_twice(tmp_path):
+    path = tmp_path / "route_failures.jsonl"
+    record_route_failures(path, cycle=1, observations=[_observation(), _observation(mechanism="M-other")])
+    records = load_route_failures(path)
+    assert route_failure_state([*records, *records])[("M-aaa", "tracer_directive")]["insufficient"] is False
+    resolve_route_failure(path, mechanism_id="M-aaa", route="tracer_directive", cycle=2, note="repaired")
+    state = route_failure_state(load_route_failures(path))
+    assert ("M-aaa", "tracer_directive") not in state
+    assert state[("M-other", "tracer_directive")]["observations"] == 1
+
+
+def test_resuming_resolution_is_idempotent_and_conflicting_content_is_rejected(tmp_path):
+    path = tmp_path / "route_failures.jsonl"
+    kwargs = dict(mechanism_id="M-aaa", route="tracer_directive", cycle=2, note="repaired")
+    first = resolve_route_failure(path, **kwargs)
+    original = path.read_bytes()
+    assert resolve_route_failure(path, **kwargs) == first
+    assert path.read_bytes() == original
+    with pytest.raises(ValueError, match="conflicting resolution"):
+        resolve_route_failure(path, **{**kwargs, "note": "different"})
+    assert path.read_bytes() == original
 
 
 def test_unknown_schema_is_rejected(tmp_path):

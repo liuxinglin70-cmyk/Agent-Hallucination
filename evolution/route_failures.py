@@ -263,25 +263,28 @@ def record_route_failures(
 def route_failure_state(
     records: Sequence[Mapping[str, Any]],
 ) -> dict[tuple[str, str], dict[str, Any]]:
-    """Collapse records into one entry per (mechanism, route).
-
-    ``insufficient`` is the admitted verdict; ``observations`` counts every
-    record, including any that have not yet accumulated enough evidence. A
-    record carrying revision evidence admits on its own, which is the
-    condition the plan states.
-    """
+    """Reduce append order into the current observation epoch for each route."""
     state: dict[tuple[str, str], dict[str, Any]] = {}
+    seen: dict[tuple[str, str, str, int], Mapping[str, Any]] = {}
     for record in records:
-        if record.get("kind") == "resolution":
-            continue
-        status = str(record.get("status") or "")
-        if status != "insufficient_for_mechanism":
-            continue
         key = (
             str(record.get("mechanism_id") or ""),
             str(record.get("route") or ""),
         )
         if not all(key):
+            continue
+        kind = str(record.get("kind") or "observation")
+        if kind != "resolution" and record.get("status") != "insufficient_for_mechanism":
+            continue
+        cycle = int(record.get("cycle") or 0)
+        event_key = (*key, kind, cycle)
+        if event_key in seen:
+            if dict(seen[event_key]) != dict(record):
+                raise ValueError(f"conflicting route event: {event_key}")
+            continue
+        seen[event_key] = record
+        if kind == "resolution":
+            state.pop(key, None)
             continue
         entry = state.setdefault(key, {
             "mechanism_id": key[0],
@@ -293,7 +296,7 @@ def route_failure_state(
             "evidence": {},
         })
         entry["observations"] = int(entry["observations"]) + 1
-        entry["cycles"] = [*entry["cycles"], int(record.get("cycle") or 0)]
+        entry["cycles"] = [*entry["cycles"], cycle]
         entry["evidence"] = dict(record.get("evidence") or {})
         revisions = record.get("revisions_observed")
         if revisions is not None and int(revisions) > 0:
@@ -372,6 +375,11 @@ def resolve_route_failure(
         "cycle": int(cycle),
         "note": str(note or ""),
     }
+    for existing in load_route_failures(path):
+        if all(existing.get(key) == record[key] for key in ("kind", "mechanism_id", "route", "cycle")):
+            if existing != record:
+                raise ValueError("conflicting resolution for the same cycle and route")
+            return existing
     append_jsonl(path, record)
     return record
 
