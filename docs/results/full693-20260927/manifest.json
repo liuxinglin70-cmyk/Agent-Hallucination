@@ -1,0 +1,53 @@
+{
+  "archived_on": "2026-10-08",
+  "files": [
+    {
+      "source": "artifacts/full693-20260924T143024Z/measurement/g0/baseline_report.json",
+      "archive": "baseline_report.json",
+      "bytes": 1006397,
+      "sha256": "f90208a68bae2b90ee976c8d91e62bdfa8e7b28a5b3eab10c928e8555d4d75db"
+    },
+    {
+      "source": "artifacts/full693-20260924T143024Z/measurement/g0/runs/full693-g0/summary.json",
+      "archive": "baseline_summary.json",
+      "bytes": 18146,
+      "sha256": "3ac70c6bf1acca2cd4fbbee153ed8eb75cff5277ae6e4286eb3181a1cc97c149"
+    },
+    {
+      "source": "artifacts/full693-20260924T143024Z/run_plan.json",
+      "archive": "run_plan.json",
+      "bytes": 2595,
+      "sha256": "a0325875ad073010bfa50cde6459c15d155e75bd5a5b660bbb764608db63a5e7"
+    },
+    {
+      "source": "artifacts/full693-20260924T143024Z/work/evolution/reports/experiment.json",
+      "archive": "evolution_experiment.json",
+      "bytes": 765048,
+      "sha256": "dfcd146113abe357294999d04ef643cccf779d28f07e5050f8aa4e34a8ffd04e"
+    },
+    {
+      "source": "artifacts/full693-20260924T143024Z/work/evolution/reports/defect_audit_verdict.json",
+      "archive": "defect_audit_verdict.json",
+      "bytes": 13299,
+      "sha256": "2ea760757184a82ca2d29a3a97854c16a3e23c9142519708f8fd0016288f264c"
+    },
+    {
+      "source": "artifacts/full693-20260924T143024Z/work/evolution/registry/active.json",
+      "archive": "active_registry.json",
+      "bytes": 169,
+      "sha256": "eb1ee95caefcfe4bb629abd55f8a0effd83b1fb4f2821ca3e426b061b4e8e1db"
+    },
+    {
+      "source": "artifacts/full693-20260924T143024Z/work/evolution/ledger.jsonl",
+      "archive": "evolution_ledger.jsonl",
+      "bytes": 372083,
+      "sha256": "6ad54222df873c82761d20a770be48ff9d7b93443453f4601b905dfab7918c57"
+    },
+    {
+      "source": "artifacts/full693-20260924T143024Z/work/evolution/candidates/archive_summary.json",
+      "archive": "candidate_archive_summary.json",
+      "bytes": 712,
+      "sha256": "8eda0f0da921b9236c4f4e02bba9f8a6bc6669d51d98dd6e44274eddcc5d9250"
+    }
+  ]
+}

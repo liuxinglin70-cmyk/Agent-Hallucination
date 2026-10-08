@@ -5,6 +5,10 @@
 **论文数据**：AgentHallu: Benchmarking Automated Hallucination Attribution of LLM-based Agents（arXiv:2601.06818），Table 4 / Table 5
 **权威叙述**：本报告是派生对比，完整实验过程与逐条监控见 [实验日志](experiment-log.md) §34。两者不一致时以日志与原始报告文件为准。
 
+**原始报告归档**：[完整基线报告](results/full693-20260927/baseline_report.json)，校验信息见 [证据清单](results/full693-20260927/manifest.json)。
+
+**长期保存的基线入口**：原始 `artifacts/full693-20260924T143024Z/measurement/g0/baseline_report.json` SHA-256 为 `f90208a68bae2b90ee976c8d91e62bdfa8e7b28a5b3eab10c928e8555d4d75db`；仓库内另存 [653 例逐例精简快照](../datasets/protocols/g0_baseline_snapshot_20260927.json)，包含金标、判定、责任步、权威性与耗时，供后续自进化划分及同口径核对使用。快照不包含原始 proof 和 provider 请求。新的 [693 例自进化划分](evolution-g0-reuse-plan-20260928.md)与本报告的 653 例测量分母不同。
+
 ---
 
 ## 0. 先读：三条限制

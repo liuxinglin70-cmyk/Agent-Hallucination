@@ -1,0 +1,51 @@
+{
+  "schema_version": "selfevo.full693.live_run.v1",
+  "run_id": "full693-20260924T143024Z",
+  "created_at_utc": "2026-09-24T14:30:24.511670+00:00",
+  "status": "preflight_complete_authorized_internal_dev_reuse",
+  "repository": "E:\\agent hallucination\\agent hallucination",
+  "source_digest": "8bdc5a76abc7e47e",
+  "evolution_config": "E:\\agent hallucination\\agent hallucination\\artifacts\\full693-20260924T143024Z\\evolution_config.json",
+  "evolution_config_sha256": "002dc2ed403151a61c20517df189aab3903b85758d5eadadc53545ce641fd659",
+  "detector_config": "E:\\agent hallucination\\agent hallucination\\detector\\configs\\autodl.json",
+  "detector_config_sha256": "da3131e671c5d9816eff50bad1c54f91e4214eaeecbafee3333f7946dbc28df0",
+  "inputs": {
+    "development.json": "5d52a99ef961622ccb032d9951fc776d39ea690fe2c7b6571460f3207fd43d14",
+    "measurement_v1.json": "892912b64e315cdee222245535f41769b46d0108e872b4edd172b3c78ffc3d2a",
+    "development_exposure.json": "ac2d651967d8cdc7b73d347d590b93e6972958d0b0b1d25061f04ad4bb336c56"
+  },
+  "dataset": {
+    "corpus_cases": 693,
+    "partition": {
+      "evolution_development_pool": 30,
+      "evolution_validation": 10,
+      "measurement": 653
+    },
+    "union_cases": 693,
+    "overlap_between_evolution_roles_and_measurement": 0,
+    "measurement_gold_positive": 419,
+    "measurement_gold_negative": 234,
+    "measurement_cases_digest": "547cef0f06913d157fc1f5d4772973446f72f1a7329c9e01e267213b90badab9"
+  },
+  "protocol_note": "Retrospective internal evaluation on the full 693-case development corpus. The fixed 40/653 partition is used; 30/10 drive self-evolution roles and 653 are reserved for paired measurement. No claim of unseen-data generalization.",
+  "execution": {
+    "cycles": 3,
+    "patrol_cases_per_cycle": 18,
+    "workers": 8,
+    "cycle_timeout_seconds": 43200,
+    "proposer_mode": "llm"
+  },
+  "stages": [
+    "preflight",
+    "selfevo_3_cycles",
+    "baseline_measurement_653",
+    "evolved_measurement_653_if_active_registry_changes",
+    "paired_evaluation_if_distinct_arm"
+  ],
+  "authorization_note": "User explicitly directed use of the full available development corpus and said not to block on development-set concerns; proceed with transparent internal retrospective labeling.",
+  "preflight": {
+    "evolution": "one authorized exposure blocker (validation overlaps historical development exposure); all technical readiness checks passed",
+    "baseline": "see preflight-baseline.json"
+  },
+  "updated_at_utc": "2026-09-24T14:31:48.683591+00:00"
+}
