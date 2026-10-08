@@ -12,6 +12,7 @@ A scanner candidate can never convict by itself.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
 from detector.evidence import (
@@ -327,6 +328,34 @@ def _parse_upgrades(
     return rows, missing, ""
 
 
+def assemble_upgraded_candidates(
+    candidates: Sequence[Mapping[str, Any]],
+    upgrades: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Derive hearing inputs from validated candidates and answered upgrade rows."""
+    by_id = {candidate["candidate_id"]: candidate for candidate in candidates}
+    positives = sorted(
+        (row for row in upgrades
+         if row.get("content_error") is True and row.get("causal") is True
+         and row.get("coverage") == "answered"),
+        key=lambda row: row["corrected_step"],
+    )
+    assembled = []
+    for row in positives:
+        candidate = by_id[row["candidate_id"]]
+        assembled.append(deepcopy({
+            **row,
+            "locus_event_id": candidate["locus_event_id"],
+            # Trajectory references and snapshot citations use separate ID spaces.
+            "evidence_refs": candidate["evidence_refs"],
+            "evidence_citations": row.get("evidence_refs") or [],
+            "conflict_note": str(row.get("conflict_note") or ""),
+            "claim": candidate["claim"],
+            "quote": candidate["quote"],
+        }))
+    return assembled
+
+
 def _upgrade_sample(
     *,
     packet: Mapping[str, Any],
@@ -621,33 +650,7 @@ def run_causal_upgrade(
         "votes": votes, "cast": cast, "per_candidate": vote_facts,
     }
 
-    def positive_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        return [
-            row for row in rows
-            if row.get("content_error") is True and row.get("causal") is True
-            and row.get("coverage") == "answered"
-        ]
-
-    positives = positive_rows(merged)
-    positives.sort(key=lambda row: int(row.get("corrected_step") or 0))
-    upgraded_candidates: list[dict[str, Any]] = []
-    for row in positives:
-        candidate = next(
-            c for c in candidates
-            if str(c.get("candidate_id") or "") == str(row.get("candidate_id"))
-        )
-        upgraded_candidates.append({
-            **row,
-            "locus_event_id": candidate["locus_event_id"],
-            # ``evidence_refs`` stays the trajectory refs the candidate
-            # deviates on; snapshot citations travel under their own key so
-            # the two id spaces are never confused.
-            "evidence_refs": candidate["evidence_refs"],
-            "evidence_citations": list(row.get("evidence_refs") or []),
-            "conflict_note": str(row.get("conflict_note") or ""),
-            "claim": candidate["claim"],
-            "quote": candidate["quote"],
-        })
+    upgraded_candidates = assemble_upgraded_candidates(candidates, merged)
     return {
         "ok": True, "upgrades": merged,
         "upgraded_candidate": upgraded_candidates[0] if upgraded_candidates else None,
@@ -663,4 +666,4 @@ def run_causal_upgrade(
     }
 
 
-__all__ = ["run_causal_upgrade", "run_recall_scan"]
+__all__ = ["assemble_upgraded_candidates", "run_causal_upgrade", "run_recall_scan"]
