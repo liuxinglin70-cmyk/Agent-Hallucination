@@ -1,0 +1,3 @@
+# Evidence archives preserve source bytes so manifest SHA-256 stays valid.
+docs/results/full693-20260927/*.json -text
+docs/results/full693-20260927/*.jsonl -text
