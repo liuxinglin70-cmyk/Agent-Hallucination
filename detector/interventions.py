@@ -1560,7 +1560,7 @@ class InterventionPlan:
                     "runner": "typed_semantic",
                 }
 
-            # Layer 2: Window projection & causal dependency closure (§6.3)
+            # Local context window; dependency closure is a separate contract.
             events = list(packet.get("events") or [])
             anchor_event_id = scope_cfg.get("anchor_event")
             if not anchor_event_id:

@@ -8,11 +8,13 @@ never enter or persist in a detector input.
 from __future__ import annotations
 
 import ast
-import hashlib
+from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
+from detector.runtime import digest
+
 PACKET_SCHEMA = "detector.packet.v1"
-EVENT_WINDOW_PROJECTION_SCHEMA = "detector.event_window_projection.v1"
+EVENT_WINDOW_PROJECTION_SCHEMA = "detector.event_window_projection.v2"
 
 ALLOWED_RECORD_KEYS = frozenset({"question", "history"})
 
@@ -225,11 +227,24 @@ def validate_packet(packet: Mapping[str, Any]) -> None:
     for event in events:
         if not isinstance(event, dict):
             raise PacketError("packet events must be objects")
-        ids.append(str(event.get("event_id") or ""))
-        positions.append(int(event.get("position") or 0))
+        event_id = event.get("event_id")
+        if not isinstance(event_id, str) or not event_id:
+            raise PacketError("packet event ids must be non-empty strings")
+        position = event.get("position")
+        if not isinstance(position, int) or isinstance(position, bool):
+            raise PacketError("packet positions must be integers")
+        ids.append(event_id)
+        positions.append(position)
         parent = str(event.get("event_id") or "")
-        for interaction in event.get("tool_interactions") or []:
-            iid = str(interaction.get("interaction_id") or "")
+        interactions = event.get("tool_interactions") or []
+        if not isinstance(interactions, list):
+            raise PacketError("packet tool_interactions must be a list")
+        for interaction in interactions:
+            if not isinstance(interaction, Mapping):
+                raise PacketError("packet tool interactions must be objects")
+            iid = interaction.get("interaction_id")
+            if not isinstance(iid, str):
+                raise PacketError("packet interaction ids must be strings")
             if not iid.startswith(parent + "_tool_"):
                 raise PacketError(f"bad interaction id {iid!r}")
             ids.append(iid)
@@ -239,8 +254,24 @@ def validate_packet(packet: Mapping[str, Any]) -> None:
         raise PacketError("packet ids must be unique")
 
 
-def event_id_for_step(packet: Mapping[str, Any], step: int) -> str | None:
+def packet_reference_index(packet: Mapping[str, Any]) -> dict[str, str]:
+    """Map each canonical event or interaction reference to its owning event."""
+    refs = {}
+    for event in packet.get("events") or ():
+        event_id = str(event.get("event_id") or "")
+        if event_id:
+            refs[event_id] = event_id
+        for interaction in event.get("tool_interactions") or ():
+            interaction_id = str(interaction.get("interaction_id") or "")
+            if interaction_id:
+                refs[interaction_id] = event_id
+    return refs
+
+
+def event_id_for_step(packet: Mapping[str, Any], step: int | None) -> str | None:
     """Return the canonical event id for a 1-based packet position."""
+    if not isinstance(step, int) or isinstance(step, bool):
+        return None
     for event in packet.get("events") or []:
         if int(event.get("position") or 0) == step:
             return str(event.get("event_id") or "") or None
@@ -286,75 +317,47 @@ def project_event_window(
     window_after: int = 2,
     include_delivered: bool = True,
 ) -> dict[str, Any]:
-    """Construct a read-only causal event window projection from the canonical packet.
-
-    Strictly label-free: consumes only the canonical packet.
-    """
+    """Project the interval between anchor and target with explicit clipped margins."""
+    for name, value in (("window_before", window_before), ("window_after", window_after)):
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise PacketError(f"{name} must be a non-negative integer")
+    if not isinstance(include_delivered, bool):
+        raise PacketError("include_delivered must be a boolean")
     events = list(packet.get("events") or [])
     if not events:
         raise PacketError("packet contains no events")
-
-    anchor_event = None
-    for event in events:
-        if str(event.get("event_id") or "") == anchor_event_id:
-            anchor_event = event
-            break
-    if anchor_event is None:
+    validate_packet(packet)
+    by_id = {event["event_id"]: event for event in events}
+    if anchor_event_id not in by_id:
         raise PacketError(f"anchor event {anchor_event_id!r} not found in packet")
-
-    anchor_pos = int(anchor_event.get("position") or 0)
-
-    target_pos = None
-    if target_event_id is not None:
-        target_event = None
-        for event in events:
-            if str(event.get("event_id") or "") == target_event_id:
-                target_event = event
-                break
-        if target_event is None:
-            raise PacketError(f"target event {target_event_id!r} not found in packet")
-        target_pos = int(target_event.get("position") or 0)
-
-    total_events = len(events)
-    start_pos = max(1, anchor_pos - max(0, window_before))
-    if target_pos is not None:
-        end_pos = min(total_events, max(target_pos, anchor_pos) + max(0, window_after))
-    else:
-        end_pos = min(total_events, anchor_pos + max(0, window_after))
-
-    projected_events = [
-        event for event in events
-        if start_pos <= int(event.get("position") or 0) <= end_pos
-    ]
-    projected_ids = [str(e.get("event_id") or "") for e in projected_events]
-
-    is_window_complete = (
-        (anchor_pos - window_before >= 1)
-        and ((target_pos or anchor_pos) + window_after <= total_events)
-    )
-
-    has_subsequent_recovery = False
-    for event in events:
-        pos = int(event.get("position") or 0)
-        if pos > anchor_pos:
-            if event.get("tool_interactions"):
-                has_subsequent_recovery = True
-                break
-            content = str(event.get("content") or "").strip()
-            if content and (
-                any(hint in content.lower() for hint in _ANSWER_TOOL_HINTS)
-                or event.get("role") == "assistant"
-            ):
-                has_subsequent_recovery = True
-                break
-
-    delivered = delivered_result(packet) if include_delivered else None
-
-    raw_hash_body = f"{anchor_event_id}:{target_event_id}:{window_before}:{window_after}:{','.join(projected_ids)}"
-    proj_hash = hashlib.sha256(raw_hash_body.encode("utf-8")).hexdigest()
-
-    return {
+    if target_event_id is not None and target_event_id not in by_id:
+        raise PacketError(f"target event {target_event_id!r} not found in packet")
+    anchor_pos = by_id[anchor_event_id]["position"]
+    target_pos = by_id[target_event_id]["position"] if target_event_id is not None else None
+    first = min(anchor_pos, target_pos if target_pos is not None else anchor_pos)
+    last = max(anchor_pos, target_pos if target_pos is not None else anchor_pos)
+    requested_start, requested_end = first - window_before, last + window_after
+    start, end = max(1, requested_start), min(len(events), requested_end)
+    projected_events = deepcopy(events[start - 1:end])
+    projected_ids = [event["event_id"] for event in projected_events]
+    omitted_ids = [event["event_id"] for event in events
+                   if event["event_id"] not in projected_ids]
+    reasons = []
+    if requested_start < 1:
+        reasons.append("window_before_clipped")
+    if requested_end > len(events):
+        reasons.append("window_after_clipped")
+    delivered = deepcopy(delivered_result(packet)) if include_delivered else None
+    delivery_ids = []
+    if delivered is not None:
+        for event_id in (delivered["last_prose_event_id"],
+                         (delivered["last_answer_tool_call"] or {}).get("event_id")):
+            if event_id and event_id not in delivery_ids:
+                delivery_ids.append(event_id)
+    projection = {
         "schema_version": EVENT_WINDOW_PROJECTION_SCHEMA,
+        "packet_digest": digest(packet),
+        "question": packet["question"],
         "anchor_event_id": anchor_event_id,
         "anchor_position": anchor_pos,
         "target_event_id": target_event_id,
@@ -363,31 +366,36 @@ def project_event_window(
         "window_after": window_after,
         "events": projected_events,
         "event_ids": projected_ids,
-        "is_window_complete": is_window_complete,
-        "has_subsequent_recovery": has_subsequent_recovery,
+        "content_digest": digest(projected_events),
+        "is_window_complete": not reasons,
+        "coverage_reasons": reasons,
+        "has_subsequent_activity": any(
+            event.get("tool_interactions") or str(event.get("content") or "").strip()
+            for event in events[anchor_pos:]
+        ),
         "delivered_result": delivered,
-        "omitted_event_count": total_events - len(projected_events),
-        "projection_hash": proj_hash,
+        "delivery_event_ids": delivery_ids,
+        "omitted_event_ids": omitted_ids,
+        "omitted_event_count": len(omitted_ids),
     }
+    projection["projection_hash"] = digest(projection)
+    return projection
 
 
 def evidence_refs_support_event(
-    evidence_refs: Sequence[str], event_id: str,
+    packet: Mapping[str, Any], evidence_refs: Sequence[str], event_id: str,
 ) -> bool:
-    """Whether refs cite an event or one of that event's tool interactions."""
-    parent = str(event_id).rsplit("_tool_", 1)[0]
-    return any(
-        str(ref).rsplit("_tool_", 1)[0] == parent
-        for ref in evidence_refs
-        if str(ref)
-    )
+    """Whether observed references belong to the specified canonical event."""
+    owners = packet_reference_index(packet)
+    owner = owners.get(event_id)
+    return owner is not None and any(owners.get(ref) == owner for ref in evidence_refs)
 
 
 def evidence_refs_support_step(
     packet: Mapping[str, Any], evidence_refs: Sequence[str], step: int,
 ) -> bool:
     event_id = event_id_for_step(packet, step)
-    return bool(event_id) and evidence_refs_support_event(evidence_refs, event_id)
+    return bool(event_id) and evidence_refs_support_event(packet, evidence_refs, event_id)
 
 
 def _answer_call(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -746,6 +754,7 @@ __all__ = [
     "evidence_refs_support_event",
     "evidence_refs_support_step",
     "packet_features",
+    "packet_reference_index",
     "project_event_window",
     "render_defense_view",
     "render_full_view",

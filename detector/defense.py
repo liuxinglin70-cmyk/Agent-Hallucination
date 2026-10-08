@@ -18,6 +18,7 @@ from detector.interventions import InterventionPlan, empty_plan
 from detector.packet import (
     evidence_refs_support_step,
     packet_features,
+    packet_reference_index,
     render_defense_view,
     render_judge_view,
 )
@@ -101,18 +102,7 @@ def _validate_defense_evidence(
     snapshot: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, str]:
     """Require defense references to resolve to packet event/tool ids."""
-    valid_ids = {
-        str(event.get("event_id") or "")
-        for event in packet.get("events") or ()
-        if isinstance(event, Mapping)
-    }
-    for event in packet.get("events") or ():
-        if isinstance(event, Mapping):
-            valid_ids.update(
-                str(item.get("interaction_id") or "")
-                for item in event.get("tool_interactions") or ()
-                if isinstance(item, Mapping)
-            )
+    valid_ids = packet_reference_index(packet)
     refs = [str(ref) for ref in parsed.get("evidence_refs") or ()]
     if any(ref not in valid_ids for ref in refs):
         return None, "evidence_refs contains an unknown packet event"

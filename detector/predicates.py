@@ -40,6 +40,7 @@ import re
 from typing import Any, Iterable, Mapping
 
 from detector.packet import delivered_result as packet_delivered_result
+from detector.packet import packet_reference_index
 
 PREDICATE_VERDICTS: dict[str, frozenset[str]] = {
     "required_action_present": frozenset({
@@ -515,15 +516,6 @@ def predicate_verbatim_fidelity(
     }
 
 
-def _packet_ids(packet: Mapping[str, Any]) -> set[str]:
-    ids: set[str] = set()
-    for event in packet.get("events") or []:
-        ids.add(str(event.get("event_id") or ""))
-        for interaction in event.get("tool_interactions") or []:
-            ids.add(str(interaction.get("interaction_id") or ""))
-    return ids
-
-
 def predicate_evidence_refs_resolve(
     packet: Mapping[str, Any], context: Mapping[str, Any]
 ) -> dict[str, Any]:
@@ -535,7 +527,7 @@ def predicate_evidence_refs_resolve(
             "verdict": "not_applicable",
             "detail": "no evidence refs supplied",
         }
-    ids = _packet_ids(packet)
+    ids = packet_reference_index(packet)
     unknown = [ref for ref in refs if ref not in ids]
     if unknown:
         return {

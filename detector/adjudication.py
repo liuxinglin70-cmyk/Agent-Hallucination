@@ -71,18 +71,10 @@ from detector.packet import (
     delivered_result as packet_delivered_result,
     evidence_refs_support_step,
     step_kind,
+    event_id_for_step,
 )
 from detector.interventions import conviction_verdicts_for
 from detector.predicates import PREDICATE_CONVICTION_VERDICTS
-
-
-def _event_id_for_step(packet: Mapping[str, Any], step: int | None) -> str | None:
-    if step is None:
-        return None
-    for event in packet.get("events") or []:
-        if int(event.get("position") or 0) == step:
-            return str(event.get("event_id") or "")
-    return None
 
 
 def _mechanical_anchor(packet: Mapping[str, Any]) -> tuple[str | None, int | None]:
@@ -523,7 +515,7 @@ def adjudicate(
             # recall-upgrade positives are the FN family caused by
             # over-refuting required-action violations.
             step = positive.get("step")
-            responsible_event_id = _event_id_for_step(packet, step)
+            responsible_event_id = event_id_for_step(packet, step)
             return {
                 "state": STATE_ERROR,
                 "decision_authority": AUTHORITY_AUTHORITATIVE,
@@ -608,7 +600,7 @@ def adjudicate(
                 "error_type": str(defense_parsed.get("reason") or ""),
             })
         step = positive.get("step")
-        responsible_event_id = _event_id_for_step(packet, step)
+        responsible_event_id = event_id_for_step(packet, step)
         return {
             "state": STATE_ERROR,
             "decision_authority": AUTHORITY_DEGRADED_JUDGE_ONLY,
@@ -690,7 +682,7 @@ def adjudicate(
                 working_positive = _clean_positive(working_positive, confirmed)
 
     step = working_positive.get("step")
-    responsible_event_id = _event_id_for_step(packet, step)
+    responsible_event_id = event_id_for_step(packet, step)
     authority = AUTHORITY_DEGRADED_JUDGE_ONLY if degraded else AUTHORITY_AUTHORITATIVE
     localization_conflict, localization_sources = _localization_record(
         hearings=hearing_queue,

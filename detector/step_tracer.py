@@ -6,7 +6,8 @@ import json
 from typing import Any, Mapping
 
 from detector.interventions import InterventionPlan, empty_plan
-from detector.packet import packet_features, render_judge_view
+from detector.packet import (evidence_refs_support_step, packet_features,
+                             packet_reference_index, render_judge_view)
 from detector.provider import ProviderError, provider_call, raise_if_fatal
 from detector.semantics import TRACER_CONTRACT_REPAIR, TRACER_SYSTEM
 
@@ -31,32 +32,10 @@ def _parse_tracer(parsed: Any, packet: Mapping[str, Any]):
     ):
         return None, "evidence_refs must be a list of strings"
     refs = [str(x) for x in refs_raw if str(x)]
-    valid_refs = {
-        str(event.get("event_id") or "")
-        for event in packet.get("events") or ()
-        if isinstance(event, Mapping)
-    }
-    for event in packet.get("events") or ():
-        if isinstance(event, Mapping):
-            valid_refs.update(
-                str(item.get("interaction_id") or "")
-                for item in event.get("tool_interactions") or ()
-                if isinstance(item, Mapping)
-            )
+    valid_refs = packet_reference_index(packet)
     if not refs or any(ref not in valid_refs for ref in refs):
         return None, "evidence_refs must resolve to packet events"
-    step_event_id = next(
-        (
-            str(event.get("event_id") or "")
-            for event in packet.get("events") or ()
-            if isinstance(event, Mapping) and event.get("position") == step
-        ),
-        "",
-    )
-    if not step_event_id or not any(
-        ref == step_event_id or ref.startswith(step_event_id + "_tool_")
-        for ref in refs
-    ):
+    if not evidence_refs_support_step(packet, refs, step):
         return None, "evidence_refs do not support the traced step"
     return {
         "step": step,

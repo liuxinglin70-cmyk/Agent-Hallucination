@@ -65,7 +65,8 @@ def test_project_event_window_causal_boundaries():
     # Event 003, 004, 005
     assert proj["event_ids"] == ["event_003", "event_004", "event_005"]
     assert proj["is_window_complete"] is True
-    assert proj["has_subsequent_recovery"] is True  # event_006 has answer content
+    assert proj["has_subsequent_activity"] is True
+    assert "has_subsequent_recovery" not in proj
     assert proj["delivered_result"] is not None
     assert isinstance(proj["projection_hash"], str)
     assert len(proj["projection_hash"]) == 64
@@ -103,6 +104,69 @@ def test_project_event_window_missing_anchor():
     packet = _sample_packet()
     with pytest.raises(PacketError, match="anchor event 'non_existent' not found"):
         project_event_window(packet, anchor_event_id="non_existent")
+
+
+def test_window_includes_target_before_anchor():
+    proj = project_event_window(
+        _sample_packet(), anchor_event_id="event_005", target_event_id="event_002",
+        window_before=1, window_after=1,
+    )
+    assert proj["event_ids"] == [f"event_{index:03d}" for index in range(1, 7)]
+    assert proj["is_window_complete"] is True
+
+
+@pytest.mark.parametrize("change", ["question", "selected_content", "omitted_content"])
+def test_projection_identity_covers_actual_packet_content(change):
+    packet = _sample_packet()
+    before = project_event_window(packet, anchor_event_id="event_003",
+                                  window_before=0, window_after=0)
+    if change == "question":
+        packet["question"] = "Calculate a different tax"
+    else:
+        index = 2 if change == "selected_content" else 5
+        packet["events"][index]["content"] = "changed observation"
+    after = project_event_window(packet, anchor_event_id="event_003",
+                                 window_before=0, window_after=0)
+    assert before["event_ids"] == after["event_ids"]
+    assert before["projection_hash"] != after["projection_hash"]
+
+
+def test_projection_has_independent_nested_content():
+    packet = _sample_packet()
+    proj = project_event_window(packet, anchor_event_id="event_002",
+                                window_before=0, window_after=0)
+    proj["events"][0]["tool_interactions"][0]["arguments"] = "changed"
+    assert packet["events"][1]["tool_interactions"][0]["arguments"] == "{}"
+
+
+@pytest.mark.parametrize("field", ["window_before", "window_after"])
+@pytest.mark.parametrize("value", [-1, True, 0.5, float("nan")])
+def test_projection_rejects_invalid_window_sizes(field, value):
+    with pytest.raises(PacketError, match=field):
+        project_event_window(_sample_packet(), anchor_event_id="event_003",
+                             **{field: value})
+
+
+def test_projection_records_clipping_and_delivery_outside_local_window():
+    proj = project_event_window(_sample_packet(), anchor_event_id="event_001",
+                                window_before=2, window_after=0)
+    assert proj["coverage_reasons"] == ["window_before_clipped"]
+    assert proj["omitted_event_ids"] == [f"event_{index:03d}" for index in range(2, 7)]
+    assert proj["omitted_event_count"] == len(proj["omitted_event_ids"])
+    assert proj["delivery_event_ids"] == ["event_006"]
+    assert "event_006" not in proj["event_ids"]
+    assert proj["question"] == "Calculate taxes"
+
+
+def test_subsequent_activity_does_not_certify_recovery():
+    packet = build_packet({"question": "What is the balance?", "history": [
+        {"role": "assistant", "content": "The balance is incorrect."},
+        {"role": "assistant", "content": "I will discuss an unrelated subject."},
+    ]})
+    proj = project_event_window(packet, anchor_event_id="event_001",
+                                window_before=0, window_after=0)
+    assert proj["has_subsequent_activity"] is True
+    assert "has_subsequent_recovery" not in proj
 
 
 def test_scoped_semantic_layer1_static_applicability_not_met():

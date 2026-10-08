@@ -25,6 +25,7 @@ from detector.packet import (
     evidence_refs_support_event,
     evidence_refs_support_step,
     packet_features,
+    packet_reference_index,
     render_judge_view,
 )
 from detector.provider import raise_if_fatal
@@ -61,15 +62,6 @@ def _provider_call(
     return provider_call(route=route, system=system, user=user, purpose=purpose)
 
 
-def _valid_event_ids(packet: Mapping[str, Any]) -> set[str]:
-    ids: set[str] = set()
-    for event in packet.get("events") or []:
-        ids.add(str(event.get("event_id") or ""))
-        for interaction in event.get("tool_interactions") or []:
-            ids.add(str(interaction.get("interaction_id") or ""))
-    return ids
-
-
 def _parse_candidates(
     parsed: Any, packet: Mapping[str, Any],
     snapshot: Mapping[str, Any] | None = None,
@@ -78,7 +70,7 @@ def _parse_candidates(
         parsed.get("candidates"), list
     ):
         return None, "recall output is not a candidates object"
-    universe = _valid_event_ids(packet)
+    universe = packet_reference_index(packet)
     candidates = []
     seen: set[str] = set()
     for index, raw in enumerate(parsed["candidates"], start=1):
@@ -102,7 +94,7 @@ def _parse_candidates(
             return None, f"candidate {candidate_id} needs claim and locus"
         if locus not in universe or any(ref not in universe for ref in refs):
             return None, f"candidate {candidate_id} references unknown event"
-        if not evidence_refs_support_event(refs, locus):
+        if not evidence_refs_support_event(packet, refs, locus):
             return None, (
                 f"candidate {candidate_id} evidence_refs do not support its locus"
             )
