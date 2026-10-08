@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import threading
 import time
 from typing import Any, Mapping, Sequence
 
@@ -64,7 +65,7 @@ from detector.runtime import (
 
 DEFAULT_RUNS_ROOT = Path("artifacts/detector/runs")
 RUN_SCHEMA = "detector.run_manifest.v3"
-SUMMARY_SCHEMA = "detector.run_summary.v2"
+SUMMARY_SCHEMA = "detector.run_summary.v3"
 
 
 def new_run_id(prefix: str = "detector") -> str:
@@ -323,8 +324,15 @@ def run_batch(
             "dataset_root": str(dataset_root),
         }
         _write_json(manifest_path, manifest)
-        rows: list[dict[str, Any]] = []
+        returned_rows: dict[str, dict[str, Any]] = {}
+        started_cases: set[str] = set()
+        progress_lock = threading.Lock()
         stop_reason: dict[str, Any] = {}
+
+        def register(row: dict[str, Any]) -> dict[str, Any]:
+            with progress_lock:
+                returned_rows[str(row["case"])] = row
+            return row
 
         def run(case_id: str) -> dict[str, Any]:
             remaining = remaining_seconds()
@@ -333,9 +341,11 @@ def run_batch(
                 # cut off: a partially-run detection is not a reading, and a
                 # summary that only counted completions could not tell this
                 # batch apart from one with fewer cases.
-                return {"case": case_id, "result": _not_started(case_id),
-                        "elapsed_seconds": 0.0, "source": "not_started"}
+                return register({"case": case_id, "result": _not_started(case_id),
+                                 "elapsed_seconds": 0.0, "source": "not_started"})
             effective_control.check()
+            with progress_lock:
+                started_cases.add(case_id)
             record, _gold = load_case(dataset_root, case_id)
             execution_identity = build_execution_identity(
                 source=source, config=config, record=record,
@@ -355,10 +365,11 @@ def run_batch(
                 if (result.get("provenance") or {}).get("execution_identity") != execution_identity:
                     raise ValueError(f"cached result execution identity mismatch: {case_id}")
                 if reusable:
+                    row = register({"case": case_id, "result": result, "elapsed_seconds": 0.0,
+                                    "source": "cached"})
                     print(f"  [{case_id}] reused cached {result.get('state')} row",
                           flush=True)
-                    return {"case": case_id, "result": result, "elapsed_seconds": 0.0,
-                            "source": "cached"}
+                    return row
                 print(f"  [{case_id}] re-running cached {result.get('state')} row",
                       flush=True)
             started = time.monotonic()
@@ -379,13 +390,14 @@ def run_batch(
                 input_record=record, result=result, elapsed_seconds=elapsed,
                 attempt_id=_attempt_id(index),
             )
+            row = register({"case": case_id, "result": result, "elapsed_seconds": elapsed,
+                            "source": "measured"})
             print(
                 f"  [{case_id}] state={result.get('state')} "
                 f"authority={result.get('decision_authority')}",
                 flush=True,
             )
-            return {"case": case_id, "result": result, "elapsed_seconds": elapsed,
-                    "source": "measured"}
+            return row
 
         def note_stop(row: Mapping[str, Any]) -> None:
             nonlocal stop_reason
@@ -404,7 +416,6 @@ def run_batch(
             try:
                 for row in bounded_map(run, cases, workers=int(workers),
                                        control=effective_control):
-                    rows.append(row)
                     note_stop(row)
             except RunStopped as exc:
                 # A stop is a recorded outcome, not a crash: the cases that
@@ -418,12 +429,14 @@ def run_batch(
                     stop_reason = {"error_type": type(exc).__name__,
                                    "message": str(exc)[:400]}
                 _write_json(run_dir / "summary.json", _summarize(
-                    run_id=run_id, cases=list(cases), rows=rows,
+                    run_id=run_id, cases=list(cases), rows=list(returned_rows.values()),
+                    started_cases=started_cases,
                     manifest=manifest, stop_reason=stop_reason,
                 ))
                 raise
         summary = _summarize(
-            run_id=run_id, cases=list(cases), rows=rows,
+            run_id=run_id, cases=list(cases), rows=list(returned_rows.values()),
+            started_cases=started_cases,
             manifest=manifest, stop_reason=stop_reason,
         )
         _write_json(run_dir / "summary.json", summary)
@@ -437,8 +450,21 @@ def _summarize(
     rows: Sequence[Mapping[str, Any]],
     manifest: Mapping[str, Any],
     stop_reason: Mapping[str, Any],
+    started_cases: Sequence[str] | set[str] | None = None,
 ) -> dict[str, Any]:
+    expected = set(map(str, cases))
     by_case = {str(row["case"]): row for row in rows}
+    if len(expected) != len(cases) or len(by_case) != len(rows) or not set(by_case) <= expected:
+        raise ValueError("batch summary coverage contains duplicate or unexpected cases")
+    explicit_not_started = {
+        str(row["case"]) for row in rows if row["result"].get("state") == "not_started"
+    }
+    known_not_started = (
+        expected - set(started_cases) - set(by_case) if started_cases is not None else set()
+    ) | explicit_not_started
+    missing = [str(case) for case in cases
+               if str(case) not in by_case and str(case) not in known_not_started]
+    not_started = [str(case) for case in cases if str(case) in known_not_started]
     statuses: dict[str, int] = {}
     states: dict[str, int] = {}
     usage: dict[str, Any] = {}
@@ -455,26 +481,25 @@ def _summarize(
         if isinstance(reading.get("usage"), Mapping):
             accumulate_usage(usage, reading["usage"])
         usage_missing += int(reading.get("missing_attempts") or 0)
-    missing = [case for case in cases if str(case) not in by_case]
     if missing and not stop_reason:
         stop_reason = {
             "error_type": "incomplete_batch",
             "message": f"{len(missing)} case(s) produced no row",
         }
-    not_started = sorted(
-        str(row["case"]) for row in rows
-        if str(row["result"].get("state") or "") == "not_started"
-    ) + missing
     return {
         "schema_version": SUMMARY_SCHEMA,
         "run_id": run_id,
         "cases": list(cases),
-        "completed": len(rows) - len(not_started),
+        "completed": len(by_case) - len(explicit_not_started),
         "state_counts": {
             state: states.get(state, 0)
             for state in ("verified_error", "verified_clean", "unresolved")
         },
         "measurement": {
+            "requested": len(expected),
+            "returned": len(by_case),
+            "missing": len(missing),
+            "missing_cases": missing,
             "status_counts": statuses,
             "authoritative": statuses.get("authoritative", 0),
             "measured": len(rows) - statuses.get("invalid_envelope", 0)

@@ -6,6 +6,7 @@ import pytest
 
 from detector.result import RESULT_SCHEMA
 from detector.runner import run_batch, safe_case_id
+from detector.runner import _summarize
 
 
 class _FakeDetector:
@@ -364,3 +365,59 @@ def test_batch_does_not_overwrite_a_detector_identity_mismatch(tmp_path, monkeyp
         run_batch(dataset_root=_write_dataset(tmp_path / "data"), cases=["a.json"],
                   run_id="r", runs_root=tmp_path / "runs", config={}, workers=1)
     assert not (tmp_path / "runs/r/cases/a.json/result.json").exists()
+
+
+def test_partial_summary_has_a_conserved_nonnegative_denominator():
+    summary = _summarize(run_id="r", cases=["a", "b", "c"],
+                         rows=[{"case": "a", "result": _envelope("a")}],
+                         manifest={}, stop_reason={})
+    assert summary["completed"] == 1
+    assert summary["measurement"]["requested"] == 3
+    assert summary["measurement"]["returned"] == 1
+    assert summary["measurement"]["missing"] == 2
+    assert summary["measurement"]["not_started"] == 0
+
+
+@pytest.mark.parametrize("row_cases", [["a", "a"], ["other"]])
+def test_summary_rejects_duplicate_and_unexpected_rows(row_cases):
+    with pytest.raises(ValueError, match="coverage"):
+        _summarize(run_id="r", cases=["a"],
+                   rows=[{"case": case, "result": _envelope(case)} for case in row_cases],
+                   manifest={}, stop_reason={})
+
+
+def test_committed_case_survives_scheduler_interruption(tmp_path, monkeypatch):
+    monkeypatch.setattr("detector.runner.Detector", _FakeDetector)
+    def interrupted_map(function, items, **kwargs):
+        yield from ()
+        function(items[0])
+        raise RuntimeError("scheduler interrupted after case commit")
+    monkeypatch.setattr("detector.runner.bounded_map", interrupted_map)
+    with pytest.raises(RuntimeError, match="scheduler interrupted"):
+        run_batch(dataset_root=_write_dataset(tmp_path / "data", ("a.json", "b.json")),
+                  cases=["a.json", "b.json"], run_id="r", runs_root=tmp_path / "runs",
+                  config={}, workers=1)
+    assert (tmp_path / "runs/r/cases/a.json/result.json").exists()
+    summary = json.loads((tmp_path / "runs/r/summary.json").read_text(encoding="utf-8"))
+    assert summary["completed"] == 1
+    assert summary["measurement"]["not_started_cases"] == ["b.json"]
+    assert summary["measurement"]["missing"] == 0
+
+
+def test_committed_case_survives_a_progress_output_error(tmp_path, monkeypatch):
+    import builtins
+    original_print = builtins.print
+    def broken_output(*args, **kwargs):
+        if args and str(args[0]).startswith("  [a.json]"):
+            raise OSError("progress output unavailable")
+        return original_print(*args, **kwargs)
+    monkeypatch.setattr("detector.runner.Detector", _FakeDetector)
+    monkeypatch.setattr(builtins, "print", broken_output)
+    with pytest.raises(OSError, match="progress output unavailable"):
+        run_batch(dataset_root=_write_dataset(tmp_path / "data", ("a.json", "b.json")),
+                  cases=["a.json", "b.json"], run_id="r", runs_root=tmp_path / "runs",
+                  config={}, workers=1)
+    assert (tmp_path / "runs/r/cases/a.json/result.json").exists()
+    summary = json.loads((tmp_path / "runs/r/summary.json").read_text(encoding="utf-8"))
+    assert summary["completed"] == 1
+    assert summary["measurement"]["missing"] == 0

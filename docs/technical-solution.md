@@ -63,6 +63,8 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 
 `detector.identity` 提供规范有限 JSON 摘要、源码/声明工件摘要和 `execution_identity.v1`。Detector 的 provenance 与批次 `run_manifest.v3` 使用同一规则；清单绑定实际有效配置和逐例 record/packet/registry/工件，恢复时验证源码与逐例输入，缓存结果必须携带相同 execution identity。新运行拒绝缺少身份的旧清单/缓存，不回写补造旧身份。源码摘要排除测试与文档；审计和演化侧完整身份接线仍在实施。
 
+批次 `run_summary.v3` 分别记录 requested/returned/not_started/missing，completed 只统计实际返回的非 not_started 行。工作线程登记完成结果，调度器中断后仍保留已提交案例；没有返回行的已开始案例记为 missing，不写成阴性或未开始。重复及额外案例行拒绝进入汇总。
+
 | 维度 | 合同 | 解释 |
 | --- | --- | --- |
 | 终态 | verified_error / verified_clean / unresolved | 未决不等于 clean |
