@@ -51,11 +51,18 @@ def test_risk_orders_local_verification_before_unverified_content():
     ("1/3", "0.333", None), ("1/0", "0", None),
     ("2**100", "5", None), ("__import__('os').getcwd()", "5", None),
     ("nan", "NaN", None), ("4", {"value": "4"}, None),
+    ("1e5000", "4", None), ("1e-5000", "4", None),
+    ("1e128*1e128", "4", None), ("4", "1e5000", None),
 ])
 def test_arithmetic_checks_only_replayable_literal_results(expression, observed, expected):
     check = arithmetic_check({"interaction_id": "event_001_tool_01", "tool_name": "calculator",
                               "arguments": {"expr": expression}, "observation": observed})
     assert (check["status"] if check else None) == expected
+
+
+def test_arithmetic_large_observed_integer_is_unknown_without_serialization():
+    assert arithmetic_check({"interaction_id": "event_001_tool_01", "tool_name": "calculator",
+                             "arguments": {"expr": "4"}, "observation": 10 ** 5000}) is None
 
 
 def test_missing_action_is_task_signal_without_step_blame():
@@ -235,7 +242,12 @@ def test_projection_rejects_tampering_and_different_inputs():
         project_dependency_closure(p, candidates=selected, graph=graph, policy=cfg)
 
 
-def test_production_shadow_diagnostics_leave_base_verdict_and_calls_unchanged(monkeypatch):
+@pytest.mark.parametrize("history", [
+    [{"role": "assistant", "content": "Four"}],
+    [{"role": "assistant", "tool_calls": [{"name": "calculator", "arguments": {"expr": "1e5000"}}],
+      "tool_responses": ["0"]}],
+])
+def test_production_shadow_diagnostics_leave_base_verdict_and_calls_unchanged(monkeypatch, history):
     from detector.api import Detector
     from detector.tests.test_api import CONFIG
 
@@ -248,7 +260,7 @@ def test_production_shadow_diagnostics_leave_base_verdict_and_calls_unchanged(mo
             "stage": "judge", "state": "ok", "attempts": 1, "view": "complete", "warnings": []}
 
     monkeypatch.setattr("detector.api.run_judge", fake_judge)
-    record = {"question": "Report four", "history": [{"role": "assistant", "content": "Four"}]}
+    record = {"question": "Report four", "history": history}
     config = {**CONFIG, "judge_route": {**CONFIG["judge_route"], "votes": 3}}
     base = Detector(config, require_credentials=False).detect(record)
     shadow = Detector({**config, "causal_audit": {"mode": "shadow"}}, require_credentials=False).detect(record)

@@ -86,22 +86,30 @@ def arithmetic_check(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
         if len(list(ast.walk(tree))) > 64:
             return None
 
+        def bounded(value: Fraction) -> Fraction:
+            if max(value.numerator.bit_length(), value.denominator.bit_length()) > 512:
+                raise ValueError("arithmetic result budget")
+            return value
+
         def evaluate(node: ast.AST) -> Fraction:
             if isinstance(node, ast.Constant) and type(node.value) in {int, float}:
-                return Fraction(ast.get_source_segment(expression, node))
+                literal = Decimal(ast.get_source_segment(expression, node))
+                if not literal.is_finite() or abs(literal.adjusted()) > 128:
+                    raise ValueError("arithmetic literal budget")
+                return bounded(Fraction(literal))
             if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
                 value = evaluate(node.operand)
                 return -value if isinstance(node.op, ast.USub) else value
             if isinstance(node, ast.BinOp):
                 left, right = evaluate(node.left), evaluate(node.right)
                 if isinstance(node.op, ast.Add):
-                    return left + right
+                    return bounded(left + right)
                 if isinstance(node.op, ast.Sub):
-                    return left - right
+                    return bounded(left - right)
                 if isinstance(node.op, ast.Mult):
-                    return left * right
+                    return bounded(left * right)
                 if isinstance(node.op, ast.Div):
-                    return left / right
+                    return bounded(left / right)
             raise ValueError("unsupported arithmetic")
 
         expected = evaluate(tree.body)
@@ -114,8 +122,11 @@ def arithmetic_check(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
         observation = interaction.get("observation")
         if type(observation) not in {str, int, float}:
             return None
+        if ((isinstance(observation, str) and len(observation) > 256)
+                or (type(observation) is int and observation.bit_length() > 512)):
+            return None
         observed = Decimal(str(observation))
-        if not observed.is_finite():
+        if not observed.is_finite() or abs(observed.adjusted()) > 128:
             return None
     except (SyntaxError, ValueError, InvalidOperation, ArithmeticError):
         return None
