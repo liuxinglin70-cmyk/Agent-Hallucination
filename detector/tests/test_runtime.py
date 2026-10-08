@@ -194,6 +194,34 @@ def test_parallel_ordered_single_worker_matches_sequential():
     assert parallel_ordered(work, 4, workers=4) == [0, 2, 4, 6]
 
 
+@pytest.mark.parametrize("workers", [1, 3])
+@pytest.mark.parametrize("failure", [ValueError("bad program"), KeyboardInterrupt(), SystemExit(2)])
+def test_parallel_ordered_propagates_program_errors_and_interrupts(workers, failure):
+    def work(index):
+        if index == 0:
+            raise failure
+        return index
+
+    with pytest.raises(type(failure)) as raised:
+        parallel_ordered(work, 5, workers=workers)
+    assert raised.value is failure
+
+
+def test_parallel_ordered_does_not_submit_all_ballots_after_fatal_error():
+    started = []
+
+    def work(index):
+        started.append(index)
+        if index == 0:
+            raise ValueError("fatal ballot defect")
+        time.sleep(0.01)
+        return index
+
+    with pytest.raises(ValueError, match="fatal ballot defect"):
+        parallel_ordered(work, 100, workers=2)
+    assert len(started) <= 2
+
+
 # --------------------------------------------------------------------------
 # usage observations
 # --------------------------------------------------------------------------

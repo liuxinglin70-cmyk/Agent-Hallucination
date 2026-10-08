@@ -205,39 +205,18 @@ def bounded_map(function: Callable[[T], R], items: Iterable[T], *, workers: int,
 
 def parallel_ordered(function: Callable[[int], R], count: int, *,
                      workers: int) -> list[R | None]:
-    """Run ``function(i)`` for ``i in range(count)``; results in index order.
-
-    Index order is the whole point. Independent ballots are documented to be
-    order-independent (``majority_vote`` says so explicitly), but the *sample*
-    a voting stage returns is "the first ballot matching the winner", so
-    collecting in completion order would let scheduling decide which ballot's
-    detail fields a verdict carries. Returning index order keeps the reported
-    sample identical to the sequential implementation while removing the serial
-    round trips that dominate a case's wall clock.
-
-    ``None`` marks a slot whose ballot abstained; the caller decides what an
-    abstention means, exactly as it does for a sequential vote.
-    """
+    """Keep ballot order while sharing bounded scheduling and cancellation."""
     if count <= 0:
         return []
     if count == 1 or int(workers) <= 1:
         return [function(index) for index in range(count)]
     results: list[R | None] = [None] * count
-    pool = ThreadPoolExecutor(max_workers=min(int(workers), count))
-    try:
-        futures = {
-            index: pool.submit(copy_context().run, function, index)
-            for index in range(count)
-        }
-        for index, future in futures.items():
-            try:
-                results[index] = future.result()
-            except RunStopped:
-                raise
-            except BaseException:
-                results[index] = None
-    finally:
-        pool.shutdown(wait=True, cancel_futures=True)
+
+    def indexed(index: int) -> tuple[int, R]:
+        return index, function(index)
+
+    for index, result in bounded_map(indexed, range(count), workers=min(int(workers), count)):
+        results[index] = result
     return results
 
 
