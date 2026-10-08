@@ -170,6 +170,80 @@ def test_record_measures_zero_false_positives_and_keeps_authority(big_corpus, go
     assert view.admits(PREDICATE) == (True, "")
 
 
+def test_cache_binds_the_calibration_actually_used(big_corpus, good_record, tmp_path, monkeypatch):
+    from detector import conviction_calibration as calibration
+    from detector.dataset import project_record
+    from evolution.backends import CachingBackend
+
+    class Backend:
+        name = "calibrated_test"
+        calls = 0
+
+        def run_case(self, record, *, case_id, registry=None, gold=None):
+            self.calls += 1
+            return {"case_id": case_id, "decision_authority": "authoritative",
+                    "calibration_admitted": calibration.default_calibration().admits(PREDICATE)[0]}
+
+    backend = Backend()
+    cache = CachingBackend(backend, tmp_path / "cache")
+    record = project_record(_clean_record())
+    registry = _mechanical_registry()
+    first_view = ConvictionCalibration(artifact=good_record, corpus_root=big_corpus)
+    monkeypatch.setattr(calibration, "default_calibration", lambda: first_view)
+    assert cache.run_case(record, case_id="case", registry=registry)["calibration_admitted"] is True
+    assert cache.run_case(record, case_id="case", registry=registry)["calibration_admitted"] is True
+    changed_record = _sealed({**good_record, "generated_at_utc": "different synthetic record"})
+    second_view = ConvictionCalibration(artifact=changed_record, corpus_root=big_corpus)
+    monkeypatch.setattr(calibration, "default_calibration", lambda: second_view)
+    cache.run_case(record, case_id="case", registry=registry)
+    assert backend.calls == 2
+    (big_corpus / "clean_0000.json").write_text(json.dumps(_clean_record("changed task")), encoding="utf-8")
+    third_view = ConvictionCalibration(artifact=changed_record, corpus_root=big_corpus)
+    monkeypatch.setattr(calibration, "default_calibration", lambda: third_view)
+    assert cache.run_case(record, case_id="case", registry=registry)["calibration_admitted"] is False
+    assert backend.calls == 3
+
+
+def test_calibration_identity_is_the_immutable_view_used_by_admission(big_corpus, good_record):
+    view = ConvictionCalibration(artifact=good_record, corpus_root=big_corpus)
+    before = view.identity([PREDICATE])
+    returned_status = view.status()
+    returned_status[PREDICATE]["admitted"] = False
+    good_record["generated_at_utc"] = "caller mutation after loading"
+    assert view.admits(PREDICATE) == (True, "")
+    assert view.identity([PREDICATE]) == before
+
+
+def test_unused_calibration_does_not_participate_in_execution_identity(monkeypatch):
+    from detector.interventions import authority_identity
+    def unexpected_read():
+        raise AssertionError("unused calibration was read")
+    monkeypatch.setattr("detector.conviction_calibration.default_calibration", unexpected_read)
+    assert authority_identity(build_intervention_registry([])) is None
+
+
+def test_journal_refuses_calibration_drift_without_redrawing(big_corpus, good_record, tmp_path, monkeypatch):
+    from evolution.checkpoint import CycleJournal
+    registry = _mechanical_registry()
+    first_view = ConvictionCalibration(artifact=good_record, corpus_root=big_corpus)
+    monkeypatch.setattr("detector.conviction_calibration.default_calibration", lambda: first_view)
+    journal = CycleJournal(tmp_path / "journal", {}, resume=False)
+    calls = []
+    def evaluate(cases, **kwargs):
+        calls.append(cases[0])
+        return [{"case": cases[0], "prediction": False}]
+    args = {"registry": registry, "fresh": False, "evaluate": evaluate, "kwargs": {"workers": 1}}
+    journal.evaluate(["case"], **args)
+    second_view = ConvictionCalibration(
+        artifact=_sealed({**good_record, "generated_at_utc": "another synthetic artifact"}),
+        corpus_root=big_corpus,
+    )
+    monkeypatch.setattr("detector.conviction_calibration.default_calibration", lambda: second_view)
+    with pytest.raises(RuntimeError, match="authority input changed"):
+        journal.evaluate(["case"], **args)
+    assert calls == ["case"]
+
+
 def test_record_is_bound_to_the_predicate_source(tmp_path, big_corpus):
     """A record whose source fingerprint no longer matches is stale.
 

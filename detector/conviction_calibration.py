@@ -63,8 +63,10 @@ import inspect
 import json
 import re
 import types
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
+from detector.identity import digest
 
 SCHEMA = "detector.conviction_calibration.v1"
 METRIC_ROLE = "conviction-authority-admission"
@@ -505,6 +507,7 @@ class ConvictionCalibration:
         self._status: dict[str, dict[str, Any]] | None = None
         self._warnings: list[str] = []
         self._artifact_error = ""
+        self._inputs: dict[str, Any] = {}
 
     # -- record loading ----------------------------------------------------
     def _load_artifact(self) -> Mapping[str, Any] | None:
@@ -512,7 +515,7 @@ class ConvictionCalibration:
         if source is None:
             source = DEFAULT_ARTIFACT
         if isinstance(source, Mapping):
-            return source
+            return deepcopy(source)
         path = Path(source)
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
@@ -531,7 +534,16 @@ class ConvictionCalibration:
     def status(self) -> dict[str, dict[str, Any]]:
         if self._status is None:
             self._status = self._resolve()
-        return self._status
+        return deepcopy(self._status)
+
+    def identity(self, predicates: Sequence[str]) -> dict[str, Any]:
+        status = self.status()
+        payload = {
+            "schema_version": "detector.calibration_identity.v1",
+            "inputs": deepcopy(self._inputs),
+            "status": {name: status.get(name) for name in sorted(set(predicates))},
+        }
+        return {**payload, "digest": digest(payload)}
 
     def warnings(self) -> list[str]:
         """Things that could not be checked, as opposed to checks that failed.
@@ -545,6 +557,7 @@ class ConvictionCalibration:
 
     def _resolve(self) -> dict[str, dict[str, Any]]:
         artifact = self._load_artifact()
+        self._inputs = {"artifact": digest(artifact), "reverify": self.reverify}
         table = _conviction_verdicts()
         resolved: dict[str, dict[str, Any]] = {}
         if artifact is None:
@@ -556,6 +569,7 @@ class ConvictionCalibration:
             }
         corpus = self._corpus_state(artifact)
         live = measure_corpus(self.corpus_root) if self.reverify else None
+        self._inputs.update(corpus=digest(corpus["live"]), remeasurement=digest(live))
         for name, verdicts in sorted(table.items()):
             reasons: list[str] = []
             entry = (artifact.get("predicates") or {}).get(name)

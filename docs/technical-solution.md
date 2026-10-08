@@ -61,7 +61,9 @@ Packet 的 `packet_reference_index` 统一事件和实际工具交互的引用�
 
 Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recaller.assemble_upgraded_candidates` 从已校验候选及升级行生成按步骤排序的完整听证列表，单数项由该列表派生，回放不信任传入的派生字段。
 
-`detector.identity` 提供规范有限 JSON 摘要、源码/声明工件摘要和 `execution_identity.v1`。Detector 的 provenance 与批次 `run_manifest.v3` 使用同一规则；清单绑定实际有效配置和逐例 record/packet/registry/工件，恢复时验证源码与逐例输入。演化 backend 复用同一输入构造规则，绑定 detector/evolution 源码、有效配置、record/packet、适用 evidence 与实际 registry/replay。内存基线核验 backend_execution_identity，并以独立副本返回。缓存 entry.v2 核验完整身份和结果摘要，目录由 registry 内容生成；缺身份的旧缓存重测，历史证据不回写。缓存中的 Mock gold 只属于测试 oracle 身份，不进入 Detector 输入。源码摘要排除测试与文档。
+`detector.identity` 提供规范有限 JSON 摘要、源码/声明工件摘要和 `execution_identity.v2`。Detector 的 provenance 与批次 `run_manifest.v3` 使用同一规则；清单绑定实际有效配置和逐例 record/packet/registry/工件，恢复时验证源码与逐例输入。演化 backend 复用同一输入构造规则，绑定 detector/evolution 源码、有效配置、record/packet、适用 evidence 与实际 registry/replay。内存基线核验 backend_execution_identity，并以独立副本返回。缓存 entry.v2 核验完整身份和结果摘要，目录由 registry 内容生成；缺身份的旧缓存重测，历史证据不回写。缓存中的 Mock gold 只属于测试 oracle 身份，不进入 Detector 输入。源码摘要排除测试与文档。
+
+使用内置机械定罪的 registry 还绑定实际校准视图：读取的校准记录、corpus 核验、可选重测和所用谓词权限状态。视图返回独立副本，已解析的权限与身份共同固定；不消费机械定罪的 registry 不加载此身份。逐例缓存随视图变化失效，CycleJournal 在同一固定 arm 的校准变化后拒绝复用或重新观测。整个周期对尚未生成候选的隐式能力工件冻结仍待完成。
 
 `backend_runtime_identity` 绑定已构造 backend 的有效配置、声明工件、Mock 参数及选定案例的实际证据快照；harness.v2、cycle_checkpoint.v2 和缺陷审计消费此身份并使用规范完整摘要。完成报告和中断检查点的恢复均经 CycleJournal.load_state 验证，输入漂移在写入前拒绝，旧 checkpoint/harness 不作为新运行复用。晋升冻结协议的历史摘要读者及 preflight 脚本迁移仍未完成。
 

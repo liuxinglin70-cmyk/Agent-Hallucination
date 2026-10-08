@@ -119,7 +119,7 @@ B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fak
 | R11 | result/elapsed 分两次提交，报告在 writer lock 释放后读 rows；缓存历史 usage 与本次 elapsed=0 混算 | 以单一不可变 attempt envelope 和固定清单读报告；成本按 invocation/attempt/lifetime 分开 | M04/M08/M17 |
 | R12 | measurement 未重算 digest；prefix 继承全量身份与 gold 计数 | 校验 schema/case set/digest，区分 parent_manifest_digest 与 selected_cases_digest 和子集统计 | M17 |
 | R13 | 多文件 registry 提交、route observation 独立性、promotion 返回/落盘状态一致性未充分证明 | 故障注入与独立 observation 身份测试，按实际证据决定修复 | M14/M15/M16 |
-| R14 | 64c1919 审查确认 runtime identity 只显式绑定 scorer；机械校准读取 DEFAULT_ARTIFACT/DEFAULT_CORPUS_ROOT，非 Python 内容未纳入身份 | M03 沿实际校准读者核验依赖，绑定实际使用工件及 corpus；不为未消费工件无条件使缓存失效 | M01/M03 |
+| R14 | 机械定罪逐例身份已绑定实际校准视图，包含记录、corpus 核验、重测及消费的权限；未消费者不加载；同 arm 检查点拒绝权限漂移 | 缓存 artifact/corpus 变化反例先失败后通过；相关 496 项和 AST 67 文件通过，待有限审查；周期尚未生成候选的能力工件冻结由 M13 接续 | M01/M03/M13 |
 
 没有调用图、反例或复现支持的事项只能留在风险栏，不能声称 bug 已证实，更不能据此删除代码。
 
@@ -495,10 +495,10 @@ python -m experiments --help
 
 四项检查点（就地覆盖）：
 
-- **当前任务**：逐模块完成本期重构及因果接口；M03 轨迹引用真源与 M07/B12 scoped semantic 引用/输入隔离已实现。
-- **进度**：2/18 工作包已验收（M00/M02）；B01/B02/B03/B04/B05/B06/B07/B09/B10/B11/B12/B13/B14 已关闭。M01 backend/cache eb49756 独立 34 项/篡改反例通过；harness/checkpoint 64c1919 扩展 133 项、最终相关 55 项、独立 7 项通过。B12 七种非法引用及投影修改反例先失败后通过，77a48c4：detector 430 项、跨包 80 项、AST 67 文件及独立 49 项通过，B12 已关闭。M01/M03/M04/M06/M07/M08/M15/M16 仍实施中。
-- **下一步**：构造临时校准 artifact/corpus 的依赖变化反例，继续 M03 外部 citation/DSL/机械校准身份核验，关闭 R14 隐式工件覆盖缺口；接续阶段合同与因果功能。
-- **未定事项**：M01 晋升协议/preflight 旧摘要消费者尚未迁移；M08 invocation/attempt/lifetime 成本、路径及存储事务尚未完成；M17 包资源分发待验证。本期不运行模型实验；用户要求优先代码重构，独立审查保持有限范围。
+- **当前任务**：逐模块完成本期重构及因果接口；M03 机械定罪校准视图与逐例身份已接通，继续风险画像和依赖图。
+- **进度**：2/18 工作包已验收（M00/M02）；B01–B07、B09–B14 已关闭。R14 缓存校准记录/corpus 变化反例先失败后通过，视图不可变、未消费不加载、检查点漂移不重测均通过；相关 496 项、AST 67 文件通过，待有限审查。M01/M03/M04/M06/M07/M08/M15/M16 仍实施中。
+- **下一步**：实现 M09 只读风险信号及有界候选、M10 有来源依赖图及闭包，接入因果生产入口；机械校准批次提交后进行固定提交有限审查。
+- **未定事项**：M13 周期隐式能力工件冻结、M01 晋升协议/preflight 旧摘要消费者、M08 成本/路径/存储事务、M17 包资源分发尚未完成。本期不运行模型实验；用户要求优先代码重构，独立审查保持有限范围。
 
 ## 12. 本期最终完成与延期项
 

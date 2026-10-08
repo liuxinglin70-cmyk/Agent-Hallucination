@@ -25,6 +25,7 @@ from detector.config import (
 from detector.interventions import (
     build_intervention_registry,
     compile_runtime_plan,
+    authority_identity,
 )
 from detector.identity import build_execution_identity, digest, source_identity, artifact_digest as declared_artifact_digest
 from detector.measurement import measurement_status
@@ -240,6 +241,7 @@ def backend_execution_identity(
         source=runtime_identity["source"], config=config,
         record=record, packet=build_packet(record), evidence=evidence,
         registry=registry, replay=replay,
+        authority=authority_identity(registry),
     )
     payload = {
         "schema_version": "evolution.backend_execution_identity.v1",

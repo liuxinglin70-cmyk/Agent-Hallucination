@@ -16,6 +16,7 @@ from detector.evidence import (
 )
 from detector.interventions import (
     SemanticExecutor,
+    authority_identity,
     compile_runtime_plan,
     load_intervention_registry,
 )
@@ -754,6 +755,7 @@ class Detector:
                 source=source_identity("detector"), config=self.config,
                 record=record, packet=packet, evidence=attached_snapshot,
                 registry=effective_interventions,
+                authority=authority_identity(effective_interventions, calibration=plan.conviction_calibration),
                 replay=replay_payload,
             ),
         }

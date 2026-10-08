@@ -13,6 +13,7 @@ import threading
 import time
 
 from detector.identity import digest
+from detector.interventions import authority_identity
 from evolution.contracts import save_json
 
 
@@ -75,11 +76,14 @@ class CycleJournal:
 
     def evaluate(self, cases, *, registry, fresh, evaluate, kwargs):
         arm = digest({"registry": registry, "fresh": fresh})
+        authority = authority_identity(registry)
 
         def one(case):
             path = self.directory / "arms" / arm[:20] / (digest(case)[:20] + ".json")
             if path.exists():
                 envelope = json.loads(path.read_text(encoding="utf-8"))
+                if envelope.get("authority") != authority:
+                    raise RuntimeError("checkpoint authority input changed; refusing a new observation")
                 if (envelope["arm"] != arm or envelope["row"]["case"] != case
                         or digest(envelope["row"]) != envelope["row_hash"]):
                     raise RuntimeError("checkpoint observation integrity failure")
@@ -88,7 +92,7 @@ class CycleJournal:
             if len(result) != 1 or result[0]["case"] != case:
                 raise RuntimeError("backend returned an incomplete case observation")
             row = result[0]
-            save_json(path, {"arm": arm, "row": row, "row_hash": digest(row)})
+            save_json(path, {"arm": arm, "authority": authority, "row": row, "row_hash": digest(row)})
             self.save()
             return row
 

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-EXECUTION_IDENTITY_SCHEMA = "detector.execution_identity.v1"
+EXECUTION_IDENTITY_SCHEMA = "detector.execution_identity.v2"
 
 
 def digest(value: Any) -> str:
@@ -42,6 +42,7 @@ def build_execution_identity(
     *, source: str, config: Mapping[str, Any], record: Mapping[str, Any],
     packet: Mapping[str, Any], evidence: Mapping[str, Any] | None = None,
     registry: Mapping[str, Any] | None = None, replay: Mapping[str, Any] | None = None,
+    authority: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     artifact = (config.get("causal_audit") or {}).get("scorer_artifact")
     payload = {
@@ -49,6 +50,7 @@ def build_execution_identity(
         "source": source, "config": digest(config), "record": digest(record),
         "packet": digest(packet), "evidence": digest(evidence),
         "registry": digest(registry), "replay": digest(replay),
+        "authority": digest(authority),
         "artifacts": {"scorer": artifact_digest(artifact)} if artifact is not None else {},
     }
     return {**payload, "digest": digest(payload)}

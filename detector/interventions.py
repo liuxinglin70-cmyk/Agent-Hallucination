@@ -1479,6 +1479,28 @@ def build_intervention_registry(
     return payload
 
 
+def authority_identity(
+    registry: Mapping[str, Any] | None, *, calibration: Any = None,
+) -> dict[str, Any] | None:
+    entries = (registry or {}).get("interventions") or ()
+    guard_names = {
+        str((entry.get("body") or {}).get("evidence_predicate") or "")
+        for entry in entries if entry.get("type") == "decision_guard"
+        and (entry.get("body") or {}).get("action") == "convict_mechanical_violation"
+    }
+    predicates = sorted({
+        str((entry.get("body") or {}).get("predicate") or "")
+        for entry in entries if entry.get("type") == "evidence_check"
+        and (entry.get("body") or {}).get("runner") == DETERMINISTIC_RUNNER
+    } & guard_names & set(PREDICATE_CONVICTION_VERDICTS))
+    if not predicates:
+        return None
+    from detector.conviction_calibration import default_calibration
+
+    view = calibration if calibration is not None else default_calibration()
+    return view.identity(predicates)
+
+
 class InterventionPlan:
     """One validated intervention registry compiled for one detection call.
 
@@ -1505,7 +1527,11 @@ class InterventionPlan:
         self.registry_hash = ""
         self.predicate_programs = inline_predicate_programs(self.entries)
         self.recall_trigger_programs = inline_trigger_programs(self.entries)
-        self.conviction_calibration = conviction_calibration
+        from detector.conviction_calibration import default_calibration
+
+        self.conviction_calibration = (
+            conviction_calibration if conviction_calibration is not None else default_calibration()
+        )
         # ``(predicate, runner) -> conviction verdicts``. The runner is part of
         # the key so an entry that shares a predicate name with a
         # conviction-authorized program cannot inherit its authority: a
@@ -1518,7 +1544,7 @@ class InterventionPlan:
         self.uncalibrated_convictions: dict[str, str] = {}
         self.predicate_conviction_verdicts = conviction_verdict_table(
             self.predicate_programs,
-            calibration=conviction_calibration,
+            calibration=self.conviction_calibration,
             uncalibrated=self.uncalibrated_convictions,
         )
         self.semantic_executor = semantic_executor
@@ -2208,6 +2234,7 @@ __all__ = [
     "TARGET_KINDS",
     "TARGET_POLARITIES",
     "build_intervention_registry",
+    "authority_identity",
     "compile_runtime_plan",
     "custom_conviction_verdicts_for",
     "custom_fact_vocab_for",

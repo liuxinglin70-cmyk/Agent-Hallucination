@@ -40,7 +40,7 @@ from detector.api import Detector
 from detector.config import load_config
 from detector.dataset import load_case
 from detector.identity import build_execution_identity, digest, source_identity
-from detector.interventions import load_intervention_registry
+from detector.interventions import load_intervention_registry, authority_identity
 from detector.packet import build_packet
 from detector.measurement import (
     fatal_failure,
@@ -312,6 +312,7 @@ def run_batch(
         execution_identities[case] = build_execution_identity(
             source=source, config=config, record=record,
             packet=build_packet(record), registry=interventions,
+            authority=authority_identity(interventions),
         )
     run_id = run_id or new_run_id()
     run_dir = Path(runs_root) / run_id
@@ -384,6 +385,7 @@ def run_batch(
             execution_identity = build_execution_identity(
                 source=source, config=config, record=record,
                 packet=build_packet(record), registry=interventions,
+                authority=authority_identity(interventions),
             )
             if execution_identity != execution_identities[case_id]:
                 raise ValueError(f"case {case_id!r} changed after run identity was established")
