@@ -585,7 +585,12 @@ def _engine_operation(method):
     def execute(self, *args, **kwargs):
         with self._operation_lock:
             self._require_open()
-            return method(self, *args, **kwargs)
+            self._operation_depth += 1
+            try:
+                return method(self, *args, **kwargs)
+            finally:
+                self._operation_depth -= 1
+                self._release_writer_if_closed()
     return execute
 
 
@@ -605,6 +610,7 @@ class EvolutionEngine:
     ) -> None:
         self._operation_lock = RLock()
         self._closed = False
+        self._operation_depth = 0
         self.config = dict(load_config()) if config is None else dict(config)
         self.paths = ensure_dirs(self.config)
         self.mini = mini
@@ -1036,18 +1042,23 @@ class EvolutionEngine:
         if self._closed:
             raise RuntimeError("evolution engine is closed")
 
-    def close(self) -> None:
-        """Release ownership after current operations; repeated closes are safe."""
-        with self._operation_lock:
-            self._closed = True
+    def _release_writer_if_closed(self) -> None:
+        if self._closed and self._operation_depth == 0:
             release, self._writer_release = self._writer_release, None
             if release is not None:
                 release()
+
+    def close(self) -> None:
+        """Reject new operations; release ownership when active scopes finish."""
+        with self._operation_lock:
+            self._closed = True
+            self._release_writer_if_closed()
 
     def __enter__(self) -> "EvolutionEngine":
         self._operation_lock.acquire()
         try:
             self._require_open()
+            self._operation_depth += 1
             return self
         except BaseException:
             self._operation_lock.release()
@@ -1057,7 +1068,11 @@ class EvolutionEngine:
         try:
             self.close()
         finally:
-            self._operation_lock.release()
+            self._operation_depth -= 1
+            try:
+                self._release_writer_if_closed()
+            finally:
+                self._operation_lock.release()
 
     def _instrument_report(
         self,

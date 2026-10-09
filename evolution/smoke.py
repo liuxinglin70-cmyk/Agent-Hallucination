@@ -20,6 +20,7 @@ not be reported as a real detector quality number.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -217,7 +218,7 @@ def create_smoke_root(work_root: str | Path) -> Path:
 def build_capability_smoke_engine(work_root: str | Path, config: dict[str, Any] | None = None):
     """Create an isolated engine + synthetic dataset under ``work_root``."""
     root = create_smoke_root(work_root)
-    cfg = dict(load_config()) if config is None else dict(config)
+    cfg = deepcopy(load_config() if config is None else config)
     sentinel, gain, patrol_pool, validation = build_synthetic_cases(root / "data")
     cfg["dataset_root"] = str(root / "data")
     cfg["split_manifest"] = str(root / "manifest.json")

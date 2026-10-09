@@ -2,6 +2,8 @@ from argparse import Namespace
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from contextvars import copy_context
+from contextlib import nullcontext
+from copy import deepcopy
 import gc
 from threading import Event
 import weakref
@@ -11,6 +13,7 @@ import pytest
 from detector.runtime import exclusive_writer
 from evolution.backends import MockDetectorBackend
 from evolution.engine import EvolutionEngine
+from evolution.proposer import ProposalBatch
 from evolution import cli
 from evolution.smoke import build_capability_smoke_engine
 from evolution.splits import EvolutionSplit
@@ -185,3 +188,45 @@ def test_close_waits_for_current_operation_before_releasing_lease(tmp_path, monk
         shutdown.result(timeout=5)
     with exclusive_writer(tmp_path / "work"):
         pass
+
+
+@pytest.mark.parametrize("context_scope", [False, True])
+def test_reentrant_close_keeps_writer_until_active_preview_finishes(tmp_path, context_scope):
+    config, split = engine_fixture(tmp_path)
+    box, successors = {}, []
+    class ClosingProposer:
+        name = "controlled-closing-proposer"
+        def propose(self, *args, **kwargs):
+            box["engine"].close()
+            try:
+                successors.append(construct(config, split))
+            except RuntimeError:
+                pass
+            return ProposalBatch(candidates=[], joint_groups=[], notes=[])
+    engine = EvolutionEngine(config, backend=MockDetectorBackend(), split=split,
+                             mini=True, proposer=ClosingProposer())
+    box["engine"] = engine
+    try:
+        with engine if context_scope else nullcontext():
+            engine.preview_cycle(1)
+        assert not successors, "active preview released its writer lease in a reentrant callback"
+        assert (tmp_path / "work" / "reports" / "proposal_preview_cycle001.json").is_file()
+        with pytest.raises(RuntimeError, match="closed"):
+            engine.preview_cycle(2)
+    finally:
+        engine.close()
+        for successor in successors:
+            successor.close()
+    with construct(config, split):
+        pass
+
+
+def test_smoke_configuration_is_an_independent_snapshot(tmp_path):
+    config, split = engine_fixture(tmp_path)
+    config["backend"]["name"] = "detector"
+    config["backend"]["cache"] = True
+    config["budget"]["patrol_cases"] = 99
+    config["audit"]["enabled"] = True
+    original = deepcopy(config)
+    with build_capability_smoke_engine(tmp_path / "smoke", config=config):
+        assert config == original, "smoke mutated the caller's production configuration"
