@@ -115,7 +115,7 @@ B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fak
 | R07 | wheel 不包含数据/实验协议，运行使用调用方提供的 --measurement/--plan；README 已明确路径合同 | 仓库外 wheel 安装后检测、批次、评估、baseline 和三个 help 入口通过；默认缺资源错误提示继续核验 | M17 |
 | R08 | 一些测试使用历史 artifacts；禁真实 provider fixture 只在 evolution 测试域 | 全套离线网络护栏；改成最小合成夹具，不能依赖既往运行输出 | M00/M17 |
 | R09 | `HybridProposer._localization_candidates` 的交付步限制可能与首次引入目标冲突 | 用同一声明、已纠正与多错误反例审查 prompt，不强制迎合 gold | M14 |
-| R10 | runtime.validate_path_id/contained_path 已统一 dataset、batch、record、evaluation 和实验读取路径；拒绝 drive/UNC、遍历、保留名、大小写/扁平化碰撞与链接越界 | 22 项代码反例及实际目录链接平台反例通过，相关 125 项合同回归通过；其余脚本读者按 M17 核销 | M02/M08/M17 |
+| R10 | runtime.validate_path_id/contained_path 已统一 dataset、batch、record、evaluation 和实验读取路径；拒绝 drive/UNC、遍历、保留名、大小写/扁平化碰撞与链接越界 | 22 项代码反例及实际目录链接平台反例通过，相关 125 项合同回归通过；Windows 点前空格和 COM/LPT 上标¹²³设备别名五反例先失败后源头修复，相关64项通过/1排除；其余脚本读者按 M17 核销 | M02/M08/M17 |
 | R11 | 引擎独立 Context/work root 租约、活跃作用域计数、关闭后拒绝调用、init/reset 及 smoke 新目录保护、独立配置快照已实现 | b7d6a8f 固定独立63项全部通过：原43、新20，含真实嵌套操作与with、同线程和其他线程close、初始化BaseException/GC、双向配置快照；e0d4d40 完整1431项通过。跨臂快照仍待完成 | M04/M08/M16/M17 |
 | R12 | measurement 已校验 schema、顺序摘要、案例冲突、排除集合与计数；子集保留父身份、独立摘要，无逐例标签则计数未知 | 13 项先失败后修复；既有冻结协议字节未改，相关合同及源码/wheel baseline 验证通过，待审查 | M17 |
 | R13 | 多文件 registry 提交、route observation 独立性、promotion 返回/落盘状态一致性未充分证明 | 故障注入与独立 observation 身份测试，按实际证据决定修复 | M14/M15/M16 |

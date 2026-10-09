@@ -60,3 +60,12 @@ def test_directory_link_cannot_escape_declared_root(tmp_path):
         pytest.skip("directory symlink creation is unavailable")
     with pytest.raises(ValueError, match="escapes"):
         contained_path(root, "link/file.json")
+
+
+
+@pytest.mark.parametrize("alias", ["COM¹.json", "COM².log", "LPT³.txt", "CON .json", "A/NUL .txt"])
+def test_windows_device_alias_is_rejected_without_device_io(tmp_path, alias):
+    with pytest.raises(ValueError, match="unsafe"):
+        validate_path_id(alias)
+    with pytest.raises(ValueError, match="unsafe"):
+        contained_path(tmp_path, alias)

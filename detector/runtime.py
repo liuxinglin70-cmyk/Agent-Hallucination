@@ -41,9 +41,10 @@ def validate_path_id(value: str, *, nested: bool = True) -> str:
     reserved = {"CON", "PRN", "AUX", "NUL", "CLOCK$", "CONIN$", "CONOUT$",
                 *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
     for part in parts:
+        device_name = part.split(".", 1)[0].rstrip(" ").translate(str.maketrans("¹²³", "123")).upper()
         if (not part or part in {".", ".."} or part.rstrip(" .") != part
                 or any(ord(char) < 32 or char in '<>:"|?*' for char in part)
-                or part.split(".", 1)[0].upper() in reserved):
+                or device_name in reserved):
             raise ValueError("path id contains an unsafe component")
     return value
 
