@@ -93,17 +93,33 @@ def test_stage_report_uses_invocation_cost_and_keeps_historical_cost_separate():
     assert report["cost"]["run_lifetime_cost"]["usage"] == {"total_tokens": 20}
 
 
-def test_measurement_scripts_keep_early_failed_attempt_usage(tmp_path):
+def _measured_run(tmp_path, monkeypatch, cases):
+    from detector.dataset import load_case
+    from detector.runner import record_case
+    monkeypatch.setattr("detector.runner.Detector", _FakeDetector)
+    data = _write_dataset(tmp_path / "data", cases)
+    runs = tmp_path / "runs"
+    run_batch(dataset_root=data, cases=cases, runs_root=runs, run_id="r", config={}, workers=1)
+
+    def commit(execution, providers=None):
+        path = runs / "r/cases/a.json/result.json"
+        result = json.loads(path.read_text(encoding="utf-8"))
+        result.pop("case_commit")
+        result["execution"] = execution
+        result["providers"] = providers or {}
+        record_case(runs_root=runs, run_id="r", case_id="a.json",
+                    input_record=load_case(data, "a.json")[0], result=result, elapsed_seconds=4)
+
+    return runs, commit
+
+
+def test_measurement_scripts_keep_early_failed_attempt_usage(tmp_path, monkeypatch):
     from scripts import run_baseline_693, real_path_check
-    directory = tmp_path / "r/cases/a.json"
-    directory.mkdir(parents=True)
-    result = _envelope("a.json")
-    result.update(execution={"provider_attempts": 3, "usage_missing_attempts": 0,
-                            "usage": {"total_tokens": 15}},
-                  providers={"judge": {"usage": {"total_tokens": 5}}})
-    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
-    assert run_baseline_693.usage_report(runs_root=tmp_path, run_id="r", cases=["a.json"])["total"] == {"total_tokens": 15}
-    assert real_path_check._case_metrics(tmp_path, "r", "a.json")["tokens"] == 15
+    runs, commit = _measured_run(tmp_path, monkeypatch, ["a.json"])
+    commit({"provider_attempts": 3, "usage_missing_attempts": 0,
+            "usage": {"total_tokens": 15}}, {"judge": {"usage": {"total_tokens": 5}}})
+    assert run_baseline_693.usage_report(runs_root=runs, run_id="r", cases=["a.json"])["total"] == {"total_tokens": 15}
+    assert real_path_check.read_metrics(runs, "r", ["a.json"])[0]["tokens"] == 15
 
 
 def test_incomplete_execution_counters_remain_unknown():
@@ -113,14 +129,12 @@ def test_incomplete_execution_counters_remain_unknown():
     assert cost["usage_unknown_cases"] == 1
 
 
-def test_baseline_usage_retains_unknown_counts(tmp_path):
+def test_baseline_usage_retains_unknown_counts(tmp_path, monkeypatch):
     from scripts.run_baseline_693 import usage_report
-    directory = tmp_path / "r/cases/a.json"
-    directory.mkdir(parents=True)
-    result = _envelope("a.json")
-    result["execution"] = {"usage": {"total_tokens": 8}, "elapsed_seconds": 4}
-    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
-    report = usage_report(runs_root=tmp_path, run_id="r", cases=["a.json", "missing.json"])
+    runs, commit = _measured_run(tmp_path, monkeypatch, ["a.json", "missing.json"])
+    commit({"usage": {"total_tokens": 8}, "elapsed_seconds": 4})
+    (runs / "r/cases/missing.json/result.json").unlink()
+    report = usage_report(runs_root=runs, run_id="r", cases=["a.json", "missing.json"])
     assert report["total_tokens"] == 8
     assert report["usage_unknown_cases"] == 2
     assert report["total_is_lower_bound"]
