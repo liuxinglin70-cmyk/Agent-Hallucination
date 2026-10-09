@@ -353,8 +353,10 @@ def test_l1_publishes_machine_readable_reason_codes():
     producer never wrote the key, so every archived failure carried ``[]``.
     """
     result = check_l1(
-        baseline_rows=[_row("A/1.json", arm="baseline", gold=True, prediction=False)],
-        candidate_rows=[_row("A/1.json", arm="candidate", gold=True, prediction=False)],
+        baseline_rows=[_row("A/1.json", arm="baseline", gold=True, prediction=False),
+                       _row("N/1.json", arm="baseline", gold=False, prediction=False)],
+        candidate_rows=[_row("A/1.json", arm="candidate", gold=True, prediction=False),
+                        _row("N/1.json", arm="candidate", gold=False, prediction=False)],
         target_cases=["A/1.json"],
         neighbor_cases=["N/1.json"],
         intervention_id="IV-1-D001",

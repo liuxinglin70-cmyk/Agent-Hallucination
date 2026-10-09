@@ -33,9 +33,10 @@ def test_cross_cycle_cache_retries_outage_but_caches_authoritative_result(tmp_pa
                     "unresolved" if self.calls == 1 else "authoritative"}
     backend = Backend()
     cache = CachingBackend(backend, tmp_path)
-    assert cache.run_case({}, case_id="a")["decision_authority"] == "unresolved"
-    assert cache.run_case({}, case_id="a")["decision_authority"] == "authoritative"
-    assert cache.run_case({}, case_id="a")["decision_authority"] == "authoritative"
+    record = {"question": "q", "history": [{"role": "assistant", "content": "answer"}]}
+    assert cache.run_case(record, case_id="a")["decision_authority"] == "unresolved"
+    assert cache.run_case(record, case_id="a")["decision_authority"] == "authoritative"
+    assert cache.run_case(record, case_id="a")["decision_authority"] == "authoritative"
     assert backend.calls == 2
 
 

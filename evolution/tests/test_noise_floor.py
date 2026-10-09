@@ -957,6 +957,7 @@ def test_a_stability_marker_blocks_admission_without_relaxing_a_threshold(tmp_pa
         overrides={candidate["intervention_id"]: {UNSTABLE: True}},
     )
     report = engine.run_cycle(1)
+    assert report["gates"][0]["m"] is not None, report["gates"][0]
     # The raw delta is one case better, which is exactly what the floor of 1
     # asks for. It was not banked.
     assert report["gates"][0]["m"]["delta"]["marginal_cases"] == 1
