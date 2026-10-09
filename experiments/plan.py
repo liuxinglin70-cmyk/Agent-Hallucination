@@ -202,7 +202,9 @@ DEFAULT_ARMS: dict[str, Any] = {
 
 
 def load_measurement(path: str | Path | None = DEFAULT_MEASUREMENT) -> MeasurementSet:
-    path = Path(path) if path else Path(DEFAULT_MEASUREMENT)
+    path = Path(path) if path is not None else Path(DEFAULT_MEASUREMENT)
+    if not path.is_file():
+        raise FileNotFoundError(f"measurement manifest not found: {path}; pass --measurement <manifest.json>")
     payload = _read_json(path)
     if not isinstance(payload, Mapping) or payload.get("schema_version") != MEASUREMENT_SCHEMA:
         raise ValueError("measurement manifest schema is unsupported")
@@ -251,7 +253,9 @@ def load_plan(
     """
     measurement = load_measurement(measurement_path)
     raw: dict[str, Any] = {}
-    plan_file = Path(plan_path) if plan_path else DEFAULT_PLAN
+    plan_file = Path(plan_path) if plan_path is not None else DEFAULT_PLAN
+    if plan_path is not None and not plan_file.is_file():
+        raise FileNotFoundError(f"explicit experiment plan not found: {plan_file}")
     if plan_file.is_file():
         raw = _read_json(plan_file)
         if not isinstance(raw, Mapping):

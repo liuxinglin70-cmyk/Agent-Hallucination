@@ -55,3 +55,11 @@ def test_prefix_does_not_share_mutable_case_or_exclusion_lists(tmp_path):
     subset.cases.clear()
     assert full.excluded == ["A/003.json"]
     assert len(full.cases) == 2
+
+
+
+def test_explicit_missing_plan_does_not_use_defaults(tmp_path):
+    from experiments.plan import load_plan
+    measurement = write(tmp_path, manifest())
+    with pytest.raises(FileNotFoundError, match="missing-plan"):
+        load_plan(plan_path=tmp_path / "missing-plan.json", measurement_path=measurement)

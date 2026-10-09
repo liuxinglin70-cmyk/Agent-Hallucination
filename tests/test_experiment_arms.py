@@ -62,3 +62,46 @@ def test_default_cli_resolves_g0_with_offline_batch(tmp_path, monkeypatch, capsy
     assert main(arguments) == 0
     assert seen[0]["interventions"]["interventions"] == []
     assert '"arm": "g0"' in capsys.readouterr().out
+
+
+
+def test_paired_unknown_arm_is_rejected_even_without_measurements(tmp_path):
+    from experiments.runner import paired_sample
+    with pytest.raises(ValueError, match="arm"):
+        paired_sample(load_plan(), tmp_path / "runs", ["unknown", "g0"])
+    assert not (tmp_path / "runs").exists()
+
+
+@pytest.mark.parametrize("arms", [["g0"], ["g0", "g0"], ["g0", "g1", "g0_roll2"]])
+def test_paired_cli_requires_two_distinct_arms_before_reading(tmp_path, arms):
+    from experiments.__main__ import main
+    arguments = ["paired", "--runs-root", str(tmp_path / "runs")]
+    for arm in arms:
+        arguments.extend(["--arm", arm])
+    with pytest.raises(SystemExit) as failure:
+        main(arguments)
+    assert failure.value.code == 2
+    assert not (tmp_path / "runs").exists()
+
+
+@pytest.mark.parametrize("count", [-1, 0, 1])
+def test_baseline_cli_prefix_is_validated_before_batch(tmp_path, monkeypatch, count):
+    from experiments.__main__ import main
+    plan = load_plan()
+    monkeypatch.setattr("experiments.__main__.load_plan", lambda **kwargs: plan)
+    seen = []
+    from types import SimpleNamespace
+    from experiments.report import StageReport
+    report = StageReport(stage="baseline", arm="g0", requested=[], rows=[]).to_dict()
+    report["measurement_prefix"] = {"size": 0}
+    monkeypatch.setattr("experiments.__main__.run_measurement_stage",
+                        lambda **kwargs: seen.append(kwargs) or SimpleNamespace(report=report))
+    arguments = ["baseline", "--cases", str(count), "--runs-root", str(tmp_path / "runs")]
+    if count < 0:
+        with pytest.raises(SystemExit) as failure:
+            main(arguments)
+        assert failure.value.code == 2
+        assert not seen
+    else:
+        assert main(arguments) == 0
+        assert seen[0]["cases"] == plan.measurement.cases[:count]

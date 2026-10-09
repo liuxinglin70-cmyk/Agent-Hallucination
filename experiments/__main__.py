@@ -54,8 +54,8 @@ def cmd_status(args: argparse.Namespace) -> int:
 def cmd_baseline(args: argparse.Namespace) -> int:
     plan = load_plan(plan_path=args.plan, measurement_path=args.measurement)
     cases = plan.measurement.cases
-    if args.cases:
-        cases = cases[: int(args.cases)]
+    if args.cases is not None:
+        cases = plan.measurement.prefix(args.cases).cases
     outcome = run_measurement_stage(
         plan=plan, stage="baseline", arm=args.arm, cases=cases,
         runs_root=args.runs_root, run_id=args.run_id,
@@ -84,6 +84,8 @@ def cmd_baseline(args: argparse.Namespace) -> int:
 def cmd_paired(args: argparse.Namespace) -> int:
     plan = load_plan(plan_path=args.plan, measurement_path=args.measurement)
     arms = list(args.arm) if args.arm else ["g0", "g1"]
+    if len(arms) != 2 or len(set(arms)) != 2:
+        raise ValueError("paired requires exactly two distinct arms")
     sample = paired_sample(plan, args.runs_root, arms)
     if sample["size"] == 0:
         _print({
@@ -186,7 +188,10 @@ def main(argv: list[str] | None = None) -> int:
         "plan": cmd_plan, "status": cmd_status,
         "baseline": cmd_baseline, "paired": cmd_paired,
     }
-    return int(dispatch[args.command](args))
+    try:
+        return int(dispatch[args.command](args))
+    except (FileNotFoundError, ValueError) as exc:
+        parser.error(str(exc))
 
 
 if __name__ == "__main__":

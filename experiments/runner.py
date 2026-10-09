@@ -269,6 +269,8 @@ def paired_sample(
     a reader assume the sample is representative.
     """
     runs_root = Path(runs_root)
+    for arm in arms:
+        plan.arm(arm)
     measured: dict[str, list[str]] = {}
     for arm in arms:
         rows = _load_rows(runs_root, arm, plan.measurement.cases)
