@@ -31,10 +31,9 @@ from evolution.engine import (
     EvolutionEngine,
     _ArmRunner,
     _defect_rejection_after_exclusions,
-    _mcnemar_improvement_p,
     terminal_classification,
 )
-from evolution.metrics import paired_delta
+from evolution.metrics import mcnemar_improvement_p, paired_delta
 from evolution.splits import EvolutionSplit
 
 
@@ -271,14 +270,14 @@ def test_the_final_mcnemar_counts_decisive_flips_only():
     delta = paired_delta(empty_rows, active_rows)
     assert delta["correctness_improved"] == 6
     assert delta["decisive_fixed"] == 0
-    assert _mcnemar_improvement_p(delta) == 1.0
+    assert mcnemar_improvement_p(delta) == 1.0
 
     # A real repair: one wrong decision replaced by the right one.
     base = [_row("A/000.json", gold=True, prediction=False)]
     active = [_row("A/000.json", gold=True, prediction=True)]
     repaired = paired_delta(base, active)
     assert repaired["decisive_fixed"] == 1
-    assert _mcnemar_improvement_p(repaired) == 0.5
+    assert mcnemar_improvement_p(repaired) == 0.5
 
 
 def test_decisive_counts_separate_direction():
@@ -293,7 +292,7 @@ def test_decisive_counts_separate_direction():
     delta = paired_delta(base, active)
     assert delta["decisive_fixed"] == 1
     assert delta["decisive_broken"] == 1
-    assert _mcnemar_improvement_p(delta) == 1.0
+    assert mcnemar_improvement_p(delta) == 1.0
 
 
 # ---------------------------------------------------------------------------

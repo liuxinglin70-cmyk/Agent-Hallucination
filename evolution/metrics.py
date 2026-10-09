@@ -6,10 +6,21 @@ external gold labels joined to the two detection arms.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Collection, Mapping, Sequence
 
 from detector.measurement import measurement_status
 from detector.result import RESULT_SCHEMA, prediction_state
+
+
+def mcnemar_improvement_p(delta: Mapping[str, Any]) -> float:
+    """One-sided exact binomial tail of decisive corrections versus regressions."""
+    improved = int(delta.get("decisive_fixed") or 0)
+    worsened = int(delta.get("decisive_broken") or 0)
+    if improved <= worsened:
+        return 1.0
+    n = improved + worsened
+    return sum(math.comb(n, k) for k in range(improved, n + 1)) / (2 ** n)
 
 
 class EvaluationState:
@@ -1498,6 +1509,7 @@ def source_deltas(
 
 
 __all__ = [
+    "mcnemar_improvement_p",
     "EvaluationState",
     "binary_metrics",
     "confusion_rows",

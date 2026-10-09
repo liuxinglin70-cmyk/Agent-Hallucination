@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from copy import deepcopy
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 from detector.identity import digest
@@ -169,7 +170,8 @@ DEFAULT_CRITERIA: dict[str, Any] = {
         ),
     },
     "effect": {
-        "rule": "decisive_fixed > decisive_broken on stable cases",
+        "rule": "decisive_fixed > decisive_broken on stable cases and one-sided p < significance_level",
+        "significance_level": 0.05,
         "minimum_detectable": {
             "fixed": 5, "broken": 0, "one_sided_p": 0.0312,
             "note": (
@@ -275,6 +277,11 @@ def load_plan(
             "the plan file or use one of "
             f"{sorted(DEFAULT_CRITERIA)}"
         )
+    if "effect" in criteria:
+        level = criteria["effect"].get("significance_level")
+        if (type(level) not in (int, float) or not math.isfinite(level)
+                or not 0 < level < 1):
+            raise ValueError("effect significance_level must be finite and between zero and one")
     return ExperimentPlan(
         schema_version=str(raw.get("schema_version") or PLAN_SCHEMA),
         measurement=measurement,

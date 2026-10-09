@@ -21,7 +21,6 @@ attribution, outcome-driven retirement and drift rollback.
 from __future__ import annotations
 
 import json
-import math
 import random
 from contextvars import Context
 from functools import wraps
@@ -73,6 +72,7 @@ from evolution.metrics import (
     gain_opportunity,
     localization_opportunity,
     mechanism_opportunity,
+    mcnemar_improvement_p,
     noise_floor,
     paired_delta,
     paired_localization_delta,
@@ -5183,7 +5183,7 @@ class EvolutionEngine:
             and int(effect["unresolved_added"]) == 0
             and int(effect["health_regressed"]) == 0
         )
-        p_value = _mcnemar_improvement_p(effect)
+        p_value = mcnemar_improvement_p(effect)
         step_check = _step_localization_check(
             self.config["dataset_root"], empty_rows, active_rows,
         )
@@ -5291,34 +5291,6 @@ def _recent_cycles(history: Sequence[Mapping[str, Any]], count: int) -> list[Map
             order.append(cycle)
         seen[cycle] = item
     return [seen[cycle] for cycle in order[-count:]]
-
-
-def _mcnemar_improvement_p(delta: Mapping[str, Any]) -> float:
-    """One-sided exact binomial p for symmetric discordance (McNemar).
-
-    The discordant pairs counted are *decisive* corrections and regressions,
-    not the wider ``correctness_improved`` / ``correctness_worsened``. The
-    wider pair counts unresolved -> correct as an improvement, which is a
-    calibration change rather than a corrected decision: on that pairing a
-    registry that merely decides more cases -- without repairing any wrong
-    answer -- reaches p < 0.05, while one that repairs real errors is
-    invisible whenever the provider abstains elsewhere. The boundary gate
-    already scores decisive flips only (``gates._decisive_correction``); the
-    final verdict reads the same quantity so both agree on what "improved"
-    means. With no decisive pair at all the test carries no information and
-    reports p = 1.0 rather than borrowing the wide counts.
-    """
-    improved = int(delta.get("decisive_fixed") or 0)
-    worsened = int(delta.get("decisive_broken") or 0)
-    n = improved + worsened
-    if n == 0:
-        return 1.0
-    if improved <= worsened:
-        return 1.0
-    tail = 0.0
-    for k in range(improved, n + 1):
-        tail += math.comb(n, k) * (0.5 ** n)
-    return min(1.0, tail)
 
 
 def _step_localization_check(

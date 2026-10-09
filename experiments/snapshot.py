@@ -88,6 +88,14 @@ class RunSnapshot:
             same = same and left == right
         return same
 
+    def require_independent_roll(self, baseline: str, roll: str, cases: Sequence[str]) -> None:
+        if self.roots[baseline] == self.roots[roll]:
+            raise ValueError("baseline rolls must be independent run roots")
+        if any(case not in self.manifests[name]["execution_identities"] for name in (baseline, roll) for case in cases):
+            raise ValueError("baseline rolls do not cover the paired cases")
+        if not self.same_execution(baseline, roll, cases):
+            raise ValueError("baseline rolls have different recorded execution inputs")
+
 
 @contextmanager
 def run_snapshot(roots: Mapping[str, str | Path], cases: Sequence[str] | None = None) -> Iterator[RunSnapshot]:

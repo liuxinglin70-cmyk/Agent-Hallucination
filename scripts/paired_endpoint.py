@@ -50,7 +50,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from detector.evaluation import evaluate_run  # noqa: E402
-from evolution.metrics import paired_delta  # noqa: E402
+from experiments.reading import read_pair  # noqa: E402
+from experiments.plan import DEFAULT_CRITERIA  # noqa: E402
 from experiments.snapshot import run_snapshot  # noqa: E402
 
 
@@ -69,43 +70,6 @@ def score(root: Path, dataset_root: Path, cases: Sequence[str]) -> dict[str, Any
         dataset_root=dataset_root,
         cases=list(cases),
     )
-
-
-def _verdict(prediction: object) -> str:
-    if prediction is True:
-        return "T"
-    if prediction is False:
-        return "F"
-    return "U"
-
-
-def stability(rows_a: Sequence[dict], rows_b: Sequence[dict]) -> dict[str, Any]:
-    """Which cases the *baseline* configuration itself reads two ways.
-
-    Read by both rolls and read identically -> stable. Absent from one roll is a
-    coverage difference, not jitter, and is named separately rather than pooled
-    into the flip count.
-    """
-    by_a = {str(row["case"]): row for row in rows_a}
-    by_b = {str(row["case"]): row for row in rows_b}
-    shared = sorted(set(by_a) & set(by_b))
-    flips: list[dict[str, Any]] = []
-    for case in shared:
-        first = _verdict(by_a[case].get("prediction"))
-        second = _verdict(by_b[case].get("prediction"))
-        if first != second:
-            flips.append({"case": case, "roll1": first, "roll2": second})
-    one_sided = sorted((set(by_a) | set(by_b)) - set(shared))
-    return {
-        "read_by_both": len(shared),
-        "flipped_cases": [item["case"] for item in flips],
-        "flips": flips,
-        "flip_rate": (
-            round(len(flips) / len(shared), 4) if shared else None
-        ),
-        "one_sided_cases": one_sided,
-        "case_set_mismatch": bool(one_sided),
-    }
 
 
 def endpoint(
@@ -131,19 +95,10 @@ def endpoint(
                 f"the deployed arm is missing {len(missing)} case(s): {missing[:5]}"
             )
 
-        noise: dict[str, Any] | None = None
-        unstable: list[str] = []
+        base_b = None
         if baseline_roll is not None:
             base_b = score(baseline_roll, dataset_root, snapshot.manifests["baseline_roll"]["cases"])
-            noise = stability(base_a["rows"], base_b["rows"])
-            if noise["case_set_mismatch"]:
-                raise SystemExit(
-                    "the two baseline rolls do not cover the same cases; a noise "
-                    f"floor cannot be pooled: {noise['one_sided_cases'][:5]}"
-                )
-            if not snapshot.same_execution("baseline", "baseline_roll", snapshot.manifests["baseline"]["cases"]):
-                raise ValueError("baseline rolls have different recorded execution inputs")
-            unstable = list(noise["flipped_cases"])
+            snapshot.require_independent_roll("baseline", "baseline_roll", cases)
 
         base_rows = {str(row["case"]): row for row in base_a["rows"]}
         base_cases = set(base_rows)
@@ -158,40 +113,9 @@ def endpoint(
             )
         same_execution = snapshot.same_execution("baseline", "deployed", cases)
     baseline_rows = [base_rows[case] for case in cases]
-    delta = paired_delta(
-        baseline_rows, deployed_scored["rows"], unstable_cases=unstable,
-    )
-
-    stable_cases = [case for case in cases if case not in set(unstable)]
-    stable_set = set(stable_cases)
-    stable_delta = paired_delta(
-        [base_rows[case] for case in stable_cases],
-        [
-            row for row in deployed_scored["rows"]
-            if str(row["case"]) in stable_set
-        ],
-    ) if stable_cases else None
-
-    def _read(block: dict[str, Any] | None) -> dict[str, Any] | None:
-        if block is None:
-            return None
-        return {
-            key: block.get(key)
-            for key in (
-                "paired_n", "decisive_fixed", "decisive_broken",
-                "correctness_improved", "correctness_worsened",
-                "marginal_cases", "new_errors",
-                "tp_lost", "fp_added", "new_fn", "new_fp",
-                "unresolved_added", "unresolved_removed",
-                "health_regressed", "health_improved",
-                "base_all_case_correct", "active_all_case_correct",
-                "marginal_cases_on_stable", "marginal_cases_on_unstable",
-                "new_errors_on_unstable", "flips", "transitions_by_gold",
-            )
-        }
-
-    fixed = int(delta.get("decisive_fixed") or 0)
-    broken = int(delta.get("decisive_broken") or 0)
+    reading = read_pair(baseline_rows, deployed_scored["rows"],
+                        baseline_roll=base_b["rows"] if base_b is not None else None,
+                        same_execution=same_execution, criteria=DEFAULT_CRITERIA["effect"])
     payload: dict[str, Any] = {
         "schema_version": "detector.paired_endpoint.v1",
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -201,21 +125,7 @@ def endpoint(
             "deployed": str(deployed),
             "cases": len(cases),
         },
-        "noise_floor": noise,
-        "unstable_cases": unstable,
-        "all_cases": _read(delta),
-        "stable_cases_only": _read(stable_delta),
-        "verdict": {
-            "decisive_fixed": fixed,
-            "decisive_broken": broken,
-            "net_decisive": fixed - broken,
-            "effect_established": None if same_execution else fixed > broken,
-            "reading": "noise_floor" if same_execution else "effect",
-            "rule": (
-                "decisive_fixed > decisive_broken on the stable cases; "
-                "an equal count is not an improvement"
-            ),
-        },
+        **reading,
         "deployed_coverage": {
             "decisive": deployed_scored["metrics"].get("decisive"),
             "unresolved": deployed_scored["metrics"].get("unresolved"),

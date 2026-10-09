@@ -315,4 +315,6 @@ def test_the_paired_command_labels_a_same_registry_pair_as_noise(measured_runs, 
     payload = json.loads(buffer.getvalue())
     assert payload["reading"] == "noise_floor"
     assert payload["effect_established"] is None
-    assert payload["flips_on_stable_cases"]["fixed"] == payload["decisive_fixed"]
+    assert payload["stable_cases_only"] is None
+    assert payload["decisive_fixed"] is None
+    assert payload["all_cases"]["decisive_fixed"] >= 0

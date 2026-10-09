@@ -23,6 +23,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from experiments.plan import load_plan
 from experiments.snapshot import run_snapshot
+from experiments.reading import read_pair
 from detector.runtime import contained_path
 from detector.config import load_config
 from experiments.runner import (
@@ -77,8 +78,14 @@ def cmd_paired(args: argparse.Namespace) -> int:
         raise ValueError("paired requires exactly two distinct arms")
     for arm in arms:
         plan.arm(arm)
+    roll = args.baseline_roll
+    if roll is not None:
+        plan.arm(roll)
+        if roll in arms:
+            raise ValueError("baseline roll must be independent of both compared arms")
+    observed_arms = [*arms, *([roll] if roll is not None else [])]
     runs_root = Path(args.runs_root)
-    with run_snapshot({arm: contained_path(runs_root, arm) for arm in arms}, plan.measurement.cases) as snapshot:
+    with run_snapshot({arm: contained_path(runs_root, arm) for arm in observed_arms}, plan.measurement.cases) as snapshot:
         sample = snapshot.sample(plan.measurement.cases)
         if sample["size"] == 0:
             _print({
@@ -91,52 +98,30 @@ def cmd_paired(args: argparse.Namespace) -> int:
             })
             return 0
         from detector.evaluation import evaluate_run
-        from evolution.metrics import paired_delta
         scored = {}
-        for arm in arms:
+        for arm in observed_arms:
             scored[arm] = evaluate_run(
                 runs_root=runs_root, run_id=arm, dataset_root=args.dataset_root,
                 cases=sample["common"],
             )
         same_execution = snapshot.same_execution(arms[0], arms[1], sample["common"])
+        if roll is not None:
+            snapshot.require_independent_roll(arms[0], roll, sample["common"])
     baseline, deployed = arms[0], arms[-1]
-    delta = paired_delta(scored[baseline]["rows"], scored[deployed]["rows"])
-    fixed = int(delta.get("decisive_fixed") or 0)
-    broken = int(delta.get("decisive_broken") or 0)
+    reading = read_pair(scored[baseline]["rows"], scored[deployed]["rows"],
+                        baseline_roll=scored[roll]["rows"] if roll is not None else None,
+                        same_execution=same_execution, criteria=plan.stage("effect"))
     payload = {
+        **reading,
+        **reading["verdict"],
         "arms": arms,
+        "baseline_roll": roll,
         "paired_cases": sample["size"],
         "bias_note": sample["note"],
-        "decisive_fixed": fixed,
-        "decisive_broken": broken,
-        "net_decisive": fixed - broken,
-        "rule": plan.stage("effect")["rule"],
         "minimum_detectable": plan.stage("effect")["minimum_detectable"],
         "baseline_metrics": scored[baseline]["metrics"],
         "deployed_metrics": scored[deployed]["metrics"],
     }
-    if same_execution:
-        # Same configuration on both sides: this is the instrument's jitter.
-        # Presented as an effect it would be the most quotable number in the
-        # report and the least meaningful, so it is named for what it is and
-        # the effect verdict is withheld rather than computed.
-        payload.update({
-            "reading": "noise_floor",
-            "effect_established": None,
-            "reason": (
-                "the paired cases have identical recorded execution inputs, so this pair "
-                "measures the instrument's own jitter on these cases; it is "
-                "not an effect reading and must not be quoted as one"
-            ),
-            "flips_on_stable_cases": {
-                "fixed": fixed, "broken": broken,
-            },
-        })
-    else:
-        payload.update({
-            "reading": "effect",
-            "effect_established": fixed > broken,
-        })
     _print(payload)
     return 0
 
@@ -170,6 +155,8 @@ def main(argv: list[str] | None = None) -> int:
 
     paired = sub.add_parser("paired", help="paired decisive-flip reading")
     paired.add_argument("--arm", action="append", default=None)
+    paired.add_argument("--baseline-roll", default=None,
+                        help="independent same-input baseline arm for stability measurement")
     paired.add_argument("--runs-root", default="artifacts/baseline/runs")
     paired.add_argument(
         "--dataset-root", default="datasets/raw/agenthallu/AgentHallu",

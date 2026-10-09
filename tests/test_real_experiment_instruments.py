@@ -156,9 +156,11 @@ def test_endpoint_reports_no_effect_when_the_arms_are_identical(tmp_path):
     verdicts = {cases[0]: "verified_error",
                 cases[1]: "verified_error",
                 cases[2]: "verified_clean"}
-    arm = _make_arm(tmp_path, cases, verdicts)
+    arm = _make_arm(tmp_path / "base", cases, verdicts)
+    roll = _make_arm(tmp_path / "roll", cases, verdicts)
+    deployed = _make_arm(tmp_path / "deployed", cases, verdicts)
     payload = endpoint_mod.endpoint(
-        baseline=arm, baseline_roll=arm, deployed=arm,
+        baseline=arm, baseline_roll=roll, deployed=deployed,
         dataset_root=DATASET_ROOT, json_out=None,
     )
     assert payload["verdict"]["decisive_fixed"] == 0
@@ -179,22 +181,24 @@ def test_endpoint_counts_a_decisive_fix_and_a_decisive_break(tmp_path):
                 cases[1]: "verified_error",   # gold negative, wrong -> should be fixed
                 cases[2]: "verified_error"}   # gold negative, wrong
     baseline = _make_arm(tmp_path / "base", cases, poisoned)
+    roll = _make_arm(tmp_path / "roll", cases, poisoned)
     fixed = dict(poisoned)
     fixed[cases[1]] = "verified_clean"       # a false positive corrected
     deployed = _make_arm(tmp_path / "dep", cases, fixed)
     payload = endpoint_mod.endpoint(
-        baseline=baseline, baseline_roll=baseline, deployed=deployed,
+        baseline=baseline, baseline_roll=roll, deployed=deployed,
         dataset_root=DATASET_ROOT, json_out=None,
     )
     assert payload["verdict"]["decisive_fixed"] == 1
     assert payload["verdict"]["decisive_broken"] == 0
-    assert payload["verdict"]["effect_established"] is True
+    assert payload["verdict"]["effect_established"] is False
+    assert payload["verdict"]["mcnemar_one_sided_p"] == 0.5
 
     broken = dict(poisoned)
     broken[cases[0]] = "verified_clean"      # a true positive lost
     deployed = _make_arm(tmp_path / "dep2", cases, broken)
     payload = endpoint_mod.endpoint(
-        baseline=baseline, baseline_roll=baseline, deployed=deployed,
+        baseline=baseline, baseline_roll=roll, deployed=deployed,
         dataset_root=DATASET_ROOT, json_out=None,
     )
     assert payload["verdict"]["decisive_fixed"] == 0
