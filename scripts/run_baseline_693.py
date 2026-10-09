@@ -210,37 +210,15 @@ def _case_elapsed(runs_root: Path, run_id: str, case: str) -> float | None:
     return case_elapsed(payload)
 
 
-def _case_usage(runs_root: Path, run_id: str, case: str) -> dict[str, Any] | None:
-    """Observed case usage; legacy stage metadata is a lower bound."""
+def _case_usage_reading(runs_root: Path, run_id: str, case: str) -> dict[str, Any]:
     path = runs_root / run_id / "cases" / safe_case_id(case) / "result.json"
     if not path.exists():
-        return None
+        return result_usage({})
     try:
         result = json.loads(path.read_text(encoding="utf-8-sig"))
     except ValueError:
-        return None
-    return result_usage(result)["usage"]
-
-
-def _case_usage_missing(runs_root: Path, run_id: str, case: str) -> int:
-    """Provider attempts of one case that returned no usage metadata.
-
-    A transport failure can burn provider tokens and still report nothing, so
-    these attempts are absent from ``_case_usage`` rather than zero inside it.
-    Counted separately, because the difference between "this case cost nothing"
-    and "this case's cost was not reported" is the difference between a total
-    and a lower bound.
-    """
-    path = runs_root / run_id / "cases" / safe_case_id(case) / "result.json"
-    if not path.exists():
-        return 0
-    try:
-        result = json.loads(path.read_text(encoding="utf-8-sig"))
-    except ValueError:
-        return 0
-    execution = result.get("execution") or {}
-    value = execution.get("usage_missing_attempts")
-    return int(value) if isinstance(value, (int, float)) else 0
+        return result_usage({})
+    return result_usage(result)
 
 
 def usage_report(
@@ -249,32 +227,21 @@ def usage_report(
     run_id: str,
     cases: Sequence[str],
 ) -> dict[str, Any]:
-    """Token burn for the run, per case and in total.
-
-    Reported because it has been missing from every archived real run: the
-    §30/§31 reports carry ``provider_usage: {}``, which forced the 693-case
-    cost model to lean on four hand-transcribed prose readings that make up 61%
-    of its sample minutes and move the workers=8 work floor between 9.4h and
-    21.3h. A measurement whose cost is unknown is a measurement that cannot be
-    scheduled.
-
-    The total is a floor, not the spend: attempts that failed in transport
-    report no counters at all, and their tokens are missing from the sum rather
-    than counted as zero. ``attempts_without_usage`` carries that count so a
-    reader can see the total is a lower bound instead of having to reconstruct
-    it from the per-case files.
-    """
+    """Observed counters, with missing and unknown attempt coverage."""
     runs_root = Path(runs_root)
     per_case: list[dict[str, Any]] = []
     total: dict[str, Any] = {}
     missing_attempts = 0
+    unknown_cases = 0
     cases_with_missing: list[str] = []
     for case in cases:
-        missing = _case_usage_missing(runs_root, run_id, case)
+        reading = _case_usage_reading(runs_root, run_id, case)
+        missing = reading["missing_attempts"]
+        unknown_cases += missing is None
         if missing:
             missing_attempts += missing
             cases_with_missing.append(case)
-        usage = _case_usage(runs_root, run_id, case)
+        usage = reading["usage"]
         if usage is None:
             continue
         per_case.append({"case": case, "usage": usage})
@@ -304,13 +271,15 @@ def usage_report(
         ),
         "attempts_without_usage": missing_attempts,
         "cases_with_missing_usage": len(cases_with_missing),
-        "total_is_lower_bound": bool(missing_attempts),
+        "usage_unknown_cases": unknown_cases,
+        "total_is_lower_bound": bool(missing_attempts or unknown_cases),
         "scope": (
             f"Sum of provider counters actually returned. {missing_attempts} "
             "provider attempt(s) across "
             f"{len(cases_with_missing)} case(s) returned no usage metadata "
-            "(transport failures), so the true spend is at or above this total."
-            if missing_attempts
+            f"and {unknown_cases} case(s) have unknown attempt coverage, so "
+            "the true spend is at or above this total."
+            if missing_attempts or unknown_cases
             else "Sum of provider counters actually returned; every attempt "
                  "reported usage metadata."
         ),

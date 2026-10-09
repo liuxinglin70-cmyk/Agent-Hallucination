@@ -38,6 +38,25 @@ def test_case_capacity_deadline_is_a_case_failure_not_global_cancellation(monkey
     assert not failure.value.retryable
 
 
+def test_actual_capacity_wait_does_not_retry_or_record_an_undispatched_request(monkeypatch):
+    from detector.runtime import RunControl, deadline_scope, run_scope, usage_scope
+
+    control = RunControl(1)
+    monkeypatch.setenv("CAPACITY_TEST_KEY", "offline-dummy")
+    monkeypatch.setattr(provider_module, "_isolated_transport",
+                        lambda **kwargs: pytest.fail("capacity wait cannot dispatch transport"))
+    with control.request_slot():
+        with run_scope(control), deadline_scope(seconds=0.05), usage_scope() as requests:
+            with pytest.raises(ProviderError) as failure:
+                provider_call(route={"endpoint": "http://127.0.0.1:1/v1", "model": "fake",
+                    "api_key_env": "CAPACITY_TEST_KEY", "transport_retries": 2},
+                    system="s", user="u", purpose="capacity")
+            assert failure.value.error_type == "case_deadline_exceeded"
+            assert not failure.value.retryable
+            assert requests == []
+    control.check()
+
+
 class _Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))

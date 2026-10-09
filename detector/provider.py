@@ -423,6 +423,8 @@ def _provider_call(
                 status, raw = _isolated_transport(
                     url=url, headers=headers, body=body, timeout=timeout,
                 )
+        except CaseDeadlineExceeded:
+            raise
         except (
             urlerror.URLError,
             TimeoutError,

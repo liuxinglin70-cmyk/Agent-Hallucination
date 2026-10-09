@@ -102,7 +102,7 @@ def test_measurement_scripts_keep_early_failed_attempt_usage(tmp_path):
                             "usage": {"total_tokens": 15}},
                   providers={"judge": {"usage": {"total_tokens": 5}}})
     (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
-    assert run_baseline_693._case_usage(tmp_path, "r", "a.json") == {"total_tokens": 15}
+    assert run_baseline_693.usage_report(runs_root=tmp_path, run_id="r", cases=["a.json"])["total"] == {"total_tokens": 15}
     assert real_path_check._case_metrics(tmp_path, "r", "a.json")["tokens"] == 15
 
 
@@ -111,6 +111,20 @@ def test_incomplete_execution_counters_remain_unknown():
     cost = cost_summary([{"result": {"execution": {"usage": {"total_tokens": 8}}}}])
     assert cost["provider_attempts"] is None
     assert cost["usage_unknown_cases"] == 1
+
+
+def test_baseline_usage_retains_unknown_counts(tmp_path):
+    from scripts.run_baseline_693 import usage_report
+    directory = tmp_path / "r/cases/a.json"
+    directory.mkdir(parents=True)
+    result = _envelope("a.json")
+    result["execution"] = {"usage": {"total_tokens": 8}, "elapsed_seconds": 4}
+    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    report = usage_report(runs_root=tmp_path, run_id="r", cases=["a.json", "missing.json"])
+    assert report["total_tokens"] == 8
+    assert report["usage_unknown_cases"] == 2
+    assert report["total_is_lower_bound"]
+    assert "every attempt reported usage metadata" not in report["scope"]
 
 
 def test_resume_refuses_corrupt_attempt_journal(tmp_path, monkeypatch):
