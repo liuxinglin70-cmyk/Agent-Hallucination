@@ -32,7 +32,7 @@ from detector.predicate_context import judge_predicate_context
 from detector.provider import ProviderError, case_deadline_ctx
 from detector.measurement import request_execution
 from detector.runtime import (
-    AddedBudgetExceeded, added_budget_scope, added_request_scope, current_added_budget, usage_scope, utc_now,
+    AddedBudgetExceeded, CaseDeadlineExceeded, added_budget_scope, added_request_scope, current_added_budget, usage_scope, utc_now,
 )
 import time
 from detector.recaller import (
@@ -335,7 +335,10 @@ class Detector:
                     frozen_judge=frozen_judge, frozen_stages=frozen_stages,
                     evidence=evidence,
                 )
-            except ProviderError as exc:
+            except (ProviderError, CaseDeadlineExceeded) as failure:
+                exc = failure if isinstance(failure, ProviderError) else ProviderError(
+                    "case", str(failure), error_type="case_deadline_exceeded", retryable=False,
+                )
                 result = {
                     "schema_version": "detector.detection_result.v1", "case_id": case_id,
                     "state": "unresolved", "occurrence_state": "unresolved",
@@ -344,7 +347,7 @@ class Detector:
                     "authority_failure_reasons": [{"component": exc.route_name, "code": exc.error_type, **exc.as_dict()}],
                     "provenance": {},
                 }
-                base = getattr(exc, "base_detection_result", None)
+                base = getattr(failure, "base_detection_result", None)
                 if base is not None:
                     result["base_detection_result"] = deepcopy(base)
                     result["audit_health"] = {"state": "execution_stopped", "error": exc.as_dict()}

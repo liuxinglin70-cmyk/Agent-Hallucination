@@ -126,3 +126,28 @@ def test_case_deadline_keeps_priority_over_added_deadline(monkeypatch, queued):
     assert reason["error_type"] == "case_deadline_exceeded"
     assert reason["retryable"] is False
     assert not control.stopped.is_set()
+
+
+@pytest.mark.parametrize('phase', ['profile', 'arithmetic'])
+def test_true_case_deadline_during_deterministic_audit_is_terminal(monkeypatch, phase):
+    import detector.causal_audit as audit
+    from detector.tests.test_causal_audit import detector_config, install_base_judge
+    install_base_judge(monkeypatch)
+    now = [0.0]
+    monkeypatch.setattr('detector.runtime.time.monotonic', lambda: now[0])
+    attr = 'build_step_risk_profile' if phase == 'profile' else 'arithmetic_check'
+    original = getattr(audit, attr)
+    def expire(*args, **kwargs):
+        result = original(*args, **kwargs)
+        now[0] = 1.1
+        return result
+    monkeypatch.setattr(audit, attr, expire)
+    control = RunControl(1)
+    cfg = detector_config(max_added_seconds_per_case=100)
+    with run_scope(control), deadline_scope(deadline=1.0):
+        result = Detector(cfg, require_credentials=False).detect(record())
+    assert result['state'] == 'unresolved'
+    assert result['authority_failure_reasons'][0]['error_type'] == 'case_deadline_exceeded'
+    assert result['base_detection_result']['state'] == 'verified_clean'
+    assert result["execution"]["provider_attempts"] == 1
+    assert not control.stopped.is_set()

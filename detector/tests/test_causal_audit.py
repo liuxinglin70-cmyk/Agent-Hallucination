@@ -11,7 +11,7 @@ from detector.packet import build_packet
 from detector.provider import ProviderError
 from detector.runner import detect_with_transport_retry
 from detector.runtime import (
-    AddedBudget, AddedBudgetExceeded, RunControl, RunStopped, added_budget_scope,
+    AddedBudget, AddedBudgetExceeded, CaseDeadlineExceeded, RunControl, RunStopped, added_budget_scope,
     current_added_budget, deadline_scope, record_request, run_scope, usage_scope,
 )
 from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates
@@ -183,7 +183,7 @@ def test_added_deadline_is_not_reset_or_longer_than_parent(monkeypatch):
         budget.begin()
         assert budget.deadline == 1
         now[0] = 1.1
-        with pytest.raises(AddedBudgetExceeded, match="time"):
+        with pytest.raises(CaseDeadlineExceeded, match="case deadline"):
             budget.begin()
     now[0] = 2.1
     with pytest.raises(AddedBudgetExceeded, match="time"):

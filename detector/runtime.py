@@ -109,7 +109,7 @@ class CaseExecutionError(RuntimeError):
 
 
 class CaseDeadlineExceeded(TimeoutError, CaseExecutionError):
-    """A case ran out of time while waiting for provider capacity."""
+    """The shared case deadline expired during execution."""
 
 
 class RunControl:
@@ -226,8 +226,11 @@ class AddedBudget:
         control = current_control()
         if control is not None:
             control.check()
-        deadline = self.deadline
-        if deadline is not None and time.monotonic() >= deadline:
+        case_deadline = current_deadline()
+        if case_deadline is not None and time.monotonic() >= case_deadline:
+            raise CaseDeadlineExceeded("case deadline exceeded")
+        if (self.started is not None and time.monotonic() >=
+                self.started + self._policy["max_added_seconds_per_case"]):
             raise AddedBudgetExceeded("time")
 
     def reserve(self, *, system: str, user: str, output_tokens: int,
