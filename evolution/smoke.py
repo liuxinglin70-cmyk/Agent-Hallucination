@@ -253,23 +253,23 @@ def build_capability_smoke_engine(work_root: str | Path, config: dict[str, Any] 
 
 
 def run_capability_smoke(work_root: str | Path) -> dict[str, Any]:
-    engine = build_capability_smoke_engine(work_root)
-    report = engine.run_cycle(1)
-    report["mini_effect"] = engine._evaluate_mini_effect()
-    report["capability_audit"] = {
-        "classification": (
-            capability_surface_report()["classification"]
-        ),
-        "capability_created": PROGRAM["name"],
-        "executor": "detector.interventions.InterventionPlan",
-        "backend": "mock",
-        "note": (
-            "offline mechanism validation only; not a real detector quality "
-            "number"
-        ),
-    }
-    save_json(Path(work_root) / "capability_smoke_report.json", report)
-    return report
+    with build_capability_smoke_engine(work_root) as engine:
+        report = engine.run_cycle(1)
+        report["mini_effect"] = engine._evaluate_mini_effect()
+        report["capability_audit"] = {
+            "classification": (
+                capability_surface_report()["classification"]
+            ),
+            "capability_created": PROGRAM["name"],
+            "executor": "detector.interventions.InterventionPlan",
+            "backend": "mock",
+            "note": (
+                "offline mechanism validation only; not a real detector quality "
+                "number"
+            ),
+        }
+        save_json(Path(work_root) / "capability_smoke_report.json", report)
+        return report
 
 
 __all__ = [

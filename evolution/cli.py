@@ -104,10 +104,10 @@ def cmd_experiment(args: argparse.Namespace) -> int:
             args.cycles,
             **({"resume": True} if getattr(args, "resume", False) else {}),
         )
+        out = resolve_path(config["work_root"]) / "reports" / "experiment.json"
+        save_json(out, report)
     finally:
         engine.close()
-    out = resolve_path(config["work_root"]) / "reports" / "experiment.json"
-    save_json(out, report)
     _print_json(report)
     if report.get("stopped_early"):
         return 2
@@ -131,18 +131,18 @@ def cmd_governance(args: argparse.Namespace) -> int:
     if args.backend == "mock":
         config["proposer"]["mode"] = "offline"
     backend = _mock_backend(config) if args.backend == "mock" else None
-    engine = EvolutionEngine(config, backend=backend, mini=bool(args.mini))
-    report = engine.run_governance(cycle=args.cycle)
-    _print_json(report)
-    return 0
+    with EvolutionEngine(config, backend=backend, mini=bool(args.mini)) as engine:
+        report = engine.run_governance(cycle=args.cycle)
+        _print_json(report)
+        return 0
 
 
 def cmd_final(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    engine = EvolutionEngine(config, mini=False)
-    report = engine.run_final()
-    _print_json(report)
-    return 0 if report["verdict"]["overall"] == "pass" else 2
+    with EvolutionEngine(config, mini=False) as engine:
+        report = engine.run_final()
+        _print_json(report)
+        return 0 if report["verdict"]["overall"] == "pass" else 2
 
 
 def cmd_full_self_evolution(args: argparse.Namespace) -> int:
@@ -193,10 +193,10 @@ def cmd_preview(args: argparse.Namespace) -> int:
     if args.backend == "mock":
         config["proposer"]["mode"] = "offline"
     backend = _mock_backend(config) if args.backend == "mock" else None
-    engine = EvolutionEngine(config, backend=backend, mini=bool(args.mini))
-    report = engine.preview_cycle(int(args.cycle))
-    _print_json(report)
-    return 0
+    with EvolutionEngine(config, backend=backend, mini=bool(args.mini)) as engine:
+        report = engine.preview_cycle(int(args.cycle))
+        _print_json(report)
+        return 0
 
 
 def cmd_registry(args: argparse.Namespace) -> int:
@@ -514,197 +514,197 @@ def cmd_develop(args: argparse.Namespace) -> int:
     split = build_split(
         config=config, dataset_root=config["dataset_root"], mini=mini,
     )
-    engine = EvolutionEngine(config, backend=backend, split=split, mini=mini)
-    preview, preview_source = _development_preview(engine, int(args.cycle), dry_run=dry_run)
-    families = list(preview.get("families") or [])
-    if not families:
-        _print_json({
-            "state": "no_family",
-            "reason": preview.get("empty_proposal_reason"),
-        })
-        return 2
-    target = _select_development_family(families, args.mechanism)
-    if target is None:
-        _print_json({
-            "state": "no_target",
-            "reason": (
-                f"no family for mechanism {args.mechanism!r}; "
-                f"available: {[f.get('mechanism', {}).get('mechanism_id') for f in families]}"
-            ),
-        })
-        return 2
-    mechanism = dict(target.get("mechanism") or {})
-    plan = dict(target.get("actionability") or {})
-    requirement = next(
-        (
-            item for item in (
-                (preview.get("capability_plan") or {}).get("requirements") or ()
-            )
-            if str(item.get("mechanism_id")) == str(mechanism.get("mechanism_id"))
-        ),
-        {},
-    )
-    development_cfg = dict(config.get("development") or {})
-    budget = DevelopmentBudget(
-        max_versions_per_mechanism=int(
-            development_cfg.get("max_versions_per_mechanism", 4),
-        ),
-        max_provider_calls=int(development_cfg.get("max_provider_calls", 6)),
-        max_l1_cases=int(development_cfg.get("max_l1_cases", 12)),
-        require_normal_neighbors=int(
-            development_cfg.get("require_normal_neighbors", 2),
-        ),
-        allow_action_class_change=bool(
-            development_cfg.get("allow_action_class_change", True),
-        ),
-    )
-    output_dir = resolve_path(
-        args.output_dir or str(
-            Path(config["work_root"]) / "development"
-            / str(mechanism.get("mechanism_id") or "unknown")
-        )
-    )
-    cases = [str(case) for case in target.get("failure_cases") or ()]
-    if getattr(args, "case_id", None):
-        # Narrowing the target set is how a researcher works one case at a
-        # time; the case has to be a member, or the reading would be about a
-        # case the mechanism was never diagnosed from.
-        wanted = str(args.case_id)
-        if wanted not in cases:
+    with EvolutionEngine(config, backend=backend, split=split, mini=mini) as engine:
+        preview, preview_source = _development_preview(engine, int(args.cycle), dry_run=dry_run)
+        families = list(preview.get("families") or [])
+        if not families:
+            _print_json({
+                "state": "no_family",
+                "reason": preview.get("empty_proposal_reason"),
+            })
+            return 2
+        target = _select_development_family(families, args.mechanism)
+        if target is None:
             _print_json({
                 "state": "no_target",
                 "reason": (
-                    f"case {wanted!r} is not a member of mechanism "
-                    f"{mechanism.get('mechanism_id')!r}; members: {cases}"
+                    f"no family for mechanism {args.mechanism!r}; "
+                    f"available: {[f.get('mechanism', {}).get('mechanism_id') for f in families]}"
                 ),
             })
             return 2
-        cases = [wanted]
-    # Neighbours come from the mechanism itself: the cases the bare base
-    # already handles on the same failure direction, which the candidate must
-    # not break. Passing an empty list made the neighbour half of L1 vacuous,
-    # so an empty list here is reported rather than silently accepted.
-    neighbor_cases = [
-        str(case) for case in mechanism.get("normal_neighbors") or ()
-        if str(case) not in set(cases)
-    ]
-    if dry_run:
-        _print_json({
-            "state": "dry_run",
-            "provider_calls": 0,
-            # The mechanism shown comes from a saved preview report when one
-            # exists, and from the offline mock otherwise: a dry run cannot
-            # discover a real mechanism without patrol, so it must not be
-            # mistaken for a real one.
-            "preview_source": preview_source,
-            "mechanism": mechanism,
-            "capability_requirement": requirement,
-            "routes": plan.get("routes"),
-            "target_cases": cases,
-            "neighbor_cases": neighbor_cases,
-            "output_dir": str(output_dir),
-            "budget": budget.as_dict(),
-        })
-        return 0
-    if not args.from_patch:
-        _print_json({
-            "state": "no_seed",
-            "reason": (
-                "the deployment-side development loop needs a seed candidate "
-                "(--from-patch) or a proposer that satisfies the development "
-                "contract; neither was supplied"
+        mechanism = dict(target.get("mechanism") or {})
+        plan = dict(target.get("actionability") or {})
+        requirement = next(
+            (
+                item for item in (
+                    (preview.get("capability_plan") or {}).get("requirements") or ()
+                )
+                if str(item.get("mechanism_id")) == str(mechanism.get("mechanism_id"))
             ),
-            "mechanism": mechanism,
-            "capability_requirement": requirement,
-        })
-        return 2
-    seed = json.loads(Path(args.from_patch).read_text(encoding="utf-8-sig"))
-    if isinstance(seed, Mapping) and "candidates" in seed:
-        seed = (seed.get("candidates") or [{}])[0]
-    seed = dict(seed)
-    seed.setdefault("provenance", {})
-    seed["provenance"].update({
-        "cycle": int(args.cycle),
-        "failure_family": str(target.get("failure_family") or ""),
-        "failure_cases": cases,
-    })
-    seed.pop("content_hash", None)
-
-    # The development replay runs under the same wall-clock budget a cycle's
-    # gate arms do. Without one it ran unbounded, and a stalled provider
-    # produced unresolved rows that scored as "no target improvement" -- an
-    # outage recorded as a falsified candidate.
-    development_deadline = engine._development_deadline()
-
-    def l1_runner(cases_to_run, *, candidate, plan):
-        rows = engine.develop_rows(
-            cases_to_run,
-            candidate=candidate,
-            split=split,
-            deadline=development_deadline,
+            {},
         )
-        return rows
+        development_cfg = dict(config.get("development") or {})
+        budget = DevelopmentBudget(
+            max_versions_per_mechanism=int(
+                development_cfg.get("max_versions_per_mechanism", 4),
+            ),
+            max_provider_calls=int(development_cfg.get("max_provider_calls", 6)),
+            max_l1_cases=int(development_cfg.get("max_l1_cases", 12)),
+            require_normal_neighbors=int(
+                development_cfg.get("require_normal_neighbors", 2),
+            ),
+            allow_action_class_change=bool(
+                development_cfg.get("allow_action_class_change", True),
+            ),
+        )
+        output_dir = resolve_path(
+            args.output_dir or str(
+                Path(config["work_root"]) / "development"
+                / str(mechanism.get("mechanism_id") or "unknown")
+            )
+        )
+        cases = [str(case) for case in target.get("failure_cases") or ()]
+        if getattr(args, "case_id", None):
+            # Narrowing the target set is how a researcher works one case at a
+            # time; the case has to be a member, or the reading would be about a
+            # case the mechanism was never diagnosed from.
+            wanted = str(args.case_id)
+            if wanted not in cases:
+                _print_json({
+                    "state": "no_target",
+                    "reason": (
+                        f"case {wanted!r} is not a member of mechanism "
+                        f"{mechanism.get('mechanism_id')!r}; members: {cases}"
+                    ),
+                })
+                return 2
+            cases = [wanted]
+        # Neighbours come from the mechanism itself: the cases the bare base
+        # already handles on the same failure direction, which the candidate must
+        # not break. Passing an empty list made the neighbour half of L1 vacuous,
+        # so an empty list here is reported rather than silently accepted.
+        neighbor_cases = [
+            str(case) for case in mechanism.get("normal_neighbors") or ()
+            if str(case) not in set(cases)
+        ]
+        if dry_run:
+            _print_json({
+                "state": "dry_run",
+                "provider_calls": 0,
+                # The mechanism shown comes from a saved preview report when one
+                # exists, and from the offline mock otherwise: a dry run cannot
+                # discover a real mechanism without patrol, so it must not be
+                # mistaken for a real one.
+                "preview_source": preview_source,
+                "mechanism": mechanism,
+                "capability_requirement": requirement,
+                "routes": plan.get("routes"),
+                "target_cases": cases,
+                "neighbor_cases": neighbor_cases,
+                "output_dir": str(output_dir),
+                "budget": budget.as_dict(),
+            })
+            return 0
+        if not args.from_patch:
+            _print_json({
+                "state": "no_seed",
+                "reason": (
+                    "the deployment-side development loop needs a seed candidate "
+                    "(--from-patch) or a proposer that satisfies the development "
+                    "contract; neither was supplied"
+                ),
+                "mechanism": mechanism,
+                "capability_requirement": requirement,
+            })
+            return 2
+        seed = json.loads(Path(args.from_patch).read_text(encoding="utf-8-sig"))
+        if isinstance(seed, Mapping) and "candidates" in seed:
+            seed = (seed.get("candidates") or [{}])[0]
+        seed = dict(seed)
+        seed.setdefault("provenance", {})
+        seed["provenance"].update({
+            "cycle": int(args.cycle),
+            "failure_family": str(target.get("failure_family") or ""),
+            "failure_cases": cases,
+        })
+        seed.pop("content_hash", None)
 
-    def propose(mechanism_, plan_, parent, diagnosis, cycle):
-        # One seed, then no new drafts: the seed is version v001 and the loop's
-        # job is to revise it. A caller that wants fresh drafts passes a
-        # proposer instead of a patch (development contract).
-        return [seed] if parent is None else []
+        # The development replay runs under the same wall-clock budget a cycle's
+        # gate arms do. Without one it ran unbounded, and a stalled provider
+        # produced unresolved rows that scored as "no target improvement" -- an
+        # outage recorded as a falsified candidate.
+        development_deadline = engine._development_deadline()
 
-    developer = CandidateDeveloper(
-        output_dir=output_dir,
-        budget=budget,
-        mechanism=mechanism,
-        capability_plan=requirement,
-        route_failure_records=engine.route_failure_records(),
-        target_cases=cases,
-        neighbor_cases=neighbor_cases,
-        active_entries=engine.registry.entries,
-        target_kind=str(target.get("target_kind") or "detection"),
-        gold_steps=engine.gold_step_map,
-        l1_runner=l1_runner,
-    )
-    result = developer.develop(
-        propose, cycle=int(args.cycle),
-        max_versions=int(development_cfg.get("max_versions_per_mechanism", 4)),
-    )
-    report = development_report(result)
-    report["capability_requirement"] = requirement
-    report["output_dir"] = str(output_dir)
-    # Hand the passing version to the promotion path here, in the same command
-    # that produced it. Only ``CandidateDeveloper.freeze`` writes the status
-    # ``candidate_from_development`` accepts, so a run that stopped at
-    # ``ready_for_freeze`` could not reach ``freeze-protocol`` at all.
-    if result.get("selected_version_id"):
-        frozen = developer.freeze(str(result["selected_version_id"]))
-        report["frozen"] = {
-            "version_id": frozen["version_id"],
-            "candidate_hash": frozen["candidate_hash"],
-            "lineage": frozen["lineage"],
-            "development_evidence": frozen["development_evidence"],
-        }
-    # §28.6: the development loop has now ended, so this is where a version has
-    # left it and its verdicts are final. Archiving happens here rather than
-    # inside ``develop`` because the *caller* owns the run boundary: the loop
-    # can be driven several times for one mechanism, and an archive written per
-    # ``develop`` call would record a mechanism's experiments as separate runs.
-    # The configured policy decides whether anything is written; with the
-    # default ``off`` this call reports a refusal and changes nothing.
-    report["archive"] = engine.archive_development_run(
-        output_dir,
-        cycle=int(args.cycle),
-        mechanism_id=str(mechanism.get("mechanism_id") or ""),
-        family_id=str(target.get("failure_family") or ""),
-        # The mechanism travels with the call: a component is stored under the
-        # capability its mechanism's repair requires, and only the caller that
-        # ran the development loop still has that mechanism.
-        mechanism=mechanism,
-    )
-    _print_json(report)
-    out = output_dir / "development_report.json"
-    save_json(out, report)
-    print(f"\ndevelopment report -> {out}")
-    return 0 if result.get("selected_version_id") else 2
+        def l1_runner(cases_to_run, *, candidate, plan):
+            rows = engine.develop_rows(
+                cases_to_run,
+                candidate=candidate,
+                split=split,
+                deadline=development_deadline,
+            )
+            return rows
+
+        def propose(mechanism_, plan_, parent, diagnosis, cycle):
+            # One seed, then no new drafts: the seed is version v001 and the loop's
+            # job is to revise it. A caller that wants fresh drafts passes a
+            # proposer instead of a patch (development contract).
+            return [seed] if parent is None else []
+
+        developer = CandidateDeveloper(
+            output_dir=output_dir,
+            budget=budget,
+            mechanism=mechanism,
+            capability_plan=requirement,
+            route_failure_records=engine.route_failure_records(),
+            target_cases=cases,
+            neighbor_cases=neighbor_cases,
+            active_entries=engine.registry.entries,
+            target_kind=str(target.get("target_kind") or "detection"),
+            gold_steps=engine.gold_step_map,
+            l1_runner=l1_runner,
+        )
+        result = developer.develop(
+            propose, cycle=int(args.cycle),
+            max_versions=int(development_cfg.get("max_versions_per_mechanism", 4)),
+        )
+        report = development_report(result)
+        report["capability_requirement"] = requirement
+        report["output_dir"] = str(output_dir)
+        # Hand the passing version to the promotion path here, in the same command
+        # that produced it. Only ``CandidateDeveloper.freeze`` writes the status
+        # ``candidate_from_development`` accepts, so a run that stopped at
+        # ``ready_for_freeze`` could not reach ``freeze-protocol`` at all.
+        if result.get("selected_version_id"):
+            frozen = developer.freeze(str(result["selected_version_id"]))
+            report["frozen"] = {
+                "version_id": frozen["version_id"],
+                "candidate_hash": frozen["candidate_hash"],
+                "lineage": frozen["lineage"],
+                "development_evidence": frozen["development_evidence"],
+            }
+        # §28.6: the development loop has now ended, so this is where a version has
+        # left it and its verdicts are final. Archiving happens here rather than
+        # inside ``develop`` because the *caller* owns the run boundary: the loop
+        # can be driven several times for one mechanism, and an archive written per
+        # ``develop`` call would record a mechanism's experiments as separate runs.
+        # The configured policy decides whether anything is written; with the
+        # default ``off`` this call reports a refusal and changes nothing.
+        report["archive"] = engine.archive_development_run(
+            output_dir,
+            cycle=int(args.cycle),
+            mechanism_id=str(mechanism.get("mechanism_id") or ""),
+            family_id=str(target.get("failure_family") or ""),
+            # The mechanism travels with the call: a component is stored under the
+            # capability its mechanism's repair requires, and only the caller that
+            # ran the development loop still has that mechanism.
+            mechanism=mechanism,
+        )
+        _print_json(report)
+        out = output_dir / "development_report.json"
+        save_json(out, report)
+        print(f"\ndevelopment report -> {out}")
+        return 0 if result.get("selected_version_id") else 2
 
 
 def _development_preview(
@@ -937,25 +937,25 @@ def cmd_smoke(args: argparse.Namespace) -> int:
     backend = make_backend(
         config, mode="mock", mock_base=base, mock_overrides=overrides,
     )
-    engine = EvolutionEngine(
+    with EvolutionEngine(
         config,
         backend=backend,
         split=split,
         mini=True,
         proposer=_smoke_proposer(smoke_id, patrol_true),
-    )
-    report = engine.run_cycle(1)
-    out = resolve_path(config["work_root"]) / "experiments" / "smoke_cycle.json"
-    save_json(out, report)
-    _print_json(report)
-    print(f"\nsmoke report -> {out}")
-    passed = (
-        report.get("state") == "completed"
-        and "IV-SMOKE-001" in (report.get("marginal_selection", {}).get("selected") or [])
-        and bool((report.get("audit") or {}).get("passed"))
-        and bool((report.get("ledger_integrity") or {}).get("valid"))
-    )
-    return 0 if passed else 2
+    ) as engine:
+        report = engine.run_cycle(1)
+        out = resolve_path(config["work_root"]) / "experiments" / "smoke_cycle.json"
+        save_json(out, report)
+        _print_json(report)
+        print(f"\nsmoke report -> {out}")
+        passed = (
+            report.get("state") == "completed"
+            and "IV-SMOKE-001" in (report.get("marginal_selection", {}).get("selected") or [])
+            and bool((report.get("audit") or {}).get("passed"))
+            and bool((report.get("ledger_integrity") or {}).get("valid"))
+        )
+        return 0 if passed else 2
 
 
 def _smoke_proposer(intervention_id: str, failure_cases: list[str]):

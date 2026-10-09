@@ -23,6 +23,8 @@ from __future__ import annotations
 import json
 import math
 import random
+from contextvars import Context
+from weakref import finalize
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -593,153 +595,150 @@ class EvolutionEngine:
         self.config = dict(load_config()) if config is None else dict(config)
         self.paths = ensure_dirs(self.config)
         self.mini = mini
-        # One writer per work_root, enforced rather than documented. Two runs
-        # sharing a work_root do not corrupt the ledger any more (it has a
-        # cross-process lock), but they still overwrite each other's registry,
-        # checkpoints and caches -- and the 2026-09-23 incident showed the
-        # result is two measurements silently mixed into one run. The lease is
-        # held for as long as the engine lives and released by ``close()``.
-        self._writer_lease = exclusive_writer(self.paths["root"])
-        self.holds_writer_lease = bool(
-            (self.config.get("runtime") or {}).get("exclusive_work_root", True)
-        )
-        self._writer_lease: Any | None = None
-        if self.holds_writer_lease:
-            self._writer_lease = exclusive_writer(self.paths["root"])
-            self._writer_lease.__enter__()
-        self.backend = backend or make_backend(
-            self.config,
-            mock_base=mock_base,
-            mock_overrides=mock_overrides,
-        )
-        self.split = split or build_split(
-            config=self.config,
-            dataset_root=self.config["dataset_root"],
-            mini=mini,
-        )
-        self.registry = registry or load_active_registry(self.config)
-        self.ledger = ledger or load_ledger(self.config)
-        self.proposer = proposer or make_proposer(
-            self.config, active_entries=self.registry.entries
-        )
-        self.rejection_feedback: list[dict[str, Any]] = []
-        for record in self.ledger.read():
-            payload = record.get("payload") or {}
-            if (
-                record.get("event") == "rejected"
-                and isinstance(payload, Mapping)
-                and (
-                    isinstance(payload.get("candidate"), Mapping)
-                    or isinstance(payload.get("candidates"), list)
+        self._writer_release: Any | None = None
+        if (self.config.get("runtime") or {}).get("exclusive_work_root", True):
+            # Engine ownership cannot inherit another engine's ambient lease.
+            context = Context()
+            lease = exclusive_writer(self.paths["root"])
+            context.run(lease.__enter__)
+            self._writer_release = finalize(self, context.run, lease.__exit__, None, None, None)
+        try:
+            self.backend = backend or make_backend(
+                self.config,
+                mock_base=mock_base,
+                mock_overrides=mock_overrides,
+            )
+            self.split = split or build_split(
+                config=self.config,
+                dataset_root=self.config["dataset_root"],
+                mini=mini,
+            )
+            self.registry = registry or load_active_registry(self.config)
+            self.ledger = ledger or load_ledger(self.config)
+            self.proposer = proposer or make_proposer(
+                self.config, active_entries=self.registry.entries
+            )
+            self.rejection_feedback: list[dict[str, Any]] = []
+            for record in self.ledger.read():
+                payload = record.get("payload") or {}
+                if (
+                    record.get("event") == "rejected"
+                    and isinstance(payload, Mapping)
+                    and (
+                        isinstance(payload.get("candidate"), Mapping)
+                        or isinstance(payload.get("candidates"), list)
+                    )
+                ):
+                    self.rejection_feedback.append(dict(payload))
+            self.gold_map = {
+                case: load_gold(self.config["dataset_root"], case)
+                for case in self.split.pool
+            }
+            # Evaluator-side localization annotation. It rides beside ``gold_map``
+            # and never reaches the detector: the backend copies it onto result
+            # rows for the evolution side to score. Without it every patrol row
+            # carries ``gold_step=None``, and a case the detector convicts
+            # correctly but localizes wrongly stays invisible to the development
+            # loop -- which is the objective plan §5.1 asks to bring into the loop.
+            self.gold_step_map = {
+                case: load_gold_step(self.config["dataset_root"], case)
+                for case in self.split.pool
+            }
+            self.cycle_reports: list[dict[str, Any]] = []
+            # H_t = (G, C, T, M, R) base. These describe and remember the
+            # generation that ran; they are read for reporting and for what the
+            # next round starts from, and they never score a candidate.
+            self.harness_dir = Path(self.config["harness_dir"])
+            self.memory_root = Path(self.config["memory_root"])
+            # Reviewed overlays may correct an older rejection without rewriting
+            # either its original ledger event or its original episode.
+            for episode in load_episodes(self.memory_root):
+                if not episode.get("correction_evidence"):
+                    continue
+                for feedback in self.rejection_feedback:
+                    candidate = feedback.get("candidate") or {}
+                    if (feedback.get("cycle") == episode.get("cycle")
+                        and feedback.get("intervention_id") == episode.get("intervention_id")
+                        and feedback.get("gate") == episode.get("gate")
+                        and feedback.get("reason") == episode.get("original_reason")
+                        and (candidate.get("provenance") or {}).get("failure_family") == episode.get("failure_family")):
+                        feedback.update(reason=episode["reason"], not_evaluable=episode["unevaluable"],
+                                        correction_evidence=episode["correction_evidence"])
+            self.gap_store = self.harness_dir / GAP_STORE_NAME
+            self.route_failure_store = self.harness_dir / ROUTE_FAILURE_NAME
+            # Optional mechanism-level scoring binding. Absent by default, which is
+            # what keeps every existing cycle's semantics unchanged.
+            self.mechanism_binding: dict[str, Any] = {}
+            self.mechanism_membership: dict[str, Any] = {}
+            self._mechanism_binding_error = ""
+            self._load_mechanism_binding()
+            # Optional, explicitly installed replacement evaluation set.
+            self._replacement_gain_cases: list[str] = []
+            self._previous_manifest = self._load_previous_manifest()
+            # §28.6: where the candidate archive is written, and whether this
+            # engine writes it at all. ``on`` is a declared choice rather than an
+            # implicit one -- see the ``archive`` block in ``config.DEFAULTS`` for
+            # what each value claims -- and ``off`` is the default so that adding
+            # the wiring cannot change what an existing run records.
+            # Whether this cycle runs the development loop before its gates, and
+            # how many mechanisms it may develop if so (§23.3.6). Read once at
+            # construction: a cycle's path is a property of its configuration, not
+            # something a later stage may flip.
+            development_cfg = self.config.get("development") or {}
+            self.development_enabled = bool(development_cfg.get("enabled", False))
+            self.development_max_mechanisms = int(
+                development_cfg.get("max_mechanisms_per_cycle", 1)
+            )
+            archive_cfg = self.config.get("archive") or {}
+            self.archive_on = str(archive_cfg.get("on") or "off")
+            if self.archive_on not in {"off", "development_end", "cycle_end"}:
+                raise ValueError(
+                    f"archive.on {self.archive_on!r} is not one of "
+                    "off, development_end, cycle_end"
                 )
-            ):
-                self.rejection_feedback.append(dict(payload))
-        self.gold_map = {
-            case: load_gold(self.config["dataset_root"], case)
-            for case in self.split.pool
-        }
-        # Evaluator-side localization annotation. It rides beside ``gold_map``
-        # and never reaches the detector: the backend copies it onto result
-        # rows for the evolution side to score. Without it every patrol row
-        # carries ``gold_step=None``, and a case the detector convicts
-        # correctly but localizes wrongly stays invisible to the development
-        # loop -- which is the objective plan §5.1 asks to bring into the loop.
-        self.gold_step_map = {
-            case: load_gold_step(self.config["dataset_root"], case)
-            for case in self.split.pool
-        }
-        self.cycle_reports: list[dict[str, Any]] = []
-        # H_t = (G, C, T, M, R) base. These describe and remember the
-        # generation that ran; they are read for reporting and for what the
-        # next round starts from, and they never score a candidate.
-        self.harness_dir = Path(self.config["harness_dir"])
-        self.memory_root = Path(self.config["memory_root"])
-        # Reviewed overlays may correct an older rejection without rewriting
-        # either its original ledger event or its original episode.
-        for episode in load_episodes(self.memory_root):
-            if not episode.get("correction_evidence"):
-                continue
-            for feedback in self.rejection_feedback:
-                candidate = feedback.get("candidate") or {}
-                if (feedback.get("cycle") == episode.get("cycle")
-                    and feedback.get("intervention_id") == episode.get("intervention_id")
-                    and feedback.get("gate") == episode.get("gate")
-                    and feedback.get("reason") == episode.get("original_reason")
-                    and (candidate.get("provenance") or {}).get("failure_family") == episode.get("failure_family")):
-                    feedback.update(reason=episode["reason"], not_evaluable=episode["unevaluable"],
-                                    correction_evidence=episode["correction_evidence"])
-        self.gap_store = self.harness_dir / GAP_STORE_NAME
-        self.route_failure_store = self.harness_dir / ROUTE_FAILURE_NAME
-        # Optional mechanism-level scoring binding. Absent by default, which is
-        # what keeps every existing cycle's semantics unchanged.
-        self.mechanism_binding: dict[str, Any] = {}
-        self.mechanism_membership: dict[str, Any] = {}
-        self._mechanism_binding_error = ""
-        self._load_mechanism_binding()
-        # Optional, explicitly installed replacement evaluation set.
-        self._replacement_gain_cases: list[str] = []
-        self._previous_manifest = self._load_previous_manifest()
-        # §28.6: where the candidate archive is written, and whether this
-        # engine writes it at all. ``on`` is a declared choice rather than an
-        # implicit one -- see the ``archive`` block in ``config.DEFAULTS`` for
-        # what each value claims -- and ``off`` is the default so that adding
-        # the wiring cannot change what an existing run records.
-        # Whether this cycle runs the development loop before its gates, and
-        # how many mechanisms it may develop if so (§23.3.6). Read once at
-        # construction: a cycle's path is a property of its configuration, not
-        # something a later stage may flip.
-        development_cfg = self.config.get("development") or {}
-        self.development_enabled = bool(development_cfg.get("enabled", False))
-        self.development_max_mechanisms = int(
-            development_cfg.get("max_mechanisms_per_cycle", 1)
-        )
-        archive_cfg = self.config.get("archive") or {}
-        self.archive_on = str(archive_cfg.get("on") or "off")
-        if self.archive_on not in {"off", "development_end", "cycle_end"}:
-            raise ValueError(
-                f"archive.on {self.archive_on!r} is not one of "
-                "off, development_end, cycle_end"
+            self.archive_root = Path(
+                str(archive_cfg.get("root") or "").strip()
+                or str(Path(self.config["work_root"]) / "candidates")
             )
-        self.archive_root = Path(
-            str(archive_cfg.get("root") or "").strip()
-            or str(Path(self.config["work_root"]) / "candidates")
-        )
-        # Layer 2 of §9.1: reusable parts. Separate from the registry by
-        # construction -- nothing this store holds has passed a promotion gate.
-        #
-        # This path is where components are both *written* (see
-        # ``archive_development_run``) and *read* (``_reusable_components``).
-        # The two used to disagree: the archive registered components under
-        # ``archive.root`` while retrieval read this attribute, so with the
-        # default configuration no component a run produced could ever reach a
-        # drafting prompt -- the archive reported a row and the prompt saw an
-        # empty store. One path now, named here and used by both sides.
-        self.component_store = Path(
-            (self.config.get("component_root") or "").strip()
-            or str(Path(self.config["work_root"]) / "components")
-        )
-        # The two stores normally live in two directories -- ``work_root/
-        # components`` for parts, ``work_root/candidates`` for candidate
-        # history, so a run's components are *not* under its archive root. That
-        # asymmetry is exactly what made the archive look empty: reading
-        # ``load_components(archive_root)`` finds nothing while the run did
-        # register a part. It is stated here rather than left to be discovered
-        # by an empty prompt, and it is silent only when the two paths really
-        # are the same directory.
-        self.component_store_warning = (
-            ""
-            if self.component_store == self.archive_root
-            else (
-                f"components are written to and read from "
-                f"{str(self.component_store)}, not from archive.root "
-                f"{str(self.archive_root)}, which holds candidate records "
-                "only; configure component_root to place the component store "
-                "somewhere else"
+            # Layer 2 of §9.1: reusable parts. Separate from the registry by
+            # construction -- nothing this store holds has passed a promotion gate.
+            #
+            # This path is where components are both *written* (see
+            # ``archive_development_run``) and *read* (``_reusable_components``).
+            # The two used to disagree: the archive registered components under
+            # ``archive.root`` while retrieval read this attribute, so with the
+            # default configuration no component a run produced could ever reach a
+            # drafting prompt -- the archive reported a row and the prompt saw an
+            # empty store. One path now, named here and used by both sides.
+            self.component_store = Path(
+                (self.config.get("component_root") or "").strip()
+                or str(Path(self.config["work_root"]) / "components")
             )
-        )
-        self.component_prompt_limit = int(
-            (self.config.get("proposer") or {}).get("max_components", 4)
-        )
+            # The two stores normally live in two directories -- ``work_root/
+            # components`` for parts, ``work_root/candidates`` for candidate
+            # history, so a run's components are *not* under its archive root. That
+            # asymmetry is exactly what made the archive look empty: reading
+            # ``load_components(archive_root)`` finds nothing while the run did
+            # register a part. It is stated here rather than left to be discovered
+            # by an empty prompt, and it is silent only when the two paths really
+            # are the same directory.
+            self.component_store_warning = (
+                ""
+                if self.component_store == self.archive_root
+                else (
+                    f"components are written to and read from "
+                    f"{str(self.component_store)}, not from archive.root "
+                    f"{str(self.archive_root)}, which holds candidate records "
+                    "only; configure component_root to place the component store "
+                    "somewhere else"
+                )
+            )
+            self.component_prompt_limit = int(
+                (self.config.get("proposer") or {}).get("max_components", 4)
+            )
+        except BaseException:
+            self.close()
+            raise
 
     # ------------------------------------------------------------------
     def _load_mechanism_binding(self) -> None:
@@ -1021,9 +1020,9 @@ class EvolutionEngine:
 
     def close(self) -> None:
         """Release the work_root writer lease. Safe to call more than once."""
-        lease, self._writer_lease = self._writer_lease, None
-        if lease is not None:
-            lease.__exit__(None, None, None)
+        release, self._writer_release = self._writer_release, None
+        if release is not None:
+            release()
 
     def __enter__(self) -> "EvolutionEngine":
         return self
@@ -5394,7 +5393,8 @@ def run_experiment(
     backend: DetectionBackend | None = None,
     mini: bool = False,
 ) -> dict[str, Any]:
-    return EvolutionEngine(config, backend=backend, mini=mini).run_experiment(cycles)
+    with EvolutionEngine(config, backend=backend, mini=mini) as engine:
+        return engine.run_experiment(cycles)
 
 
 def run_full_self_evolution(
@@ -5409,137 +5409,137 @@ def run_full_self_evolution(
         raise RuntimeError(
             "full self-evolution requires experiment.mode=full_self_evolution"
         )
-    engine = EvolutionEngine(cfg, backend=backend, mini=False)
-    final_ids = {
-        str(item.get("case_id") or "") for item in engine.split.final
-    }
-    evolution_ids = set(engine.split.pool)
-    raw_ids = {
-        path.relative_to(Path(cfg["dataset_root"])).as_posix()
-        for path in Path(cfg["dataset_root"]).rglob("*.json")
-    }
-    expected_evolution = int(experiment.get("expected_evolution_cases", len(evolution_ids)))
-    expected_evaluation = int(experiment.get("expected_evaluation_cases", len(final_ids)))
-    expected_total = int(experiment.get("expected_dataset_cases", len(raw_ids)))
-    if (
-        len(evolution_ids) != expected_evolution
-        or len(final_ids) != expected_evaluation
-        or len(raw_ids) != expected_total
-        or evolution_ids & final_ids
-        or evolution_ids | final_ids != raw_ids
-    ):
-        raise RuntimeError(
-            "full self-evolution split must partition all raw cases exactly: "
-            f"evolution={len(evolution_ids)}, evaluation={len(final_ids)}, "
-            f"raw={len(raw_ids)}, overlap={len(evolution_ids & final_ids)}"
-        )
-    reports = engine.ledger.read()
-    if reports and not any(
-        record.get("event") == "full_self_evolution_started"
-        for record in reports
-    ):
-        raise RuntimeError(
-            "full self-evolution work root contains a foreign ledger"
-        )
-    completed = {
-        int((record.get("payload") or {}).get("cycle") or 0)
-        for record in reports
-        if record.get("event") == "cycle_completed"
-        and (record.get("payload") or {}).get("state") == "completed"
-    }
-    started = {
-        int((record.get("payload") or {}).get("cycle") or 0)
-        for record in reports
-        if record.get("event") == "cycle_started"
-    }
-    interrupted = sorted(started - completed)
-    # An interrupted cycle may be resumed ONLY from its own durable
-    # checkpoint, which re-validates code/config/data/split/registry identity
-    # and refuses a fresh proposal draw. Without a checkpoint the fixed S/G
-    # search cannot be reconstructed, so the run must start over in a new work
-    # root instead of silently re-searching the same cases.
-    resumable: set[int] = set()
-    for cycle in interrupted:
-        checkpoint = (
-            engine.paths["root"] / "checkpoints" / f"cycle{cycle:03d}"
-            / "checkpoint.json"
-        )
-        if not checkpoint.exists():
+    with EvolutionEngine(cfg, backend=backend, mini=False) as engine:
+        final_ids = {
+            str(item.get("case_id") or "") for item in engine.split.final
+        }
+        evolution_ids = set(engine.split.pool)
+        raw_ids = {
+            path.relative_to(Path(cfg["dataset_root"])).as_posix()
+            for path in Path(cfg["dataset_root"]).rglob("*.json")
+        }
+        expected_evolution = int(experiment.get("expected_evolution_cases", len(evolution_ids)))
+        expected_evaluation = int(experiment.get("expected_evaluation_cases", len(final_ids)))
+        expected_total = int(experiment.get("expected_dataset_cases", len(raw_ids)))
+        if (
+            len(evolution_ids) != expected_evolution
+            or len(final_ids) != expected_evaluation
+            or len(raw_ids) != expected_total
+            or evolution_ids & final_ids
+            or evolution_ids | final_ids != raw_ids
+        ):
             raise RuntimeError(
-                "an evolution cycle was interrupted with no resumable "
-                "checkpoint; fixed S/G cannot be searched again: "
-                f"{interrupted}"
+                "full self-evolution split must partition all raw cases exactly: "
+                f"evolution={len(evolution_ids)}, evaluation={len(final_ids)}, "
+                f"raw={len(raw_ids)}, overlap={len(evolution_ids & final_ids)}"
             )
-        resumable.add(cycle)
-    if not reports:
-        if engine.registry.entries or int(engine.registry.state.get("cycle") or 0):
+        reports = engine.ledger.read()
+        if reports and not any(
+            record.get("event") == "full_self_evolution_started"
+            for record in reports
+        ):
             raise RuntimeError(
-                "full self-evolution must start from an empty registry"
+                "full self-evolution work root contains a foreign ledger"
             )
-        engine._ledger("full_self_evolution_started", {
-            "evolution_cases": len(evolution_ids),
-            "evaluation_cases": len(final_ids),
-            "initial_registry_hash": engine.registry.registry_hash,
-            "source_digest": source_identity("detector", "evolution"),
-            "runtime_identity": backend_runtime_identity(engine.backend),
-        })
-    cycle_reports = []
-    for path in sorted(engine.paths["cycles"].glob("cycle*.json")):
-        cycle_reports.append(json.loads(path.read_text(encoding="utf-8-sig")))
-    target_cycles = int(cfg.get("cycles", 3))
-    for cycle in range(1, target_cycles + 1):
-        if cycle in completed:
-            continue
-        report = engine.run_cycle(cycle, resume=cycle in resumable)
-        cycle_reports.append(report)
-        if report.get("state") != "completed":
+        completed = {
+            int((record.get("payload") or {}).get("cycle") or 0)
+            for record in reports
+            if record.get("event") == "cycle_completed"
+            and (record.get("payload") or {}).get("state") == "completed"
+        }
+        started = {
+            int((record.get("payload") or {}).get("cycle") or 0)
+            for record in reports
+            if record.get("event") == "cycle_started"
+        }
+        interrupted = sorted(started - completed)
+        # An interrupted cycle may be resumed ONLY from its own durable
+        # checkpoint, which re-validates code/config/data/split/registry identity
+        # and refuses a fresh proposal draw. Without a checkpoint the fixed S/G
+        # search cannot be reconstructed, so the run must start over in a new work
+        # root instead of silently re-searching the same cases.
+        resumable: set[int] = set()
+        for cycle in interrupted:
+            checkpoint = (
+                engine.paths["root"] / "checkpoints" / f"cycle{cycle:03d}"
+                / "checkpoint.json"
+            )
+            if not checkpoint.exists():
+                raise RuntimeError(
+                    "an evolution cycle was interrupted with no resumable "
+                    "checkpoint; fixed S/G cannot be searched again: "
+                    f"{interrupted}"
+                )
+            resumable.add(cycle)
+        if not reports:
+            if engine.registry.entries or int(engine.registry.state.get("cycle") or 0):
+                raise RuntimeError(
+                    "full self-evolution must start from an empty registry"
+                )
+            engine._ledger("full_self_evolution_started", {
+                "evolution_cases": len(evolution_ids),
+                "evaluation_cases": len(final_ids),
+                "initial_registry_hash": engine.registry.registry_hash,
+                "source_digest": source_identity("detector", "evolution"),
+                "runtime_identity": backend_runtime_identity(engine.backend),
+            })
+        cycle_reports = []
+        for path in sorted(engine.paths["cycles"].glob("cycle*.json")):
+            cycle_reports.append(json.loads(path.read_text(encoding="utf-8-sig")))
+        target_cycles = int(cfg.get("cycles", 3))
+        for cycle in range(1, target_cycles + 1):
+            if cycle in completed:
+                continue
+            report = engine.run_cycle(cycle, resume=cycle in resumable)
+            cycle_reports.append(report)
+            if report.get("state") != "completed":
+                raise RuntimeError(
+                    f"full self-evolution cycle {cycle} did not complete: "
+                    f"{report.get('state')}"
+                )
+        ledger_status = engine.ledger.verify()
+        if not ledger_status["valid"]:
             raise RuntimeError(
-                f"full self-evolution cycle {cycle} did not complete: "
-                f"{report.get('state')}"
+                f"full self-evolution ledger is invalid: {ledger_status['reason']}"
             )
-    ledger_status = engine.ledger.verify()
-    if not ledger_status["valid"]:
-        raise RuntimeError(
-            f"full self-evolution ledger is invalid: {ledger_status['reason']}"
+        final_report = engine.run_final()
+        meta_report = write_meta_report(
+            cycle_reports,
+            engine.ledger,
+            engine.paths["reports"] / "meta_eval.json",
         )
-    final_report = engine.run_final()
-    meta_report = write_meta_report(
-        cycle_reports,
-        engine.ledger,
-        engine.paths["reports"] / "meta_eval.json",
-    )
-    nonempty = bool(engine.registry.entries)
-    overall = (
-        "pass"
-        if nonempty and final_report["verdict"]["overall"] == "pass"
-        and bool(meta_report["defect_injection_audit"]["passed"])
-        and bool(ledger_status["valid"])
-        else "fail"
-    )
-    report = {
-        "schema_version": "evolution.full_self_evolution.v1",
-        "experiment_scope": "disjoint_evolution_and_sealed_holdout",
-        "partition_sizes": {
-            "evolution": len(evolution_ids), "evaluation": len(final_ids),
-            "dataset": len(raw_ids),
-        },
-        "historical_contamination_ignored": bool(
-            experiment.get("ignore_historical_contamination", False)
-        ),
-        "initial_registry": "empty",
-        "cycles": cycle_reports,
-        "active_interventions": [
-            str(item.get("intervention_id") or "")
-            for item in engine.registry.entries
-        ],
-        "registry_hash": engine.registry.registry_hash,
-        "final": final_report,
-        "meta": meta_report,
-        "ledger_integrity": ledger_status,
-        "overall": overall,
-    }
-    save_json(engine.paths["reports"] / "full_self_evolution.json", report)
-    return report
+        nonempty = bool(engine.registry.entries)
+        overall = (
+            "pass"
+            if nonempty and final_report["verdict"]["overall"] == "pass"
+            and bool(meta_report["defect_injection_audit"]["passed"])
+            and bool(ledger_status["valid"])
+            else "fail"
+        )
+        report = {
+            "schema_version": "evolution.full_self_evolution.v1",
+            "experiment_scope": "disjoint_evolution_and_sealed_holdout",
+            "partition_sizes": {
+                "evolution": len(evolution_ids), "evaluation": len(final_ids),
+                "dataset": len(raw_ids),
+            },
+            "historical_contamination_ignored": bool(
+                experiment.get("ignore_historical_contamination", False)
+            ),
+            "initial_registry": "empty",
+            "cycles": cycle_reports,
+            "active_interventions": [
+                str(item.get("intervention_id") or "")
+                for item in engine.registry.entries
+            ],
+            "registry_hash": engine.registry.registry_hash,
+            "final": final_report,
+            "meta": meta_report,
+            "ledger_integrity": ledger_status,
+            "overall": overall,
+        }
+        save_json(engine.paths["reports"] / "full_self_evolution.json", report)
+        return report
 
 
 __all__ = ["EvolutionEngine", "run_experiment", "run_full_self_evolution"]

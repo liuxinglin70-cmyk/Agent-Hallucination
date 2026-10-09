@@ -1334,6 +1334,7 @@ def test_full_self_evolution_resumes_interrupted_cycle_with_checkpoint(
     )
     checkpoint.parent.mkdir(parents=True, exist_ok=True)
     checkpoint.write_text("{}", encoding="utf-8")
+    engine.close()
 
     seen_resume: list[bool] = []
 
@@ -2101,6 +2102,7 @@ def test_cycle_report_declares_whether_evidence_was_active(tmp_path):
     # reaching admission: an engine with no evidence block reports inactive.
     fresh_config = dict(config)
     fresh_config.pop("evidence", None)
+    engine.close()
     inactive = EvolutionEngine(
         fresh_config, backend=MockDetectorBackend(base_predictions={}),
         split=split, mini=True,

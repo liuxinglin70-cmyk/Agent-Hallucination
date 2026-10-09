@@ -609,6 +609,7 @@ def test_a_split_component_root_is_reported_not_silent(tmp_path):
     assert engine.component_store.name == "components"
     assert engine.component_store_warning
     assert str(engine.component_store) in engine.component_store_warning
+    engine.close()
 
     # A configured root moves the store, and the warning names the new path.
     config["component_root"] = str(tmp_path / "parts")
@@ -617,6 +618,7 @@ def test_a_split_component_root_is_reported_not_silent(tmp_path):
     )
     assert engine.component_store == Path(tmp_path / "parts")
     assert str(Path(tmp_path / "parts")) in engine.component_store_warning
+    engine.close()
     # Aligning the two paths is possible, and then there is nothing to report.
     config["archive"] = {"on": "off", "root": str(tmp_path / "parts")}
     aligned = EvolutionEngine(
@@ -624,6 +626,7 @@ def test_a_split_component_root_is_reported_not_silent(tmp_path):
     )
     assert aligned.component_store == aligned.archive_root
     assert aligned.component_store_warning == ""
+    aligned.close()
 
 
 # ==========================================================================

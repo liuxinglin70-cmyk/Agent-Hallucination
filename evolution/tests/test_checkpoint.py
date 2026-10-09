@@ -117,6 +117,7 @@ def test_cycle_resume_keeps_proposals_and_completed_arms(tmp_path, monkeypatch):
     completed_paths = list((tmp_path / "work" / "checkpoints").rglob("arms/*/*.json"))
     assert completed_paths
     original_observations = {str(p): p.read_bytes() for p in completed_paths}
+    engine.close()
     engine = EvolutionEngine(config, backend=MockDetectorBackend(), split=split,
                              mini=True, proposer=Proposer())
     report = engine.run_cycle(1, resume=True)
@@ -175,6 +176,7 @@ def test_resume_after_committed_admission_reverts_its_own_write(tmp_path):
         engine.run_cycle(1)
     # The interrupted run really did commit its admission.
     assert [e["intervention_id"] for e in engine.registry.entries] == ["IV-1-001"]
+    engine.close()
 
     resumed = _resume_engine(
         tmp_path, config, split,
@@ -250,6 +252,7 @@ def test_resume_after_measurement_reuses_journaled_observations(tmp_path):
         for path in journal.rglob("arms/*/*.json")
     }
     assert journaled_cases, "the first attempt must have journaled observations"
+    engine.close()
 
     resumed = _resume_engine(
         tmp_path, config, split, counting_backend(resume_calls),
@@ -312,6 +315,7 @@ def test_resume_refuses_when_cycle_is_complete_but_registry_differs(tmp_path):
     engine.registry.restore(
         make_registry([extra]), reason="test divergence",
     )
+    engine.close()
     resumed = _resume_engine(
         tmp_path, config, split,
         MockDetectorBackend(base_predictions=base, overrides=overrides),
