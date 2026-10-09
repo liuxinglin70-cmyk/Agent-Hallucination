@@ -64,11 +64,17 @@ class MeasurementSet:
     cases: list[str]
     digest: str
     policy: str
-    excluded: list[str]
+    excluded_mini_split: list[str]
+    excluded_unlabeled: list[str]
     gold_positive: int | None
     gold_negative: int | None
     source: Path
     parent_manifest_digest: str = ""
+    manifest_digest: str = ""
+
+    @property
+    def excluded(self) -> list[str]:
+        return [*self.excluded_mini_split, *self.excluded_unlabeled]
 
     @property
     def size(self) -> int:
@@ -89,11 +95,28 @@ class MeasurementSet:
         complete = len(selected) == len(self.cases)
         return MeasurementSet(
             cases=list(selected), digest=case_list_digest(selected),
-            policy=self.policy, excluded=list(self.excluded),
+            policy=self.policy, excluded_mini_split=list(self.excluded_mini_split),
+            excluded_unlabeled=list(self.excluded_unlabeled),
             gold_positive=self.gold_positive if complete else None if selected else 0,
             gold_negative=self.gold_negative if complete else None if selected else 0,
             source=self.source, parent_manifest_digest=self.parent_manifest_digest,
+            manifest_digest=self.manifest_digest,
         )
+
+    def to_manifest(self, *, gold: Mapping[str, bool] | None = None) -> dict[str, Any]:
+        positive, negative = self.gold_positive, self.gold_negative
+        if gold is not None:
+            if set(gold) != set(self.cases) or any(type(value) is not bool for value in gold.values()):
+                raise ValueError("exported gold must cover exactly the selected cases with boolean labels")
+            positive, negative = sum(gold.values()), len(gold) - sum(gold.values())
+        payload = {"schema_version": MEASUREMENT_SCHEMA, "policy": self.policy,
+                   "cases": list(self.cases), "cases_digest": self.digest,
+                   "gold_positive": positive, "gold_negative": negative,
+                   "excluded_mini_split": list(self.excluded_mini_split),
+                   "excluded_unlabeled": list(self.excluded_unlabeled),
+                   "parent_manifest_digest": self.parent_manifest_digest}
+        _measurement(payload, self.source)
+        return payload
 
     def stratification(self, count: int | None = None) -> dict[str, Any]:
         """Source and polarity coverage of a prefix, for the report.
@@ -151,6 +174,7 @@ class ExperimentPlan:
                 "cases": self.measurement.size,
                 "digest": self.measurement.digest,
                 "parent_manifest_digest": self.measurement.parent_manifest_digest,
+                "manifest_digest": self.measurement.manifest_digest,
                 "policy": self.measurement.policy,
                 "gold_positive": self.measurement.gold_positive,
                 "gold_negative": self.measurement.gold_negative,
@@ -216,6 +240,10 @@ def load_measurement(path: str | Path | None = DEFAULT_MEASUREMENT) -> Measureme
     if not path.is_file():
         raise FileNotFoundError(f"measurement manifest not found: {path}; pass --measurement <manifest.json>")
     payload = _read_json(path)
+    return _measurement(payload, path)
+
+
+def _measurement(payload: Any, path: Path) -> MeasurementSet:
     if not isinstance(payload, Mapping) or payload.get("schema_version") != MEASUREMENT_SCHEMA:
         raise ValueError("measurement manifest schema is unsupported")
     cases = _case_list(payload.get("cases"), "measurement cases")
@@ -240,13 +268,18 @@ def load_measurement(path: str | Path | None = DEFAULT_MEASUREMENT) -> Measureme
         if not isinstance(counts, Mapping) or any(type(counts.get(key)) is not int or counts[key] != value
                                                   for key, value in expected.items()):
             raise ValueError("measurement manifest counts differ from its declared sets")
+    manifest_digest = digest(payload)
+    parent_digest = payload.get("parent_manifest_digest", manifest_digest)
+    if (not isinstance(parent_digest, str) or len(parent_digest) != 64
+            or any(character not in "0123456789abcdef" for character in parent_digest)):
+        raise ValueError("measurement parent_manifest_digest must be a SHA-256 digest")
     return MeasurementSet(
         cases=cases,
         digest=case_list_digest(cases),
         policy=str(payload.get("policy") or ""),
-        excluded=[*excluded, *unlabeled],
+        excluded_mini_split=excluded, excluded_unlabeled=unlabeled,
         gold_positive=payload["gold_positive"], gold_negative=payload["gold_negative"],
-        source=path, parent_manifest_digest=digest(payload),
+        source=path, parent_manifest_digest=parent_digest, manifest_digest=manifest_digest,
     )
 
 

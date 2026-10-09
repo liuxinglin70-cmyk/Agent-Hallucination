@@ -63,3 +63,32 @@ def test_explicit_missing_plan_does_not_use_defaults(tmp_path):
     measurement = write(tmp_path, manifest())
     with pytest.raises(FileNotFoundError, match="missing-plan"):
         load_plan(plan_path=tmp_path / "missing-plan.json", measurement_path=measurement)
+
+
+def test_child_export_preserves_exclusion_roles_and_binds_its_own_content(tmp_path):
+    payload = manifest(excluded_unlabeled=["B/004.json"])
+    full = load_measurement(write(tmp_path, payload))
+    child = full.prefix(1)
+    exported = child.to_manifest(gold={child.cases[0]: False})
+    output = tmp_path / "child.json"
+    output.write_text(json.dumps(exported), encoding="utf-8")
+    loaded = load_measurement(output)
+    assert loaded.excluded_mini_split == ["A/003.json"]
+    assert loaded.excluded_unlabeled == ["B/004.json"]
+    assert loaded.parent_manifest_digest == full.manifest_digest
+    assert loaded.gold_positive == 0 and loaded.gold_negative == 1
+    exported["policy"] = "another sampling rule"
+    output.write_text(json.dumps(exported), encoding="utf-8")
+    changed = load_measurement(output)
+    assert changed.manifest_digest != loaded.manifest_digest
+    assert changed.parent_manifest_digest == loaded.parent_manifest_digest
+    child.excluded_mini_split.clear()
+    child.excluded_unlabeled.clear()
+    assert full.excluded == ["A/003.json", "B/004.json"]
+
+
+@pytest.mark.parametrize("gold", [None, {}, {"A/001.json": None}, {"A/001.json": 1}, {"A/001.json": False, "extra": True}])
+def test_export_requires_known_exact_label_counts(tmp_path, gold):
+    child = load_measurement(write(tmp_path, manifest())).prefix(1)
+    with pytest.raises(ValueError):
+        child.to_manifest(gold=gold)

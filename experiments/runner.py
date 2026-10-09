@@ -174,6 +174,7 @@ def run_measurement_stage(
     report["arm_role"] = plan.arm(arm)["role"]
     report["registry_digest"] = digest(resolved)
     report["selection"] = {"parent_manifest_digest": selection.parent_manifest_digest,
+                           "manifest_digest": selection.manifest_digest,
                            "selected_cases_digest": selection.digest, "size": selection.size,
                            "gold_positive": selection.gold_positive, "gold_negative": selection.gold_negative}
     if report_path is not None:

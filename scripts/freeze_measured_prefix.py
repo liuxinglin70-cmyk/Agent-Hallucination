@@ -20,8 +20,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from experiments.snapshot import run_snapshot  # noqa: E402
-from experiments.plan import measured_prefix  # noqa: E402
+from experiments.plan import load_measurement, measured_prefix  # noqa: E402
 from detector.result import prediction_state  # noqa: E402
+from detector.runtime import atomic_json, exclusive_writer  # noqa: E402
+from evolution.splits import load_gold  # noqa: E402
+
+DEFAULT_DATASET_ROOT = ROOT / "datasets/raw/agenthallu/AgentHallu"
 
 
 def completed_prefix(
@@ -85,46 +89,43 @@ def main(argv: list[str] | None = None) -> int:
         "--order", default=str(ROOT / "datasets/protocols/measurement_v1.json"),
     )
     parser.add_argument("--out", default=None)
+    parser.add_argument("--dataset-root", default=str(DEFAULT_DATASET_ROOT),
+                        help="corpus used to count labels in the exported prefix")
     parser.add_argument(
         "--min-cases", type=int, default=0,
         help="refuse to write a prefix shorter than this",
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
-
-    order = [
-        str(case)
-        for case in json.loads(
-            Path(args.order).read_text(encoding="utf-8-sig")
-        )["cases"]
-    ]
+    if args.min_cases < 0:
+        parser.error("--min-cases must be nonnegative")
+    try:
+        measurement = load_measurement(args.order)
+    except (ValueError, OSError) as exc:
+        parser.error(str(exc))
+    order = measurement.cases
     baselines = [Path(item) for item in args.baseline]
     prefix, detail = common_prefix(baselines=baselines, order=order)
     if len(prefix) < args.min_cases:
-        raise SystemExit(
+        parser.error(
             f"the arms share only {len(prefix)} completed case(s), below "
             f"--min-cases {args.min_cases}; nothing written"
         )
     if args.out and not args.dry_run:
-        out = Path(args.out)
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(
-            json.dumps({
-                "schema_version": "detector.measurement_manifest.v1",
-                "policy": (
-                    "The prefix of the pre-registered order that every arm "
-                    "completed. Derived from authoritative measurement coverage, never from a "
-                    "verdict, so the arms are paired over the same cases "
-                    "without anyone choosing them."
-                ),
-                "derived_from": [str(item) for item in baselines],
-                "order": str(args.order),
-                "prefix_size": len(prefix),
-                "scheduling": detail,
-                "cases": prefix,
-            }, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        out = Path(args.out).resolve()
+        if any(out.is_relative_to(path.resolve()) for path in [*baselines, Path(args.dataset_root)]):
+            parser.error("prefix output must be outside run roots and the raw corpus")
+        try:
+            selected = measurement.select(prefix)
+            payload = selected.to_manifest(gold={case: load_gold(args.dataset_root, case) for case in prefix})
+            payload.update(derived_from=[str(path) for path in baselines],
+                           order=str(args.order), scheduling=detail)
+            with exclusive_writer(out.parent):
+                if out.exists():
+                    raise ValueError("prefix output already exists; frozen evidence cannot be replaced")
+                atomic_json(out, payload)
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
     print(json.dumps({
         "prefix_size": len(prefix),
         "order_size": len(order),

@@ -64,3 +64,5 @@ artifacts/    本地输出和缓存，不入 Git
 ```
 
 依赖方向：evolution 和 experiments 使用 detector；detector 不依赖 evolution。新输出统一写 artifacts，长期结论归入实验日志。旧 reports/output 和分散文档从版本库移除；必要回放材料作为测试夹具保留。
+
+冻结前缀时，`scripts/freeze_measured_prefix.py --dataset-root <corpus>` 从实际标签核算导出计数；文件保留案例摘要、父身份与排除角色，可直接作为 `--measurement` 输入。空样本、未知标签、覆盖既有文件及写入运行目录或原始语料目录均拒绝。
