@@ -21,7 +21,7 @@ from typing import Any, Mapping, Sequence
 
 from detector.dataset import load_case
 from detector.result import prediction_state
-from detector.runner import safe_case_id
+from detector.runner import safe_case_id, validate_case_commit
 from detector.runtime import contained_path, validate_path_id
 
 
@@ -127,6 +127,8 @@ def evaluate_run(
             })
             continue
         result = json.loads(result_path.read_text(encoding="utf-8-sig"))
+        if "case_commit" in result:
+            validate_case_commit(result, run_id=run_id, case_id=case_id)
         # Two readings of one envelope, kept apart on purpose.
         #
         # ``prediction`` is what the accuracy line may count: only an

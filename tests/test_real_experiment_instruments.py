@@ -134,9 +134,6 @@ def _write_case(run_root: Path, case: str, *, state: str, authoritative: bool = 
     (case_dir / "result.json").write_text(
         json.dumps(result), encoding="utf-8",
     )
-    (case_dir / "elapsed_seconds.json").write_text(
-        json.dumps({"elapsed_seconds": 1.0}), encoding="utf-8",
-    )
 
 
 def _make_arm(root: Path, cases: list[str], verdicts: dict[str, str]) -> Path:

@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import copy
+import math
 from pathlib import Path
 import threading
 import sys
@@ -74,6 +75,7 @@ from detector.runtime import (
 DEFAULT_RUNS_ROOT = Path("artifacts/detector/runs")
 RUN_SCHEMA = "detector.run_manifest.v3"
 SUMMARY_SCHEMA = "detector.run_summary.v3"
+CASE_COMMIT_SCHEMA = "detector.case_commit.v1"
 
 
 def new_run_id(prefix: str = "detector") -> str:
@@ -194,31 +196,57 @@ def record_case(
     elapsed_seconds: float,
     attempt_id: str | None = None,
 ) -> Path:
-    """Write one completed attempt; the canonical row is the last completed one.
-
-    ``attempts/<attempt_id>/`` is written first and never overwritten, so a
-    re-run keeps the earlier measurement instead of replacing the evidence for
-    what this case previously produced. ``result.json`` beside it is the
-    reader's path and always holds a *completed* attempt.
-    """
+    """Commit one immutable input/result/timing snapshot and its canonical copy."""
     validate_path_id(run_id, nested=False)
     if attempt_id is not None:
         validate_path_id(attempt_id, nested=False)
     case_dir = contained_path(runs_root, run_id, "cases", safe_case_id(case_id))
-    _write_json(case_dir / "input.json", input_record)
-    if attempt_id:
+    if result.get("case_id") != case_id or "case_commit" in result:
+        raise ValueError("case result identity differs or already contains a commit")
+    if (type(elapsed_seconds) not in (int, float) or not math.isfinite(elapsed_seconds)
+            or elapsed_seconds < 0):
+        raise ValueError("case elapsed_seconds must be finite and nonnegative")
+    with exclusive_writer(case_dir):
+        attempt_id = attempt_id or _attempt_id(_previous_attempts(case_dir) + 1)
         attempt_dir = contained_path(case_dir, "attempts", attempt_id)
-        _write_json(attempt_dir / "result.json", result)
-        (attempt_dir / "elapsed_seconds.json").write_text(
-            json.dumps({"elapsed_seconds": elapsed_seconds, "attempt_id": attempt_id}) + "\n",
-            encoding="utf-8",
-        )
-    _write_json(case_dir / "result.json", result)
-    (case_dir / "elapsed_seconds.json").write_text(
-        json.dumps({"elapsed_seconds": elapsed_seconds, "attempt_id": attempt_id}) + "\n",
-        encoding="utf-8",
-    )
+        if (attempt_dir / "result.json").exists():
+            raise FileExistsError(f"completed case attempt is immutable: {attempt_dir}")
+        commit = {"schema_version": CASE_COMMIT_SCHEMA, "run_id": run_id,
+                  "case_id": case_id, "attempt_id": attempt_id,
+                  "input_record": copy.deepcopy(dict(input_record)), "input_digest": digest(input_record),
+                  "elapsed_seconds": elapsed_seconds, "result_digest": digest(result)}
+        commit["commit_digest"] = digest(commit)
+        payload = {**copy.deepcopy(dict(result)), "case_commit": commit}
+        _write_json(attempt_dir / "result.json", payload)
+        _write_json(case_dir / "result.json", payload)
     return case_dir
+
+
+def validate_case_commit(result: Mapping[str, Any], *, run_id: str, case_id: str) -> Mapping[str, Any]:
+    commit = result.get("case_commit")
+    if not isinstance(commit, Mapping) or commit.get("schema_version") != CASE_COMMIT_SCHEMA:
+        raise ValueError("case result lacks a supported commit")
+    if result.get("schema_version") != RESULT_SCHEMA or not isinstance(commit.get("input_record"), Mapping):
+        raise ValueError("case commit input/result schema is invalid")
+    if commit.get("run_id") != run_id or commit.get("case_id") != case_id or result.get("case_id") != case_id:
+        raise ValueError("case commit identity differs from its run/case")
+    validate_path_id(commit.get("attempt_id"), nested=False)
+    elapsed = commit.get("elapsed_seconds")
+    if type(elapsed) not in (int, float) or not math.isfinite(elapsed) or elapsed < 0:
+        raise ValueError("case commit timing is invalid")
+    if (commit.get("commit_digest") != digest({k: v for k, v in commit.items() if k != "commit_digest"})
+            or commit.get("result_digest") != digest({k: v for k, v in result.items() if k != "case_commit"})
+            or commit.get("input_digest") != digest(commit.get("input_record"))):
+        raise ValueError("case commit digest differs from its content")
+    return commit
+
+
+def case_elapsed(result: Mapping[str, Any]) -> float | None:
+    commit = result.get("case_commit")
+    execution = result.get("execution")
+    source = commit if isinstance(commit, Mapping) else execution if isinstance(execution, Mapping) else {}
+    value = source.get("elapsed_seconds")
+    return float(value) if type(value) in (int, float) and math.isfinite(value) and value >= 0 else None
 
 
 def _attempt_id(index: int) -> str:
@@ -420,6 +448,9 @@ def run_batch(
                 reusable = _cached_envelope_is_reusable(result, retry_unresolved=retry_unresolved)
                 if (result.get("provenance") or {}).get("execution_identity") != execution_identity:
                     raise ValueError(f"cached result execution identity mismatch: {case_id}")
+                commit = validate_case_commit(result, run_id=run_id, case_id=case_id)
+                if commit["input_digest"] != digest(record):
+                    raise ValueError(f"cached result input digest mismatch: {case_id}")
                 if reusable:
                     row = register({"case": case_id, "result": result, "elapsed_seconds": 0.0,
                                     "source": "cached"})
@@ -446,7 +477,6 @@ def run_batch(
                 _write_json(case_dir / "attempts" / case_attempt_id / "case_attempts"
                             / f"{attempt['attempt']:03d}" / "attempt.json", attempt)
 
-            _write_json(case_dir / "input.json", record)
             result = detect_with_transport_retry(
                 detector, record, case_id=case_id,
                 interventions=interventions,
@@ -578,6 +608,7 @@ def _summarize(
         "run_id": run_id,
         "cases": list(cases),
         "completed": len(by_case) - len(explicit_not_started),
+        "case_sources": {case: row.get("source", "unknown") for case, row in by_case.items()},
         "state_counts": {
             state: states.get(state, 0)
             for state in ("verified_error", "verified_clean", "unresolved")

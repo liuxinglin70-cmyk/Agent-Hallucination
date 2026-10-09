@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from detector.config import load_config
-from detector.runner import safe_case_id
+from detector.runner import case_elapsed, safe_case_id
 
 DEFAULT_PROTOCOL = ROOT / "datasets" / "protocols" / "real_path_check.json"
 
@@ -65,12 +65,6 @@ def _case_metrics(run_root: Path, run_id: str, case_id: str) -> dict:
     if not result_path.exists():
         return row
     result = json.loads(result_path.read_text(encoding="utf-8-sig"))
-    elapsed_path = case_dir / "elapsed_seconds.json"
-    elapsed = None
-    if elapsed_path.exists():
-        elapsed = json.loads(
-            elapsed_path.read_text(encoding="utf-8")
-        ).get("elapsed_seconds")
     tokens = 0
     provider_models = set()
     for provider in (result.get("providers") or {}).values():
@@ -85,7 +79,7 @@ def _case_metrics(run_root: Path, run_id: str, case_id: str) -> dict:
         "authority": result.get("decision_authority"),
         "responsible_step": result.get("responsible_step"),
         "runtime_valid": result.get("runtime_valid"),
-        "elapsed_seconds": elapsed,
+        "elapsed_seconds": case_elapsed(result),
         "tokens": tokens,
         "stages": {
             key: value.get("state")

@@ -5,10 +5,14 @@ from __future__ import annotations
 
 import json
 import time
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from detector.runner import case_elapsed
 
 TREES = [
     ("nf_roll1", ROOT / "artifacts/noise_floor/runs/nf_roll1", 40),
@@ -38,16 +42,7 @@ def main() -> int:
             except ValueError:
                 continue
             states[str(result.get("state"))] = states.get(str(result.get("state")), 0) + 1
-            stamp = d / "elapsed_seconds.json"
-            if stamp.is_file():
-                try:
-                    elapsed += float(
-                        json.loads(stamp.read_text(encoding="utf-8-sig")).get(
-                            "elapsed_seconds"
-                        ) or 0
-                    )
-                except ValueError:
-                    pass
+            elapsed += case_elapsed(result) or 0
         share = f"/{target}" if target else ""
         idle = (time.time() - newest) / 60
         print(

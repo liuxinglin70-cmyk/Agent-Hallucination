@@ -185,10 +185,7 @@ def test_run_batch_writes_run_tree(tmp_path, monkeypatch):
         .read_text(encoding="utf-8")
     )
     assert result["state"] == "verified_clean"
-    input_record = json.loads(
-        (tmp_path / "runs" / "r" / "cases" / "BFCL__001.json" / "input.json")
-        .read_text(encoding="utf-8")
-    )
+    input_record = result["case_commit"]["input_record"]
     assert set(input_record) == {"question", "history"}
 
 

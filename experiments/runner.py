@@ -31,7 +31,7 @@ from detector.config import load_config, validate_config
 from detector.interventions import build_intervention_registry, load_intervention_registry, validate_registry
 from detector.identity import digest
 from detector.result import prediction_state
-from detector.runner import new_run_id, run_batch, safe_case_id
+from detector.runner import case_elapsed, new_run_id, run_batch, safe_case_id, validate_case_commit
 from detector.runtime import RunControl, contained_path, exclusive_writer, validate_path_id
 
 from experiments.plan import ExperimentPlan
@@ -106,19 +106,13 @@ def _load_rows(runs_root: Path, run_id: str, cases: Sequence[str]) -> list[dict[
         result_path = case_dir / "result.json"
         if not result_path.is_file():
             continue
-        stamp = case_dir / "elapsed_seconds.json"
-        elapsed = None
-        if stamp.is_file():
-            try:
-                elapsed = json.loads(stamp.read_text(encoding="utf-8-sig")).get(
-                    "elapsed_seconds"
-                )
-            except ValueError:
-                elapsed = None
+        result = json.loads(result_path.read_text(encoding="utf-8-sig"))
+        if "case_commit" in result:
+            validate_case_commit(result, run_id=run_id, case_id=case)
         rows.append({
             "case": case,
-            "result": json.loads(result_path.read_text(encoding="utf-8-sig")),
-            "elapsed_seconds": elapsed,
+            "result": result,
+            "elapsed_seconds": case_elapsed(result),
         })
     return rows
 
@@ -172,18 +166,22 @@ def run_measurement_stage(
             deadline_seconds=deadline_seconds,
             control=RunControl(max_provider_inflight=max(1, int(workers))),
         )
+        rows = _load_rows(runs_root, run_id, requested)
+        for row in rows:
+            row["source"] = (batch.get("case_sources") or {}).get(row["case"], "unknown")
+            if row["source"] == "cached":
+                row["elapsed_seconds"] = 0
+        measured = [
+            str(row["case"]) for row in rows
+            if prediction_state(row.get("result") or {}) is not None
+        ]
+        evaluation = None
+        if measured:
+            evaluation = evaluate_run(
+                runs_root=runs_root, run_id=run_id,
+                dataset_root=dataset_root, cases=measured,
+            )
     wall = time.monotonic() - started
-    rows = _load_rows(runs_root, run_id, requested)
-    measured = [
-        str(row["case"]) for row in rows
-        if prediction_state(row.get("result") or {}) is not None
-    ]
-    evaluation = None
-    if measured:
-        evaluation = evaluate_run(
-            runs_root=runs_root, run_id=run_id,
-            dataset_root=dataset_root, cases=measured,
-        )
     report = summarize_stage(
         stage=stage, arm=arm, requested=requested, batch_summary=batch,
         rows=rows, evaluation=evaluation, wall_seconds=round(wall, 1),

@@ -63,7 +63,7 @@ from detector.config import load_config
 from detector.dataset import load_case
 from detector.evaluation import binary_metrics, evaluate_run
 from detector.packet import build_packet, validate_record
-from detector.runner import run_batch, safe_case_id
+from detector.runner import case_elapsed, run_batch, safe_case_id
 
 REPORT_SCHEMA = "detector.baseline_report.v1"
 DEFAULT_MANIFEST = ROOT / "datasets" / "protocols" / "development_exposure.json"
@@ -197,17 +197,14 @@ def preflight_cases(
 
 
 def _case_elapsed(runs_root: Path, run_id: str, case: str) -> float | None:
-    path = (
-        runs_root / run_id / "cases" / safe_case_id(case) / "elapsed_seconds.json"
-    )
+    path = runs_root / run_id / "cases" / safe_case_id(case) / "result.json"
     if not path.exists():
         return None
     try:
         payload = json.loads(path.read_text(encoding="utf-8-sig"))
     except ValueError:
         return None
-    value = payload.get("elapsed_seconds")
-    return float(value) if isinstance(value, (int, float)) else None
+    return case_elapsed(payload)
 
 
 def _case_usage(runs_root: Path, run_id: str, case: str) -> dict[str, Any] | None:
