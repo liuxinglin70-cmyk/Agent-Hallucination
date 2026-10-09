@@ -96,6 +96,10 @@ class RunSnapshot:
         if not self.same_execution(baseline, roll, cases):
             raise ValueError("baseline rolls have different recorded execution inputs")
 
+    def scored_rows(self, arm: str, rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+        evidence = {row["case"]: row["result"] for row in self.rows[arm]}
+        return [{**row, "result": evidence.get(row["case"], {})} for row in rows]
+
 
 @contextmanager
 def run_snapshot(roots: Mapping[str, str | Path], cases: Sequence[str] | None = None) -> Iterator[RunSnapshot]:

@@ -87,7 +87,9 @@ def endpoint(
         if any(root is None for root in snapshot.roots.values()):
             raise ValueError("paired endpoint requires existing run roots")
         base_a = score(baseline, dataset_root, snapshot.manifests["baseline"]["cases"])
+        base_a["rows"] = snapshot.scored_rows("baseline", base_a["rows"])
         deployed_scored = score(deployed, dataset_root, snapshot.manifests["deployed"]["cases"])
+        deployed_scored["rows"] = snapshot.scored_rows("deployed", deployed_scored["rows"])
         cases = [str(row["case"]) for row in deployed_scored["rows"]]
         missing = deployed_scored["missing_cases"]
         if missing:
@@ -98,6 +100,7 @@ def endpoint(
         base_b = None
         if baseline_roll is not None:
             base_b = score(baseline_roll, dataset_root, snapshot.manifests["baseline_roll"]["cases"])
+            base_b["rows"] = snapshot.scored_rows("baseline_roll", base_b["rows"])
             snapshot.require_independent_roll("baseline", "baseline_roll", cases)
 
         base_rows = {str(row["case"]): row for row in base_a["rows"]}

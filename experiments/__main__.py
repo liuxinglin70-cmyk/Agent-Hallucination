@@ -104,6 +104,7 @@ def cmd_paired(args: argparse.Namespace) -> int:
                 runs_root=runs_root, run_id=arm, dataset_root=args.dataset_root,
                 cases=sample["common"],
             )
+            scored[arm]["rows"] = snapshot.scored_rows(arm, scored[arm]["rows"])
         same_execution = snapshot.same_execution(arms[0], arms[1], sample["common"])
         if roll is not None:
             snapshot.require_independent_roll(arms[0], roll, sample["common"])

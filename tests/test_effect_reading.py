@@ -27,14 +27,20 @@ def readings(tmp_path, monkeypatch):
     plan = load_plan(measurement_path=measurement)
     config = load_config(require_credentials=False)
     predictions = {}
+    bad_health = set()
     class FakeDetector:
         def __init__(self, config):
             self.config = deepcopy(config)
         def detect(self, record, *, case_id, **kwargs):
-            return _result(case_id, state="verified_error" if predictions[case_id] else "verified_clean")
+            result = _result(case_id, state="verified_error" if predictions[case_id] else "verified_clean")
+            if case_id in bad_health:
+                result["stage_status"]["causal_audit"] = {"state": "provider_error"}
+            return result
     monkeypatch.setattr("detector.runner.Detector", FakeDetector)
-    def measure(arm, values, changed=False):
+    def measure(arm, values, changed=False, health_cases=()):
         predictions.update(dict(zip(cases, values)))
+        bad_health.clear()
+        bad_health.update(health_cases)
         cfg = deepcopy(config)
         if changed:
             cfg["causal_audit"]["mode"] = "shadow"
@@ -45,16 +51,17 @@ def readings(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("entry", ["endpoint", "paired"])
-@pytest.mark.parametrize("scenario", ["unstable_only", "unmeasured", "same_root", "four", "five", "all_unstable"])
+@pytest.mark.parametrize("scenario", ["unstable_only", "unmeasured", "same_root", "four", "five", "all_unstable", "health"])
 def test_effect_requires_independent_stable_significant_evidence(readings, monkeypatch, capsys, entry, scenario):
     cases, data, runs, plan, measure = readings
     baseline = measure("g0", [True] * 6)
-    changed_n = {"four": 4, "five": 5, "all_unstable": 6}.get(scenario, 1)
+    changed_n = {"four": 4, "five": 5, "health": 5, "all_unstable": 6}.get(scenario, 1)
     deployed = measure("g1", [False] * changed_n + [True] * (6 - changed_n), changed=True)
     roll = None
     if scenario != "unmeasured":
         flipped_n = 6 if scenario == "all_unstable" else 1 if scenario == "unstable_only" else 0
-        roll = baseline if scenario == "same_root" else measure("g0_roll2", [False] * flipped_n + [True] * (6 - flipped_n))
+        roll = baseline if scenario == "same_root" else measure("g0_roll2", [False] * flipped_n + [True] * (6 - flipped_n),
+             health_cases=cases[:1] if scenario == "health" else ())
     capsys.readouterr()
     def read():
         if entry == "endpoint":
@@ -76,7 +83,7 @@ def test_effect_requires_independent_stable_significant_evidence(readings, monke
         assert payload["effect_established"] is expected
         if scenario == "unstable_only":
             assert payload["decisive_fixed"] == 0
-        if scenario == "four":
+        if scenario in {"four", "health"}:
             assert payload["mcnemar_one_sided_p"] == 0.0625
         if scenario == "five":
             assert payload["mcnemar_one_sided_p"] == 0.03125
