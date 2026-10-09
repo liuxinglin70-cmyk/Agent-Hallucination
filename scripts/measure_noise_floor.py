@@ -1,42 +1,13 @@
-"""Measure the detector's own jitter from repeated rolls -- offline.
+"""Read measurement jitter from locked independent same-input run snapshots.
 
-This is the calibration tool for the noise floor. The detector is not
-deterministic at temperature 0: in the RSI pilot ``BFCL/008`` and ``BFCL/024``
-read 6/2 across 8 repeats of one configuration, same packet hash, same
-interventions hash. A framework whose admission can rest on one case has to
-know that number before its readings can be believed, and only a real set of
-repeats can produce it -- ``evolution.metrics.flipped_cases`` gives the same
-reading from the cycle's own two rolls, which is enough to *flag* a case but
-not enough to *quantify* one that only disagrees once in eight.
+Roll mode validates current manifests and case commits before comparing
+terminal readings, health, coverage and model routes. Cycle mode reads a
+published historical report; an absent noise-floor field remains unknown.
+No mode executes a provider. Active writers must release ownership before
+run snapshots can be read.
 
-Two modes, both read-only:
-
-    # 1. N independent rolls of one configuration -> per-case tallies
-    python scripts/measure_noise_floor.py rolls \
-        artifacts/run_rep01 artifacts/run_rep02 artifacts/run_rep03
-
-    # 2. what one evolution cycle already published, from its report
-    python scripts/measure_noise_floor.py cycle artifacts/.../cycle001.json
-
-A "roll" is a detector run tree -- a directory holding ``cases/<case>/result.json``,
-which is what the detector's own run writer produces (see
-``artifacts/rsi_pilot_20260919/*/cases``). Rolls must cover the same case set;
-the tool reports a case read by fewer rolls than the rest rather than pooling it
-silently.
-
-Nothing here calls a model service. It reads files that already exist, so it is
-safe to run at any time, including while a real run is in progress -- it opens
-each result file once and never writes.
-
-A run tree carries no gold label, so ``rolls`` mode reports the verdict
-transition table and the flip set but leaves the gold-based quantities
-(``marginal_cases``, ``new_errors``) as ``None``. The cycle's own floor has
-gold, because its control rows come from the evaluation harness that joins
-``gold_map``; ``cycle`` mode reports that reading.
-
-Exit code: 0 always, unless a path cannot be read (then 2). The reading is the
-output, not a verdict, and a caller that wants a gate on it should use the
-numbers in the JSON.
+    python scripts/measure_noise_floor.py rolls artifacts/runs/roll1 artifacts/runs/roll2
+    python scripts/measure_noise_floor.py cycle artifacts/work/cycles/cycle001.json
 """
 
 from __future__ import annotations
@@ -53,6 +24,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from experiments.snapshot import run_snapshot
+from detector.result import prediction_state
 from detector.measurement import measurement_status  # noqa: E402
 from evolution.metrics import (  # noqa: E402
     flipped_cases,
@@ -68,30 +41,22 @@ def read_roll(root: Path, *, case_ids: list[str] | None = None) -> list[dict]:
     was never run is not a case that read "unresolved", and inventing a row for
     it would put a fabricated observation into a jitter measurement.
     """
-    cases_dir = root / "cases"
-    if not cases_dir.is_dir():
-        raise SystemExit(f"no cases directory under {root}")
-    wanted = {str(case) for case in case_ids} if case_ids else None
-    rows: list[dict] = []
-    for path in sorted(cases_dir.iterdir()):
-        if not path.is_dir():
-            continue
-        result_path = path / "result.json"
-        if not result_path.is_file():
-            continue
-        result = json.loads(result_path.read_text(encoding="utf-8-sig"))
-        case_id = str(result.get("case_id") or path.name.replace("__", "/"))
-        if wanted is not None and case_id not in wanted:
-            continue
+    with run_snapshot({"roll": root}, case_ids) as snapshot:
+        if snapshot.roots["roll"] is None:
+            raise ValueError(f"missing run tree: {root}")
+        return _roll_rows(snapshot.rows["roll"])
+
+
+def _roll_rows(observations: list[dict]) -> list[dict]:
+    rows = []
+    for observation in observations:
+        result, case_id = observation["result"], observation["case"]
         status = measurement_status(result)
         route_info = (result.get("execution") or {}).get("model_route") or (result.get("config") or {}).get("judge_route") or "unspecified"
         route_name = route_info.get("model", "unspecified") if isinstance(route_info, Mapping) else str(route_info)
         rows.append({
             "case": case_id,
-            "prediction": {
-                "verified_error": True,
-                "verified_clean": False,
-            }.get(str(result.get("state") or "")),
+            "prediction": prediction_state(result),
             "state": result.get("state"),
             "authority": result.get("decision_authority"),
             "responsible_step": result.get("responsible_step"),
@@ -119,7 +84,16 @@ def report_rolls(roots: list[Path]) -> dict:
       difference in how the runs were built, not a statement about the
       detector, and pooling it into the jitter count would inflate it.
     """
-    rolls = [read_roll(root) for root in roots]
+    names = [str(index) for index in range(len(roots))]
+    with run_snapshot(dict(zip(names, roots))) as snapshot:
+        if any(root is None for root in snapshot.roots.values()):
+            raise ValueError("noise measurement requires existing run roots")
+        if len(set(snapshot.roots.values())) != len(roots):
+            raise ValueError("noise measurement requires independent run roots")
+        for name in names[1:]:
+            common = set(snapshot.manifests[names[0]]["cases"]) & set(snapshot.manifests[name]["cases"])
+            snapshot.require_independent_roll(names[0], name, sorted(common))
+        rolls = [_roll_rows(snapshot.rows[name]) for name in names]
     counts = [len(roll) for roll in rolls]
     reading = repeated_roll_disagreement(rolls)
     one_sided = reading_stable_case_set(rolls)
@@ -389,7 +363,11 @@ def main(argv: list[str] | None = None) -> int:
             if not root.exists():
                 print(f"missing run tree: {root}", file=sys.stderr)
                 return 2
-        payload = report_rolls(roots)
+        try:
+            payload = report_rolls(roots)
+        except (ValueError, OSError) as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
     else:
         path = Path(args.report)
         if not path.is_file():

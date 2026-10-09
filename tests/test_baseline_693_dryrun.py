@@ -419,23 +419,40 @@ def test_token_total_is_flagged_as_a_lower_bound_when_attempts_omit_usage(tmp_pa
     # case of this gap: the total exists, and it is a floor over a stated count.
     assert "attempts_without_usage" in usage
     assert "total_is_lower_bound" in usage
-    if usage["attempts_without_usage"]:
+    if usage["attempts_without_usage"] or usage["usage_unknown_cases"]:
         assert usage["total_is_lower_bound"] is True
         assert "lower bound" in usage["scope"] or "at or above" in usage["scope"]
     else:
         assert usage["total_is_lower_bound"] is False
 
 
-def test_usage_lower_bound_counts_attempts_that_reported_nothing(tmp_path):
+def test_usage_lower_bound_counts_attempts_that_reported_nothing(tmp_path, monkeypatch):
     """The count comes from ``execution.usage_missing_attempts``, per case.
 
     Written against a hand-built run tree rather than the fake: the fake takes
     the branch above, and a field that only ever reads zero would pass while
     measuring nothing.
     """
-    runs = tmp_path / "runs" / "gap" / "cases" / safe_case_id("BFCL/000.json")
-    runs.mkdir(parents=True)
-    (runs / "result.json").write_text(json.dumps({
+    from detector.runner import run_batch, record_case
+    from detector.dataset import load_case
+    from detector.interventions import build_intervention_registry
+    data = tmp_path / "data"
+    case = "BFCL/000.json"
+    path = data / case
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({"question": "q", "history": [{"content": "a"}], "is_hallucination": True}), encoding="utf-8")
+    class FakeDetector:
+        def __init__(self, config):
+            self.config = config
+        def detect(self, record, *, case_id, **kwargs):
+            return _envelope(case_id, state="verified_error", authority="authoritative")
+    monkeypatch.setattr("detector.runner.Detector", FakeDetector)
+    run_batch(runs_root=tmp_path / "runs", run_id="gap", dataset_root=data, cases=[case],
+              config={}, interventions=build_intervention_registry([]), workers=1)
+    result_path = tmp_path / "runs" / "gap" / "cases" / safe_case_id(case) / "result.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result.pop("case_commit")
+    result.update({
         "case_id": "BFCL/000.json",
         "state": "verified_error",
         "execution": {
@@ -449,7 +466,9 @@ def test_usage_lower_bound_counts_attempts_that_reported_nothing(tmp_path):
                                       "completion_tokens": 50,
                                       "total_tokens": 150}},
         },
-    }), encoding="utf-8")
+    })
+    record_case(runs_root=tmp_path / "runs", run_id="gap", case_id=case,
+                input_record=load_case(data, case)[0], result=result, elapsed_seconds=1)
     report = baseline.usage_report(
         runs_root=tmp_path / "runs", run_id="gap", cases=["BFCL/000.json"],
     )

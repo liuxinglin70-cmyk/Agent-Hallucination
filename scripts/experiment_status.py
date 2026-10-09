@@ -13,6 +13,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from detector.runner import case_elapsed
+from detector.runner import safe_case_id
+from detector.runtime import contained_path, exclusive_writer
+from experiments.snapshot import run_snapshot
 
 TREES = [
     ("nf_roll1", ROOT / "artifacts/noise_floor/runs/nf_roll1", 40),
@@ -26,37 +29,29 @@ TREES = [
 
 def main() -> int:
     print(datetime.now(timezone.utc).strftime("%H:%M:%SZ"))
-    for name, root, target in TREES:
-        cases = root / "cases"
-        if not cases.is_dir():
-            continue
-        dirs = [d for d in cases.iterdir() if (d / "result.json").is_file()]
-        if not dirs:
-            continue
-        newest = max(d.stat().st_mtime for d in dirs)
-        states: dict[str, int] = {}
-        elapsed = 0.0
-        for d in dirs:
-            try:
-                result = json.loads((d / "result.json").read_text(encoding="utf-8-sig"))
-            except ValueError:
+    with run_snapshot({name: root for name, root, _ in TREES}) as snapshot:
+        for name, root, target in TREES:
+            rows = snapshot.rows[name]
+            if not rows:
                 continue
-            states[str(result.get("state"))] = states.get(str(result.get("state")), 0) + 1
-            elapsed += case_elapsed(result) or 0
-        share = f"/{target}" if target else ""
-        idle = (time.time() - newest) / 60
-        print(
-            f"  {name:8s} {len(dirs):4d}{share:5s} "
-            f"idle={idle:5.1f}m work={elapsed / 60:7.1f}m "
-            f"{ {k: v for k, v in sorted(states.items())} }"
-        )
+            newest = max(contained_path(root, "cases", safe_case_id(row["case"]), "result.json").stat().st_mtime for row in rows)
+            states: dict[str, int] = {}
+            elapsed = 0.0
+            for row in rows:
+                result = row["result"]
+                states[str(result.get("state"))] = states.get(str(result.get("state")), 0) + 1
+                elapsed += case_elapsed(result) or 0
+            share = f"/{target}" if target else ""
+            idle = (time.time() - newest) / 60
+            print(
+                f"  {name:8s} {len(rows):4d}{share:5s} "
+                f"idle={idle:5.1f}m work={elapsed / 60:7.1f}m "
+                f"{ {k: v for k, v in sorted(states.items())} }"
+            )
     ledger = ROOT / "artifacts/selfevo-real-multigen-20260923/ledger.jsonl"
     if ledger.is_file():
-        events = [
-            json.loads(line)
-            for line in ledger.read_text(encoding="utf-8-sig").splitlines()
-            if line.strip()
-        ]
+        with exclusive_writer(ledger.parent):
+            events = [json.loads(line) for line in ledger.read_text(encoding="utf-8-sig").splitlines() if line.strip()]
         names = [str(e.get("event")) for e in events]
         print(f"  multigen {len(events)} records: {names}")
     return 0

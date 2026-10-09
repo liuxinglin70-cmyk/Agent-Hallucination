@@ -1165,18 +1165,29 @@ def test_noise_floor_block_is_json_serializable(provider_stage):
 # The offline measurement tool
 # ---------------------------------------------------------------------------
 def _write_roll(root: Path, index: int, reads: dict[str, str]) -> Path:
-    """One run tree, shaped exactly like the detector's own run writer."""
-    tree = root / f"rep{index:02d}"
+    from unittest.mock import patch
+    from detector.config import load_config
+    from detector.interventions import build_intervention_registry
+    from detector.runner import run_batch
+    from detector.result import RESULT_SCHEMA
+    dataset = root / "roll_data"
     for case, state in reads.items():
-        case_dir = tree / "cases" / case.replace("/", "__")
-        case_dir.mkdir(parents=True, exist_ok=True)
-        (case_dir / "result.json").write_text(json.dumps({
-            "case_id": case,
-            "state": state,
-            "decision_authority": "authoritative",
-            "responsible_step": 3,
-        }), encoding="utf-8")
-    return tree
+        path = dataset / case
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"question": "q", "history": [{"content": "a"}], "is_hallucination": True}), encoding="utf-8")
+    class FakeDetector:
+        def __init__(self, config):
+            self.config = config
+        def detect(self, record, *, case_id, **kwargs):
+            state = reads[case_id]
+            return {"schema_version": RESULT_SCHEMA, "case_id": case_id, "state": state,
+                    "occurrence_state": state, "incident_occurred": state == "verified_error",
+                    "decision_authority": "authoritative", "runtime_valid": True,
+                    "responsible_step": 3, "stage_status": {}, "proof": {}, "providers": {}}
+    with patch("detector.runner.Detector", FakeDetector):
+        run_batch(dataset_root=dataset, runs_root=root, run_id=f"rep{index:02d}", cases=list(reads),
+                  config=load_config(require_credentials=False), interventions=build_intervention_registry([]), workers=1)
+    return root / f"rep{index:02d}"
 
 
 def test_the_offline_tool_measures_the_six_two_split(tmp_path):

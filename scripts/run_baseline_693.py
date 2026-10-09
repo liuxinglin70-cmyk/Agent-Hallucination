@@ -65,7 +65,8 @@ from detector.evaluation import binary_metrics, evaluate_run
 from detector.measurement import result_usage
 from detector.provider import accumulate_usage
 from detector.packet import build_packet, validate_record
-from detector.runner import case_elapsed, run_batch, safe_case_id
+from detector.runner import run_batch, safe_case_id
+from experiments.snapshot import run_snapshot
 from detector.runtime import contained_path, exclusive_writer, validate_path_id
 
 REPORT_SCHEMA = "detector.baseline_report.v1"
@@ -199,28 +200,6 @@ def preflight_cases(
     }
 
 
-def _case_elapsed(runs_root: Path, run_id: str, case: str) -> float | None:
-    path = runs_root / run_id / "cases" / safe_case_id(case) / "result.json"
-    if not path.exists():
-        return None
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8-sig"))
-    except ValueError:
-        return None
-    return case_elapsed(payload)
-
-
-def _case_usage_reading(runs_root: Path, run_id: str, case: str) -> dict[str, Any]:
-    path = runs_root / run_id / "cases" / safe_case_id(case) / "result.json"
-    if not path.exists():
-        return result_usage({})
-    try:
-        result = json.loads(path.read_text(encoding="utf-8-sig"))
-    except ValueError:
-        return result_usage({})
-    return result_usage(result)
-
-
 def usage_report(
     *,
     runs_root: str | Path,
@@ -228,14 +207,19 @@ def usage_report(
     cases: Sequence[str],
 ) -> dict[str, Any]:
     """Observed counters, with missing and unknown attempt coverage."""
-    runs_root = Path(runs_root)
+    with run_snapshot({"run": contained_path(runs_root, run_id)}, cases) as snapshot:
+        return _usage_report(snapshot.rows["run"], cases)
+
+
+def _usage_report(rows: Sequence[Mapping[str, Any]], cases: Sequence[str]) -> dict[str, Any]:
+    results = {row["case"]: row["result"] for row in rows}
     per_case: list[dict[str, Any]] = []
     total: dict[str, Any] = {}
     missing_attempts = 0
     unknown_cases = 0
     cases_with_missing: list[str] = []
     for case in cases:
-        reading = _case_usage_reading(runs_root, run_id, case)
+        reading = result_usage(results.get(case, {}))
         missing = reading["missing_attempts"]
         unknown_cases += missing is None
         if missing:
@@ -295,12 +279,12 @@ def timing_report(
     slowest: int = 5,
 ) -> dict[str, Any]:
     """Per-case wall clock: the distribution, and the cases that set it."""
-    runs_root = Path(runs_root)
-    measured: list[tuple[str, float]] = []
-    for case in cases:
-        elapsed = _case_elapsed(runs_root, run_id, case)
-        if elapsed is not None:
-            measured.append((case, elapsed))
+    with run_snapshot({"run": contained_path(runs_root, run_id)}, cases) as snapshot:
+        return _timing_report(snapshot.rows["run"], cases, slowest)
+
+
+def _timing_report(rows: Sequence[Mapping[str, Any]], cases: Sequence[str], slowest: int) -> dict[str, Any]:
+    measured = [(row["case"], row["elapsed_seconds"]) for row in rows if row["elapsed_seconds"] is not None]
     values = [elapsed for _case, elapsed in measured]
     ranked = sorted(measured, key=lambda item: (-item[1], item[0]))
     return {
@@ -355,7 +339,7 @@ def build_report(
     anything.
     """
     validate_path_id(run_id, nested=False)
-    with exclusive_writer(contained_path(runs_root, run_id)):
+    with run_snapshot({"run": contained_path(runs_root, run_id)}, cases) as snapshot:
         dataset_root = Path(dataset_root)
         runs_root = Path(runs_root)
         evaluation = evaluate_run(
@@ -366,10 +350,7 @@ def build_report(
         )
         rows = evaluation["rows"]
         metrics = evaluation["metrics"]
-        elapsed = {
-            row["case"]: _case_elapsed(runs_root, run_id, row["case"])
-            for row in rows
-        }
+        elapsed = {row["case"]: row["elapsed_seconds"] for row in snapshot.rows["run"]}
         decorated = [
             {
                 **row,
@@ -434,12 +415,8 @@ def build_report(
                     )
                 },
             },
-            "timing": timing_report(
-                runs_root=runs_root, run_id=run_id, cases=list(cases), slowest=slowest,
-            ),
-            "usage": usage_report(
-                runs_root=runs_root, run_id=run_id, cases=list(cases),
-            ),
+            "timing": _timing_report(snapshot.rows["run"], cases, slowest),
+            "usage": _usage_report(snapshot.rows["run"], cases),
             "errors": evaluation["errors"],
             "degraded_disagreements": evaluation["degraded_disagreements"],
             "rows": decorated,

@@ -1,39 +1,12 @@
 #!/usr/bin/env python
-"""The primary endpoint of the large-scale experiment, computed read-only.
+"""Read the paired decisive effect from locked, identity-bound run evidence.
 
-Answers one question with two run trees and no new metric code: on the
-pre-registered measurement prefix, does the deployed registry produce more
-*decisive* corrections than it breaks, relative to the empty registry?
+An independent same-input baseline roll identifies unstable cases. The effect
+uses the stable subset and the registered one-sided significance threshold;
+without a stability measurement the conclusion remains unknown. Full paired
+counts remain available separately. Gold comes from the corpus.
 
-Why ``decisive_fixed``/``decisive_broken`` and not an accuracy difference.
-§32.5 found the terminal verdict reading ``correctness_improved``, which counts
-``unresolved -> correct`` as an improvement -- so a registry that only stopped
-abstaining on five cases scored ``overall = pass`` (p=0.03125), while a
-regression where four true positives all became unresolved left the test
-insensitive (mcnemar_p = 1.0). The fix restricts the terminal verdict to
-decisive flips and requires at least one. This script reads that same pair, so
-the experiment's headline number is the one the framework's own fix defines.
-
-Three inputs, because a single baseline read cannot separate a real effect from
-jitter:
-
-* ``--baseline`` and ``--baseline-roll`` are two independent rolls of the *same*
-  empty-registry configuration. Cases those two disagree on are the
-  instrument's own noise, and they are excluded from the endpoint's numerator
-  and denominator while still being reported.
-* ``--deployed`` is the same prefix under the active registry.
-
-Both arms must cover the same case set. A deployed arm covering fewer cases
-would silently shrink its own denominator, so a mismatch is an error, not a
-warning. The gold is loaded from the corpus, so no run tree can assert its own
-labels.
-
-    python scripts/paired_endpoint.py \
-        --baseline artifacts/baseline/runs/g0 \
-        --baseline-roll artifacts/baseline/runs/g0_roll2 \
-        --deployed artifacts/baseline/runs/g1 \
-        --dataset-root datasets/raw/agenthallu/AgentHallu \
-        --json artifacts/<date>_real_experiment/endpoint.json
+    python scripts/paired_endpoint.py --baseline artifacts/runs/g0 --baseline-roll artifacts/runs/g0_roll2 --deployed artifacts/runs/g1
 """
 
 from __future__ import annotations

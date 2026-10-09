@@ -26,7 +26,9 @@ sys.path.insert(0, str(ROOT))
 
 from detector.config import load_config
 from detector.measurement import result_usage
-from detector.runner import case_elapsed, safe_case_id
+from detector.runner import case_elapsed
+from detector.runtime import contained_path
+from experiments.snapshot import run_snapshot
 
 DEFAULT_PROTOCOL = ROOT / "datasets" / "protocols" / "real_path_check.json"
 
@@ -50,9 +52,13 @@ def _source_manifest() -> dict[str, str]:
     }
 
 
-def _case_metrics(run_root: Path, run_id: str, case_id: str) -> dict:
-    case_dir = Path(run_root) / run_id / "cases" / safe_case_id(case_id)
-    result_path = case_dir / "result.json"
+def read_metrics(run_root: Path, run_id: str, cases: list[str]) -> list[dict]:
+    with run_snapshot({"run": contained_path(run_root, run_id)}, cases) as snapshot:
+        results = {row["case"]: row["result"] for row in snapshot.rows["run"]}
+        return [_case_metrics(case, results.get(case)) for case in cases]
+
+
+def _case_metrics(case_id: str, result: dict | None) -> dict:
     row: dict = {
         "case": case_id,
         "state": "missing_result",
@@ -63,9 +69,8 @@ def _case_metrics(run_root: Path, run_id: str, case_id: str) -> dict:
         "stages": {},
         "model": None,
     }
-    if not result_path.exists():
+    if result is None:
         return row
-    result = json.loads(result_path.read_text(encoding="utf-8-sig"))
     usage = result_usage(result)["usage"]
     tokens = usage.get("total_tokens") if isinstance(usage, dict) else None
     provider_models = set()
@@ -226,9 +231,7 @@ def main() -> int:
             json.dumps(evaluation, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        rows = [
-            _case_metrics(runs_root, rep_id, case) for case in cases
-        ]
+        rows = read_metrics(runs_root, rep_id, cases)
         repetitions_rows.append({
             "repetition": index,
             "metrics": evaluation.get("metrics"),
@@ -285,9 +288,7 @@ def main() -> int:
                 report.update(status="failed", reason=f"{label} command failed")
                 write_report()
                 return 2
-        recall_rows = [
-            _case_metrics(runs_root, "recall", case) for case in recall_cases
-        ]
+        recall_rows = read_metrics(runs_root, "recall", recall_cases)
         recall_evaluation_path = runs_root / "recall" / "evaluation.json"
         if recall_evaluation_path.exists():
             # The forced single-vote judge changes verdicts, so these rows are

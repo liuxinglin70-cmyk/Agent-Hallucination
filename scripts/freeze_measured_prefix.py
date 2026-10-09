@@ -1,25 +1,11 @@
 #!/usr/bin/env python
-"""Freeze the measured prefix, so the deployed arm can be paired against it.
+"""Freeze the longest authoritative measured prefix of a registered order.
 
-The baseline walks the pre-registered order and stops wherever the clock runs
-out. The deployed arm must then be run on *exactly* the cases the baseline
-actually finished -- not on round numbers, and not on "roughly the same" cases.
+All selected runs share one locked snapshot. Missing, failed and degraded
+results stop the prefix; positive and negative readings count equally.
+The prefix follows the registered order without selecting by correctness.
 
-Two reasons it is derived from the finished results rather than chosen:
-
-* ``run_batch`` refuses a resumed run whose ``run.json`` case list differs, so
-  an inexact list is not a measurement, it is a crash.
-* Picking a convenient subset after seeing the baseline is the selection the
-  pre-registered order exists to prevent. The prefix rule ("everything the
-  baseline completed, in registered order") cannot be steered.
-
-Only the *presence* of a result is read here, never its verdict, so the prefix
-is fixed before anyone knows how the two arms will differ.
-
-    python scripts/freeze_measured_prefix.py \
-        --baseline artifacts/baseline/runs/g0 \
-        --order datasets/protocols/measurement_v1.json \
-        --out artifacts/baseline/runs/prefix.json
+    python scripts/freeze_measured_prefix.py --baseline artifacts/runs/g0 --order measurement.json
 """
 
 from __future__ import annotations
@@ -33,28 +19,25 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from detector.runner import safe_case_id  # noqa: E402
+from experiments.snapshot import run_snapshot  # noqa: E402
+from experiments.plan import measured_prefix  # noqa: E402
+from detector.result import prediction_state  # noqa: E402
 
 
 def completed_prefix(
     *, baseline: Path, order: list[str],
 ) -> tuple[list[str], list[str]]:
-    """The longest leading run of *order* whose cases all have a result.
+    """The longest leading run of *order* whose cases all have an authoritative reading.
 
     Returns ``(prefix, first_blocking)``. The string of the first missing case
     is returned even though the prefix stops there, because a gap in the middle
     means the run is still filling in -- and a reader who only saw the length
     would take the truncated prefix for the intended sample.
     """
-    prefix: list[str] = []
-    for case in order:
-        result = (
-            baseline / "cases" / safe_case_id(case) / "result.json"
-        )
-        if not result.is_file():
-            return prefix, [case]
-        prefix.append(case)
-    return prefix, []
+    with run_snapshot({"baseline": baseline}, order) as snapshot:
+        prefix = measured_prefix(order, [row["case"] for row in snapshot.rows["baseline"]
+                                         if prediction_state(row["result"]) is not None])
+    return prefix, order[len(prefix):len(prefix) + 1]
 
 
 def common_prefix(*, baselines: list[Path], order: list[str]) -> tuple[list[str], dict]:
@@ -69,10 +52,11 @@ def common_prefix(*, baselines: list[Path], order: list[str]) -> tuple[list[str]
     Also reports, per arm, how much further it got -- the gap is a scheduling
     fact worth seeing, not something to average away.
     """
-    per_arm = {
-        str(path): completed_prefix(baseline=path, order=order)
-        for path in baselines
-    }
+    with run_snapshot({str(path): path for path in baselines}, order) as snapshot:
+        per_arm = {}
+        for name, rows in snapshot.rows.items():
+            prefix = measured_prefix(order, [row["case"] for row in rows if prediction_state(row["result"]) is not None])
+            per_arm[name] = prefix, order[len(prefix):len(prefix) + 1]
     lengths = {path: len(prefix) for path, (prefix, _) in per_arm.items()}
     if not lengths:
         return [], {"per_arm": {}, "blocking": {}}
@@ -129,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
                 "schema_version": "detector.measurement_manifest.v1",
                 "policy": (
                     "The prefix of the pre-registered order that every arm "
-                    "completed. Derived from result presence only, never from a "
+                    "completed. Derived from authoritative measurement coverage, never from a "
                     "verdict, so the arms are paired over the same cases "
                     "without anyone choosing them."
                 ),

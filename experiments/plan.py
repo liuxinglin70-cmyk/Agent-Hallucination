@@ -36,6 +36,14 @@ def case_list_digest(cases: list[str]) -> str:
     return hashlib.sha256("\n".join(cases).encode("utf-8")).hexdigest()
 
 
+def measured_prefix(order: Sequence[str], measured: Sequence[str]) -> list[str]:
+    found = set(measured)
+    for index, case in enumerate(order):
+        if case not in found:
+            return list(order[:index])
+    return list(order)
+
+
 def _case_list(value: Any, name: str) -> list[str]:
     if not isinstance(value, list) or any(not isinstance(case, str) for case in value):
         raise ValueError(f"{name} must be a list of case identifiers")

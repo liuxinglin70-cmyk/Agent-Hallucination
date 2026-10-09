@@ -34,7 +34,7 @@ from detector.result import prediction_state
 from detector.runner import new_run_id, run_batch
 from detector.runtime import RunControl, contained_path, exclusive_writer, validate_path_id
 
-from experiments.plan import ExperimentPlan
+from experiments.plan import ExperimentPlan, measured_prefix
 from experiments.report import summarize_stage
 from experiments.snapshot import _read_rows, run_snapshot
 
@@ -67,13 +67,7 @@ class StageOutcome:
         the prefix, because "the first N in the frozen order" is the only
         subset of a pre-registered order that nobody chose after the fact.
         """
-        measured = set(self.measured)
-        prefix: list[str] = []
-        for case in self.requested:
-            if case not in measured:
-                break
-            prefix.append(case)
-        return prefix
+        return measured_prefix(self.requested, self.measured)
 
 
 def _resolve_registry(plan: ExperimentPlan, arm: str, registry: Mapping[str, Any] | None,
