@@ -7,8 +7,8 @@ import pytest
 from detector.api import Detector
 from detector.defense import run_defense
 from detector.packet import build_packet
-from detector.runner import run_batch
-from detector.runtime import RunControl, deadline_scope, run_scope
+from detector.runner import detect_with_transport_retry, run_batch
+from detector.runtime import RunControl, RunStopped, deadline_scope, run_scope
 from detector.tests.test_judge_defense import POSITIVE
 from detector.tests.test_causal_feedback import (
     feedback_config, install_base_judge, install_review, offline_policy,
@@ -150,4 +150,61 @@ def test_true_case_deadline_during_deterministic_audit_is_terminal(monkeypatch, 
     assert result['authority_failure_reasons'][0]['error_type'] == 'case_deadline_exceeded'
     assert result['base_detection_result']['state'] == 'verified_clean'
     assert result["execution"]["provider_attempts"] == 1
+    assert not control.stopped.is_set()
+
+
+@pytest.mark.parametrize('kind',['deadline','cancel'])
+def test_tracer_feedback_eligibility_terminal_retains_completed_base(monkeypatch,kind):
+    from detector.causal_audit import OfflineFeedbackPolicy
+    from detector.tests.test_causal_feedback import feedback_config, install_base_judge as feedback_judge
+    feedback_judge(monkeypatch)
+    now=[0.0]
+    monkeypatch.setattr('detector.runtime.time.monotonic',lambda:now[0])
+    control=RunControl(1)
+    def allows(anomalies):
+        assert anomalies
+        if kind=='deadline':
+            now[0]=1.1
+        else:
+            control.stop({'error_type':'run_cancelled','message':'during feedback eligibility'})
+        return True
+    cfg=feedback_config(max_added_seconds_per_case=100)
+    cfg['judge_route']['votes']=3
+    detector=Detector(cfg,require_credentials=False,
+                      offline_feedback_policy=OfflineFeedbackPolicy('controlled-eligibility',allows))
+    attempts=[]
+    with run_scope(control),deadline_scope(deadline=1):
+        if kind=='deadline':
+            result=detector.detect(record())
+            assert result['state']=='unresolved'
+            assert result['authority_failure_reasons'][0]['error_type']=='case_deadline_exceeded'
+            assert result['execution']['provider_attempts']==1
+            assert result.get('base_detection_result',{}).get('state')=='verified_clean'
+        else:
+            with pytest.raises(RunStopped):
+                detect_with_transport_retry(detector,record(),case_id='eligibility',attempt_observer=attempts.append)
+            assert len(attempts)==1
+            assert attempts[0]['execution']['provider_attempts']==1
+            assert attempts[0]['result'].get('state')=='verified_clean'
+
+
+def test_tracer_feedback_eligibility_added_expiry_keeps_clean_base(monkeypatch):
+    from detector.causal_audit import OfflineFeedbackPolicy
+    from detector.tests.test_causal_feedback import feedback_config, install_base_judge as feedback_judge
+    feedback_judge(monkeypatch)
+    now=[0.0]
+    monkeypatch.setattr('detector.runtime.time.monotonic',lambda:now[0])
+    def allows(anomalies):
+        assert anomalies
+        now[0]=1.1
+        return True
+    cfg=feedback_config(max_added_seconds_per_case=1)
+    cfg['judge_route']['votes']=3
+    detector=Detector(cfg,require_credentials=False,offline_feedback_policy=OfflineFeedbackPolicy('added-eligibility',allows))
+    control=RunControl(1)
+    with run_scope(control),deadline_scope(deadline=100):
+        result=detector.detect(record())
+    assert result['state']=='verified_clean'
+    assert result['proof']['negative_feedback']['state']=='budget_exhausted'
+    assert result['execution']['provider_attempts']==1
     assert not control.stopped.is_set()

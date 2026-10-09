@@ -902,13 +902,13 @@ class Detector:
             case_id=case_id, packet=packet, proof=proof, stage_status=stage_status,
             providers=providers, provenance=provenance,
         )
-        if causal_diagnostics is not None:
-            output["proof"]["causal_diagnostics"] = causal_diagnostics
-        elif causal_policy["mode"] != "off":
-            mandatory = list(dict.fromkeys(eid for eid in (
-                event_id_for_step(packet, hearing.get("step")) for hearing in hearings
-            ) if eid is not None))
-            try:
+        try:
+            if causal_diagnostics is not None:
+                output["proof"]["causal_diagnostics"] = causal_diagnostics
+            elif causal_policy["mode"] != "off":
+                mandatory = list(dict.fromkeys(eid for eid in (
+                    event_id_for_step(packet, hearing.get("step")) for hearing in hearings
+                ) if eid is not None))
                 output["proof"]["causal_diagnostics"] = build_causal_diagnostics(
                     packet=packet, config=self.config, budget=current_added_budget(),
                     mandatory_event_ids=mandatory,
@@ -916,42 +916,39 @@ class Detector:
                     snapshot=snapshot,
                 )
                 causal_diagnostics = output["proof"]["causal_diagnostics"]
-            except BaseException as exc:
-                exc.base_detection_result = deepcopy(output)
-                raise
-        if (causal_review is None and causal_policy["mode"] == "tracer_context"
-                and output["state"] == "verified_clean" and recall_status.get("state") == "not_needed"):
-            budget = current_added_budget()
-            decision = causal_recall_decision(
-                (causal_diagnostics or {}).get("audit"), judge_result=judge_result,
-                policy=causal_policy, budget=budget, offline_policy=self.offline_feedback_policy,
-            )
-            output["proof"]["negative_feedback"] = decision
-            if decision["state"] == "eligible":
-                review = _CausalReview(review_input_digest, deepcopy(judge_result), deepcopy(judge_status),
-                                       deepcopy(causal_diagnostics), seal({
-                    "schema_version": "detector.causal_recall_context.v1", "packet_digest": digest(packet),
-                    "anomalies": decision["anomalies"], "decision_authority": "none",
-                }))
-                try:
-                    if not budget.start_negative_review():
-                        output["proof"]["negative_feedback"] = {
-                            **decision, "state": "inactive", "reason": "review_already_attempted"}
-                        return output
-                    with added_request_scope(budget):
-                        reviewed = self._detect(
-                            record, case_id=case_id, interventions=effective_interventions,
-                            evidence=evidence, causal_review=review,
-                        )
-                except AddedBudgetExceeded as exc:
-                    output["proof"]["negative_feedback"] = {**decision, "state": "budget_exhausted", "reason": exc.resource}
-                except BaseException as exc:
-                    exc.base_detection_result = deepcopy(output)
-                    raise
-                else:
-                    reviewed["proof"]["negative_feedback"] = {**decision, "state": "reviewed"}
-                    reviewed["base_detection_result"] = deepcopy(output)
-                    output = reviewed
+            if (causal_review is None and causal_policy["mode"] == "tracer_context"
+                    and output["state"] == "verified_clean" and recall_status.get("state") == "not_needed"):
+                budget = current_added_budget()
+                decision = causal_recall_decision(
+                    (causal_diagnostics or {}).get("audit"), judge_result=judge_result,
+                    policy=causal_policy, budget=budget, offline_policy=self.offline_feedback_policy,
+                )
+                output["proof"]["negative_feedback"] = decision
+                if decision["state"] == "eligible":
+                    review = _CausalReview(review_input_digest, deepcopy(judge_result), deepcopy(judge_status),
+                                           deepcopy(causal_diagnostics), seal({
+                        "schema_version": "detector.causal_recall_context.v1", "packet_digest": digest(packet),
+                        "anomalies": decision["anomalies"], "decision_authority": "none",
+                    }))
+                    try:
+                        if not budget.start_negative_review():
+                            output["proof"]["negative_feedback"] = {
+                                **decision, "state": "inactive", "reason": "review_already_attempted"}
+                            return output
+                        with added_request_scope(budget):
+                            reviewed = self._detect(
+                                record, case_id=case_id, interventions=effective_interventions,
+                                evidence=evidence, causal_review=review,
+                            )
+                    except AddedBudgetExceeded as exc:
+                        output["proof"]["negative_feedback"] = {**decision, "state": "budget_exhausted", "reason": exc.resource}
+                    else:
+                        reviewed["proof"]["negative_feedback"] = {**decision, "state": "reviewed"}
+                        reviewed["base_detection_result"] = deepcopy(output)
+                        output = reviewed
+        except BaseException as exc:
+            exc.base_detection_result = deepcopy(output)
+            raise
         return output
 
 
