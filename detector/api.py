@@ -42,17 +42,9 @@ from detector.recaller import (
     run_causal_upgrade,
     run_recall_scan,
 )
+from detector.replay import frozen_masked_stages
 from detector.result import build_detection_output
 from detector.step_tracer import _parse_tracer, run_step_tracer
-
-
-_FROZEN_STAGE_HOOKS: dict[str, frozenset[str]] = {
-    "judge_result": frozenset({"judge.system"}),
-    "recall_result": frozenset({"scanner.system", "recall.trigger"}),
-    "upgrade_result": frozenset({"upgrade.pre", "upgrade.system"}),
-    "tracer_result": frozenset({"tracer.system"}),
-    "defense_result": frozenset({"defense.pre", "defense.system"}),
-}
 
 
 @dataclass(frozen=True)
@@ -82,32 +74,6 @@ def _judge_negative_needs_recall(
     cast = int(vote.get("cast") or 0)
     positives = int(vote.get("positives") or 0)
     return cast < requested or positives > 0 or bool(vote.get("tie"))
-
-
-def _frozen_masked_stages(
-    frozen: Mapping[str, Any], targeted_hooks: set[str],
-) -> list[str]:
-    """Frozen stages whose live inputs an active intervention would change.
-
-    Replaying such a stage would mask the intervention under test, so the
-    replay must be refused fail-closed. ``judge.post`` is absent: it is a
-    post-hoc deterministic evidence hook that still runs during replay.
-    Hearing rows count as frozen whenever any hearing carries them.
-    """
-    def stage_frozen(stage_key: str) -> bool:
-        if stage_key in frozen:
-            return True
-        return any(
-            stage_key in entry for entry in frozen.get("hearings") or ()
-        )
-
-    return sorted(
-        {
-            stage_key.removesuffix("_result")
-            for stage_key, hooks in _FROZEN_STAGE_HOOKS.items()
-            if targeted_hooks & hooks and stage_frozen(stage_key)
-        }
-    )
 
 
 def _frozen_stage(
@@ -459,7 +425,7 @@ class Detector:
             frozen = _validate_frozen_stages(frozen, packet, snapshot)
             judge_result = frozen["judge_result"]
             judge_status = frozen["judge_status"]
-            masked = _frozen_masked_stages(frozen, targeted_hooks)
+            masked = frozen_masked_stages(frozen, targeted_hooks)
             if masked:
                 raise ValueError(
                     "frozen stage replay is refused: active interventions "

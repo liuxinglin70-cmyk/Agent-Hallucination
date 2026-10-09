@@ -28,6 +28,8 @@ candidate is admitted by exactly the code that admits a cycle candidate.
 
 from __future__ import annotations
 
+from detector.replay import requires_fresh_evaluation
+
 import hashlib
 import json
 import time
@@ -64,7 +66,6 @@ from evolution.gates import (
     meets_localization,
     meets_m,
     meets_resolution,
-    requires_fresh_evaluation,
     resolution_behavior_gate,
     sentinel_coverage,
     structural_gate,

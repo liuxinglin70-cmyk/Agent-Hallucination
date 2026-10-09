@@ -48,24 +48,6 @@ SEMANTICS_KEYS = (
 )
 
 
-def requires_fresh_evaluation(
-    entries: Sequence[Mapping[str, Any]],
-) -> bool:
-    """Whether the entire provider flow needs a fresh paired control.
-
-    Downstream hooks instead reuse the judge and rerun their affected suffix.
-    """
-    return any(
-        str(entry.get("hook") or "") == "judge.system"
-        or (
-            entry.get("type") == "decision_guard"
-            and (entry.get("body") or {}).get("action")
-            == "require_full_view_defense"
-        )
-        for entry in entries
-    )
-
-
 def _semantics_text() -> str:
     from detector import semantics
 
@@ -1353,5 +1335,4 @@ __all__ = [
     "structural_gate",
     "harmlessness_gate",
     "behavior_gate",
-    "requires_fresh_evaluation",
 ]

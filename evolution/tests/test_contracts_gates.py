@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from detector.replay import requires_fresh_evaluation
+
 import pytest
 
 from evolution.config import load_config
@@ -10,7 +12,6 @@ from evolution.contracts import (
 )
 from evolution.gates import (
     defect_candidates,
-    requires_fresh_evaluation,
     structural_gate,
     harmlessness_gate,
 )

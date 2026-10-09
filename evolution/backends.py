@@ -9,6 +9,8 @@ budget; its results are marked ``backend=mock`` in every report.
 
 from __future__ import annotations
 
+from detector.replay import requires_fresh_evaluation, stage_invalidated
+
 import json
 import copy
 import hashlib
@@ -584,7 +586,7 @@ class LiveDetectorBackend(DetectionBackend):
             return str((status.get(name) or {}).get("state") or "")
 
         judge_state = state_of("judge")
-        if judge_state == "ok" and isinstance(proof.get("judge"), Mapping):
+        if not stage_invalidated("judge_result", hooks) and judge_state == "ok" and isinstance(proof.get("judge"), Mapping):
             judge_result: dict[str, Any] = {"ok": True, "parsed": dict(proof["judge"])}
             judge_provider = providers.get("judge")
             if isinstance(judge_provider, Mapping) and isinstance(
@@ -595,7 +597,7 @@ class LiveDetectorBackend(DetectionBackend):
                 # candidate arm (which would re-run provider stages).
                 judge_result["provider"] = {"vote": dict(judge_provider["vote"])}
             add("judge", "judge", judge_result)
-        elif settled("judge"):
+        elif not stage_invalidated("judge_result", hooks) and settled("judge"):
             add("judge", "judge", {
                 "ok": False,
                 "parsed": None,
@@ -603,8 +605,7 @@ class LiveDetectorBackend(DetectionBackend):
                 "error_type": judge_state,
             })
         if (
-            "scanner.system" not in hooks
-            and "recall.trigger" not in hooks
+            not stage_invalidated("recall_result", hooks)
             and "judge_result" in frozen
             and settled("recall_scanner")
         ):
@@ -624,8 +625,7 @@ class LiveDetectorBackend(DetectionBackend):
                     "error_type": state_of("recall_scanner"),
                 })
         if (
-            "upgrade.pre" not in hooks
-            and "upgrade.system" not in hooks
+            not stage_invalidated("upgrade_result", hooks)
             and "recall_result" in frozen
             and settled("causal_upgrade")
         ):
@@ -658,10 +658,8 @@ class LiveDetectorBackend(DetectionBackend):
                         else {}
                     ),
                 })
-        freeze_tracer = "tracer.system" not in hooks
-        freeze_defense = (
-            "defense.pre" not in hooks and "defense.system" not in hooks
-        )
+        freeze_tracer = not stage_invalidated("tracer_result", hooks)
+        freeze_defense = not stage_invalidated("defense_result", hooks)
         if freeze_tracer or freeze_defense:
             # Tracer/defense replay per hearing: freezing only the top-level
             # results would paste one hearing's outcome into every other
@@ -726,8 +724,7 @@ class LiveDetectorBackend(DetectionBackend):
         }
         snapshot = self.evidence_for(case_id)
         evidence_kwargs = {"evidence": snapshot} if snapshot is not None else {}
-        if "judge.system" in hooks:
-            # The intervention changes the judge itself; replay would mask it.
+        if requires_fresh_evaluation(entries):
             return self.detector.detect(
                 record, case_id=case_id, interventions=registry,
                 **evidence_kwargs,
@@ -1010,7 +1007,6 @@ _CACHE_PATH_MAX = 250
 _CACHE_TEMP_NAME = ".tmp-XXXXXXXX.json"
 _DIGEST_NAME_WIDTH = 16
 # Reports use a short boundary label; cache reuse verifies the full input identity.
-_BOUNDARY_KEY_WIDTH = 8
 
 
 class CachingBackend(DetectionBackend):
@@ -1077,7 +1073,7 @@ class CachingBackend(DetectionBackend):
         replay = None
         if isinstance(self.backend, LiveDetectorBackend) and (registry or {}).get("interventions"):
             hooks = set(_hooks_of(registry))
-            if "judge.system" not in hooks:
+            if not requires_fresh_evaluation(self.backend._active_entries(registry)):
                 baseline = self.backend._baseline(record, case_id=case_id)
                 replay = self.backend._frozen_stages(baseline, hooks)
         identity = {
@@ -1256,177 +1252,15 @@ def make_backend(
     return backend
 
 
-# Canonical stage order of the detector flow. One spelling, used by the
-# dependency graph below, by ``replay_boundary`` and by every report that names
-# a boundary, so a stage cannot be called ``tracer`` in one place and
-# ``step_tracer`` in another.
-REPLAY_STAGES: tuple[str, ...] = (
-    "judge", "recall_scanner", "causal_upgrade", "step_tracer", "defense",
-    "adjudication",
-)
-
-# Which stages a change to one hook can affect, and therefore which stages a
-# targeted development replay must re-run. ``judge.system`` rewrites the judge
-# prompt, so every stage downstream of the judge is downstream of it;
-# ``adjudicate.guard`` only decides, so nothing else needs re-measuring.
-#
-# This is the minimal rerun boundary the development loop (plan P0.3, §7.3)
-# needs before it can evaluate a candidate cheaply. Without it a development
-# check degenerates into a full arm run and the L0/L1 split buys nothing:
-# ``gates.requires_fresh_evaluation`` treats only ``judge.system`` and
-# ``require_full_view_defense`` as fresh, and every other hook replays a frozen
-# judge, so "which stages must move" is a question that has to be answered
-# explicitly rather than inferred from the hook name.
-#
-# This table declares *reach*: what a hook can affect. The envelope
-# ``LiveDetectorBackend._frozen_stages`` builds decides what a replay actually
-# reuses, and it reuses at least the reach (it may freeze more, never less).
-# ``test_backends.py`` pins that containment, so a hook whose live behaviour
-# drifts outside its declaration fails rather than silently widening or
-# narrowing the measurement.
-HOOK_DEPENDENCY_GRAPH: dict[str, tuple[str, ...]] = {
-    "judge.system": (
-        "judge", "recall_scanner", "causal_upgrade", "step_tracer", "defense",
-        "adjudication",
-    ),
-    "judge.post": (
-        "recall_scanner", "causal_upgrade", "step_tracer", "defense",
-        "adjudication",
-    ),
-    "recall.trigger": (
-        "recall_scanner", "causal_upgrade", "step_tracer", "defense",
-        "adjudication",
-    ),
-    "scanner.system": (
-        "recall_scanner", "causal_upgrade", "step_tracer", "defense",
-        "adjudication",
-    ),
-    "upgrade.pre": ("causal_upgrade", "step_tracer", "defense", "adjudication"),
-    "upgrade.system": (
-        "causal_upgrade", "step_tracer", "defense", "adjudication",
-    ),
-    "tracer.system": ("step_tracer", "adjudication"),
-    "defense.pre": ("defense", "adjudication"),
-    "defense.system": ("defense", "adjudication"),
-    "adjudicate.guard": ("adjudication",),
-}
-
-# The stage each hook belongs to, for downstream reporting.
-_HOOK_STAGE = {
-    "judge.system": "judge",
-    "judge.post": "judge",
-    "recall.trigger": "recall_scanner",
-    "scanner.system": "recall_scanner",
-    "upgrade.pre": "causal_upgrade",
-    "upgrade.system": "causal_upgrade",
-    "tracer.system": "step_tracer",
-    "defense.pre": "defense",
-    "defense.system": "defense",
-    "adjudicate.guard": "adjudication",
-}
-
-
-def replay_boundary(hooks: Iterable[str]) -> dict[str, Any]:
-    """The rerun reach of a hook set, and the identity of that boundary.
-
-    One implementation for the whole framework: the development loop uses it to
-    say how much of the flow a candidate forces to re-run, and the result cache
-    keys on ``boundary_key`` so a cached measurement can never be served under a
-    boundary it was not produced under. That second use is why the boundary is
-    a *digest* and not just a report field: the boundary logic is expected to
-    change (P1 is where it gets extended), and a cache written before such a
-    change must not answer for one made after it.
-
-    ``unknown`` hooks are the conservative case. A hook the graph does not
-    declare cannot be shown to reach anything, and assuming it reaches nothing
-    would silently freeze stages the change can actually affect -- so an
-    unknown hook widens the boundary to the whole flow, which is the same
-    envelope ``fresh`` produces.
-    """
-    hook_set = sorted({str(hook) for hook in hooks if str(hook)})
-    reach: set[str] = set()
-    unknown: list[str] = []
-    for hook in hook_set:
-        declared = HOOK_DEPENDENCY_GRAPH.get(hook)
-        if declared is None:
-            unknown.append(hook)
-            continue
-        reach.update(declared)
-    if unknown:
-        reach = set(REPLAY_STAGES)
-    identity = {
-        "rerun_stages": sorted(reach),
-        "hooks": hook_set,
-        "unknown_hooks": sorted(unknown),
-    }
-    payload = dict(identity)
-    payload["boundary_key"] = hashlib.sha256(
-        json.dumps(identity, ensure_ascii=False, sort_keys=True,
-                   separators=(",", ":")).encode("utf-8")
-    ).hexdigest()[:_BOUNDARY_KEY_WIDTH]
-    return payload
-
-
-def partial_replay_plan(
-    entries: Sequence[Mapping[str, Any]],
-    *,
-    active_entries: Sequence[Mapping[str, Any]] = (),
-) -> dict[str, Any]:
-    """Which stages a candidate set forces to re-run, and which may be reused.
-
-    Returns the union of the dependency sets of every hook the candidate set
-    targets -- candidate and active entries together, because the deployed
-    version participates in the same measurement.
-
-    ``fresh`` is reported alongside, because the two are not the same question:
-    ``fresh`` says the *whole* provider flow must be re-run (a judge-system
-    change, or a defence that demands the full view), while a partial plan says
-    which stages the change can reach. The second is what makes a development
-    check cheap; the first is a correctness constraint that a development check
-    must respect rather than relax.
-    """
-    entries = [*active_entries, *entries]
-    hooks = sorted({
-        str(entry.get("hook") or "")
-        for entry in entries
-        if str(entry.get("hook") or "")
-    })
-    from evolution.gates import requires_fresh_evaluation
-
-    fresh = requires_fresh_evaluation(entries)
-    boundary = replay_boundary(hooks)
-    stages = set(boundary["rerun_stages"])
-    if fresh:
-        # A whole-flow rerun reaches everything, so the boundary is the full
-        # stage list rather than the union of the hooks it happens to name.
-        stages = set(REPLAY_STAGES)
-    return {
-        "hooks": hooks,
-        "rerun_stages": sorted(stages),
-        "reusable_stages": sorted(set(REPLAY_STAGES) - stages),
-        "stage_of_hook": {
-            hook: _HOOK_STAGE.get(hook, "") for hook in hooks
-        },
-        "fresh_required": fresh,
-        "unknown_hooks": list(boundary["unknown_hooks"]),
-        # The cache identity of the boundary this plan was derived from, so a
-        # stored plan can be matched against the measurement it describes.
-        "boundary_key": boundary["boundary_key"],
-    }
-
-
 __all__ = [
     "ARTIFACT_MANIFEST_SCHEMA",
     "CACHE_FORMAT",
-    "REPLAY_STAGES",
     "artifact_digest",
     "artifact_manifest",
     "backend_execution_identity",
     "backend_runtime_identity",
-    "replay_boundary",
     "CachingBackend",
     "DetectionBackend",
-    "HOOK_DEPENDENCY_GRAPH",
     "LiveDetectorBackend",
     "MockDetectorBackend",
     "file_digest",

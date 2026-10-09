@@ -20,6 +20,8 @@ attribution, outcome-driven retirement and drift rollback.
 
 from __future__ import annotations
 
+from detector.replay import requires_fresh_evaluation
+
 import json
 import random
 from contextvars import Context
@@ -54,7 +56,6 @@ from evolution.gates import (
     marginal_floor_rests_on_unstable,
     meets_localization,
     meets_m,
-    requires_fresh_evaluation,
     structural_gate,
     harmlessness_gate,
     localization_behavior_gate,

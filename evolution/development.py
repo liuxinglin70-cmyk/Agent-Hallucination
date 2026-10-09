@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from detector.interventions import validate_intervention
-from evolution.backends import partial_replay_plan
+from detector.replay import HOOK_POLICIES, partial_replay_plan
 from evolution.candidate_versions import CandidateVersionGraph, canonical_hash
 from evolution.contracts import (
     candidate_contains_case_id,
@@ -324,12 +324,10 @@ def plan_reaches(hook: str, stage: str) -> bool:
     The hook dependency map is the authority; a hook it does not know cannot be
     shown to reach anything, so it is reported as not reaching.
     """
-    from evolution.backends import HOOK_DEPENDENCY_GRAPH
-
-    reached = HOOK_DEPENDENCY_GRAPH.get(str(hook or ""))
-    if reached is None:
+    policy = HOOK_POLICIES.get(str(hook or ""))
+    if policy is None:
         return False
-    return str(stage or "") == "" or str(stage) in reached
+    return str(stage or "") == "" or str(stage) in policy.reach
 
 
 def check_l1(

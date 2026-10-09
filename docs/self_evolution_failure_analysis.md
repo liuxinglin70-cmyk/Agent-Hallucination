@@ -466,7 +466,7 @@ status=deterministic_replay; applicable=false; rolls=1
 every arm ... is a frozen replay ... jitter is zero by construction
 ```
 
-但冻结的是上游 stage，scanner/upgrade 等后缀仍调用 provider；049 的真实输出截断与 no_quorum 已证实后缀不是静态纯函数。`fresh_control=null`。当前 [requires_fresh_evaluation:51](<E:/agent hallucination/agent hallucination/evolution/gates.py:51>) 主要在 judge.system 或 require_full_view_defense 等情况下返回 true，其他 hook 可以复用 judge 后重跑后缀。**无需全流程重跑，不意味着后缀没有采样或运行波动。**
+但冻结的是上游 stage，scanner/upgrade 等后缀仍调用 provider；049 的真实输出截断与 no_quorum 已证实后缀不是静态纯函数。`fresh_control=null`。当前 [requires_fresh_evaluation](<E:/agent hallucination/agent hallucination/detector/replay.py:39>) 在 judge.system、require_full_view_defense 或未知 hook 情况下返回 true，其他 hook 可以复用 judge 后重跑后缀。**无需全流程重跑，不意味着后缀没有采样或运行波动。**
 
 它造成两个评估缺口：无关049的 provider 故障让候选不可评估；049的单次 FP 修复也不能排除自然后缀波动。对 C1-D002 必须同时保留“观察到收益”与“未建立稳定因果归因”，不能只挑对某个论点有利的一面。
 

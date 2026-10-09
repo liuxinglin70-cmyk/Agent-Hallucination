@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from evolution.backends import DetectionBackend, LiveDetectorBackend
 from evolution.contracts import make_intervention, make_registry
-from detector.api import _FROZEN_STAGE_HOOKS, _validate_frozen_stages
+from detector.api import _validate_frozen_stages
 from detector.packet import build_packet
 
 
@@ -249,6 +249,29 @@ def test_detector_backend_does_not_freeze_when_judge_hook_active():
         record, case_id="case", registry=make_registry([judge_candidate]),
     )
     assert backend.detector.calls[-1]["frozen_judge"] is None
+
+
+def test_live_and_caching_full_view_guard_respect_fresh_stage_policy(tmp_path):
+    from evolution.backends import CachingBackend
+    guard = make_intervention(
+        intervention_id="IV-FULL", intervention_type="decision_guard",
+        hook="adjudicate.guard", packet_features=["has_tool_calls"],
+        facts=["positive_source=judge"],
+        body={"action": "require_full_view_defense",
+              "action_not_when": "Never when the complete view is already present.",
+              "action_not_when_facts": ["defense_view_degraded=false"]},
+        expected_behavior="defense sees the complete case", target_polarity="precision",
+        cycle=1, failure_family="FAM-fp", failure_cases=["A/1.json", "A/2.json"],
+    )
+    registry = make_registry([guard])
+    record = {"question": "q", "history": [{"role": "assistant", "content": "a"}]}
+    for wrapped in [False, True]:
+        backend = _backend()
+        runner = CachingBackend(backend, tmp_path / "cache", namespace="full") if wrapped else backend
+        runner.run_case(record, case_id="case")
+        runner.run_case(record, case_id="case", registry=registry)
+        assert len(backend.detector.calls) == 2
+        assert backend.detector.calls[-1]["frozen_stages"] is None
 
 
 def test_backend_isolates_single_case_exception(tmp_path):
@@ -525,7 +548,7 @@ def test_frozen_stages_preserve_judge_vote():
 # --------------------------------------------------------------------------
 def test_replay_boundary_is_a_pure_function_of_the_hook_set():
     """The same hooks always produce the same boundary, and its key."""
-    from evolution.backends import replay_boundary
+    from detector.replay import replay_boundary
 
     first = replay_boundary(["judge.post", "tracer.system"])
     second = replay_boundary(["tracer.system", "judge.post"])
@@ -542,57 +565,18 @@ def test_replay_boundary_treats_an_unknown_hook_as_whole_flow():
     the conservative answer is the whole flow -- the same envelope ``fresh``
     produces.
     """
-    from evolution.backends import REPLAY_STAGES, replay_boundary
+    from detector.replay import REPLAY_STAGES, replay_boundary
 
     boundary = replay_boundary(["no.such.hook"])
     assert boundary["unknown_hooks"] == ["no.such.hook"]
     assert boundary["rerun_stages"] == sorted(REPLAY_STAGES)
 
 
-def test_graph_reach_covers_every_hook_the_detector_refuses_to_replay_around():
-    """The masking table must be a subset of the declared reach.
+def test_direct_stage_invalidation_is_within_declared_hook_reach():
+    from detector.replay import HOOK_POLICIES, frozen_masked_stages
 
-    Three relations exist and are easy to confuse:
-
-    * ``HOOK_DEPENDENCY_GRAPH`` (this package) declares which stages a hook can
-      affect -- the rerun boundary for a targeted partial replay;
-    * ``detector.api._FROZEN_STAGE_HOOKS`` declares which hooks invalidate a
-      frozen stage, so a replay around them is refused fail-closed;
-    * ``_frozen_stages`` decides what one replay actually reuses, and it may
-      reuse a *settled* stage even when the hook reaches it, because the stage's
-      value was produced from the same inputs.
-
-    The invariant that must hold is containment: if a hook makes a frozen stage
-    invalid, it necessarily affects that stage, so the graph must declare it.
-    A hook missing from the graph would let the development loop hand a
-    candidate a rerun boundary that excludes a stage the detector itself
-    refuses to replay around -- a boundary that under-reports what the change
-    can move.
-    """
-    from evolution.backends import HOOK_DEPENDENCY_GRAPH
-
-    stage_of_frozen_key = {
-        "judge_result": "judge",
-        "recall_result": "recall_scanner",
-        "upgrade_result": "causal_upgrade",
-        "tracer_result": "step_tracer",
-        "defense_result": "defense",
-    }
-    for frozen_key, hooks in sorted(_FROZEN_STAGE_HOOKS.items()):
-        stage = stage_of_frozen_key[frozen_key]
-        for hook in sorted(hooks):
-            declared = HOOK_DEPENDENCY_GRAPH.get(hook)
-            assert declared is not None, (
-                f"{hook!r} invalidates the frozen {frozen_key!r} but the "
-                "dependency graph does not declare it at all"
-            )
-            assert stage in declared, (
-                f"{hook!r} invalidates the frozen {frozen_key!r} "
-                f"({stage!r}), but the graph declares its reach as {declared}"
-            )
-    # ``judge.post`` is deliberately absent from the masking table: it is a
-    # post-hoc deterministic hook that runs during replay, so a settled stage
-    # stays reusable under it.
-    assert not any(
-        "judge.post" in hooks for hooks in _FROZEN_STAGE_HOOKS.values()
-    )
+    for hook, policy in HOOK_POLICIES.items():
+        if policy.frozen_key:
+            assert policy.stage in policy.reach
+            assert frozen_masked_stages({policy.frozen_key: {}}, {hook}) == [policy.frozen_key.removesuffix("_result")]
+    assert frozen_masked_stages({"judge_result": {}}, {"judge.post"}) == []
