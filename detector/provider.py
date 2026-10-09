@@ -25,7 +25,7 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 from contextlib import nullcontext
 from detector.runtime import (
-    CaseDeadlineExceeded, current_control, current_deadline, deadline_scope, record_request,
+    CaseDeadlineExceeded, current_added_request_budget, current_control, current_deadline, deadline_scope, record_request,
 )
 
 _DIRECT_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))
@@ -269,8 +269,17 @@ def provider_call(
     try:
         if control is not None:
             control.check()
-        return _provider_call(route=route, system=system, user=user,
-                              purpose=purpose, cache_tag=cache_tag)
+        budget = current_added_request_budget()
+        if budget is not None:
+            route = {**route, "transport_retries": 0, "max_tokens": budget.reserve(
+                system=system, user=user, output_tokens=int(route.get("max_tokens") or 1500),
+                extra_input=route.get("extra_body"),
+            )}
+        result = _provider_call(route=route, system=system, user=user,
+                                purpose=purpose, cache_tag=cache_tag)
+        if budget is not None:
+            budget.check()
+        return result
     except CaseDeadlineExceeded as exc:
         raise ProviderError(
             str(route.get("_route_name") or purpose), str(exc),

@@ -8,7 +8,10 @@ from typing import Any, Mapping
 
 from detector.adjudication import adjudicate
 from detector.config import load_config, validate_config
-from detector.causal_audit import build_causal_diagnostics
+from detector.causal_audit import (
+    OfflineFeedbackPolicy, build_causal_diagnostics, causal_recall_decision, context_for_hearing,
+)
+from detector.causal_contracts import seal
 from detector.identity import build_execution_identity, digest, source_identity
 from detector.defense import _parse_defense, _validate_defense_evidence, run_defense
 from detector.evidence import (
@@ -27,7 +30,9 @@ from detector.packet import build_packet, event_id_for_step, validate_record
 from detector.predicate_context import judge_predicate_context
 from detector.provider import ProviderError, case_deadline_ctx
 from detector.measurement import request_execution
-from detector.runtime import added_budget_scope, current_added_budget, usage_scope, utc_now
+from detector.runtime import (
+    AddedBudgetExceeded, added_budget_scope, added_request_scope, current_added_budget, usage_scope, utc_now,
+)
 import time
 from detector.recaller import (
     _parse_candidates,
@@ -231,7 +236,12 @@ class Detector:
         require_credentials: bool = True,
         semantic_executor: "SemanticExecutor | None" = None,
         component_executor_factory: Any | None = None,
+        offline_feedback_policy: OfflineFeedbackPolicy | None = None,
     ) -> None:
+        if offline_feedback_policy is not None:
+            if require_credentials or not isinstance(offline_feedback_policy, OfflineFeedbackPolicy):
+                raise ValueError("offline feedback policy requires an uncredentialed offline detector")
+        self.offline_feedback_policy = offline_feedback_policy
         self.config = (
             validate_config(config, require_credentials=require_credentials) if config is not None
             else load_config(require_credentials=require_credentials)
@@ -351,6 +361,7 @@ class Detector:
         frozen_judge: Mapping[str, Any] | None = None,
         frozen_stages: Mapping[str, Any] | None = None,
         evidence: Mapping[str, Any] | None = None,
+        causal_review: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         validate_record(record)
         packet = build_packet(record)
@@ -441,6 +452,15 @@ class Detector:
             )
         judge_parsed = judge_result.get("parsed") or {}
         judge_positive = bool(judge_parsed.get("is_hallucination"))
+        causal_policy = self.config["causal_audit"]
+        causal_diagnostics = causal_review["diagnostics"] if causal_review is not None else None
+        if causal_diagnostics is None and causal_policy["mode"] == "tracer_context":
+            target_id = event_id_for_step(packet, judge_parsed.get("hallucination_step"))
+            causal_diagnostics = build_causal_diagnostics(
+                packet=packet, config=self.config, budget=current_added_budget(),
+                mandatory_event_ids=[target_id] if target_id else [],
+                context=None, snapshot=snapshot,
+            )
         plan.evidence_for(
             "judge.post",
             packet,
@@ -479,6 +499,7 @@ class Detector:
                 recall_result, recall_status = run_recall_scan(
                     packet=packet, config=self.config, plan=plan,
                     **(stage_kwargs),
+                    **({"causal_context": causal_review["context"]} if causal_review is not None else {}),
                 )
             if recall_result.get("ok") and recall_result.get("candidates"):
                 if frozen is not None and "upgrade_result" in frozen:
@@ -525,6 +546,7 @@ class Detector:
             and not judge_positive
             and (
                 recall_forced
+                or causal_review is not None
                 or _judge_negative_needs_recall(judge_result, self.config)
             )
         )
@@ -627,7 +649,12 @@ class Detector:
         ]:
             """Tracer + defense for one positive; defense is decisive."""
             entry = frozen_hearing(positive)
-            if entry is not None and "tracer_result" in entry:
+            causal_context = None
+            if causal_diagnostics is not None and causal_diagnostics.get("audit") is not None:
+                causal_context = context_for_hearing(causal_diagnostics["audit"], positive=positive, packet=packet)
+            context_digest = causal_context["digest"] if causal_context is not None else None
+            if (entry is not None and "tracer_result" in entry
+                    and entry["tracer_result"].get("causal_context_digest") == context_digest):
                 tracer_r = dict(entry["tracer_result"])
                 tracer_s = dict(entry["tracer_status"])
             else:
@@ -638,6 +665,7 @@ class Detector:
                     config=self.config,
                     plan=plan,
                     positive=positive,
+                    **({"causal_context": causal_context} if causal_context is not None else {}),
                 )
             if entry is not None and "defense_result" in entry:
                 defense_r = dict(entry["defense_result"])
@@ -767,7 +795,9 @@ class Detector:
         provenance: dict[str, Any] = {
             "packet_hash": digest(packet),
             "execution_identity": build_execution_identity(
-                source=source_identity("detector"), config=self.config,
+                source=source_identity("detector"), config={**self.config, **(
+                    {"offline_feedback_policy": self.offline_feedback_policy.policy_id}
+                    if self.offline_feedback_policy is not None else {})},
                 record=record, packet=packet, evidence=attached_snapshot,
                 registry=effective_interventions,
                 authority=authority_identity(effective_interventions, calibration=plan.conviction_calibration),
@@ -852,8 +882,9 @@ class Detector:
             case_id=case_id, packet=packet, proof=proof, stage_status=stage_status,
             providers=providers, provenance=provenance,
         )
-        causal_policy = self.config["causal_audit"]
-        if causal_policy["mode"] != "off":
+        if causal_diagnostics is not None:
+            output["proof"]["causal_diagnostics"] = causal_diagnostics
+        elif causal_policy["mode"] != "off":
             mandatory = list(dict.fromkeys(eid for eid in (
                 event_id_for_step(packet, hearing.get("step")) for hearing in hearings
             ) if eid is not None))
@@ -865,6 +896,35 @@ class Detector:
             except BaseException as exc:
                 exc.base_detection_result = deepcopy(output)
                 raise
+        if (causal_review is None and causal_policy["mode"] == "tracer_context"
+                and output["state"] == "verified_clean" and recall_status.get("state") == "not_needed"):
+            budget = current_added_budget()
+            decision = causal_recall_decision(
+                (causal_diagnostics or {}).get("audit"), judge_result=judge_result,
+                policy=causal_policy, budget=budget, offline_policy=self.offline_feedback_policy,
+            )
+            output["proof"]["negative_feedback"] = decision
+            if decision["state"] == "eligible":
+                review = {"diagnostics": causal_diagnostics, "context": seal({
+                    "schema_version": "detector.causal_recall_context.v1", "packet_digest": digest(packet),
+                    "anomalies": decision["anomalies"], "decision_authority": "none",
+                })}
+                try:
+                    with added_request_scope(budget):
+                        reviewed = self._detect(
+                            record, case_id=case_id, interventions=effective_interventions,
+                            frozen_stages={"judge_result": judge_result, "judge_status": judge_status},
+                            evidence=evidence, causal_review=review,
+                        )
+                except AddedBudgetExceeded as exc:
+                    output["proof"]["negative_feedback"] = {**decision, "state": "budget_exhausted", "reason": exc.resource}
+                except BaseException as exc:
+                    exc.base_detection_result = deepcopy(output)
+                    raise
+                else:
+                    reviewed["proof"]["negative_feedback"] = {**decision, "state": "reviewed"}
+                    reviewed["base_detection_result"] = deepcopy(output)
+                    output = reviewed
         return output
 
 

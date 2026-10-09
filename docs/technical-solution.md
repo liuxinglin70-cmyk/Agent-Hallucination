@@ -1,8 +1,8 @@
 # 核心技术文档
 
-更新：2026-10-08（补充拟议方向，原有实现叙述保持不变）。本文描述当前实现及约束；历史实验、旧方案和数值统一见 [实验日志](experiment-log.md)。
+更新：2026-10-09。本文描述当前实现及约束；历史实验、旧方案和数值统一见 [实验日志](experiment-log.md)。
 
-> **研究方向补充（未实现）**：详见 [疑惑度引导的双向因果轨迹审计技术设计](uncertainty-guided-causal-audit-design-20261008.md)，简明版见 [2026-10-08 组会汇报](group-meeting-uncertainty-causal-feedback-20261008.md)。
+> **研究方向与验收目标**：详见 [疑惑度引导的双向因果轨迹审计技术设计](uncertainty-guided-causal-audit-design-20261008.md)，简明版见 [2026-10-08 组会汇报](group-meeting-uncertainty-causal-feedback-20261008.md)。
 
 代码重构、缺陷修复及新功能的当前实施状态统一见根目录 [实施台账](../IMPLEMENTATION_PLAN.md)。本期采用离线代码验收，不开展真实模型实验；本文件仍只描述已实现合同。
 
@@ -55,7 +55,7 @@ flowchart TD
 
 `api.Detector` 编排阶段；`judge.py`、`recaller.py`、`step_tracer.py`、`defense.py` 各自校验模型输出。Judge 阳性和召回升级候选进入 hearing 队列；`adjudication.py` 校验证据引用、指控和确认步骤，计算终态。机械谓词的定罪能力受 `conviction_calibration.py` 和校准记录约束；证据型组件不能自行获得定罪权。
 
-`interventions.py` 负责统一 schema、内容哈希、hook 和执行计划；`predicate_dsl.py`、`predicate_context.py` 定义可执行谓词及可用上下文。冻结阶段回放必须匹配证据身份，并拒绝覆盖待测干预的目标阶段。配置文件与 `Detector(config=...)` 共用 `config.validate_config`，解析有效 route 并保留默认 off 的审计配置，未知字段、非法数值与缺失声明工件直接报错；`require_credentials=False` 不读取仓库 .env。审计配置已可解析，执行分支仍待后续工作包接通。
+`interventions.py` 负责统一 schema、内容哈希、hook 和执行计划；`predicate_dsl.py`、`predicate_context.py` 定义可执行谓词及可用上下文。冻结阶段回放必须匹配证据身份，并拒绝覆盖待测干预的目标阶段。配置文件与 `Detector(config=...)` 共用 `config.validate_config`，解析有效 route 并保留默认 off 的审计配置，未知字段、非法数值与缺失声明工件直接报错；`require_credentials=False` 不读取仓库 .env。审计默认关闭；shadow 与 tracer_context 执行分支已接通，完整模块验收状态见实施台账。
 
 Packet 的 `packet_reference_index` 统一事件和实际工具交互的引用归属，canonical position 与原始 source_step_id 分开；局部窗口 v2 覆盖 anchor/target 双端，携带 packet/内容摘要、遗漏 ID、截断原因与独立数据，后续活动不标为恢复。
 
@@ -80,6 +80,16 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 | 版本 | detector.detection_result.v1 | 不匹配的缓存拒绝复用 |
 
 `result.prediction_state` 同时检查 schema、authority、runtime_valid、state 与 occurrence_state，正式预测只返回 True、False 或 None。定位优先使用被定罪 hearing 的 tracer，其次是可用的 defense 确认，再次是指控步骤。tracer 比确认步骤更早本身不构成冲突；首 hearing 的镜像 tracer 与最终采纳步矛盾则降低定位权威性。旧定位文档曾混淆这些不同种类的不一致，这里按当前代码明确区分。
+
+### 因果诊断与定位上下文
+
+`causal_contracts.py`、`step_uncertainty.py` 和 `causal_graph.py` 生成只读风险画像、确定性候选和实际依赖投影；未知语义关系保留未知，teacher-forced PPL 返回 unsupported。`causal_audit.py` 可验证局部字面算术偏差；模型解释只记 hypothesis，局部错误不证明材料性、最早责任步或最终交付违约。
+
+`shadow` 在基础裁决后使用剩余新增预算生成诊断。`tracer_context` 在听证前准备诊断，`context_for_hearing` 只投影当前听证所引用事件的核验记录，并绑定完整目标摘要；事件重叠仍不证明 claim 等价。Tracer 可以拒绝不相关上下文，原引用解析和 Adjudication 权限保持有效。上下文的实际证据摘要不含审计耗时，冻结 Tracer 仅在上下文身份相同后复用；配置变化或此前无上下文时重新执行。
+
+新增上下文按 UTF-8 内容字节保守计入输入预算；repair 单独准入，耗尽时回到基础 Tracer。新增阴性复审的 Scanner、Upgrade 多票、Tracer、Defense 及 repair 都由 provider 的 `added_request_scope` 共享同一案例请求、输入、输出和 deadline 预算，transport 不重新领预算。预算耗尽保留已形成的基础证明与实际请求成本；fatal 和取消传播并保留基础证明。
+
+阴性反馈独立开关默认为 false，仅在 tracer_context 模式、基础 clean 且原召回未运行时检查已核验异常。生产配置缺少真实校准时记录 calibration_unavailable，不启动扩展。`OfflineFeedbackPolicy` 是无凭据 API 的显式离线策略注入点，不能从 JSON 校准证书装载；它允许复审后仍必须经过完整召回、升级、独立听证和裁决。Scanner 只接收有界异常与来源，不接收 Judge 的 correct_result；仅凭高风险或模型意见不会重开。当前离线闭环不证明真实收益，完整同 claim 首次引入证书及演化消费仍在实施。
 
 ### 测量、故障与成本
 

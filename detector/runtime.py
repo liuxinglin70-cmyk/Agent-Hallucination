@@ -22,6 +22,7 @@ _DEADLINE: ContextVar[float | None] = ContextVar("execution_deadline", default=N
 _CONTROL: ContextVar["RunControl | None"] = ContextVar("execution_control", default=None)
 _USAGE: ContextVar[list[dict[str, Any]] | None] = ContextVar("request_usage", default=None)
 _ADDED_BUDGET: ContextVar["AddedBudget | None"] = ContextVar("added_case_budget", default=None)
+_ADDED_REQUESTS: ContextVar["AddedBudget | None"] = ContextVar("added_requests", default=None)
 _OWNERS: dict[str, tuple[int, int, Any]] = {}
 _OWNER_LOCK = threading.RLock()
 
@@ -218,6 +219,14 @@ class AddedBudget:
             self.output_tokens += cap
             return cap
 
+    def reserve_context(self, text: str) -> None:
+        with self._lock:
+            self.begin()
+            size = len(text.encode("utf-8"))
+            if self.input_bytes + size > self._policy["max_added_prompt_tokens_per_case"]:
+                raise AddedBudgetExceeded("input")
+            self.input_bytes += size
+
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             return {
@@ -247,6 +256,22 @@ def added_budget_scope(policy: Mapping[str, Any] | None) -> Iterator[AddedBudget
 
 def current_added_budget() -> AddedBudget | None:
     return _ADDED_BUDGET.get()
+
+
+@contextmanager
+def added_request_scope(budget: AddedBudget) -> Iterator[None]:
+    if budget is not current_added_budget():
+        raise ValueError("added requests require the current case budget")
+    token = _ADDED_REQUESTS.set(budget)
+    try:
+        with deadline_scope(deadline=budget.deadline):
+            yield
+    finally:
+        _ADDED_REQUESTS.reset(token)
+
+
+def current_added_request_budget() -> AddedBudget | None:
+    return _ADDED_REQUESTS.get()
 
 
 def bounded_map(function: Callable[[T], R], items: Iterable[T], *, workers: int,

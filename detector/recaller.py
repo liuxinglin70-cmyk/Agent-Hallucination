@@ -13,6 +13,7 @@ A scanner candidate can never convict by itself.
 from __future__ import annotations
 
 from copy import deepcopy
+import json
 from typing import Any, Mapping, Sequence
 
 from detector.evidence import (
@@ -128,6 +129,7 @@ def run_recall_scan(
     config: Mapping[str, Any],
     plan: InterventionPlan | None = None,
     snapshot: Mapping[str, Any] | None = None,
+    causal_context: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     plan = plan or empty_plan()
     route = dict(config["recall_route"])
@@ -145,6 +147,14 @@ def run_recall_scan(
         "whether the trajectory is hallucinated.\n\n" + view_text
         + evidence_block
     )
+    if causal_context is not None:
+        from detector.causal_contracts import validate_seal
+        from detector.identity import digest
+        validate_seal(causal_context, schema="detector.causal_recall_context.v1")
+        if causal_context["packet_digest"] != digest(packet):
+            raise ValueError("causal recall context packet identity differs")
+        user += "\n\nCAUSAL ANOMALIES: " + json.dumps(causal_context, ensure_ascii=False)
+        cache_tag = digest({"snapshot": cache_tag, "causal_context": causal_context["digest"]})
     try:
         parsed, meta = _provider_call(
             route=route, system=system, user=user, purpose="recall_scanner",

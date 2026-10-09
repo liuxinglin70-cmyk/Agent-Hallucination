@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import dataclass
 import json
 import time
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from detector.causal_contracts import (
     CAUSAL_PROJECTION_SCHEMA, RISK_PROFILE_SCHEMA, arithmetic_check, seal, validate_seal,
@@ -13,13 +14,14 @@ from detector.causal_contracts import (
 from detector.causal_graph import build_observed_dependencies, project_dependency_closure
 from detector.identity import digest
 from detector.measurement import request_execution
-from detector.packet import packet_reference_error, validate_packet
+from detector.packet import event_id_for_step, packet_reference_error, packet_reference_index, validate_packet
 from detector.provider import ProviderError, provider_call, raise_if_fatal
 from detector.predicates import run_predicate
 from detector.runtime import AddedBudget, AddedBudgetExceeded, deadline_scope, usage_scope, utc_now
 from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates
 
 AUDIT_SCHEMA = "detector.causal_audit.v1"
+CONTEXT_SCHEMA = "detector.causal_context.v1"
 CAUSAL_ROLES = frozenset({"introduction", "propagation", "delivery", "corrected", "unknown"})
 CLAIM_STATUSES = frozenset({"supported", "refuted", "inconclusive"})
 _SYSTEM = (
@@ -29,6 +31,55 @@ _SYSTEM = (
     "\"reason\": string}]}. Your explanation is a hypothesis, not execution verification. "
     "Do not invent tool replays, external facts or state changes."
 )
+
+
+@dataclass(frozen=True)
+class OfflineFeedbackPolicy:
+    policy_id: str
+    allows: Callable[[list[dict[str, Any]]], bool]
+
+    def __post_init__(self):
+        if not isinstance(self.policy_id, str) or not self.policy_id.strip() or not callable(self.allows):
+            raise ValueError("offline feedback policy requires an identity and a callable")
+
+
+def causal_recall_decision(
+    audit: Mapping[str, Any] | None, *, judge_result: Mapping[str, Any],
+    policy: Mapping[str, Any], budget: AddedBudget,
+    offline_policy: OfflineFeedbackPolicy | None = None,
+) -> dict[str, Any]:
+    result = {"state": "inactive", "reason": "disabled", "anomalies": [],
+              "policy_origin": "offline_injected" if offline_policy else "production",
+              "policy_id": offline_policy.policy_id if offline_policy else None,
+              "decision_authority": "none"}
+    if policy["mode"] != "tracer_context" or not policy["negative_feedback_enabled"]:
+        return result
+    if not judge_result.get("ok") or (judge_result.get("parsed") or {}).get("is_hallucination") is not False:
+        return {**result, "reason": "not_a_verified_negative"}
+    if audit is None:
+        return {**result, "reason": "audit_unavailable"}
+    validate_seal(audit, schema=AUDIT_SCHEMA)
+    if audit["policy_digest"] != digest(policy):
+        raise ValueError("negative feedback policy identity differs")
+    if audit["health"]["state"] != "ok":
+        return {**result, "reason": "audit_unhealthy"}
+    anomalies = [deepcopy(row) for row in audit["candidates"]
+                 if row["claim_status"] == "supported" and row["verification_status"] == "verified"
+                 and row["scope"] == "local_arithmetic_result" and row["evidence_refs"]]
+    if not anomalies:
+        return {**result, "reason": "no_verified_anomaly"}
+    if offline_policy is None:
+        return {**result, "reason": "calibration_unavailable"}
+    allowed = offline_policy.allows(deepcopy(anomalies))
+    if type(allowed) is not bool:
+        raise ValueError("offline feedback policy must return a boolean")
+    if not allowed:
+        return {**result, "reason": "policy_refused"}
+    try:
+        budget.check()
+    except AddedBudgetExceeded as exc:
+        return {**result, "state": "budget_exhausted", "reason": exc.resource}
+    return {**result, "state": "eligible", "reason": "verified_anomaly_allowed", "anomalies": anomalies}
 
 
 def _model_hypotheses(parsed: Any, packet, selected, visible) -> list[dict[str, Any]]:
@@ -176,6 +227,39 @@ def run_causal_audit(
         "cost": execution, "budget": budget.snapshot(),
     })
     return audit, health
+
+
+def context_for_hearing(
+    audit: Mapping[str, Any], *, positive: Mapping[str, Any], packet: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    validate_seal(audit, schema=AUDIT_SCHEMA)
+    if audit["packet_digest"] != digest(packet):
+        raise ValueError("causal context packet identity differs")
+    if audit["health"]["state"] != "ok":
+        return None
+    refs = positive.get("evidence_refs") or []
+    error = packet_reference_error(packet, refs)
+    if error:
+        raise ValueError(error)
+    owners = packet_reference_index(packet)
+    anchors = {owners[ref] for ref in refs}
+    eid = event_id_for_step(packet, positive.get("step"))
+    if eid is not None:
+        anchors.add(eid)
+    # A shared event is a relevance bound, not proof that two claims are equivalent.
+    candidates = [row for row in audit["candidates"] if row["event_id"] in anchors
+                  and row["verification_status"] == "verified"]
+    if not candidates:
+        return None
+    return seal({
+        "schema_version": CONTEXT_SCHEMA, "packet_digest": audit["packet_digest"],
+        "policy_digest": audit["policy_digest"],
+        "audit_evidence_digest": digest({key: value for key, value in audit.items()
+                                        if key not in {"digest", "cost", "budget", "hypotheses"}}),
+        "target_digest": digest(positive), "candidates": candidates,
+        "scope": "hearing_referenced_local_checks", "claim_equivalence": "unverified",
+        "closure_state": audit["closure_state"], "decision_authority": "none",
+    })
 
 
 def build_causal_diagnostics(
