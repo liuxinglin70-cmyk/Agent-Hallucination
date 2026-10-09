@@ -127,9 +127,10 @@ def test_detect_batch_evaluate_through_http(tmp_path, cli_runtime):
         server.server_close()
 
 
-def test_batch_cli_returns_nonzero_after_fatal_provider_error(tmp_path):
+def test_batch_cli_returns_nonzero_after_fatal_provider_error(tmp_path, cli_runtime):
     """A recorded 401 is a failed measurement, not a successful CLI run."""
 
+    working_directory, pythonpath = cli_runtime
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):
             self.rfile.read(int(self.headers["Content-Length"]))
@@ -184,13 +185,14 @@ def test_batch_cli_returns_nonzero_after_fatal_provider_error(tmp_path):
             "PYTHONUTF8": "1",
             "DETECTOR_ENDPOINT": endpoint,
             "DETECTOR_API_KEY_ENV": "CLI_AUTH_FAILURE_KEY",
+            "PYTHONPATH": pythonpath,
         }
         result = subprocess.run(
             [sys.executable, "-m", "detector", "batch",
              "--dataset-root", str(data), "--cases-file", str(cases),
              "--runs-root", str(tmp_path / "runs"), "--run-id", "unauthorized",
              "--config", str(config), "--workers", "1"],
-            cwd=ROOT, env=env, capture_output=True, text=True,
+            cwd=working_directory, env=env, capture_output=True, text=True,
             encoding="utf-8", timeout=60,
         )
         assert result.returncode == 2, result.stdout + result.stderr
@@ -200,7 +202,41 @@ def test_batch_cli_returns_nonzero_after_fatal_provider_error(tmp_path):
         assert summary["stop"]["error_type"] == "authentication_error"
         assert summary["measurement"]["status_counts"]["fatal_provider"] == 1
         assert summary["measurement"]["not_started"] == 1
+        from experiments.plan import case_list_digest
+        measurement = tmp_path / "measurement.json"
+        selected = ["one.json", "two.json"]
+        measurement.write_text(json.dumps({"schema_version": "detector.measurement_manifest.v1",
+            "cases": selected, "cases_digest": case_list_digest(selected),
+            "gold_positive": 0, "gold_negative": 2}), encoding="utf-8")
+        failed_stage = subprocess.run([sys.executable, "-m", "experiments", "--measurement", str(measurement),
+            "baseline", "--config", str(config), "--dataset-root", str(data),
+            "--runs-root", str(tmp_path / "experiments"), "--run-id", "denied", "--workers", "1"],
+            cwd=working_directory, env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
+        payload = json.loads(failed_stage.stdout)
+        assert payload["stop"]["error_type"] == "authentication_error"
+        assert failed_stage.returncode == 2, failed_stage.stdout + failed_stage.stderr
+        assert payload["selection"]["selected_cases_digest"] == case_list_digest(selected)
+        assert payload["cost"]["cost_basis"] == "invocation"
+        assert all(key in payload["cost"] for key in ("invocation_cost", "case_attempt_cost", "run_lifetime_cost"))
     finally:
         server.shutdown()
         thread.join(timeout=5)
         server.server_close()
+
+
+
+def test_experiment_cli_missing_resources_report_actionable_errors(tmp_path, cli_runtime):
+    working_directory, pythonpath = cli_runtime
+    env = {**os.environ, "PYTHONPATH": pythonpath, "PYTHONUTF8": "1"}
+    missing = subprocess.run([sys.executable, "-m", "experiments", "--measurement",
+        str(tmp_path / "missing.json"), "plan"], cwd=working_directory, env=env,
+        capture_output=True, text=True, encoding="utf-8", timeout=15)
+    assert missing.returncode == 2
+    assert "--measurement" in missing.stderr
+    assert "Traceback" not in missing.stderr
+    if working_directory != ROOT:
+        default = subprocess.run([sys.executable, "-m", "experiments", "plan"], cwd=working_directory,
+            env=env, capture_output=True, text=True, encoding="utf-8", timeout=15)
+        assert default.returncode == 2
+        assert "--measurement" in default.stderr
+        assert "Traceback" not in default.stderr

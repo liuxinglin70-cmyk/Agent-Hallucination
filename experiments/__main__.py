@@ -66,19 +66,8 @@ def cmd_baseline(args: argparse.Namespace) -> int:
         retry_unresolved=args.retry_unresolved,
         report_path=args.report,
     )
-    payload = outcome.report
-    _print({
-        "stage": payload["stage"], "arm": payload["arm"],
-        "coverage": payload["coverage"], "readings": payload["readings"],
-        "cost": {key: payload["cost"][key] for key in (
-            "case_hours", "provider_attempts", "usage", "mean_case_seconds",
-            "slowest_cases", "wall_seconds",
-        )},
-        "stop": payload["stop"],
-        "measurement_prefix": payload["measurement_prefix"]["size"],
-        "report_path": payload.get("report_path"),
-    })
-    return 0
+    _print(outcome.report)
+    return 2 if outcome.report.get("stop") else 0
 
 
 def cmd_paired(args: argparse.Namespace) -> int:
