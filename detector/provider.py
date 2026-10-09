@@ -25,7 +25,7 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 from contextlib import nullcontext
 from detector.runtime import (
-    CaseDeadlineExceeded, current_added_request_budget, current_control, current_deadline, deadline_scope, record_request,
+    CaseDeadlineExceeded, CaseExecutionError, current_added_request_budget, current_control, current_deadline, deadline_scope, record_request,
 )
 
 _DIRECT_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))
@@ -99,7 +99,7 @@ def _isolated_transport(
     return status, raw
 
 
-class ProviderError(RuntimeError):
+class ProviderError(CaseExecutionError):
     """A provider call failed after exhausting its retry budget."""
 
     def __init__(
@@ -132,8 +132,8 @@ FATAL_PROVIDER_ERRORS = frozenset({
 })
 
 
-def raise_if_fatal(exc: ProviderError) -> None:
-    if exc.error_type in FATAL_PROVIDER_ERRORS:
+def raise_if_terminal(exc: ProviderError) -> None:
+    if not exc.retryable or exc.error_type in FATAL_PROVIDER_ERRORS:
         raise exc
 
 
@@ -371,6 +371,7 @@ def _provider_call(
             raise ProviderError(
                 route_name, "case deadline exceeded",
                 error_type="case_deadline_exceeded",
+                retryable=False,
             )
         total_timeout = min(total_timeout, remaining_case)
     deadline = time.monotonic() + total_timeout
@@ -531,9 +532,12 @@ def _provider_call(
             last_error = "provider reply carried no usable JSON object"
             break
         return parsed, meta
-    error_type = ("invalid_json" if "JSON" in last_error else
+    expired_case = case_deadline is not None and time.monotonic() >= case_deadline
+    error_type = ("case_deadline_exceeded" if expired_case else
+                  "invalid_json" if "JSON" in last_error else
                   "rate_limited" if last_status == 429 else "provider_error")
     raise ProviderError(
         route_name, last_error or "unknown failure",
         error_type=error_type, attempts=attempts, http_status=last_status,
+        retryable=not expired_case,
     )

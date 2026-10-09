@@ -21,7 +21,7 @@ from detector.provider import (
     accumulate_usage,
     majority_vote,
     provider_call,
-    raise_if_fatal,
+    raise_if_terminal,
     required_quorum,
 )
 from detector.runtime import parallel_ordered
@@ -135,35 +135,20 @@ def _cast_vote(
     route: Mapping[str, Any],
     system: str,
     user: str,
-    view_state: str,
-) -> tuple[dict | None, dict[str, Any] | None, bool, list[dict[str, str]]]:
-    """One judge ballot; a ``None`` verdict means this ballot abstains.
-
-    Returns ``(parsed_or_None, provider_meta_or_None, fatal, warnings)``
-    where ``fatal`` marks a failure that makes the whole judge stage fail
-    (a missing credential repeats for every vote). Ordinary contract
-    violations and transport failures are repaired once and otherwise
-    abstain — the remaining ballots still decide.
-    """
+) -> tuple[dict | None, dict[str, Any] | None, list[dict[str, str]]]:
+    """A recoverable failed ballot abstains; terminal errors propagate."""
     warnings: list[dict[str, str]] = []
 
     def abstain(message: str) -> tuple:
         warnings.append({"attempt": "vote", "error": message})
-        return None, None, False, list(warnings)
-
-    def fatal_error(message: str, attempts: int, error_type: str) -> tuple:
-        warnings.append({"attempt": "vote", "error": message})
-        return None, None, True, list(warnings)
+        return None, None, list(warnings)
 
     try:
         parsed, meta = provider_call(
             route=route, system=system, user=user, purpose="judge",
         )
     except ProviderError as exc:
-        if exc.error_type != "missing_credential":
-            raise_if_fatal(exc)
-        if exc.error_type == "missing_credential":
-            return fatal_error(exc.message, exc.attempts, "provider_error")
+        raise_if_terminal(exc)
         return abstain(exc.message)
     result, error = _parse_judge(parsed, packet)
     if result is None:
@@ -176,14 +161,11 @@ def _cast_vote(
             )
             result, error = _parse_judge(parsed, packet)
         except ProviderError as exc:
-            if exc.error_type != "missing_credential":
-                raise_if_fatal(exc)
-            if exc.error_type == "missing_credential":
-                return fatal_error(exc.message, exc.attempts, "provider_error")
+            raise_if_terminal(exc)
             return abstain(exc.message)
     if result is None:
         warnings.append({"attempt": "final", "error": f"contract:{error}"})
-    return result, meta, False, list(warnings)
+    return result, meta, list(warnings)
 
 
 def run_judge(
@@ -194,9 +176,8 @@ def run_judge(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run the judge; returns ``(judge_result, stage_status)``.
 
-    ``judge_result`` always carries ``ok`` and ``parsed``. A provider or
-    contract failure is returned as status, never raised: only the judge
-    failure can make the whole case unresolved. When the route requests
+    Recoverable provider or contract failures return an abstention status.
+    Terminal failures propagate with their classification. When the route requests
     more than one vote, independent samples decide ``is_hallucination``
     by strict majority; a tie or no quorum keeps the negative verdict and
     the stage degrades, because a positive verdict is the extraordinary
@@ -224,82 +205,35 @@ def run_judge(
     ballots_usage: dict[str, Any] = {}
     total_attempts = 0
     warnings: list[dict[str, str]] = []
-    fatal_error = ""
     topups_used = 0
-
-    def cast_one() -> bool:
-        """One ballot; False marks a fatal failure that stops all voting."""
-        nonlocal fatal_error, total_attempts, sample_meta
-        parsed, meta, fatal, vote_warnings = _cast_vote(
-            packet=packet, route=route, system=system, user=user,
-            view_state=view_state,
-        )
-        total_attempts += int((meta or {}).get("attempts") or 0)
-        warnings.extend(vote_warnings)
-        if fatal:
-            fatal_error = (
-                vote_warnings[-1]["error"] if vote_warnings
-                else "judge vote failed"
-            )
-            return False
-        if parsed is not None:
-            ballots.append(parsed)
-            sample_meta = dict(meta or {})
-            accumulate_usage(ballots_usage, (meta or {}).get("usage") or {})
-        return True
 
     # Independent ballots are exactly that, so they are cast concurrently: the
     # vote count is a majority requirement, not a serial protocol. Order is
     # preserved (see ``parallel_ordered``) so the returned sample does not
     # depend on which ballot happened to finish first.
-    def cast_at(_index: int) -> tuple[Any, Any, bool, list]:
+    def cast_at(_index: int) -> tuple[Any, Any, list]:
         return _cast_vote(
             packet=packet, route=route, system=system, user=user,
-            view_state=view_state,
         )
 
-    def absorb(result: tuple[Any, Any, bool, list]) -> bool:
-        nonlocal fatal_error, sample_meta
-        parsed, meta, fatal, vote_warnings = result
+    def absorb(result: tuple[Any, Any, list]) -> None:
+        nonlocal total_attempts, sample_meta
+        parsed, meta, vote_warnings = result
+        total_attempts += int((meta or {}).get("attempts") or 0)
         warnings.extend(vote_warnings)
-        if fatal:
-            fatal_error = (
-                vote_warnings[-1]["error"] if vote_warnings else "judge vote failed"
-            )
-            return False
         if parsed is not None:
             ballots.append(parsed)
             sample_meta = dict(meta or {})
             accumulate_usage(ballots_usage, (meta or {}).get("usage") or {})
-        return True
 
     parallel = max(1, int((route.get("vote_concurrency") or votes) or 1))
     outcomes = parallel_ordered(cast_at, votes, workers=parallel)
     for outcome in outcomes:
-        if outcome is None:
-            warnings.append({"attempt": "parallel", "error": "ballot raised"})
-            continue
-        total_attempts += int((outcome[1] or {}).get("attempts") or 0)
-        if not absorb(outcome):
-            break
-    while (
-        not fatal_error and len(ballots) < votes and topup_budget > 0
-    ):
+        absorb(outcome)
+    while len(ballots) < votes and topup_budget > 0:
         topup_budget -= 1
         topups_used += 1
-        if not cast_one():
-            break
-    if fatal_error:
-        return {
-            "ok": False,
-            "parsed": None,
-            "error": fatal_error,
-            "error_type": "provider_error",
-        }, {
-            "stage": "judge", "state": "provider_error",
-            "attempts": total_attempts, "view": view_state,
-            "warnings": warnings,
-        }
+        absorb(cast_at(0))
     if not ballots:
         return {
             "ok": False,

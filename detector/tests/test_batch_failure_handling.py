@@ -109,9 +109,13 @@ def test_an_exhausted_budget_is_not_retried_inside_the_run():
                         reasons=_deadline_failure())
     assert measurement_status(expired) == "infrastructure_failure"
     assert retry_in_run(expired) is False
-    # ...but a later invocation should still measure it: a slice of the corpus
-    # that was never read is not a slice the detector decided about.
     assert needs_remeasurement(expired) is True
+
+
+def test_explicit_terminal_case_error_is_not_retried_inside_the_run():
+    result = _envelope("c.json", state="unresolved", authority="invalid", reasons=[{
+        "component": "judge", "error_type": "provider_error", "retryable": False}])
+    assert not retry_in_run(result)
 
 
 def test_a_provider_error_is_retried_inside_the_run():

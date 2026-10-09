@@ -104,7 +104,11 @@ class RunStopped(BaseException):
         super().__init__(str(self.reason.get("message") or self.reason.get("error_type") or "run stopped"))
 
 
-class CaseDeadlineExceeded(TimeoutError):
+class CaseExecutionError(RuntimeError):
+    """An expected case failure does not cancel other cases in the run."""
+
+
+class CaseDeadlineExceeded(TimeoutError, CaseExecutionError):
     """A case ran out of time while waiting for provider capacity."""
 
 
@@ -341,8 +345,8 @@ def bounded_map(function: Callable[[T], R], items: Iterable[T], *, workers: int,
         # measurement.
         if effective is not None and effective.stopped.is_set():
             raise RunStopped(effective.reason or {"error_type": "stopped"})
-    except BaseException:
-        if effective is not None:
+    except BaseException as exc:
+        if effective is not None and not isinstance(exc, CaseExecutionError):
             effective.stop({"error_type": "cancelled", "message": "run interrupted"})
         for future in pending:
             future.cancel()

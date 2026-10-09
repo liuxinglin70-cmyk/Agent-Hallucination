@@ -15,7 +15,7 @@ from detector.causal_graph import build_observed_dependencies, project_dependenc
 from detector.identity import digest
 from detector.measurement import request_execution
 from detector.packet import event_id_for_step, packet_reference_error, packet_reference_index, validate_packet
-from detector.provider import ProviderError, provider_call, raise_if_fatal
+from detector.provider import ProviderError, provider_call, raise_if_terminal
 from detector.predicates import run_predicate
 from detector.runtime import AddedBudget, AddedBudgetExceeded, deadline_scope, usage_scope, utc_now
 from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates
@@ -211,7 +211,7 @@ def run_causal_audit(
             health = {"state": "budget_exhausted", "warnings": [exc.resource]}
             hypotheses = []
         except ProviderError as exc:
-            raise_if_fatal(exc)
+            raise_if_terminal(exc)
             health = {"state": "provider_error", "warnings": [exc.as_dict()]}
             hypotheses = []
     execution = request_execution(observations, started_at=started_at, finished_at=utc_now(),

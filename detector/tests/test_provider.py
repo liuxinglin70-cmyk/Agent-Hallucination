@@ -57,6 +57,29 @@ def test_actual_capacity_wait_does_not_retry_or_record_an_undispatched_request(m
     control.check()
 
 
+@pytest.mark.parametrize("votes", [1, 3])
+def test_capacity_deadline_survives_judge_and_whole_case_retry(monkeypatch, votes):
+    from unittest.mock import patch
+    from detector.api import Detector
+    from detector.runner import detect_with_transport_retry
+    from detector.runtime import RunControl, deadline_scope, run_scope
+    monkeypatch.setenv("CAPACITY_TEST_KEY", "offline-dummy")
+    monkeypatch.setattr(provider_module, "_isolated_transport",
+                        lambda **kwargs: pytest.fail("capacity wait cannot dispatch transport"))
+    detector = Detector({"provider": {"endpoint": "http://127.0.0.1:1/v1", "model": "fake",
+        "api_key_env": "CAPACITY_TEST_KEY", "votes": votes, "vote_topup": 2}}, require_credentials=False)
+    control = RunControl(1)
+    with patch.object(detector, "detect", wraps=detector.detect) as detect:
+        with control.request_slot(), run_scope(control), deadline_scope(seconds=0.05):
+            result = detect_with_transport_retry(detector,
+                {"question": "What is 2+2?", "history": [{"role": "assistant", "content": "4"}]},
+                case_id="capacity.json")
+        assert detect.call_count == 1
+    assert result["authority_failure_reasons"][0]["error_type"] == "case_deadline_exceeded"
+    assert result["execution"]["provider_attempts"] == 0
+    control.check()
+
+
 class _Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))
@@ -324,6 +347,8 @@ def test_case_deadline_bounds_provider_call(monkeypatch):
     assert "total timeout exceeded" in str(exc.value)
     assert all(t <= 2.0 for t in timeouts)
     assert len(timeouts) > 1
+    assert exc.value.error_type == "case_deadline_exceeded"
+    assert not exc.value.retryable
 
 
 def test_case_deadline_raises_when_already_exceeded(monkeypatch):

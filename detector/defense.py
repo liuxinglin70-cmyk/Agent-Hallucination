@@ -27,7 +27,7 @@ from detector.provider import (
     accumulate_usage,
     majority_vote,
     provider_call,
-    raise_if_fatal,
+    raise_if_terminal,
     required_quorum,
 )
 from detector.runtime import parallel_ordered
@@ -188,7 +188,7 @@ def _call_defense(
             cache_tag=cache_tag,
         )
     except ProviderError as exc:
-        raise_if_fatal(exc)
+        raise_if_terminal(exc)
         return {"ok": False, "parsed": None, "error": exc.message,
                 "error_type": exc.error_type}, {
             "stage": "defense", "state": "provider_error",
@@ -215,7 +215,7 @@ def _call_defense(
                     result, packet, positive, snapshot,
                 )
         except ProviderError as exc:
-            raise_if_fatal(exc)
+            raise_if_terminal(exc)
             return {"ok": False, "parsed": None, "error": exc.message,
                     "error_type": exc.error_type}, {
                 "stage": "defense", "state": "provider_error",

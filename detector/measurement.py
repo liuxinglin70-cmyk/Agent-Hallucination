@@ -87,7 +87,8 @@ def retry_in_run(result: Mapping[str, Any]) -> bool:
     different competing load, the same case is worth asking again.
     """
     errors = _error_types(result)
-    if errors & EXHAUSTED_ERRORS or fatal_failure(result):
+    if (errors & EXHAUSTED_ERRORS or fatal_failure(result)
+            or any(reason.get("retryable") is False for reason in failure_reasons(result))):
         return False
     return measurement_status(result) == "infrastructure_failure"
 
