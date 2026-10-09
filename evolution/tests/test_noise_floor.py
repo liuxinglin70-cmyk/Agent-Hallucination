@@ -28,12 +28,16 @@ constructs a live backend, so no seam to a provider exists to be reached.
 from __future__ import annotations
 
 import json
+from contextvars import ContextVar
+from threading import Event
 from pathlib import Path
 
 import pytest
 
 from evolution.backends import MockDetectorBackend
 from evolution.config import load_config
+from evolution.checkpoint import CycleJournal
+from evolution.contracts import empty_registry
 from evolution.engine import (
     EvolutionEngine,
     _ArmRunner,
@@ -169,38 +173,34 @@ class _RerollUnstableBackend(MockDetectorBackend):
         self.flip_case = str(flip_case)
         self.unstable_roll_one = unstable_roll_one
         self.unstable_roll_two = unstable_roll_two
-        # None = "not inside a roll the mock recognises". "frozen" and "fresh"
-        # are the two rolls the cycle pairs.
-        self._roll: str | None = None
+        self._roll: ContextVar[str | None] = ContextVar("synthetic_roll", default=None)
         self.fresh_reads: list[list[str]] = []
 
     def evaluate(self, cases, **kwargs):  # type: ignore[no-untyped-def]
-        if self._roll is None:
-            self._roll = "frozen"
-            try:
-                return MockDetectorBackend.evaluate(self, cases, **kwargs)
-            finally:
-                self._roll = None
-        return MockDetectorBackend.evaluate(self, cases, **kwargs)
+        token = self._roll.set(self._roll.get() or "frozen")
+        try:
+            return MockDetectorBackend.evaluate(self, cases, **kwargs)
+        finally:
+            self._roll.reset(token)
 
     def evaluate_fresh(self, cases, **kwargs):  # type: ignore[no-untyped-def]
         self.fresh_reads.append(sorted(str(case) for case in cases))
-        previous = self._roll
-        self._roll = "fresh"
+        token = self._roll.set("fresh")
         try:
             return MockDetectorBackend.evaluate_fresh(self, cases, **kwargs)
         finally:
-            self._roll = previous
+            self._roll.reset(token)
 
     def run_case(self, record, *, case_id, registry=None, gold=None):  # type: ignore[no-untyped-def]
         entries = (registry or {}).get("interventions") or []
         row = MockDetectorBackend.run_case(
             self, record, case_id=case_id, registry=registry, gold=gold,
         )
-        if str(case_id) != self.flip_case or entries or self._roll is None:
+        roll = self._roll.get()
+        if str(case_id) != self.flip_case or entries or roll is None:
             return row
         prediction = (
-            self.unstable_roll_one if self._roll == "frozen"
+            self.unstable_roll_one if roll == "frozen"
             else self.unstable_roll_two
         )
         state = "verified_error" if prediction else "verified_clean"
@@ -1297,3 +1297,46 @@ def test_the_offline_tool_exits_nonzero_on_a_missing_path(tmp_path):
 
     assert tool.main(["rolls", str(tmp_path / "nope")]) == 2
     assert tool.main(["cycle", str(tmp_path / "nope.json")]) == 2
+
+
+
+def test_journal_reroll_survives_another_case_finishing(tmp_path, monkeypatch):
+    dataset = tmp_path / "data"
+    _make_dataset(dataset, n=20)
+    backend = _RerollUnstableBackend()
+    journal = CycleJournal(tmp_path / "checkpoint", {"synthetic": True}, resume=False)
+    cases = [STABLE_FIX, UNSTABLE]
+    first_entered, second_entered, first_returned = Event(), Event(), Event()
+    original_run = backend.run_case
+    def run(record, *, case_id, **kwargs):
+        if case_id == STABLE_FIX:
+            first_entered.set()
+            assert second_entered.wait(5)
+        else:
+            second_entered.set()
+            assert first_returned.wait(5)
+        return original_run(record, case_id=case_id, **kwargs)
+    monkeypatch.setattr(backend, "run_case", run)
+    def evaluate(cases, **kwargs):
+        if cases == [UNSTABLE]:
+            assert first_entered.wait(5)
+        rows = backend.evaluate_fresh(cases, **kwargs)
+        if cases == [STABLE_FIX]:
+            first_returned.set()
+        return rows
+    registry = empty_registry()
+    rows = journal.evaluate(cases, registry=registry, fresh=True, evaluate=evaluate,
+                            kwargs={"dataset_root": dataset, "registry": registry,
+                                    "gold_map": {case: _gold_of(case) for case in cases}, "workers": 2})
+    assert {row["case"]: row["prediction"] for row in rows}[UNSTABLE] is False
+
+
+def test_reroll_context_reaches_inner_parallel_backend_workers(tmp_path):
+    dataset = tmp_path / "data"
+    cases = _make_dataset(dataset, n=20)
+    backend = _RerollUnstableBackend()
+    kwargs = {"dataset_root": dataset, "registry": empty_registry(), "workers": 8}
+    frozen = backend.evaluate(cases, **kwargs)
+    fresh = backend.evaluate_fresh(cases, **kwargs)
+    assert next(row for row in frozen if row["case"] == UNSTABLE)["prediction"] is True
+    assert next(row for row in fresh if row["case"] == UNSTABLE)["prediction"] is False
