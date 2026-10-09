@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 
-from detector.measurement import measurement_status
+from detector.measurement import cost_summary, measurement_status
 
 REPORT_SCHEMA = "experiments.stage_report.v1"
 
@@ -132,27 +132,20 @@ class StageReport:
     def cost(self) -> dict[str, Any]:
         """Wall time, provider attempts and tokens, from the rows themselves."""
         elapsed = 0.0
-        attempts = 0
-        usage: dict[str, Any] = {}
-        missing_usage = 0
         per_case: list[dict[str, Any]] = []
         for row in self.rows:
             seconds = float(row.get("elapsed_seconds") or 0.0)
             elapsed += seconds
-            result = row.get("result") or {}
-            execution = result.get("execution") or {}
-            if isinstance(execution, Mapping):
-                attempts += int(execution.get("provider_attempts") or 0)
-                missing_usage += int(execution.get("usage_missing_attempts") or 0)
-                usage = _fold(usage, execution.get("usage"))
             per_case.append({"case": row.get("case"), "elapsed_seconds": round(seconds, 1)})
         per_case.sort(key=lambda item: -item["elapsed_seconds"])
+        cost = cost_summary(self.rows)
         return {
             "case_seconds": round(elapsed, 1),
             "case_hours": round(elapsed / 3600, 3),
-            "provider_attempts": attempts,
-            "usage": usage or None,
-            "usage_missing_attempts": missing_usage,
+            "provider_attempts": cost["provider_attempts"],
+            "usage": cost["usage"],
+            "usage_missing_attempts": cost["usage_missing_attempts"],
+            "usage_unknown_cases": cost["usage_unknown_cases"],
             "slowest_cases": per_case[:5],
             "wall_seconds": self.wall_seconds,
             "mean_case_seconds": (
@@ -190,21 +183,6 @@ class StageReport:
         }
 
 
-def _fold(total: dict[str, Any], usage: Any) -> dict[str, Any]:
-    if not isinstance(usage, Mapping):
-        return total
-    for key, value in usage.items():
-        if isinstance(value, Mapping):
-            bucket = total.setdefault(key, {})
-            if isinstance(bucket, dict):
-                _fold(bucket, value)
-        elif isinstance(value, bool):
-            continue
-        elif isinstance(value, (int, float)):
-            total[key] = total.get(key, 0) + value
-    return total
-
-
 def summarize_stage(
     *,
     stage: str,
@@ -232,6 +210,19 @@ def summarize_stage(
     )
     payload = report.to_dict(evaluation)
     batch_measurement = dict((batch_summary or {}).get("measurement") or {})
+    invocation = batch_measurement.get("invocation_cost")
+    if isinstance(invocation, Mapping):
+        elapsed = invocation["elapsed_seconds"]
+        payload["cost"].update(
+            cost_basis="invocation", invocation_cost=dict(invocation),
+            case_attempt_cost=batch_measurement.get("case_attempt_cost"),
+            run_lifetime_cost=batch_measurement.get("run_lifetime_cost"),
+            case_seconds=elapsed, case_hours=round(elapsed / 3600, 3),
+            provider_attempts=invocation["provider_attempts"], usage=invocation["usage"],
+            usage_missing_attempts=invocation["usage_missing_attempts"],
+            usage_unknown_cases=invocation["usage_unknown_cases"],
+            mean_case_seconds=round(elapsed / len(rows), 1) if rows else None,
+        )
     payload["batch"] = {
         "attempt_id": batch_measurement.get("attempt_id"),
         "attempts": batch_measurement.get("attempts"),

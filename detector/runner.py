@@ -51,8 +51,9 @@ from detector.measurement import (
     retry_in_run,
     request_execution,
     case_execution,
+    cost_summary,
 )
-from detector.provider import accumulate_usage, case_deadline_ctx
+from detector.provider import case_deadline_ctx
 from detector.result import RESULT_SCHEMA
 from detector.runtime import (
     added_budget_scope,
@@ -60,7 +61,6 @@ from detector.runtime import (
     RunStopped,
     atomic_json,
     bounded_map,
-    current_control,
     contained_path,
     deadline_scope,
     exclusive_writer,
@@ -258,6 +258,21 @@ def _previous_attempts(case_dir: Path) -> int:
     if not attempts.is_dir():
         return 0
     return sum(1 for item in attempts.iterdir() if item.is_dir())
+
+
+def _run_lifetime_cost(run_dir: Path, cases: Sequence[str]) -> dict[str, Any]:
+    rows = []
+    for case in cases:
+        case_dir = contained_path(run_dir, "cases", safe_case_id(case))
+        for path in sorted(case_dir.glob("attempts/*/case_attempts/*/attempt.json")):
+            path = contained_path(case_dir, path.relative_to(case_dir).as_posix())
+            attempt = json.loads(path.read_text(encoding="utf-8-sig"))
+            execution = attempt.get("execution")
+            if not isinstance(execution, Mapping):
+                raise ValueError(f"attempt journal has no execution: {path}")
+            rows.append({"result": {"execution": execution},
+                         "elapsed_seconds": execution.get("elapsed_seconds")})
+    return cost_summary(rows)
 
 
 def _manifest_identity(manifest: Mapping[str, Any]) -> dict[str, Any]:
@@ -492,6 +507,8 @@ def run_batch(
                     started_cases=started_cases,
                     partial_executions=partial_executions,
                     manifest=manifest, stop_reason=stop_reason,
+                    lifetime_cost=_run_lifetime_cost(run_dir, cases),
+                    peak_provider_inflight=effective_control.peak_requests,
                 ))
                 raise
         summary = _summarize(
@@ -499,6 +516,8 @@ def run_batch(
             started_cases=started_cases,
             partial_executions=partial_executions,
             manifest=manifest, stop_reason=stop_reason,
+            lifetime_cost=_run_lifetime_cost(run_dir, cases),
+            peak_provider_inflight=effective_control.peak_requests,
         )
         _write_json(run_dir / "summary.json", summary)
         return summary
@@ -513,6 +532,8 @@ def _summarize(
     stop_reason: Mapping[str, Any],
     started_cases: Sequence[str] | set[str] | None = None,
     partial_executions: Mapping[str, Mapping[str, Any]] | None = None,
+    lifetime_cost: Mapping[str, Any] | None = None,
+    peak_provider_inflight: int | None = None,
 ) -> dict[str, Any]:
     expected = set(map(str, cases))
     by_case = {str(row["case"]): row for row in rows}
@@ -529,31 +550,24 @@ def _summarize(
     not_started = [str(case) for case in cases if str(case) in known_not_started]
     statuses: dict[str, int] = {}
     states: dict[str, int] = {}
-    usage: dict[str, Any] = {}
-    usage_missing = 0
-    usage_unknown_cases = 0
-    elapsed = 0.0
     for row in rows:
         result = row["result"]
         status = measurement_status(result)
         statuses[status] = statuses.get(status, 0) + 1
         state = str(result.get("state") or "unknown")
         states[state] = states.get(state, 0) + 1
-        elapsed += float(row.get("elapsed_seconds") or 0.0)
-        reading = result_usage(result)
-        if isinstance(reading.get("usage"), Mapping):
-            accumulate_usage(usage, reading["usage"])
-        usage_missing += int(reading.get("missing_attempts") or 0)
-        usage_unknown_cases += reading.get("missing_attempts") is None
+    invocation_rows = [row for row in rows
+                       if row.get("source") != "cached" and row["result"].get("state") != "not_started"]
+    case_rows = [{"result": row["result"],
+                  "elapsed_seconds": (row["result"].get("execution") or {}).get(
+                      "elapsed_seconds", row.get("elapsed_seconds"))}
+                 for row in rows if row["result"].get("state") != "not_started"]
     for case, execution in (partial_executions or {}).items():
         if case in by_case:
             continue
-        reading = result_usage({"execution": execution})
-        if isinstance(reading.get("usage"), Mapping):
-            accumulate_usage(usage, reading["usage"])
-        usage_missing += int(reading.get("missing_attempts") or 0)
-        usage_unknown_cases += reading.get("missing_attempts") is None
-        elapsed += float(execution.get("elapsed_seconds") or 0.0)
+        invocation_rows.append({"result": {"execution": execution},
+                                "elapsed_seconds": execution.get("elapsed_seconds")})
+    invocation_cost = cost_summary(invocation_rows)
     if missing and not stop_reason:
         stop_reason = {
             "error_type": "incomplete_batch",
@@ -579,14 +593,17 @@ def _summarize(
             - statuses.get("not_started", 0),
             "not_started": len(not_started),
             "not_started_cases": not_started,
-            "elapsed_seconds": round(elapsed, 1),
+            "elapsed_seconds": invocation_cost["elapsed_seconds"],
             "attempt_id": manifest.get("attempt_id"),
             "attempts": manifest.get("attempts"),
             "deadline_seconds": manifest.get("deadline_seconds"),
-            "usage": usage or None,
-            "usage_missing_attempts": usage_missing,
-            "usage_unknown_cases": usage_unknown_cases,
-            "peak_provider_inflight": getattr(current_control(), "peak_requests", None),
+            "usage": invocation_cost["usage"],
+            "usage_missing_attempts": invocation_cost["usage_missing_attempts"],
+            "usage_unknown_cases": invocation_cost["usage_unknown_cases"],
+            "invocation_cost": invocation_cost,
+            "case_attempt_cost": cost_summary(case_rows),
+            "run_lifetime_cost": dict(lifetime_cost) if lifetime_cost is not None else None,
+            "peak_provider_inflight": peak_provider_inflight,
         },
         "stop": dict(stop_reason),
         "finished_at": utc_now(),

@@ -178,3 +178,21 @@ def result_usage(result: Mapping[str, Any]) -> dict[str, Any]:
             accumulate_usage(total, usage)
     return {"usage": total or None, "source": "legacy_stage_metadata_lower_bound",
             "missing_attempts": None, "attempts": None}
+
+
+def cost_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    usage: dict[str, Any] = {}
+    attempts: list[int | None] = []
+    missing: list[int | None] = []
+    elapsed = 0.0
+    for row in rows:
+        reading = result_usage(row["result"])
+        if isinstance(reading["usage"], Mapping):
+            accumulate_usage(usage, reading["usage"])
+        attempts.append(reading["attempts"])
+        missing.append(reading["missing_attempts"])
+        elapsed += float(row.get("elapsed_seconds") or 0)
+    return {"elapsed_seconds": round(elapsed, 1), "usage": usage or None,
+            "provider_attempts": sum(attempts) if all(type(n) is int for n in attempts) else None,
+            "usage_missing_attempts": sum(n for n in missing if type(n) is int),
+            "usage_unknown_cases": sum(n is None for n in missing)}

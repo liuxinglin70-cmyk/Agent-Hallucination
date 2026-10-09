@@ -99,7 +99,9 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 
 `measurement.py` 统一健康分类与重测策略。error_type 和 code 都可能携带致命错误，必须同时检查。凭据、权限、请求、配额等致命故障不在同轮重试，修复环境后可在后续运行重测。暂时性服务错误允许同轮重试；耗尽案例或批次时限后不能重新申请完整预算。
 
-`runner.py` 统一结果落盘、尝试记录、断点复用和调度；`runtime.py` 提供运行控制、deadline、原子写入和单写者保护。整例重试共享案例 deadline。`measurement.request_execution` 汇总单次 Detector 的真实请求，`case_execution` 生成 execution.v2，保留每次整例尝试的结果、错误和请求成本；嵌套 usage scope 向父层归并一次。批次每次尝试结束即原子保存 attempt.json，程序错误和中断仍传播，汇总保留已发生的成本而不补造结果行。未知请求统计用 usage_unknown_cases 表示，旧 providers/hearings 统计仅为下界。缓存命中的当次与历史成本分离、完整存储事务仍待 M08 实施。
+`runner.py` 统一结果落盘、尝试记录、断点复用和调度；`runtime.py` 提供运行控制、deadline、原子写入和单写者保护。整例重试共享案例 deadline。`measurement.request_execution` 汇总单次 Detector 的真实请求，`case_execution` 生成 execution.v2，保留每次整例尝试的结果、错误和请求成本；嵌套 usage scope 向父层归并一次。批次每次尝试结束即原子保存 attempt.json，程序错误和中断仍传播，汇总保留已发生的成本而不补造结果行。未知请求统计用 usage_unknown_cases 表示，旧 providers/hearings 统计仅为下界。
+
+`measurement.cost_summary` 是运行/报告成本汇总真源。批次 measurement 的 `invocation_cost` 只统计本次实际执行（含中断请求），缓存命中不收取历史请求；`case_attempt_cost` 汇总选中案例最近一次完成测量，`run_lifetime_cost` 从持久化整例尝试 journal 累计所有实际请求，失败与重测保留且不重复。顶层 usage/elapsed 和实验报告 cost 使用 invocation 口径，独立列出历史成本；请求数未知不写零。provider 并发峰值在运行控制退出前后由同一实例显式交付。结果/耗时的原子提交与报告读取事务仍待 M08 实施。
 
 ## 🧬 自进化模型
 
