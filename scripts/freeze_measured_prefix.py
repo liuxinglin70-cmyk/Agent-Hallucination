@@ -112,7 +112,8 @@ def main(argv: list[str] | None = None) -> int:
             f"--min-cases {args.min_cases}; nothing written"
         )
     if args.out and not args.dry_run:
-        out = Path(args.out).resolve()
+        requested = Path(args.out)
+        out = requested.parent.resolve() / requested.name
         if any(out.is_relative_to(path.resolve()) for path in [*baselines, Path(args.dataset_root)]):
             parser.error("prefix output must be outside run roots and the raw corpus")
         try:
@@ -121,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
             payload.update(derived_from=[str(path) for path in baselines],
                            order=str(args.order), scheduling=detail)
             with exclusive_writer(out.parent):
-                if out.exists():
+                if out.exists() or out.is_symlink():
                     raise ValueError("prefix output already exists; frozen evidence cannot be replaced")
                 atomic_json(out, payload)
         except (ValueError, OSError) as exc:

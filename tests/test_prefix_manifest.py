@@ -1,4 +1,5 @@
 import json
+import os
 
 import pytest
 
@@ -47,3 +48,22 @@ def test_freeze_rejects_invalid_or_mutating_output(readings, tmp_path, boundary,
         main(args)
     assert exc.value.code == 2
     assert (output.read_bytes() if output.exists() else None) == before
+
+
+def test_freeze_rejects_existing_dangling_output_link(readings, tmp_path, monkeypatch):
+    _, data, _, plan, measure = readings
+    root = measure("g0", [False] * 6)
+    monkeypatch.setattr(freeze_measured_prefix, "DEFAULT_DATASET_ROOT", data)
+    output = tmp_path / "prefix.json"
+    target = tmp_path / "uncreated.json"
+    try:
+        output.symlink_to(target)
+    except OSError as exc:
+        pytest.skip(f"symbolic links unavailable: {exc}")
+    link = os.readlink(output)
+    with pytest.raises(SystemExit) as exc:
+        main(["--baseline", str(root), "--order", str(plan.measurement.source),
+              "--out", str(output)])
+    assert exc.value.code == 2
+    assert output.is_symlink() and os.readlink(output) == link
+    assert not target.exists()
