@@ -51,6 +51,49 @@ def _backend():
     return backend
 
 
+def test_fresh_evaluation_preserves_case_evidence_without_replay(tmp_path, monkeypatch):
+    import copy
+    import threading
+    from detector.tests.test_runner import _write_dataset
+    from evolution.backends import CachingBackend
+
+    class DetectorWithEvidence(_FakeDetector):
+        def __init__(self, config, **kwargs):
+            super().__init__()
+            self.config = config
+            self._calls_lock = threading.Lock()
+
+        def detect(self, record, *, evidence=None, **kwargs):
+            with self._calls_lock:
+                result = super().detect(record, **kwargs)
+                self.calls[-1]["evidence"] = copy.deepcopy(evidence)
+            return result
+
+    monkeypatch.setattr("evolution.backends.Detector", DetectorWithEvidence)
+    monkeypatch.setattr("evolution.backends.load_detector_config", lambda path: {})
+    cases = ["a.json", "b.json"]
+    data = _write_dataset(tmp_path / "data", cases)
+    snapshots = {case: {"sources": [{"excerpt": case}]} for case in cases}
+    requests = []
+
+    def evidence(case):
+        requests.append(case)
+        return snapshots[case]
+
+    backend = LiveDetectorBackend({"detector_config": str(tmp_path / "config.json")}, evidence_provider=evidence)
+    backend.evaluate(cases, dataset_root=data, workers=2)
+    cached = CachingBackend(backend, cache_dir=tmp_path / "cache", namespace="fresh")
+    for runner in [backend, cached]:
+        rows = runner.evaluate_fresh(cases, dataset_root=data, workers=2)
+        assert {row["case"] for row in rows} == set(cases)
+        assert all(row["authority"] == "authoritative" for row in rows)
+    assert len(backend.detector.calls) == 6
+    for call in backend.detector.calls:
+        assert call["evidence"] == snapshots[call["case"]]
+        assert call["frozen_judge"] is None and call["frozen_stages"] is None
+    assert sorted(requests) == cases
+
+
 def test_global_run_stop_is_not_an_unresolved_backend_case(tmp_path, monkeypatch):
     import pytest
     from detector.runtime import RunStopped

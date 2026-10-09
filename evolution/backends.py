@@ -762,7 +762,7 @@ class LiveDetectorBackend(DetectionBackend):
         deadline: float | None = None,
     ) -> list[dict[str, Any]]:
         """Run every stage without cached/frozen baseline replay."""
-        direct = _DirectDetectorBackend(self.detector)
+        direct = _DirectDetectorBackend(self)
         return direct.evaluate(
             cases,
             dataset_root=dataset_root,
@@ -777,8 +777,8 @@ class LiveDetectorBackend(DetectionBackend):
 class _DirectDetectorBackend(DetectionBackend):
     name = "detector_fresh"
 
-    def __init__(self, detector: Detector) -> None:
-        self.detector = detector
+    def __init__(self, backend: LiveDetectorBackend) -> None:
+        self.backend = backend
 
     def run_case(
         self,
@@ -788,10 +788,12 @@ class _DirectDetectorBackend(DetectionBackend):
         registry: Mapping[str, Any] | None = None,
         gold: bool | None = None,
     ) -> dict[str, Any]:
-        return self.detector.detect(
+        snapshot = self.backend.evidence_for(case_id)
+        return self.backend.detector.detect(
             record,
             case_id=case_id,
             interventions=(registry or build_intervention_registry([])),
+            **({"evidence": snapshot} if snapshot is not None else {}),
         )
 
 
