@@ -154,8 +154,8 @@ def result_usage(result: Mapping[str, Any]) -> dict[str, Any]:
     execution = result.get("execution")
     if isinstance(execution, Mapping):
         return {"usage": execution.get("usage"), "source": "request_observations",
-                "missing_attempts": execution.get("usage_missing_attempts", 0),
-                "attempts": execution.get("provider_attempts", 0)}
+                "missing_attempts": execution.get("usage_missing_attempts"),
+                "attempts": execution.get("provider_attempts")}
     providers = result.get("providers") or {}
     hearings = (result.get("proof") or {}).get("hearings") or []
     values: list[Mapping[str, Any]] = []

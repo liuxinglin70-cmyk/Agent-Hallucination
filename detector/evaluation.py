@@ -22,7 +22,7 @@ from typing import Any, Mapping, Sequence
 from detector.dataset import load_case
 from detector.result import prediction_state
 from detector.runner import safe_case_id, validate_case_commit
-from detector.runtime import contained_path, validate_path_id
+from detector.runtime import contained_path, exclusive_writer, validate_path_id
 
 
 def binary_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -86,191 +86,192 @@ def evaluate_run(
     dataset_root: str | Path,
     cases: Sequence[str],
 ) -> dict[str, Any]:
-    rows: list[dict[str, Any]] = []
-    errors: list[dict[str, Any]] = []
-    degraded_rows: list[dict[str, Any]] = []
-    missing_cases: list[str] = []
     validate_path_id(run_id, nested=False)
-    for case_id in cases:
-        result_path = (
-            contained_path(runs_root, run_id, "cases", safe_case_id(case_id), "result.json")
-        )
-        _record, gold = load_case(dataset_root, case_id)
-        raw = json.loads(
-            contained_path(dataset_root, case_id).read_text(encoding="utf-8-sig")
-        )
-        gold_step = raw.get("hallucination_step")
-        if str(gold_step or "").isdigit():
-            gold_step = int(gold_step)
-        else:
-            gold_step = None
-        label = gold.get("is_hallucination")
-        if isinstance(label, bool):
-            gold_bool = label
-        elif label is None:
-            raise ValueError(f"missing is_hallucination label for {case_id}")
-        elif isinstance(label, str) and label.strip().lower() in {"true", "false"}:
-            gold_bool = label.strip().lower() == "true"
-        else:
-            raise ValueError(f"invalid is_hallucination label for {case_id}: {label!r}")
-        if not result_path.exists():
-            missing_cases.append(case_id)
+    with exclusive_writer(contained_path(runs_root, run_id)):
+        rows: list[dict[str, Any]] = []
+        errors: list[dict[str, Any]] = []
+        degraded_rows: list[dict[str, Any]] = []
+        missing_cases: list[str] = []
+        validate_path_id(run_id, nested=False)
+        for case_id in cases:
+            result_path = (
+                contained_path(runs_root, run_id, "cases", safe_case_id(case_id), "result.json")
+            )
+            _record, gold = load_case(dataset_root, case_id)
+            raw = json.loads(
+                contained_path(dataset_root, case_id).read_text(encoding="utf-8-sig")
+            )
+            gold_step = raw.get("hallucination_step")
+            if str(gold_step or "").isdigit():
+                gold_step = int(gold_step)
+            else:
+                gold_step = None
+            label = gold.get("is_hallucination")
+            if isinstance(label, bool):
+                gold_bool = label
+            elif label is None:
+                raise ValueError(f"missing is_hallucination label for {case_id}")
+            elif isinstance(label, str) and label.strip().lower() in {"true", "false"}:
+                gold_bool = label.strip().lower() == "true"
+            else:
+                raise ValueError(f"invalid is_hallucination label for {case_id}: {label!r}")
+            if not result_path.exists():
+                missing_cases.append(case_id)
+                rows.append({
+                    "case": case_id,
+                    "gold": gold_bool,
+                    "prediction": None,
+                    "terminal_prediction": None,
+                    "gold_step": gold_step,
+                    "responsible_step": None,
+                    "state": "missing_result",
+                    "authority": "invalid",
+                })
+                continue
+            result = json.loads(result_path.read_text(encoding="utf-8-sig"))
+            validate_case_commit(result, run_id=run_id, case_id=case_id)
+            # Two readings of one envelope, kept apart on purpose.
+            #
+            # ``prediction`` is what the accuracy line may count: only an
+            # ``authoritative`` terminal decision is the detector's answer. The
+            # loose reader below accepts a degraded terminal state, which is what
+            # the provider-health accounting needs -- a judge-only clear produced
+            # while the recall net was unreachable has to be visible as such --
+            # but counting it as a prediction turned an outage into a false
+            # positive against the detector.
+            prediction = prediction_state(result, require_authoritative=True)
+            terminal_prediction = prediction_state(
+                result, require_authoritative=False,
+            )
             rows.append({
                 "case": case_id,
                 "gold": gold_bool,
-                "prediction": None,
-                "terminal_prediction": None,
-                "gold_step": gold_step,
-                "responsible_step": None,
-                "state": "missing_result",
-                "authority": "invalid",
-            })
-            continue
-        result = json.loads(result_path.read_text(encoding="utf-8-sig"))
-        if "case_commit" in result:
-            validate_case_commit(result, run_id=run_id, case_id=case_id)
-        # Two readings of one envelope, kept apart on purpose.
-        #
-        # ``prediction`` is what the accuracy line may count: only an
-        # ``authoritative`` terminal decision is the detector's answer. The
-        # loose reader below accepts a degraded terminal state, which is what
-        # the provider-health accounting needs -- a judge-only clear produced
-        # while the recall net was unreachable has to be visible as such --
-        # but counting it as a prediction turned an outage into a false
-        # positive against the detector.
-        prediction = prediction_state(result, require_authoritative=True)
-        terminal_prediction = prediction_state(
-            result, require_authoritative=False,
-        )
-        rows.append({
-            "case": case_id,
-            "gold": gold_bool,
-            "prediction": prediction,
-            "terminal_prediction": terminal_prediction,
-            "gold_step": gold_step,
-            "responsible_step": result.get("responsible_step"),
-            # What kind of step the verdict blames: the event's own structure
-            # carries either assistant prose or tool calls, and the two are
-            # not comparable. Left None for a row written before the envelope
-            # recorded it, so "unclassified" stays distinguishable from
-            # "classified as empty".
-            "responsible_step_kind": (
-                result.get("responsible_step_kind")
-                or (result.get("proof") or {}).get("responsible_step_kind")
-            ),
-            "state": result.get("state"),
-            "authority": result.get("decision_authority"),
-        })
-        if prediction is not None and prediction != gold_bool:
-            errors.append({
-                "case": case_id,
-                "kind": "fp" if prediction and not gold_bool else "fn",
-                "state": result.get("state"),
-                "authority": result.get("decision_authority"),
-                "judge": (
-                    (result.get("proof") or {}).get("judge") or {}
-                ),
-                "defense": (
-                    (result.get("proof") or {}).get("defense") or {}
-                ),
-            })
-        elif (
-            prediction is None
-            and terminal_prediction is not None
-            and terminal_prediction != gold_bool
-        ):
-            # Non-authoritative and, read loosely, wrong. Listed rather than
-            # scored: a run has to be able to see these without having them
-            # enter the accuracy line.
-            degraded_rows.append({
-                "case": case_id,
-                "gold": gold_bool,
+                "prediction": prediction,
                 "terminal_prediction": terminal_prediction,
+                "gold_step": gold_step,
+                "responsible_step": result.get("responsible_step"),
+                # What kind of step the verdict blames: the event's own structure
+                # carries either assistant prose or tool calls, and the two are
+                # not comparable. Left None for a row written before the envelope
+                # recorded it, so "unclassified" stays distinguishable from
+                # "classified as empty".
+                "responsible_step_kind": (
+                    result.get("responsible_step_kind")
+                    or (result.get("proof") or {}).get("responsible_step_kind")
+                ),
                 "state": result.get("state"),
                 "authority": result.get("decision_authority"),
-                "kind": (
-                    "fp" if terminal_prediction and not gold_bool else "fn"
-                ),
             })
+            if prediction is not None and prediction != gold_bool:
+                errors.append({
+                    "case": case_id,
+                    "kind": "fp" if prediction and not gold_bool else "fn",
+                    "state": result.get("state"),
+                    "authority": result.get("decision_authority"),
+                    "judge": (
+                        (result.get("proof") or {}).get("judge") or {}
+                    ),
+                    "defense": (
+                        (result.get("proof") or {}).get("defense") or {}
+                    ),
+                })
+            elif (
+                prediction is None
+                and terminal_prediction is not None
+                and terminal_prediction != gold_bool
+            ):
+                # Non-authoritative and, read loosely, wrong. Listed rather than
+                # scored: a run has to be able to see these without having them
+                # enter the accuracy line.
+                degraded_rows.append({
+                    "case": case_id,
+                    "gold": gold_bool,
+                    "terminal_prediction": terminal_prediction,
+                    "state": result.get("state"),
+                    "authority": result.get("decision_authority"),
+                    "kind": (
+                        "fp" if terminal_prediction and not gold_bool else "fn"
+                    ),
+                })
 
-    metrics = binary_metrics(rows)
-    metrics["authoritative"] = sum(
-        1 for row in rows if row["authority"] == "authoritative"
-    )
-    metrics["degraded"] = sum(
-        1 for row in rows
-        if row["authority"] not in {"authoritative", "invalid"}
-        and row["terminal_prediction"] is not None
-    )
-    metrics["degraded_disagreeing"] = len(degraded_rows)
-    # The older, looser reading: every terminal decision, degraded included.
-    # Named ``terminal_metrics`` so a caller that wants it says so, and the
-    # headline numbers stay authoritative-only.
-    metrics["terminal_metrics"] = binary_metrics([
-        {**row, "prediction": row["terminal_prediction"]} for row in rows
-    ])
-    metrics["provider_unresolved"] = sum(
-        1 for row in rows if row["state"] in {"unresolved", "missing_result"}
-    )
-    # Rows that produced no terminal decision at all, whatever the authority
-    # said: an unresolved envelope is not a degraded *answer*, and the two are
-    # reported apart because the remedies differ (a provider problem versus a
-    # stage that ran under a reduced view).
-    metrics["no_terminal_decision"] = sum(
-        1 for row in rows if row["terminal_prediction"] is None
-    )
-    metrics["requested_cases"] = len(cases)
-    metrics["found_results"] = len(cases) - len(missing_cases)
-    metrics["missing_cases"] = len(missing_cases)
-    step_hits = 0
-    step_total = 0
-    by_kind: dict[str, dict[str, int]] = {}
-    for row in rows:
-        if not row["gold"] or row["gold_step"] is None:
-            continue
-        step_total += 1
-        # Localization is only credited for an authoritative positive; a
-        # responsible step read off a degraded verdict is not the detector's
-        # answer any more than the verdict is.
-        hit = (
-            row["prediction"] is True
-            and row["responsible_step"] == row["gold_step"]
+        metrics = binary_metrics(rows)
+        metrics["authoritative"] = sum(
+            1 for row in rows if row["authority"] == "authoritative"
         )
-        if hit:
-            step_hits += 1
-        # Split by what the blamed step actually is. The overall rate mixes
-        # two populations that the corpus annotates differently -- a verdict
-        # that blames the tool call the agent made and one that blames the
-        # prose it wrote are not the same claim -- so the reading is broken
-        # out instead of being reported only as one average.
-        kind = str(row.get("responsible_step_kind") or "unclassified")
-        bucket = by_kind.setdefault(kind, {"n": 0, "hits": 0})
-        bucket["n"] += 1
-        bucket["hits"] += int(hit)
-    for bucket in by_kind.values():
-        bucket["accuracy"] = (
-            bucket["hits"] / bucket["n"] if bucket["n"] else None
+        metrics["degraded"] = sum(
+            1 for row in rows
+            if row["authority"] not in {"authoritative", "invalid"}
+            and row["terminal_prediction"] is not None
         )
-    metrics["step_localization"] = {
-        "n": step_total,
-        "hits": step_hits,
-        "accuracy": step_hits / step_total if step_total else None,
-        # Reporting only; the overall rate above is unchanged. Two step kinds
-        # are not comparable, so a reader must not average across them.
-        "by_step_kind": by_kind,
-        "note": (
-            "action-step and content-step accuracy answer different questions; "
-            "read them apart, never as one rate"
-        ),
-    }
-    return {
-        "run_id": run_id,
-        "metrics": metrics,
-        "rows": rows,
-        "errors": errors,
-        "degraded_disagreements": degraded_rows,
-        "missing_cases": missing_cases,
-    }
+        metrics["degraded_disagreeing"] = len(degraded_rows)
+        # The older, looser reading: every terminal decision, degraded included.
+        # Named ``terminal_metrics`` so a caller that wants it says so, and the
+        # headline numbers stay authoritative-only.
+        metrics["terminal_metrics"] = binary_metrics([
+            {**row, "prediction": row["terminal_prediction"]} for row in rows
+        ])
+        metrics["provider_unresolved"] = sum(
+            1 for row in rows if row["state"] in {"unresolved", "missing_result"}
+        )
+        # Rows that produced no terminal decision at all, whatever the authority
+        # said: an unresolved envelope is not a degraded *answer*, and the two are
+        # reported apart because the remedies differ (a provider problem versus a
+        # stage that ran under a reduced view).
+        metrics["no_terminal_decision"] = sum(
+            1 for row in rows if row["terminal_prediction"] is None
+        )
+        metrics["requested_cases"] = len(cases)
+        metrics["found_results"] = len(cases) - len(missing_cases)
+        metrics["missing_cases"] = len(missing_cases)
+        step_hits = 0
+        step_total = 0
+        by_kind: dict[str, dict[str, int]] = {}
+        for row in rows:
+            if not row["gold"] or row["gold_step"] is None:
+                continue
+            step_total += 1
+            # Localization is only credited for an authoritative positive; a
+            # responsible step read off a degraded verdict is not the detector's
+            # answer any more than the verdict is.
+            hit = (
+                row["prediction"] is True
+                and row["responsible_step"] == row["gold_step"]
+            )
+            if hit:
+                step_hits += 1
+            # Split by what the blamed step actually is. The overall rate mixes
+            # two populations that the corpus annotates differently -- a verdict
+            # that blames the tool call the agent made and one that blames the
+            # prose it wrote are not the same claim -- so the reading is broken
+            # out instead of being reported only as one average.
+            kind = str(row.get("responsible_step_kind") or "unclassified")
+            bucket = by_kind.setdefault(kind, {"n": 0, "hits": 0})
+            bucket["n"] += 1
+            bucket["hits"] += int(hit)
+        for bucket in by_kind.values():
+            bucket["accuracy"] = (
+                bucket["hits"] / bucket["n"] if bucket["n"] else None
+            )
+        metrics["step_localization"] = {
+            "n": step_total,
+            "hits": step_hits,
+            "accuracy": step_hits / step_total if step_total else None,
+            # Reporting only; the overall rate above is unchanged. Two step kinds
+            # are not comparable, so a reader must not average across them.
+            "by_step_kind": by_kind,
+            "note": (
+                "action-step and content-step accuracy answer different questions; "
+                "read them apart, never as one rate"
+            ),
+        }
+        return {
+            "run_id": run_id,
+            "metrics": metrics,
+            "rows": rows,
+            "errors": errors,
+            "degraded_disagreements": degraded_rows,
+            "missing_cases": missing_cases,
+        }
 
 
 __all__ = ["binary_metrics", "evaluate_run", "prediction_state"]

@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from detector.config import load_config
+from detector.measurement import result_usage
 from detector.runner import case_elapsed, safe_case_id
 
 DEFAULT_PROTOCOL = ROOT / "datasets" / "protocols" / "real_path_check.json"
@@ -65,13 +66,12 @@ def _case_metrics(run_root: Path, run_id: str, case_id: str) -> dict:
     if not result_path.exists():
         return row
     result = json.loads(result_path.read_text(encoding="utf-8-sig"))
-    tokens = 0
+    usage = result_usage(result)["usage"]
+    tokens = usage.get("total_tokens") if isinstance(usage, dict) else None
     provider_models = set()
     for provider in (result.get("providers") or {}).values():
         if not isinstance(provider, dict):
             continue
-        usage = provider.get("usage") or {}
-        tokens += int(usage.get("total_tokens") or 0)
         if provider.get("model"):
             provider_models.add(str(provider["model"]))
     row.update({

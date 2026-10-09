@@ -93,3 +93,39 @@ def test_stage_reads_and_evaluates_under_the_same_writer_lease(tmp_path, monkeyp
     run_measurement_stage(plan=plan, stage="baseline", arm="g0", cases=[case],
         runs_root=tmp_path / "runs", run_id="r", dataset_root=tmp_path / "data")
     assert calls == ["read", "evaluate"]
+
+
+def test_public_case_writer_cannot_bypass_the_run_lease(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from detector.runtime import exclusive_writer
+    commit(tmp_path)
+    with exclusive_writer(tmp_path / "r"):
+        with ThreadPoolExecutor(1) as pool:
+            with pytest.raises(RuntimeError, match="writer"):
+                pool.submit(commit, tmp_path, attempt_id="002").result()
+
+
+def test_current_reader_rejects_a_removed_commit(tmp_path):
+    directory = commit(tmp_path)
+    path = directory / "result.json"
+    result = json.loads(path.read_text(encoding="utf-8"))
+    result.pop("case_commit")
+    path.write_text(json.dumps(result), encoding="utf-8")
+    with pytest.raises(ValueError, match="commit"):
+        _load_rows(tmp_path, "r", ["a.json"])
+
+
+def test_evaluator_obeys_the_run_lease(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from detector.evaluation import evaluate_run
+    from detector.runtime import exclusive_writer
+    directory = tmp_path / "data"
+    directory.mkdir()
+    (directory / "a.json").write_text(json.dumps({"question": "q", "history": [],
+                                                  "is_hallucination": False}), encoding="utf-8")
+    commit(tmp_path)
+    with exclusive_writer(tmp_path / "r"):
+        with ThreadPoolExecutor(1) as pool:
+            with pytest.raises(RuntimeError, match="writer"):
+                pool.submit(evaluate_run, runs_root=tmp_path, run_id="r",
+                            dataset_root=directory, cases=["a.json"]).result()

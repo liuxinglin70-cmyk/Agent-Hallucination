@@ -14,7 +14,7 @@ import json
 
 import pytest
 
-from detector.runner import safe_case_id
+from detector.runner import record_case
 from detector.result import RESULT_SCHEMA
 from experiments.plan import (
     load_measurement,
@@ -239,9 +239,9 @@ def measured_runs(tmp_path):
         record.write_text(json.dumps({"question": "2+2", "history": [], "is_hallucination": False}), encoding="utf-8")
     for arm, measured in (("g0", cases[:2]), ("g0_roll2", cases[1:])):
         for case in measured:
-            folder = runs / arm / "cases" / safe_case_id(case)
-            folder.mkdir(parents=True)
-            (folder / "result.json").write_text(json.dumps(_result(case)), encoding="utf-8")
+            record_case(runs_root=runs, run_id=arm, case_id=case,
+                        input_record={"question": "2+2", "history": []},
+                        result=_result(case), elapsed_seconds=0)
     return plan, runs, data
 
 

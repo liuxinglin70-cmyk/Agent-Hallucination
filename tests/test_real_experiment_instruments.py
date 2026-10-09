@@ -129,11 +129,9 @@ def _write_case(run_root: Path, case: str, *, state: str, authoritative: bool = 
         "incident_occurred": state == "verified_error",
         "providers": {},
     }
-    case_dir = run_root / "cases" / safe_case_id(case)
-    case_dir.mkdir(parents=True, exist_ok=True)
-    (case_dir / "result.json").write_text(
-        json.dumps(result), encoding="utf-8",
-    )
+    from detector.runner import record_case
+    record_case(runs_root=run_root.parent, run_id=run_root.name, case_id=case,
+                input_record={"question": "q", "history": []}, result=result, elapsed_seconds=1)
 
 
 def _make_arm(root: Path, cases: list[str], verdicts: dict[str, str]) -> Path:

@@ -1,5 +1,6 @@
 from detector.runner import _summarize, run_batch
 from detector.tests.test_runner import _FakeDetector, _envelope, _write_dataset
+import json
 
 
 def test_cache_hit_has_zero_invocation_cost_and_retains_case_cost():
@@ -90,3 +91,37 @@ def test_stage_report_uses_invocation_cost_and_keeps_historical_cost_separate():
     assert report["cost"]["usage"] is None
     assert report["cost"]["case_seconds"] == 0
     assert report["cost"]["run_lifetime_cost"]["usage"] == {"total_tokens": 20}
+
+
+def test_measurement_scripts_keep_early_failed_attempt_usage(tmp_path):
+    from scripts import run_baseline_693, real_path_check
+    directory = tmp_path / "r/cases/a.json"
+    directory.mkdir(parents=True)
+    result = _envelope("a.json")
+    result.update(execution={"provider_attempts": 3, "usage_missing_attempts": 0,
+                            "usage": {"total_tokens": 15}},
+                  providers={"judge": {"usage": {"total_tokens": 5}}})
+    (directory / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    assert run_baseline_693._case_usage(tmp_path, "r", "a.json") == {"total_tokens": 15}
+    assert real_path_check._case_metrics(tmp_path, "r", "a.json")["tokens"] == 15
+
+
+def test_incomplete_execution_counters_remain_unknown():
+    from detector.measurement import cost_summary
+    cost = cost_summary([{"result": {"execution": {"usage": {"total_tokens": 8}}}}])
+    assert cost["provider_attempts"] is None
+    assert cost["usage_unknown_cases"] == 1
+
+
+def test_resume_refuses_corrupt_attempt_journal(tmp_path, monkeypatch):
+    monkeypatch.setattr("detector.runner.Detector", _FakeDetector)
+    options = dict(dataset_root=_write_dataset(tmp_path / "data"), cases=["a.json"],
+                   runs_root=tmp_path / "runs", run_id="r", config={}, workers=1)
+    run_batch(**options)
+    path = next((tmp_path / "runs/r/cases/a.json/attempts").glob("*/case_attempts/*/attempt.json"))
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["execution"]["usage"] = {"total_tokens": 999}
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    import pytest
+    with pytest.raises(ValueError, match="journal"):
+        run_batch(**options)

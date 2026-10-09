@@ -103,12 +103,11 @@ def _load_rows(runs_root: Path, run_id: str, cases: Sequence[str]) -> list[dict[
     validate_path_id(run_id, nested=False)
     for case in cases:
         case_dir = contained_path(runs_root, run_id, "cases", safe_case_id(case))
-        result_path = case_dir / "result.json"
+        result_path = contained_path(case_dir, "result.json")
         if not result_path.is_file():
             continue
         result = json.loads(result_path.read_text(encoding="utf-8-sig"))
-        if "case_commit" in result:
-            validate_case_commit(result, run_id=run_id, case_id=case)
+        validate_case_commit(result, run_id=run_id, case_id=case)
         rows.append({
             "case": case,
             "result": result,

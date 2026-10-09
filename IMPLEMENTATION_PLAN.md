@@ -116,7 +116,7 @@ B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fak
 | R08 | 一些测试使用历史 artifacts；禁真实 provider fixture 只在 evolution 测试域 | 全套离线网络护栏；改成最小合成夹具，不能依赖既往运行输出 | M00/M17 |
 | R09 | `HybridProposer._localization_candidates` 的交付步限制可能与首次引入目标冲突 | 用同一声明、已纠正与多错误反例审查 prompt，不强制迎合 gold | M14 |
 | R10 | runtime.validate_path_id/contained_path 已统一 dataset、batch、record、evaluation 和实验读取路径；拒绝 drive/UNC、遍历、保留名、大小写/扁平化碰撞与链接越界 | 22 项代码反例及实际目录链接平台反例通过，相关 125 项合同回归通过；其余脚本读者按 M17 核销 | M02/M08/M17 |
-| R11 | 1c3c12e 分开 invocation/case_attempt/run_lifetime 成本；case_commit.v1 将输入/结果/耗时一次提交，拒绝覆盖已完成 attempt，报告读取/评估保持同一写锁；计时脚本已迁移唯一读值 | 6 项成本反例、6 项提交/读取反例（5 项先失败），相关 85 项通过；源码/wheel/链接平台 4 项、Fake 数据路径 13 项通过。独立审查和剩余读者一致性待完成 | M04/M08/M17 |
+| R11 | 1c3c12e/d128ab1 分离成本及原子提交；独立审查发现 run/case 租约不互斥、脚本成本低计、未知计数默认零、提交可删除绕过、journal 无完整性 | review-storage-d128ab1：7 失败/2 正例、相关 85 项；上述根因已由 ContextVar 租约、严格提交、共享 usage 和封存 journal 修复，当前相关 113 项通过。跨臂快照与固定修复复核待完成 | M04/M08/M17 |
 | R12 | measurement 已校验 schema、顺序摘要、案例冲突、排除集合与计数；子集保留父身份、独立摘要，无逐例标签则计数未知 | 13 项先失败后修复；既有冻结协议字节未改，相关合同及源码/wheel baseline 验证通过，待审查 | M17 |
 | R13 | 多文件 registry 提交、route observation 独立性、promotion 返回/落盘状态一致性未充分证明 | 故障注入与独立 observation 身份测试，按实际证据决定修复 | M14/M15/M16 |
 | R14 | 机械定罪逐例身份已绑定实际校准视图，包含记录、corpus 核验、重测及消费的权限；未消费者不加载；同 arm 检查点拒绝权限漂移 | 17d3ae1：缓存 artifact/corpus 变化反例先失败后通过，相关 496 项、AST 67 文件、独立 4 项通过；周期尚未生成候选的能力工件冻结由 M13 接续 | M01/M03/M13 |

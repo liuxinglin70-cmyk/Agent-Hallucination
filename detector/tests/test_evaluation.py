@@ -69,7 +69,7 @@ def _write_case(dataset, case_id, gold):
 
 
 def _write_result(runs_root, run_id, case_id, **overrides):
-    from detector.runner import safe_case_id
+    from detector.runner import record_case
 
     payload = {
         "schema_version": "detector.detection_result.v1",
@@ -80,11 +80,8 @@ def _write_result(runs_root, run_id, case_id, **overrides):
         "decision_authority": "authoritative",
     }
     payload.update(overrides)
-    directory = runs_root / run_id / "cases" / safe_case_id(case_id)
-    directory.mkdir(parents=True, exist_ok=True)
-    (directory / "result.json").write_text(
-        json.dumps(payload), encoding="utf-8",
-    )
+    record_case(runs_root=runs_root, run_id=run_id, case_id=case_id,
+                input_record={"question": "q", "history": []}, result=payload, elapsed_seconds=0)
 
 
 def test_degraded_readings_do_not_enter_the_accuracy_line(tmp_path):
@@ -217,9 +214,7 @@ def _write_envelope(run_root, case_id, *, state, step, kind, gold_step):
     """One detection envelope in the layout ``evaluate_run`` reads."""
     from detector.result import RESULT_SCHEMA
 
-    directory = run_root / "cases" / case_id.replace("/", "__")
-    directory.mkdir(parents=True, exist_ok=True)
-    directory.joinpath("result.json").write_text(json.dumps({
+    payload = {
         "schema_version": RESULT_SCHEMA,
         "case_id": case_id,
         "state": state,
@@ -234,7 +229,10 @@ def _write_envelope(run_root, case_id, *, state, step, kind, gold_step):
             "responsible_step": step,
             "responsible_step_kind": kind,
         },
-    }, ensure_ascii=False), encoding="utf-8")
+    }
+    from detector.runner import record_case
+    record_case(runs_root=run_root.parent, run_id=run_root.name, case_id=case_id,
+                input_record={"question": "q", "history": []}, result=payload, elapsed_seconds=0)
 
 
 def test_step_localization_is_split_by_what_kind_of_step_was_blamed(tmp_path):
@@ -286,16 +284,17 @@ def test_a_row_without_a_recorded_step_kind_is_unclassified_not_guessed(tmp_path
         "is_hallucination": "true", "hallucination_step": "3",
     }), encoding="utf-8")
     run_root = tmp_path / "runs" / "r1"
-    directory = run_root / "cases" / "A__001.json"
-    directory.mkdir(parents=True, exist_ok=True)
-    directory.joinpath("result.json").write_text(json.dumps({
+    payload = {
         "schema_version": RESULT_SCHEMA, "case_id": "A/001.json",
         "state": "verified_error", "occurrence_state": "verified_error",
         "decision_authority": "authoritative", "runtime_valid": True,
         "responsible_step": 3,
         "proof": {"decision_authority": "authoritative",
                   "runtime_valid": True, "responsible_step": 3},
-    }), encoding="utf-8")
+    }
+    from detector.runner import record_case
+    record_case(runs_root=run_root.parent, run_id=run_root.name, case_id="A/001.json",
+                input_record={"question": "q", "history": []}, result=payload, elapsed_seconds=0)
     report = evaluate_run(
         runs_root=tmp_path / "runs", run_id="r1",
         dataset_root=dataset, cases=["A/001.json"],

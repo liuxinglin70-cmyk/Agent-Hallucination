@@ -23,7 +23,8 @@ _CONTROL: ContextVar["RunControl | None"] = ContextVar("execution_control", defa
 _USAGE: ContextVar[list[dict[str, Any]] | None] = ContextVar("request_usage", default=None)
 _ADDED_BUDGET: ContextVar["AddedBudget | None"] = ContextVar("added_case_budget", default=None)
 _ADDED_REQUESTS: ContextVar["AddedBudget | None"] = ContextVar("added_requests", default=None)
-_OWNERS: dict[str, tuple[int, int, Any]] = {}
+_WRITER_LEASES: ContextVar[Mapping[str, object] | None] = ContextVar("writer_leases", default=None)
+_OWNERS: dict[str, tuple[object, int, Any]] = {}
 _OWNER_LOCK = threading.RLock()
 
 
@@ -360,16 +361,17 @@ def parallel_ordered(function: Callable[[int], R], count: int, *,
 
 @contextmanager
 def exclusive_writer(directory: str | Path) -> Iterator[None]:
-    """Fail fast across processes; same-thread nesting shares the OS lease."""
+    """Fail fast; delegated execution contexts share their existing OS lease."""
     path = Path(directory).resolve() / ".writer.lock"
     key = os.path.normcase(str(path))
-    owner = threading.get_ident()
+    leases = _WRITER_LEASES.get() or {}
     with _OWNER_LOCK:
         existing = _OWNERS.get(key)
         if existing is not None:
-            if existing[0] != owner:
+            if leases.get(key) is not existing[0]:
                 raise RuntimeError(f"run directory already has a writer: {path.parent}")
-            _OWNERS[key] = (owner, existing[1] + 1, existing[2])
+            lease = existing[0]
+            _OWNERS[key] = (lease, existing[1] + 1, existing[2])
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             handle = open(path, "a+b")
@@ -387,14 +389,17 @@ def exclusive_writer(directory: str | Path) -> Iterator[None]:
             except OSError as exc:
                 handle.close()
                 raise RuntimeError(f"run directory already has a writer: {path.parent}") from exc
-            _OWNERS[key] = (owner, 1, handle)
+            lease = object()
+            _OWNERS[key] = (lease, 1, handle)
+    token = _WRITER_LEASES.set({**leases, key: lease})
     try:
         yield
     finally:
+        _WRITER_LEASES.reset(token)
         with _OWNER_LOCK:
             _, count, handle = _OWNERS[key]
             if count > 1:
-                _OWNERS[key] = (owner, count - 1, handle)
+                _OWNERS[key] = (lease, count - 1, handle)
             else:
                 del _OWNERS[key]
                 handle.seek(0)

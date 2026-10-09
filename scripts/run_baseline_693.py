@@ -62,8 +62,11 @@ if str(ROOT) not in sys.path:
 from detector.config import load_config
 from detector.dataset import load_case
 from detector.evaluation import binary_metrics, evaluate_run
+from detector.measurement import result_usage
+from detector.provider import accumulate_usage
 from detector.packet import build_packet, validate_record
 from detector.runner import case_elapsed, run_batch, safe_case_id
+from detector.runtime import contained_path, exclusive_writer, validate_path_id
 
 REPORT_SCHEMA = "detector.baseline_report.v1"
 DEFAULT_MANIFEST = ROOT / "datasets" / "protocols" / "development_exposure.json"
@@ -208,16 +211,7 @@ def _case_elapsed(runs_root: Path, run_id: str, case: str) -> float | None:
 
 
 def _case_usage(runs_root: Path, run_id: str, case: str) -> dict[str, Any] | None:
-    """Tokens one case burned, summed over its stages.
-
-    ``usage`` under a stage is the *last ballot's* provider meta, not the
-    stage's spend; the summed vote lives beside it as ``usage_total``
-    (``detector.provider.accumulate_usage``). One archived real row reads
-    4948 against 17359 -- a 3.5x undercount -- and the burn is the one number a
-    run's cost has to be sized from, so ``usage_total`` wins wherever it is
-    present and ``usage`` is only the fallback for a non-voting stage. Summing
-    both would double-count the final ballot, so exactly one is read per stage.
-    """
+    """Observed case usage; legacy stage metadata is a lower bound."""
     path = runs_root / run_id / "cases" / safe_case_id(case) / "result.json"
     if not path.exists():
         return None
@@ -225,36 +219,7 @@ def _case_usage(runs_root: Path, run_id: str, case: str) -> dict[str, Any] | Non
         result = json.loads(path.read_text(encoding="utf-8-sig"))
     except ValueError:
         return None
-    total: dict[str, Any] = {}
-    found = False
-    for provider in (result.get("providers") or {}).values():
-        if not isinstance(provider, dict):
-            continue
-        usage = provider.get("usage_total") or provider.get("usage") or {}
-        if not usage:
-            continue
-        found = True
-        _fold_usage(total, usage)
-    return total if found else None
-
-
-def _fold_usage(total: dict[str, Any], usage: Mapping[str, Any]) -> None:
-    """Add every numeric leaf of *usage* into *total*, keyed by its path.
-
-    Deliberately path-agnostic: providers report nested details blocks
-    (``completion_tokens_details.reasoning_tokens`` and friends) and a new
-    counter must be totalled without a code change here, which is the same
-    bargain ``detector.provider.accumulate_usage`` strikes.
-    """
-    for key, value in usage.items():
-        if isinstance(value, Mapping):
-            nested = total.setdefault(str(key), {})
-            if isinstance(nested, dict):
-                _fold_usage(nested, value)
-        elif isinstance(value, bool):
-            continue
-        elif isinstance(value, (int, float)):
-            total[str(key)] = total.get(str(key), 0) + value
+    return result_usage(result)["usage"]
 
 
 def _case_usage_missing(runs_root: Path, run_id: str, case: str) -> int:
@@ -313,7 +278,7 @@ def usage_report(
         if usage is None:
             continue
         per_case.append({"case": case, "usage": usage})
-        _fold_usage(total, usage)
+        accumulate_usage(total, usage)
     values = [
         float(entry["usage"]["total_tokens"])
         for entry in per_case
@@ -420,94 +385,96 @@ def build_report(
     again -- after a crash, or after a resume added rows -- without re-running
     anything.
     """
-    dataset_root = Path(dataset_root)
-    runs_root = Path(runs_root)
-    evaluation = evaluate_run(
-        runs_root=runs_root,
-        run_id=run_id,
-        dataset_root=dataset_root,
-        cases=list(cases),
-    )
-    rows = evaluation["rows"]
-    metrics = evaluation["metrics"]
-    elapsed = {
-        row["case"]: _case_elapsed(runs_root, run_id, row["case"])
-        for row in rows
-    }
-    decorated = [
-        {
-            **row,
-            "source": str(row["case"]).split("/")[0],
-            "elapsed_seconds": elapsed.get(row["case"]),
+    validate_path_id(run_id, nested=False)
+    with exclusive_writer(contained_path(runs_root, run_id)):
+        dataset_root = Path(dataset_root)
+        runs_root = Path(runs_root)
+        evaluation = evaluate_run(
+            runs_root=runs_root,
+            run_id=run_id,
+            dataset_root=dataset_root,
+            cases=list(cases),
+        )
+        rows = evaluation["rows"]
+        metrics = evaluation["metrics"]
+        elapsed = {
+            row["case"]: _case_elapsed(runs_root, run_id, row["case"])
+            for row in rows
         }
-        for row in rows
-    ]
-    by_source = {
-        source: {
-            "n": len(group),
-            "metrics": binary_metrics(group),
+        decorated = [
+            {
+                **row,
+                "source": str(row["case"]).split("/")[0],
+                "elapsed_seconds": elapsed.get(row["case"]),
+            }
+            for row in rows
+        ]
+        by_source = {
+            source: {
+                "n": len(group),
+                "metrics": binary_metrics(group),
+            }
+            for source, group in _rows_by(rows, lambda r: str(r["case"]).split("/")[0]).items()
         }
-        for source, group in _rows_by(rows, lambda r: str(r["case"]).split("/")[0]).items()
-    }
-    by_gold = {
-        key: {"n": len(group), "metrics": binary_metrics(group)}
-        for key, group in _rows_by(rows, lambda r: _gold_key(bool(r["gold"]))).items()
-    }
-    return {
-        "schema_version": REPORT_SCHEMA,
-        "run_id": run_id,
-        "dataset_root": str(dataset_root),
-        "runs_root": str(runs_root),
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "case_list": dict(case_list),
-        "batch": dict(batch_summary) if batch_summary is not None else None,
-        "metrics": metrics,
-        "by_source": by_source,
-        "by_gold": by_gold,
-        "coverage": {
-            "requested_cases": len(cases),
-            "found_results": metrics["found_results"],
-            "missing_cases": evaluation["missing_cases"],
-            "authoritative": metrics["authoritative"],
-            "degraded": metrics["degraded"],
-            "degraded_disagreeing": metrics["degraded_disagreeing"],
-            "no_terminal_decision": metrics["no_terminal_decision"],
-            "provider_unresolved": metrics["provider_unresolved"],
-            # ``metrics["unresolved"]`` is ``decisive``'s complement, so it
-            # includes the degraded rows -- they produced a verdict, just not an
-            # authoritative one. Said out loud here because "unresolved=67" next
-            # to "provider_unresolved=0" otherwise reads like a contradiction.
-            "undecided_decomposition": {
-                "metrics_unresolved": metrics["unresolved"],
-                "degraded_rows_with_a_non_authoritative_answer": metrics["degraded"],
-                "rows_with_no_answer_at_all": metrics["no_terminal_decision"],
-                "identity": (
-                    "metrics.unresolved == degraded + no_terminal_decision"
-                    " + degraded rows that were also wrong (already inside"
-                    " degraded)"
-                ),
+        by_gold = {
+            key: {"n": len(group), "metrics": binary_metrics(group)}
+            for key, group in _rows_by(rows, lambda r: _gold_key(bool(r["gold"]))).items()
+        }
+        return {
+            "schema_version": REPORT_SCHEMA,
+            "run_id": run_id,
+            "dataset_root": str(dataset_root),
+            "runs_root": str(runs_root),
+            "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+            "case_list": dict(case_list),
+            "batch": dict(batch_summary) if batch_summary is not None else None,
+            "metrics": metrics,
+            "by_source": by_source,
+            "by_gold": by_gold,
+            "coverage": {
+                "requested_cases": len(cases),
+                "found_results": metrics["found_results"],
+                "missing_cases": evaluation["missing_cases"],
+                "authoritative": metrics["authoritative"],
+                "degraded": metrics["degraded"],
+                "degraded_disagreeing": metrics["degraded_disagreeing"],
+                "no_terminal_decision": metrics["no_terminal_decision"],
+                "provider_unresolved": metrics["provider_unresolved"],
+                # ``metrics["unresolved"]`` is ``decisive``'s complement, so it
+                # includes the degraded rows -- they produced a verdict, just not an
+                # authoritative one. Said out loud here because "unresolved=67" next
+                # to "provider_unresolved=0" otherwise reads like a contradiction.
+                "undecided_decomposition": {
+                    "metrics_unresolved": metrics["unresolved"],
+                    "degraded_rows_with_a_non_authoritative_answer": metrics["degraded"],
+                    "rows_with_no_answer_at_all": metrics["no_terminal_decision"],
+                    "identity": (
+                        "metrics.unresolved == degraded + no_terminal_decision"
+                        " + degraded rows that were also wrong (already inside"
+                        " degraded)"
+                    ),
+                },
+                "state_counts": {
+                    state: sum(1 for row in rows if row["state"] == state)
+                    for state in sorted({str(row["state"]) for row in rows})
+                },
+                "authority_counts": {
+                    authority: sum(1 for row in rows if row["authority"] == authority)
+                    for authority in sorted(
+                        {str(row["authority"]) for row in rows}
+                    )
+                },
             },
-            "state_counts": {
-                state: sum(1 for row in rows if row["state"] == state)
-                for state in sorted({str(row["state"]) for row in rows})
-            },
-            "authority_counts": {
-                authority: sum(1 for row in rows if row["authority"] == authority)
-                for authority in sorted(
-                    {str(row["authority"]) for row in rows}
-                )
-            },
-        },
-        "timing": timing_report(
-            runs_root=runs_root, run_id=run_id, cases=list(cases), slowest=slowest,
-        ),
-        "usage": usage_report(
-            runs_root=runs_root, run_id=run_id, cases=list(cases),
-        ),
-        "errors": evaluation["errors"],
-        "degraded_disagreements": evaluation["degraded_disagreements"],
-        "rows": decorated,
-    }
+            "timing": timing_report(
+                runs_root=runs_root, run_id=run_id, cases=list(cases), slowest=slowest,
+            ),
+            "usage": usage_report(
+                runs_root=runs_root, run_id=run_id, cases=list(cases),
+            ),
+            "errors": evaluation["errors"],
+            "degraded_disagreements": evaluation["degraded_disagreements"],
+            "rows": decorated,
+        }
 
 
 @contextlib.contextmanager
@@ -572,47 +539,48 @@ def run_baseline(
                 f"{len(preflight['invalid_records'])} invalid"
             )
 
-    with _detector_factory(detector_factory):
-        batch_summary = run_batch(
-            dataset_root=dataset_root,
-            cases=cases,
-            run_id=run_id,
-            runs_root=runs_root,
-            # A fake brings its own behaviour; letting ``run_batch`` fall back
-            # to ``load_config()`` here would make the offline path demand real
-            # credentials and fingerprint the real routes into the manifest of
-            # a run that called nothing. The stub keeps the manifest honest and
-            # the dry run credential-free.
-            config=(
-                config if config is not None
-                else ({"offline_dry_run": True} if detector_factory is not None
-                      else None)
-            ),
-            interventions=interventions,
-            workers=workers,
-            retry_unresolved=retry_unresolved,
-        )
+    with exclusive_writer(contained_path(runs_root, run_id)):
+        with _detector_factory(detector_factory):
+            batch_summary = run_batch(
+                dataset_root=dataset_root,
+                cases=cases,
+                run_id=run_id,
+                runs_root=runs_root,
+                # A fake brings its own behaviour; letting ``run_batch`` fall back
+                # to ``load_config()`` here would make the offline path demand real
+                # credentials and fingerprint the real routes into the manifest of
+                # a run that called nothing. The stub keeps the manifest honest and
+                # the dry run credential-free.
+                config=(
+                    config if config is not None
+                    else ({"offline_dry_run": True} if detector_factory is not None
+                          else None)
+                ),
+                interventions=interventions,
+                workers=workers,
+                retry_unresolved=retry_unresolved,
+            )
 
-    report = build_report(
-        dataset_root=dataset_root,
-        runs_root=runs_root,
-        run_id=run_id,
-        cases=cases,
-        case_list=case_list,
-        batch_summary=batch_summary,
-        slowest=slowest,
-    )
-    report["preflight"] = preflight
-    report["sampled_at_utc"] = datetime.now(timezone.utc).isoformat()
-    if report_path is not None:
-        report_path = Path(report_path)
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(
-            json.dumps(report, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
+        report = build_report(
+            dataset_root=dataset_root,
+            runs_root=runs_root,
+            run_id=run_id,
+            cases=cases,
+            case_list=case_list,
+            batch_summary=batch_summary,
+            slowest=slowest,
         )
-        report["report_path"] = str(report_path)
-    return report
+        report["preflight"] = preflight
+        report["sampled_at_utc"] = datetime.now(timezone.utc).isoformat()
+        if report_path is not None:
+            report_path = Path(report_path)
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(
+                json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            report["report_path"] = str(report_path)
+        return report
 
 
 def import_factory(spec: str) -> Callable[..., Any]:

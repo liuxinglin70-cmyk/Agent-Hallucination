@@ -206,7 +206,7 @@ def record_case(
     if (type(elapsed_seconds) not in (int, float) or not math.isfinite(elapsed_seconds)
             or elapsed_seconds < 0):
         raise ValueError("case elapsed_seconds must be finite and nonnegative")
-    with exclusive_writer(case_dir):
+    with exclusive_writer(contained_path(runs_root, run_id)), exclusive_writer(case_dir):
         attempt_id = attempt_id or _attempt_id(_previous_attempts(case_dir) + 1)
         attempt_dir = contained_path(case_dir, "attempts", attempt_id)
         if (attempt_dir / "result.json").exists():
@@ -295,6 +295,8 @@ def _run_lifetime_cost(run_dir: Path, cases: Sequence[str]) -> dict[str, Any]:
         for path in sorted(case_dir.glob("attempts/*/case_attempts/*/attempt.json")):
             path = contained_path(case_dir, path.relative_to(case_dir).as_posix())
             attempt = json.loads(path.read_text(encoding="utf-8-sig"))
+            if attempt.get("attempt_digest") != digest({k: v for k, v in attempt.items() if k != "attempt_digest"}):
+                raise ValueError(f"attempt journal digest differs from its content: {path}")
             execution = attempt.get("execution")
             if not isinstance(execution, Mapping):
                 raise ValueError(f"attempt journal has no execution: {path}")
@@ -475,7 +477,8 @@ def run_batch(
                 with progress_lock:
                     partial_executions[case_id] = execution
                 _write_json(case_dir / "attempts" / case_attempt_id / "case_attempts"
-                            / f"{attempt['attempt']:03d}" / "attempt.json", attempt)
+                            / f"{attempt['attempt']:03d}" / "attempt.json",
+                            {**copy.deepcopy(dict(attempt)), "attempt_digest": digest(attempt)})
 
             result = detect_with_transport_retry(
                 detector, record, case_id=case_id,
