@@ -44,7 +44,7 @@ python -m evolution experiment --mini
 
 默认配置为 detector/configs/autodl.json，凭据读取 AUTODL_API_KEY，.env 不入 Git。数据放在 datasets/raw/agenthallu/AgentHallu，由 datasets/integrity.json 校验。本地完整数据有 693 个案例，默认协议是开发复测，不是独立终审。
 
-明确传入的 --plan 缺失时直接报错；安装包缺协议资源时使用 --measurement 指定清单。baseline --cases 接受非负前缀长度，0 选择空前缀；paired 接受恰好两个不同的已声明臂，输入错误退出码为 2。实验入口按计划中声明的 arm 解析 registry；默认 `g0` 和 `g0_roll2` 使用显式空 registry。measurement 清单会核验案例顺序摘要、路径冲突、排除集合和标签计数。选择子集后报告保留父清单身份，使用独立选择摘要；无法从逐例标签核算的子集计数显示为未知。运行进度写入 stderr，stdout 输出完整 JSON 报告，保留选择身份与 invocation/case attempt/run lifetime 成本。baseline 有停止原因时退出码为 2。
+明确传入的 --plan 缺失时直接报错；安装包缺协议资源时使用 --measurement 指定清单。baseline --cases 接受非负前缀长度，0 选择空前缀；paired 接受恰好两个不同的已声明臂，输入错误退出码为 2。实验入口按计划中声明的 arm 解析 registry；默认 `g0` 和 `g0_roll2` 使用显式空 registry。measurement 清单会核验案例顺序摘要、路径冲突、排除集合和标签计数。选择子集后报告保留父清单身份，使用独立选择摘要；无法从逐例标签核算的子集计数显示为未知。运行进度写入 stderr，stdout 输出完整 JSON 报告，保留选择身份与 invocation/case attempt/run lifetime 成本。baseline 有停止原因时退出码为 2。paired/status 和旧配对脚本在选中既有 run 的共同租约内读取；噪声/效果分类使用实际逐例执行身份，缺运行身份或任务输入变化时拒绝评分。
 
 wheel 包含三个运行包及运行配置；数据集和实验协议由调用方提供。仓库外运行实验时使用 `python -m experiments --measurement /absolute/path/measurement.json baseline --config /absolute/path/config.json --dataset-root /absolute/path/data --runs-root /absolute/path/runs`；自定义计划另加 `--plan /absolute/path/plan.json`。源码和仓库外 wheel 的回环检测、批次、评估及实验 baseline 入口已通过离线验证。
 

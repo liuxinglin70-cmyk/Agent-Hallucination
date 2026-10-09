@@ -31,11 +31,12 @@ from detector.config import load_config, validate_config
 from detector.interventions import build_intervention_registry, load_intervention_registry, validate_registry
 from detector.identity import digest
 from detector.result import prediction_state
-from detector.runner import case_elapsed, new_run_id, run_batch, safe_case_id, validate_case_commit
+from detector.runner import new_run_id, run_batch
 from detector.runtime import RunControl, contained_path, exclusive_writer, validate_path_id
 
 from experiments.plan import ExperimentPlan
 from experiments.report import summarize_stage
+from experiments.snapshot import _read_rows, run_snapshot
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -97,25 +98,6 @@ def _resolve_registry(plan: ExperimentPlan, arm: str, registry: Mapping[str, Any
     return load_intervention_registry(path, require_executable_bounds=True)
 
 
-def _load_rows(runs_root: Path, run_id: str, cases: Sequence[str]) -> list[dict[str, Any]]:
-    """Read the run tree back into the row shape the report consumes."""
-    rows: list[dict[str, Any]] = []
-    validate_path_id(run_id, nested=False)
-    for case in cases:
-        case_dir = contained_path(runs_root, run_id, "cases", safe_case_id(case))
-        result_path = contained_path(case_dir, "result.json")
-        if not result_path.is_file():
-            continue
-        result = json.loads(result_path.read_text(encoding="utf-8-sig"))
-        validate_case_commit(result, run_id=run_id, case_id=case)
-        rows.append({
-            "case": case,
-            "result": result,
-            "elapsed_seconds": case_elapsed(result),
-        })
-    return rows
-
-
 def _effective_config(plan: ExperimentPlan, arm: str, config: Mapping[str, Any] | None):
     overrides = plan.arm(arm).get("detector_policy")
     if overrides is None:
@@ -165,7 +147,7 @@ def run_measurement_stage(
             deadline_seconds=deadline_seconds,
             control=RunControl(max_provider_inflight=max(1, int(workers))),
         )
-        rows = _load_rows(runs_root, run_id, requested)
+        rows = _read_rows(contained_path(runs_root, run_id), requested)
         for row in rows:
             row["source"] = (batch.get("case_sources") or {}).get(row["case"], "unknown")
             if row["source"] == "cached":
@@ -233,91 +215,29 @@ def run_baseline_stage(**kwargs: Any) -> StageOutcome:
     return run_measurement_stage(**{**kwargs, "arm": baseline_arms[0]})
 
 
-def _shared_registry(plan: ExperimentPlan, arms: Sequence[str]) -> bool:
-    """Whether every named arm deploys the same registry.
-
-    Two rolls of one configuration are the instrument's own jitter. Reporting
-    them as a paired effect would call noise a result, which is exactly how a
-    "2 fixed, 1 broken" reading between two baseline rolls would have been
-    quoted -- and the terminal criterion only reaches p<0.05 at five net
-    corrections, so nothing at this scale is an effect either way.
-    """
-    registries = {
-        plan.arm(arm)["registry"]
-        for arm in arms
-    }
-    return len(registries) <= 1
-
-
-def paired_sample(
-    plan: ExperimentPlan, runs_root: str | Path, arms: Sequence[str],
-) -> dict[str, Any]:
-    """The cases every named arm measured, and what conditioning on them costs.
-
-    Two samples are defensible and they answer different questions:
-
-    * the **contiguous prefix** of the frozen order is the strict
-      pre-registration -- "the first N cases", chosen by nothing but the order;
-    * the **common measured set** is everything the arms can actually be paired
-      on, which is what a paired delta requires.
-
-    The second is larger and is *not* result-dependent: which cases survived
-    measurement is decided by the provider and the clock, not by the verdict.
-    It is, however, difficulty-dependent -- the slow cases are exactly the ones
-    an outage removes -- so a comparison on it is biased toward the easier part
-    of the corpus, and the report has to say that out loud rather than letting
-    a reader assume the sample is representative.
-    """
-    runs_root = Path(runs_root)
+def paired_sample(plan: ExperimentPlan, runs_root: str | Path, arms: Sequence[str]) -> dict[str, Any]:
     for arm in arms:
         plan.arm(arm)
-    measured: dict[str, list[str]] = {}
-    for arm in arms:
-        rows = _load_rows(runs_root, arm, plan.measurement.cases)
-        measured[arm] = [
-            str(row["case"]) for row in rows
-            if prediction_state(row.get("result") or {}) is not None
-        ]
-    if not measured:
-        return {"arms": {}, "common": [], "size": 0}
-    common = set(plan.measurement.cases)
-    for arm in arms:
-        common &= set(measured.get(arm, ()))
-    ordered = [case for case in plan.measurement.cases if case in common]
-    return {
-        "arms": {arm: len(cases) for arm, cases in measured.items()},
-        "size": len(ordered),
-        "common": ordered,
-        "note": (
-            "the common measured set is chosen by which cases survived "
-            "measurement, not by their verdicts; because slow cases are the "
-            "ones an outage removes, it is biased toward the easier part of "
-            "the corpus and must not be read as a representative sample"
-        ),
-    }
+    roots = {arm: contained_path(runs_root, arm) for arm in arms}
+    with run_snapshot(roots, plan.measurement.cases) as snapshot:
+        return snapshot.sample(plan.measurement.cases)
 
 
 def plan_status(plan: ExperimentPlan, runs_root: str | Path) -> dict[str, Any]:
     """Which arms exist and how far each one got, without running anything."""
     runs_root = Path(runs_root)
+    roots = {name: contained_path(runs_root, name) for name in plan.arms}
     arms: dict[str, Any] = {}
-    for name, spec in plan.arms.items():
-        run_dir = runs_root / name
-        if not run_dir.is_dir():
-            arms[name] = {"exists": False, "role": spec.get("role")}
-            continue
-        rows = _load_rows(runs_root, name, plan.measurement.cases)
-        measured = [
-            str(row["case"]) for row in rows
-            if prediction_state(row.get("result") or {}) is not None
-        ]
-        arms[name] = {
-            "exists": True,
-            "role": spec.get("role"),
-            "rows": len(rows),
-            "measured": len(measured),
-            "measured_prefix": len(_prefix_of(plan.measurement.cases, measured)),
-        }
+    with run_snapshot(roots, plan.measurement.cases) as snapshot:
+        for name in plan.arms:
+            spec = plan.arm(name)
+            if snapshot.roots[name] is None:
+                arms[name] = {"exists": False, "role": spec["role"]}
+                continue
+            rows = snapshot.rows[name]
+            measured = [row["case"] for row in rows if prediction_state(row["result"]) is not None]
+            arms[name] = {"exists": True, "role": spec["role"], "rows": len(rows), "measured": len(measured),
+                          "measured_prefix": len(_prefix_of(plan.measurement.cases, measured))}
     shared = None
     if arms:
         prefixes = [

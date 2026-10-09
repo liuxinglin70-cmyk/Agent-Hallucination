@@ -4,7 +4,7 @@ import pytest
 
 from detector.runner import record_case
 from detector.tests.test_runner import _envelope
-from experiments.runner import _load_rows
+from experiments.snapshot import _read_rows
 
 
 def commit(tmp_path, **kwargs):
@@ -45,13 +45,13 @@ def test_interrupted_canonical_replace_keeps_previous_result_and_timing(tmp_path
     with pytest.raises(OSError, match="interrupted"):
         commit(tmp_path, attempt_id="002", elapsed_seconds=9)
     assert (directory / "result.json").read_bytes() == original
-    assert _load_rows(tmp_path, "r", ["a.json"])[0]["elapsed_seconds"] == 4
+    assert _read_rows(tmp_path / "r", ["a.json"])[0]["elapsed_seconds"] == 4
 
 
 def test_report_does_not_pair_result_with_unrelated_timing(tmp_path):
     directory = commit(tmp_path)
     (directory / "elapsed_seconds.json").write_text('{"elapsed_seconds": 999}', encoding="utf-8")
-    assert _load_rows(tmp_path, "r", ["a.json"])[0]["elapsed_seconds"] == 4
+    assert _read_rows(tmp_path / "r", ["a.json"])[0]["elapsed_seconds"] == 4
 
 
 def test_tampered_case_commit_is_refused_by_current_reader(tmp_path):
@@ -61,7 +61,7 @@ def test_tampered_case_commit_is_refused_by_current_reader(tmp_path):
     payload["state"] = "verified_error"
     path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ValueError, match="digest"):
-        _load_rows(tmp_path, "r", ["a.json"])
+        _read_rows(tmp_path / "r", ["a.json"])
 
 
 def test_stage_reads_and_evaluates_under_the_same_writer_lease(tmp_path, monkeypatch):
@@ -88,7 +88,7 @@ def test_stage_reads_and_evaluates_under_the_same_writer_lease(tmp_path, monkeyp
         assert_lease("evaluate")
         return {}
     monkeypatch.setattr("experiments.runner.run_batch", lambda **kwargs: {})
-    monkeypatch.setattr("experiments.runner._load_rows", read)
+    monkeypatch.setattr("experiments.runner._read_rows", read)
     monkeypatch.setattr("experiments.runner.evaluate_run", evaluate)
     run_measurement_stage(plan=plan, stage="baseline", arm="g0", cases=[case],
         runs_root=tmp_path / "runs", run_id="r", dataset_root=tmp_path / "data")
@@ -112,7 +112,7 @@ def test_current_reader_rejects_a_removed_commit(tmp_path):
     result.pop("case_commit")
     path.write_text(json.dumps(result), encoding="utf-8")
     with pytest.raises(ValueError, match="commit"):
-        _load_rows(tmp_path, "r", ["a.json"])
+        _read_rows(tmp_path / "r", ["a.json"])
 
 
 def test_evaluator_obeys_the_run_lease(tmp_path):

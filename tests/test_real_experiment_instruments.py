@@ -118,35 +118,23 @@ def test_manifest_excludes_the_evolution_loops_own_exposure_surface():
 # --------------------------------------------------------------------------
 
 
-def _write_case(run_root: Path, case: str, *, state: str, authoritative: bool = True):
-    result = {
-        "schema_version": RESULT_SCHEMA,
-        "case_id": case,
-        "state": state,
-        "occurrence_state": state,
-        "decision_authority": "authoritative" if authoritative else "degraded",
-        "runtime_valid": True,
-        "incident_occurred": state == "verified_error",
-        "providers": {},
-    }
-    from detector.runner import record_case
-    from detector.dataset import load_case
-    record, _ = load_case(DATASET_ROOT, case)
-    record_case(runs_root=run_root.parent, run_id=run_root.name, case_id=case,
-                input_record=record, result=result, elapsed_seconds=1)
-
-
-def _make_arm(root: Path, cases: list[str], verdicts: dict[str, str]) -> Path:
-    arm = root / "arm"
-    arm.mkdir(parents=True, exist_ok=True)
-    (arm / "run.json").write_text(
-        json.dumps({"schema_version": "detector.run_manifest.v1",
-                    "run_id": "arm", "cases": cases}),
-        encoding="utf-8",
-    )
-    for case in cases:
-        _write_case(arm, case, state=verdicts[case])
-    return arm
+def _make_arm(root: Path, cases: list[str], verdicts: dict[str, str], *, configuration=None) -> Path:
+    from unittest.mock import patch
+    from detector.runner import run_batch
+    from detector.interventions import build_intervention_registry
+    class FakeDetector:
+        def __init__(self, config):
+            self.config = config
+        def detect(self, record, *, case_id, **kwargs):
+            state = verdicts[case_id]
+            return {"schema_version": RESULT_SCHEMA, "case_id": case_id, "state": state,
+                    "occurrence_state": state, "decision_authority": "authoritative",
+                    "runtime_valid": True, "incident_occurred": state == "verified_error",
+                    "providers": {}, "proof": {}, "authority_failure_reasons": []}
+    with patch("detector.runner.Detector", FakeDetector):
+        run_batch(runs_root=root, run_id="arm", dataset_root=DATASET_ROOT, cases=cases,
+                  config={"fake_predictions": verdicts if configuration is None else configuration}, interventions=build_intervention_registry([]), workers=1)
+    return root / "arm"
 
 
 def _three_cases():
@@ -175,7 +163,8 @@ def test_endpoint_reports_no_effect_when_the_arms_are_identical(tmp_path):
     )
     assert payload["verdict"]["decisive_fixed"] == 0
     assert payload["verdict"]["decisive_broken"] == 0
-    assert payload["verdict"]["effect_established"] is False
+    assert payload["verdict"]["effect_established"] is None
+    assert payload["verdict"]["reading"] == "noise_floor"
     assert payload["noise_floor"]["flip_rate"] == 0.0
 
 
@@ -221,7 +210,7 @@ def test_endpoint_excludes_unstable_cases_from_the_stable_reading(tmp_path):
     roll1 = _make_arm(tmp_path / "r1", cases, verdicts)
     roll2_verdicts = dict(verdicts)
     roll2_verdicts[cases[1]] = "verified_error"   # baseline flips on this case
-    roll2 = _make_arm(tmp_path / "r2", cases, roll2_verdicts)
+    roll2 = _make_arm(tmp_path / "r2", cases, roll2_verdicts, configuration=verdicts)
     deployed_verdicts = dict(verdicts)
     deployed_verdicts[cases[1]] = "verified_error"  # deployed "gains" on the flip
     deployed = _make_arm(tmp_path / "d", cases, deployed_verdicts)

@@ -51,6 +51,7 @@ if str(ROOT) not in sys.path:
 
 from detector.evaluation import evaluate_run  # noqa: E402
 from evolution.metrics import paired_delta  # noqa: E402
+from experiments.snapshot import run_snapshot  # noqa: E402
 
 
 def _run_id(root: Path) -> str:
@@ -115,44 +116,47 @@ def endpoint(
     dataset_root: Path,
     json_out: Path | None,
 ) -> dict[str, Any]:
-    base_a = score(baseline, dataset_root, _cases_of(baseline))
-    deployed_scored = score(deployed, dataset_root, _cases_of(deployed))
-    cases = [str(row["case"]) for row in deployed_scored["rows"]]
-    missing = deployed_scored["missing_cases"]
-    if missing:
-        raise SystemExit(
-            f"the deployed arm is missing {len(missing)} case(s): {missing[:5]}"
-        )
-
-    noise: dict[str, Any] | None = None
-    unstable: list[str] = []
+    roots = {"baseline": baseline, "deployed": deployed}
     if baseline_roll is not None:
-        base_b = score(baseline_roll, dataset_root, _cases_of(baseline_roll))
-        noise = stability(base_a["rows"], base_b["rows"])
-        if noise["case_set_mismatch"]:
+        roots["baseline_roll"] = baseline_roll
+    with run_snapshot(roots) as snapshot:
+        if any(root is None for root in snapshot.roots.values()):
+            raise ValueError("paired endpoint requires existing run roots")
+        base_a = score(baseline, dataset_root, snapshot.manifests["baseline"]["cases"])
+        deployed_scored = score(deployed, dataset_root, snapshot.manifests["deployed"]["cases"])
+        cases = [str(row["case"]) for row in deployed_scored["rows"]]
+        missing = deployed_scored["missing_cases"]
+        if missing:
             raise SystemExit(
-                "the two baseline rolls do not cover the same cases; a noise "
-                f"floor cannot be pooled: {noise['one_sided_cases'][:5]}"
+                f"the deployed arm is missing {len(missing)} case(s): {missing[:5]}"
             )
-        unstable = list(noise["flipped_cases"])
 
-    # The endpoint pair is baseline roll 1 against the deployed arm, both
-    # scored on the deployed arm's case list so the pairing is exact. The two
-    # arms must cover the *same* cases: a deployed arm covering fewer would
-    # silently shrink its own denominator, and a baseline missing cases the
-    # deployed arm has cannot be paired at all. Both directions are refused --
-    # checking only one leaves the other as a quiet way to move the endpoint.
-    base_rows = {str(row["case"]): row for row in base_a["rows"]}
-    base_cases = set(base_rows)
-    deployed_cases = set(cases)
-    if deployed_cases != base_cases:
-        only_deployed = sorted(deployed_cases - base_cases)
-        only_baseline = sorted(base_cases - deployed_cases)
-        raise SystemExit(
-            "the arms do not cover the same cases, so no paired endpoint "
-            f"exists: deployed-only={only_deployed[:5]} "
-            f"baseline-only={only_baseline[:5]}"
-        )
+        noise: dict[str, Any] | None = None
+        unstable: list[str] = []
+        if baseline_roll is not None:
+            base_b = score(baseline_roll, dataset_root, snapshot.manifests["baseline_roll"]["cases"])
+            noise = stability(base_a["rows"], base_b["rows"])
+            if noise["case_set_mismatch"]:
+                raise SystemExit(
+                    "the two baseline rolls do not cover the same cases; a noise "
+                    f"floor cannot be pooled: {noise['one_sided_cases'][:5]}"
+                )
+            if not snapshot.same_execution("baseline", "baseline_roll", snapshot.manifests["baseline"]["cases"]):
+                raise ValueError("baseline rolls have different recorded execution inputs")
+            unstable = list(noise["flipped_cases"])
+
+        base_rows = {str(row["case"]): row for row in base_a["rows"]}
+        base_cases = set(base_rows)
+        deployed_cases = set(cases)
+        if deployed_cases != base_cases:
+            only_deployed = sorted(deployed_cases - base_cases)
+            only_baseline = sorted(base_cases - deployed_cases)
+            raise SystemExit(
+                "the arms do not cover the same cases, so no paired endpoint "
+                f"exists: deployed-only={only_deployed[:5]} "
+                f"baseline-only={only_baseline[:5]}"
+            )
+        same_execution = snapshot.same_execution("baseline", "deployed", cases)
     baseline_rows = [base_rows[case] for case in cases]
     delta = paired_delta(
         baseline_rows, deployed_scored["rows"], unstable_cases=unstable,
@@ -205,7 +209,8 @@ def endpoint(
             "decisive_fixed": fixed,
             "decisive_broken": broken,
             "net_decisive": fixed - broken,
-            "effect_established": fixed > broken,
+            "effect_established": None if same_execution else fixed > broken,
+            "reading": "noise_floor" if same_execution else "effect",
             "rule": (
                 "decisive_fixed > decisive_broken on the stable cases; "
                 "an equal count is not an improvement"
@@ -229,15 +234,6 @@ def endpoint(
             encoding="utf-8",
         )
     return payload
-
-
-def _cases_of(root: Path) -> list[str]:
-    manifest = root / "run.json"
-    if not manifest.is_file():
-        raise SystemExit(f"{manifest} not found; not a run tree: {root}")
-    return [str(case) for case in json.loads(
-        manifest.read_text(encoding="utf-8-sig")
-    )["cases"]]
 
 
 def main(argv: list[str] | None = None) -> int:

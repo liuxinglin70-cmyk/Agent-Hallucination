@@ -227,7 +227,7 @@ def test_report_writing_is_json_round_trippable(tmp_path):
 
 
 @pytest.fixture
-def measured_runs(tmp_path):
+def measured_runs(tmp_path, monkeypatch):
     plan = load_plan()
     cases = ["Synthetic/a.json", "Synthetic/b.json", "Synthetic/c.json"]
     plan = replace(plan, measurement=replace(plan.measurement, cases=cases))
@@ -236,12 +236,20 @@ def measured_runs(tmp_path):
     for case in cases:
         record = data / case
         record.parent.mkdir(parents=True, exist_ok=True)
-        record.write_text(json.dumps({"question": "2+2", "history": [], "is_hallucination": False}), encoding="utf-8")
+        record.write_text(json.dumps({"question": "2+2", "history": [{"role": "assistant", "content": "4"}], "is_hallucination": False}), encoding="utf-8")
+    from detector.runner import run_batch
+    from detector.config import load_config
+    from detector.interventions import build_intervention_registry
+    class FakeDetector:
+        def __init__(self, config):
+            self.config = config
+        def detect(self, record, *, case_id, **kwargs):
+            return _result(case_id)
+    monkeypatch.setattr("detector.runner.Detector", FakeDetector)
+    config = load_config(require_credentials=False)
     for arm, measured in (("g0", cases[:2]), ("g0_roll2", cases[1:])):
-        for case in measured:
-            record_case(runs_root=runs, run_id=arm, case_id=case,
-                        input_record={"question": "2+2", "history": []},
-                        result=_result(case), elapsed_seconds=0)
+        run_batch(runs_root=runs, run_id=arm, dataset_root=data, cases=measured,
+                  config=config, interventions=build_intervention_registry([]), workers=1)
     return plan, runs, data
 
 
@@ -282,19 +290,13 @@ def test_plan_status_lists_the_arms_that_do_not_exist_yet(measured_runs):
 # --------------------------------------------------------------------------
 
 
-def test_two_rolls_of_one_registry_are_recognised_as_noise():
-    """A paired delta between identical configurations is the instrument.
-
-    Measured on the real trees: ``g0`` and ``g0_roll2`` are both the empty
-    registry, and pairing them gives 2 fixed against 1 broken. Quoted as an
-    effect that reads like a finding; it is jitter, and the terminal criterion
-    needs five net corrections before it means anything at all.
-    """
-    from experiments.runner import _shared_registry
-
-    plan = load_plan()
-    assert _shared_registry(plan, ["g0", "g0_roll2"]) is True
-    assert _shared_registry(plan, ["g0", "g1"]) is False
+def test_two_rolls_of_one_execution_are_recognised_as_noise(measured_runs):
+    from experiments.snapshot import run_snapshot
+    plan, runs, _ = measured_runs
+    with run_snapshot({arm: runs / arm for arm in ("g0", "g0_roll2")}, plan.measurement.cases) as snapshot:
+        cases = snapshot.sample(plan.measurement.cases)["common"]
+        assert cases
+        assert snapshot.same_execution("g0", "g0_roll2", cases)
 
 
 def test_the_paired_command_labels_a_same_registry_pair_as_noise(measured_runs, monkeypatch):
@@ -305,8 +307,6 @@ def test_the_paired_command_labels_a_same_registry_pair_as_noise(measured_runs, 
 
     plan, runs, data = measured_runs
     monkeypatch.setattr("experiments.__main__.load_plan", lambda **_: plan)
-    from experiments.runner import _shared_registry
-    assert _shared_registry(plan, ["g0", "g0_roll2"]) is True
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer):
         code = main(["paired", "--arm", "g0", "--arm", "g0_roll2",

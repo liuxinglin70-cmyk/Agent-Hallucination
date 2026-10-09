@@ -22,10 +22,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from experiments.plan import load_plan
+from experiments.snapshot import run_snapshot
+from detector.runtime import contained_path
 from detector.config import load_config
 from experiments.runner import (
-    _shared_registry,
-    paired_sample,
     plan_status,
     run_measurement_stage,
 )
@@ -75,31 +75,34 @@ def cmd_paired(args: argparse.Namespace) -> int:
     arms = list(args.arm) if args.arm else ["g0", "g1"]
     if len(arms) != 2 or len(set(arms)) != 2:
         raise ValueError("paired requires exactly two distinct arms")
-    sample = paired_sample(plan, args.runs_root, arms)
-    if sample["size"] == 0:
-        _print({
-            **sample,
-            "reading": None,
-            "reason": (
-                "no case is measured by every named arm, so no paired reading "
-                "exists; this is 'not measured', not 'no effect'"
-            ),
-        })
-        return 0
-    from detector.evaluation import evaluate_run
-    from evolution.metrics import paired_delta
-    runs_root = Path(args.runs_root)
-    scored = {}
     for arm in arms:
-        scored[arm] = evaluate_run(
-            runs_root=runs_root, run_id=arm, dataset_root=args.dataset_root,
-            cases=sample["common"],
-        )
+        plan.arm(arm)
+    runs_root = Path(args.runs_root)
+    with run_snapshot({arm: contained_path(runs_root, arm) for arm in arms}, plan.measurement.cases) as snapshot:
+        sample = snapshot.sample(plan.measurement.cases)
+        if sample["size"] == 0:
+            _print({
+                **sample,
+                "reading": None,
+                "reason": (
+                    "no case is measured by every named arm, so no paired reading "
+                    "exists; this is 'not measured', not 'no effect'"
+                ),
+            })
+            return 0
+        from detector.evaluation import evaluate_run
+        from evolution.metrics import paired_delta
+        scored = {}
+        for arm in arms:
+            scored[arm] = evaluate_run(
+                runs_root=runs_root, run_id=arm, dataset_root=args.dataset_root,
+                cases=sample["common"],
+            )
+        same_execution = snapshot.same_execution(arms[0], arms[1], sample["common"])
     baseline, deployed = arms[0], arms[-1]
     delta = paired_delta(scored[baseline]["rows"], scored[deployed]["rows"])
     fixed = int(delta.get("decisive_fixed") or 0)
     broken = int(delta.get("decisive_broken") or 0)
-    same_registry = _shared_registry(plan, arms)
     payload = {
         "arms": arms,
         "paired_cases": sample["size"],
@@ -112,7 +115,7 @@ def cmd_paired(args: argparse.Namespace) -> int:
         "baseline_metrics": scored[baseline]["metrics"],
         "deployed_metrics": scored[deployed]["metrics"],
     }
-    if same_registry:
+    if same_execution:
         # Same configuration on both sides: this is the instrument's jitter.
         # Presented as an effect it would be the most quotable number in the
         # report and the least meaningful, so it is named for what it is and
@@ -121,7 +124,7 @@ def cmd_paired(args: argparse.Namespace) -> int:
             "reading": "noise_floor",
             "effect_established": None,
             "reason": (
-                "every named arm deploys the same registry, so this pair "
+                "the paired cases have identical recorded execution inputs, so this pair "
                 "measures the instrument's own jitter on these cases; it is "
                 "not an effect reading and must not be quoted as one"
             ),
