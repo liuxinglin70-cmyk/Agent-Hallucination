@@ -32,6 +32,8 @@ python -m experiments --help
 python scripts/verify.py --scope code_only
 ```
 
+离线 smoke 在配置的 work_root 下创建独立目录。已有 smoke/capability_smoke 目录会被拒绝；重复验证使用新的 work_root，保留此前输出。Python 调用 EvolutionEngine 时使用 with 或显式 close，关闭后的实例不能继续执行。
+
 真实检测需要本地模型服务凭据，会产生模型调用：
 
 ```bash

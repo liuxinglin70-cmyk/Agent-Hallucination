@@ -20,7 +20,6 @@ not be reported as a real detector quality number.
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -206,11 +205,18 @@ class CapabilityProposer:
         )
 
 
+def create_smoke_root(work_root: str | Path) -> Path:
+    root = Path(work_root).resolve()
+    try:
+        root.mkdir(parents=True, exist_ok=False)
+    except FileExistsError as exc:
+        raise RuntimeError(f"smoke root already exists; choose an unused work root: {root}") from exc
+    return root
+
+
 def build_capability_smoke_engine(work_root: str | Path, config: dict[str, Any] | None = None):
     """Create an isolated engine + synthetic dataset under ``work_root``."""
-    root = Path(work_root)
-    shutil.rmtree(root, ignore_errors=True)
-    root.mkdir(parents=True, exist_ok=True)
+    root = create_smoke_root(work_root)
     cfg = dict(load_config()) if config is None else dict(config)
     sentinel, gain, patrol_pool, validation = build_synthetic_cases(root / "data")
     cfg["dataset_root"] = str(root / "data")
@@ -276,6 +282,7 @@ __all__ = [
     "CapabilityProposer",
     "PROGRAM",
     "build_capability_smoke_engine",
+    "create_smoke_root",
     "build_synthetic_cases",
     "run_capability_smoke",
 ]

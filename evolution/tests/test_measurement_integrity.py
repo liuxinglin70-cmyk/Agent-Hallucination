@@ -329,6 +329,7 @@ def test_the_audit_fingerprint_covers_the_gate_thresholds(tmp_path, monkeypatch)
     gates = dict(config.get("gates") or {})
     gates["m_min_marginal_cases"] = int(gates.get("m_min_marginal_cases", 1)) + 1
     tightened["gates"] = gates
+    engine.close()
     engine2 = EvolutionEngine(
         tightened, backend=MockDetectorBackend(), split=split, mini=True,
     )

@@ -27,6 +27,7 @@ from evolution.ledger import load_ledger
 from evolution.meta_eval import write_meta_report
 from evolution.registry import load_active_registry
 from evolution.splits import build_split
+from detector.runtime import exclusive_writer
 
 
 def _print_json(payload: Any) -> None:
@@ -35,16 +36,17 @@ def _print_json(payload: Any) -> None:
 
 def cmd_init(args: argparse.Namespace) -> int:
     config = load_config(args.config)
-    registry = load_active_registry(config)
-    ledger = load_ledger(config)
-    if args.reset:
-        registry.clear()
-    _print_json({
-        "active": [str(c.get("intervention_id") or "") for c in registry.entries],
-        "registry_hash": registry.registry_hash,
-        "ledger_integrity": ledger.verify(),
-    })
-    return 0
+    with exclusive_writer(resolve_path(config["work_root"])):
+        registry = load_active_registry(config)
+        ledger = load_ledger(config)
+        if args.reset:
+            registry.clear()
+        _print_json({
+            "active": [str(c.get("intervention_id") or "") for c in registry.entries],
+            "registry_hash": registry.registry_hash,
+            "ledger_integrity": ledger.verify(),
+        })
+        return 0
 
 
 def _apply_mechanism_binding(config: dict[str, Any], args: Any) -> dict[str, Any]:
@@ -888,10 +890,9 @@ def cmd_smoke(args: argparse.Namespace) -> int:
     config = copy.deepcopy(config)
     # Smoke runs in an isolated workspace so a toy admission never pollutes
     # the real registry/ledger that a formal detector experiment would use.
-    import shutil
+    from evolution.smoke import create_smoke_root
 
-    smoke_root = Path(config["work_root"]) / "smoke"
-    shutil.rmtree(smoke_root, ignore_errors=True)
+    smoke_root = create_smoke_root(resolve_path(config["work_root"]) / "smoke")
     config["work_root"] = str(smoke_root)
     config["registry_dir"] = str(smoke_root / "registry")
     config["ledger_path"] = str(smoke_root / "ledger.jsonl")

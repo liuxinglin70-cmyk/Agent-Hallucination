@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -293,8 +294,8 @@ def test_experiment_cli_fails_when_a_cycle_stops_early(tmp_path, monkeypatch):
 def test_governance_cli_preserves_optional_cycle_default(monkeypatch):
     seen = []
     monkeypatch.setattr(cli, "load_config", lambda _: {})
-    monkeypatch.setattr(cli, "EvolutionEngine", lambda *a, **k: SimpleNamespace(
-        run_governance=lambda cycle: seen.append(cycle) or {}))
+    monkeypatch.setattr(cli, "EvolutionEngine", lambda *a, **k: nullcontext(SimpleNamespace(
+        run_governance=lambda cycle: seen.append(cycle) or {})))
     assert cli.cmd_governance(SimpleNamespace(config=None, backend=None, mini=True, cycle=None)) == 0
     assert seen == [None]
 
@@ -348,8 +349,8 @@ def test_smoke_cli_rejects_failed_admission(tmp_path, monkeypatch):
         patrol_pool=["A/patrol1", "A/patrol2"], gain=["A/gain1", "A/gain2"]))
     monkeypatch.setattr(cli, "_gold", lambda *_: True)
     monkeypatch.setattr("evolution.backends.make_backend", lambda *a, **k: object())
-    monkeypatch.setattr(cli, "EvolutionEngine", lambda *a, **k: SimpleNamespace(run_cycle=lambda _: {
+    monkeypatch.setattr(cli, "EvolutionEngine", lambda *a, **k: nullcontext(SimpleNamespace(run_cycle=lambda _: {
         "state": "completed", "marginal_selection": {"selected": []},
         "audit": {"passed": True}, "ledger_integrity": {"valid": True},
-    }))
+    })))
     assert cli.cmd_smoke(SimpleNamespace(config=None)) == 2

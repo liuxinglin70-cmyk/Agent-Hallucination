@@ -24,6 +24,8 @@ import json
 import math
 import random
 from contextvars import Context
+from functools import wraps
+from threading import RLock
 from weakref import finalize
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -578,6 +580,15 @@ class _ArmRunner:
         return rows
 
 
+def _engine_operation(method):
+    @wraps(method)
+    def execute(self, *args, **kwargs):
+        with self._operation_lock:
+            self._require_open()
+            return method(self, *args, **kwargs)
+    return execute
+
+
 class EvolutionEngine:
     def __init__(
         self,
@@ -592,6 +603,8 @@ class EvolutionEngine:
         mock_base: Mapping[str, bool | None] | None = None,
         mock_overrides: Mapping[str, Mapping[str, bool | None]] | None = None,
     ) -> None:
+        self._operation_lock = RLock()
+        self._closed = False
         self.config = dict(load_config()) if config is None else dict(config)
         self.paths = ensure_dirs(self.config)
         self.mini = mini
@@ -916,6 +929,7 @@ class EvolutionEngine:
             ][:max_gaps],
         }
 
+    @_engine_operation
     def set_replacement_gain_cases(
         self, cases: Sequence[str] | None,
     ) -> None:
@@ -1018,17 +1032,32 @@ class EvolutionEngine:
             "provider_attached": provider is not None,
         }
 
+    def _require_open(self) -> None:
+        if self._closed:
+            raise RuntimeError("evolution engine is closed")
+
     def close(self) -> None:
-        """Release the work_root writer lease. Safe to call more than once."""
-        release, self._writer_release = self._writer_release, None
-        if release is not None:
-            release()
+        """Release ownership after current operations; repeated closes are safe."""
+        with self._operation_lock:
+            self._closed = True
+            release, self._writer_release = self._writer_release, None
+            if release is not None:
+                release()
 
     def __enter__(self) -> "EvolutionEngine":
-        return self
+        self._operation_lock.acquire()
+        try:
+            self._require_open()
+            return self
+        except BaseException:
+            self._operation_lock.release()
+            raise
 
     def __exit__(self, *_exc: Any) -> None:
-        self.close()
+        try:
+            self.close()
+        finally:
+            self._operation_lock.release()
 
     def _instrument_report(
         self,
@@ -1324,6 +1353,7 @@ class EvolutionEngine:
                                 "reason": unmeasured_reason or "no repair opportunities in gain"})
         return ready, blocked
 
+    @_engine_operation
     def record_harness(self, cycle: int) -> dict[str, Any]:
         """Write H_t for this cycle and diff it against the previous one.
 
@@ -1364,6 +1394,7 @@ class EvolutionEngine:
         })
         return {"manifest": manifest, "diff": diff}
 
+    @_engine_operation
     def record_capability_gaps(
         self,
         cycle: int,
@@ -1397,12 +1428,14 @@ class EvolutionEngine:
         })
         return {"open": backlog, "summary": summary}
 
+    @_engine_operation
     def route_failure_records(self) -> list[dict[str, Any]]:
         """The route-falsification memory as stored, for a planner or a report."""
         if not self.route_failure_store.exists():
             return []
         return load_route_failures(self.route_failure_store)
 
+    @_engine_operation
     def develop_rows(
         self,
         cases: Sequence[str],
@@ -2047,6 +2080,7 @@ class EvolutionEngine:
 
         return draft
 
+    @_engine_operation
     def archive_development_run(
         self,
         run_dir: str | Path,
@@ -2220,6 +2254,7 @@ class EvolutionEngine:
         caps = [str(item) for item in required.get("required_capabilities") or ()]
         return caps[0] if caps else ""
 
+    @_engine_operation
     def record_route_failures(
         self,
         *,
@@ -2310,6 +2345,7 @@ class EvolutionEngine:
             ),
         }
 
+    @_engine_operation
     def recall_experience(
         self,
         *,
@@ -3149,6 +3185,7 @@ class EvolutionEngine:
         )
         return extended_patrol, extended_bare, contrast
 
+    @_engine_operation
     def preview_cycle(self, cycle: int) -> dict[str, Any]:
         """Patrol + proposal preview without gates, ledger, or registry writes.
 
@@ -3301,6 +3338,7 @@ class EvolutionEngine:
         return report
 
     # ------------------------------------------------------------------
+    @_engine_operation
     def run_cycle(
         self, cycle: int, *, proposal_batch: ProposalBatch | None = None,
         resume: bool = False,
@@ -4652,6 +4690,7 @@ class EvolutionEngine:
             )
 
     # ------------------------------------------------------------------
+    @_engine_operation
     def run_experiment(self, cycles: int | None = None, *, resume: bool = False) -> dict[str, Any]:
         import time as _time
 
@@ -4817,6 +4856,7 @@ class EvolutionEngine:
         )
 
     # ------------------------------------------------------------------
+    @_engine_operation
     def run_governance(self, cycle: int | None = None) -> dict[str, Any]:
         """Post-B library governance: attribution, retirement, rollback.
 
@@ -5036,6 +5076,7 @@ class EvolutionEngine:
         }
 
     # ------------------------------------------------------------------
+    @_engine_operation
     def run_final(self) -> dict[str, Any]:
         if not bool(
             (self.config.get("final_evaluation") or {}).get("enabled", False)
