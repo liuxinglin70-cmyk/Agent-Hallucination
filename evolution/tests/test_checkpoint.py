@@ -17,15 +17,20 @@ def test_checkpoint_rejects_old_schema_without_rewriting_it(tmp_path):
 
 
 @pytest.mark.parametrize("drift", ["config", "backend", "record"])
-def test_completed_cycle_resume_checks_execution_contract_before_reusing_report(tmp_path, drift):
+def test_completed_cycle_resume_checks_execution_contract_before_reusing_report(tmp_path, drift, monkeypatch):
     from evolution.backends import MockDetectorBackend
     from evolution.engine import EvolutionEngine
     from evolution.proposer import ProposalBatch
     from evolution.splits import EvolutionSplit
     from evolution.tests.test_engine_smoke import _config, _make_dataset
 
+    def forbid_provider_proposer(*args, **kwargs):
+        raise AssertionError("synthetic checkpoint must use an offline proposer")
+    monkeypatch.setattr("evolution.proposer.LLMProposer", forbid_provider_proposer)
+
     cases = _make_dataset(tmp_path / "data", n=20)
     config = _config(tmp_path)
+    config["proposer"]["mode"] = "offline"
     config["audit"]["enabled"] = False
     split = EvolutionSplit(name="synthetic", pool=cases, sentinel=cases[:4],
                            gain=cases[4:12], patrol_pool=cases[12:], mini=True)
