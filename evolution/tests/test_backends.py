@@ -51,6 +51,22 @@ def _backend():
     return backend
 
 
+def test_global_run_stop_is_not_an_unresolved_backend_case(tmp_path, monkeypatch):
+    import pytest
+    from detector.runtime import RunStopped
+    from detector.tests.test_runner import _write_dataset
+
+    dataset = _write_dataset(tmp_path / "dataset")
+    stop = RunStopped({"error_type": "run_cancelled"})
+    backend = _backend()
+    def cancelled(*args, **kwargs):
+        raise stop
+    monkeypatch.setattr(backend, "run_case", cancelled)
+    with pytest.raises(RunStopped) as failure:
+        backend.evaluate(["a.json"], dataset_root=dataset)
+    assert failure.value is stop
+
+
 def test_baseline_remeasures_changed_record_with_the_same_case_id():
     backend = _backend()
     first = {"question": "first", "history": [{"role": "assistant", "content": "answer"}]}

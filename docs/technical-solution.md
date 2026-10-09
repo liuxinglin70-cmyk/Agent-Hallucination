@@ -176,7 +176,7 @@ engine、backends、promotion、interventions 仍承担较多职责，后续物�
 
 `runtime.AddedBudget` 是每例新增预算的唯一持有者，Detector 和整例重试共用；嵌套调用不能重领或更换策略。诊断启动后时间额度与现有 case/run deadline 取更短者。请求前累计预留请求数、UTF-8 输入内容/声明选项的字节数和输出上限；没有 tokenizer 时这是保守估计，不承诺精确 token hard cap。慢审关闭内部 transport retry，实际请求/usage 仍由统一 usage_scope 记录，并在审计及整例 execution 中分别呈现范围，汇总只读取整例计数。
 
-可恢复 provider/合同失败或预算不足只改变诊断 health，保留基础终态和必需阶段健康。致命 provider 失败继续返回原有 invalid/unresolved 信封并附 `base_detection_result` 和停止原因；KeyboardInterrupt/RunStopped 等传播原异常，整例 attempt 记录保留已生成的基础证明和实际成本。
+可恢复 provider/合同失败或预算不足只改变诊断 health，保留基础终态和必需阶段健康。致命 provider 失败继续返回原有 invalid/unresolved 信封并附 `base_detection_result` 和停止原因；KeyboardInterrupt/RunStopped 等传播原异常，整例 attempt 记录保留已生成的基础证明和实际成本。RunStopped 属于运行控制中止，继承 BaseException，provider 不转换为普通 provider 错误，backend 的案例失败处理也不能吞掉它。等待 provider 容量时耗尽单例 deadline 则抛 CaseDeadlineExceeded，由 provider 转为不可同轮重试的 case_deadline_exceeded，保留单例失败与全运行取消的区别。
 
 **待接通**：阳性听证的同 claim Tracer 上下文及受校准策略约束的阴性复审。当前 tracer_context 配置产生审计诊断，尚不改变 Tracer 输入。阴性复审仍须经过 Recall/Upgrade/Defense/Adjudication。异常分数不能定罪，模型反事实不能充当工具回放；强一致阴性的默认路径保持现有行为。
 

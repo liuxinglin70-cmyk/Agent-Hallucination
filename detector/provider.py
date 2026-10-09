@@ -25,7 +25,7 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 from contextlib import nullcontext
 from detector.runtime import (
-    RunStopped, current_control, current_deadline, deadline_scope, record_request,
+    CaseDeadlineExceeded, current_control, current_deadline, deadline_scope, record_request,
 )
 
 _DIRECT_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))
@@ -271,10 +271,10 @@ def provider_call(
             control.check()
         return _provider_call(route=route, system=system, user=user,
                               purpose=purpose, cache_tag=cache_tag)
-    except RunStopped as exc:
+    except CaseDeadlineExceeded as exc:
         raise ProviderError(
             str(route.get("_route_name") or purpose), str(exc),
-            error_type=str(exc.reason.get("error_type") or "run_cancelled"),
+            error_type="case_deadline_exceeded",
             retryable=False,
         ) from exc
     except ProviderError as exc:

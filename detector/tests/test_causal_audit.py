@@ -270,6 +270,37 @@ def test_shadow_cancel_propagates_same_exception_and_journals_base_proof(monkeyp
     assert attempts[0]["execution"]["provider_attempts"] == 2
 
 
+def test_real_provider_wrapper_preserves_run_stop_and_attempt_error(monkeypatch):
+    install_base_judge(monkeypatch)
+    stop = RunStopped({"error_type": "run_cancelled", "message": "cancelled"})
+    def transport(**kwargs):
+        record_request({"purpose": "causal_audit", "usage": None})
+        raise stop
+    monkeypatch.setattr("detector.provider._provider_call", transport)
+    detector = Detector(detector_config(counterfactual_mode="model_hypothesis", max_added_prompt_tokens_per_case=20000),
+                        require_credentials=False)
+    attempts = []
+    with pytest.raises(RunStopped) as failure:
+        detect_with_transport_retry(detector, record(), case_id="test", attempt_observer=attempts.append)
+    assert failure.value is stop
+    assert attempts[0]["error"]["type"] == "RunStopped"
+    assert attempts[0]["result"]["proof"]["state"] == "verified_clean"
+    assert attempts[0]["execution"]["provider_attempts"] == 2
+
+
+@pytest.mark.parametrize("votes", [1, 3])
+def test_base_judge_cancellation_also_bypasses_provider_failure_handlers(monkeypatch, votes):
+    stop = RunStopped({"error_type": "run_cancelled"})
+    def transport(**kwargs):
+        raise stop
+    monkeypatch.setattr("detector.provider._provider_call", transport)
+    cfg = detector_config()
+    cfg["judge_route"]["votes"] = votes
+    with pytest.raises(RunStopped) as failure:
+        Detector(cfg, require_credentials=False).detect(record())
+    assert failure.value is stop
+
+
 def test_zero_added_time_skips_diagnostics_but_keeps_base_proof(monkeypatch):
     install_base_judge(monkeypatch)
     result = Detector(detector_config(max_added_seconds_per_case=0), require_credentials=False).detect(record())

@@ -23,6 +23,21 @@ def test_extract_json_object_fences():
     assert extract_json_object("not json") is None
 
 
+def test_case_capacity_deadline_is_a_case_failure_not_global_cancellation(monkeypatch):
+    from detector.runtime import CaseDeadlineExceeded, RunControl, deadline_scope
+    with deadline_scope(deadline=0), pytest.raises(CaseDeadlineExceeded):
+        with RunControl().request_slot():
+            raise AssertionError("expired case cannot acquire provider capacity")
+
+    def expired(**kwargs):
+        raise CaseDeadlineExceeded("case capacity timed out")
+    monkeypatch.setattr(provider_module, "_provider_call", expired)
+    with pytest.raises(ProviderError) as failure:
+        provider_call(route={}, system="", user="", purpose="case")
+    assert failure.value.error_type == "case_deadline_exceeded"
+    assert not failure.value.retryable
+
+
 class _Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))

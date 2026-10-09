@@ -68,10 +68,16 @@ def remaining_seconds() -> float | None:
     return None if deadline is None else max(0.0, deadline - time.monotonic())
 
 
-class RunStopped(RuntimeError):
+class RunStopped(BaseException):
+    """Run control must bypass handlers for ordinary case failures."""
+
     def __init__(self, reason: Mapping[str, Any]):
         self.reason = dict(reason)
         super().__init__(str(self.reason.get("message") or self.reason.get("error_type") or "run stopped"))
+
+
+class CaseDeadlineExceeded(TimeoutError):
+    """A case ran out of time while waiting for provider capacity."""
 
 
 class RunControl:
@@ -102,7 +108,7 @@ class RunControl:
             self.check()
             remaining = remaining_seconds()
             if remaining is not None and remaining <= 0:
-                raise RunStopped({"error_type": "case_deadline_exceeded", "message": "deadline exceeded waiting for provider capacity"})
+                raise CaseDeadlineExceeded("deadline exceeded waiting for provider capacity")
             if self._slots.acquire(timeout=min(0.1, remaining) if remaining is not None else 0.1):
                 break
         try:
