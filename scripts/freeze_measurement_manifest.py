@@ -35,7 +35,6 @@ Two exclusions, both stated rather than silent:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import random
 import sys
@@ -48,6 +47,7 @@ if str(ROOT) not in sys.path:
 
 from evolution.config import load_config  # noqa: E402
 from evolution.splits import build_split, load_gold  # noqa: E402
+from experiments.plan import case_list_digest  # noqa: E402
 
 SCHEMA = "detector.measurement_manifest.v1"
 DEFAULT_OUT = ROOT / "datasets" / "protocols" / "measurement_v1.json"
@@ -159,16 +159,6 @@ def build_manifest(
         "gold_negative": sum(1 for case in ordered if gold[case] is False),
         "cases": ordered,
     }
-
-
-def case_list_digest(cases: list[str]) -> str:
-    """Content digest of the frozen list, so a later reader can prove it.
-
-    The order *is* the pre-registration, so the digest is over the ordered ids
-    and not over the set: a re-sorted list is a different experiment.
-    """
-    payload = "\n".join(cases).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
 
 
 def main(argv: list[str] | None = None) -> int:

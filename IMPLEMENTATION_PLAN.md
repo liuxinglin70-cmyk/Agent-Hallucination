@@ -4,11 +4,11 @@
 
 | 项目 | 当前值 |
 |---|---|
-| 当前任务 | 恢复完整 18 包代码重构；完成 M12 定位上下文/受控阴性反馈接线并继续合同核验，最终统一清理和文档归档 |
+| 当前任务 | 继续完整 18 包代码重构；验证 M17 的 arm/measurement/路径合同并核验 M08 的原子提交和成本，最终统一清理和文档归档 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | 1601d9c 取消传播相关 85 项复核通过；M12 正式 Tracer 上下文与离线阴性复审链接通，初始 11 项反例先失败后修复，相关 115 项通过；完整 code_only：1320 通过/3 失败；其中两个旧夹具在 1601d9c 独立复现，稳定性用例单独及所在模块 23 项通过，套件次序风险待核验 |
+| 本轮已完成 | 664ca93 接通 M12 上下文/阴性复审；旧 L1/缓存夹具已修正；B08、measurement 和路径合同修复后完整 code_only 1365 通过/0 失败，AST/三 CLI/运行期间源码一致性通过；源码/wheel 功能入口平台 3 项、目录链接边界 1 项通过。稳定性用例本次全套未失败，未声称已证明全部次序独立性 |
 | 代码实施 | 2/18 个工作包已验收；M12 实施中，M11 取消传播已有限复核；其余完整合同和独立审查仍按 §6 验收 |
-| 下一工作包 | 修正 L1/缓存旧夹具及核验稳定性套件风险，再继续 M17 的 B08/measurement 合同和 M13 回放接线 |
+| 下一工作包 | 完成当前全套回归，修 M08 报告与恢复成本的一致性，再继续 M13 阶段回放合同 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
 | 更新时间 | 2026-10-09，Asia/Shanghai |
 
@@ -92,7 +92,7 @@ Python 的真源标注使用合法的 `# SOURCE: <symbol>`，只指向符号，�
 | B05 | 批次 resume 只比较案例 ID/配置，源码和逐例内容改变仍复用 | run_manifest.v3 与逐例 execution_identity 同时绑定源码、有效配置、record/packet、registry 与声明工件；缓存缺身份拒绝；漂移在写清单前拒绝 | M01/M08 | 关闭；5a0bff8 及修正 7f91c3e；相关 469 项、独立 25 项及 replay 反例 1 项通过，初次 P1 已核销；演化侧整体 identity 属 M01/M13 后续范围 |
 | B06 | `runner.py:147–153`、`api.py:348–373`：整例重试只返回最后一次 execution，早期请求与 token 遗失 | measurement 为 request/case execution 唯一汇总规则，execution.v2 保留整例尝试，失败尝试立即落盘，嵌套请求只累计一次 | M04/M08 | 关闭；a2fed20，2 项最小反例先失败后通过，相关 82 项/批次失败 15 项/平台 3 项通过，AST 67 文件通过；独立 51 项及三票并发反例验证 6 请求/30 tokens 不重计，无阻断 |
 | B07 | completed 错减缺失行导致负数；调度中断可能遗失已落盘案例 | run_summary.v3 从 expected/returned/started 集合定义 completed/not_started/missing；工作线程登记返回行，调度中断保留已提交案例；重复或多余行拒绝 | M08 | 关闭；9c40b5c，5 项最小反例修复后相关 51 项、2 项 CLI 回环及独立 19 项/81 个覆盖分区通过；review_offline_review 无阻断 |
-| B08 | `experiments/__main__.py:159` 默认 g0；`runner.py:76–86` 仅直接识别 empty，默认入口报需 registry | arm 名称按 `ExperimentPlan.arms` 解析，一处处理角色和 registry | M17 | 已复现，待修 |
+| B08 | 默认 g0 被当成需要 registry 的普通名称；默认 run_id=None 还导致目录拼接失败 | plan.arm 为角色/registry 真源，空臂显式空 registry，缺 run ID 统一生成 | M17 | 已修待审查；7 项反例与源码/wheel 回环 baseline 功能验证通过；全套 code_only 1365 项通过 |
 | B09 | AST 基线报告明确检出两个 `_step_kind_split`；全仓调用检索只有两个定义，无消费者 | 删除两个无消费者定义，保留实际 `_joint_kind_split` 真源 | M15 | 关闭；4000669，AST/1020 项回归及 review_4000669 核销 |
 | B10 | `development.py:375–402,562–563`：双臂同时漏掉预期 neighbor，目标改善仍能通过 L1 | 配对评分前要求两臂恰好覆盖 target∪neighbor；缺测独立返回 | M15 | 关闭；9dbf358，最小回归修复前 8 失败/2 通过，修复后相关 87 项、独立 17 项通过；review_offline_review 无阻断 |
 | B11 | `development.py:567–577`：gold step 已知时，wrong→same wrong 被计为 regression，即使另一 target 改善 | 回退按 baseline 原本命中→失去命中定义；检测/权威退化单独处理 | M15 | 关闭；9dbf358，最小回归修复前 8 失败/2 通过，修复后相关 87 项、独立 17 项通过；review_offline_review 无阻断 |
@@ -112,12 +112,12 @@ B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fak
 | R04 | 引用集合枚举、step→event、provider forwarding、executor 身份验证重复 | 证明职责相同后归一，保持阶段信息权限差异 | M02/M03/M05/M07 |
 | R05 | `engine.py` 5532 行、`_run_cycle` 936 行；preview 与 cycle 准备流程相似 | 沿既有职责提取家族准备、开发适配和门编排；先用入口测试确认重复 | M14/M16 |
 | R06 | `stable_localization_families` 默认仅自动接受结构不可能定位；普通晚判仍 needs_review | 引入有核验的同指控因果证书；多错误和仅模型意见继续待审查 | M14 |
-| R07 | 包安装规则未包含默认协议资源；`experiments.plan` 从包上层读取 datasets | 仓库外 wheel/CLI 验证后决定显式资源参数或打包确实需要的默认协议 | M17 |
+| R07 | wheel 不包含数据/实验协议，运行使用调用方提供的 --measurement/--plan；README 已明确路径合同 | 仓库外 wheel 安装后检测、批次、评估、baseline 和三个 help 入口通过；默认缺资源错误提示继续核验 | M17 |
 | R08 | 一些测试使用历史 artifacts；禁真实 provider fixture 只在 evolution 测试域 | 全套离线网络护栏；改成最小合成夹具，不能依赖既往运行输出 | M00/M17 |
 | R09 | `HybridProposer._localization_candidates` 的交付步限制可能与首次引入目标冲突 | 用同一声明、已纠正与多错误反例审查 prompt，不强制迎合 gold | M14 |
-| R10 | `dataset.py` 直接拼接 case 路径，case/run ID 的 containment 不完整 | 用临时目录核验绝对路径、../、Windows drive/UNC/保留名和碰撞，统一入口验证 | M02/M08/M17 |
+| R10 | runtime.validate_path_id/contained_path 已统一 dataset、batch、record、evaluation 和实验读取路径；拒绝 drive/UNC、遍历、保留名、大小写/扁平化碰撞与链接越界 | 22 项代码反例及实际目录链接平台反例通过，相关 125 项合同回归通过；其余脚本读者按 M17 核销 | M02/M08/M17 |
 | R11 | result/elapsed 分两次提交，报告在 writer lock 释放后读 rows；缓存历史 usage 与本次 elapsed=0 混算 | 以单一不可变 attempt envelope 和固定清单读报告；成本按 invocation/attempt/lifetime 分开 | M04/M08/M17 |
-| R12 | measurement 未重算 digest；prefix 继承全量身份与 gold 计数 | 校验 schema/case set/digest，区分 parent_manifest_digest 与 selected_cases_digest 和子集统计 | M17 |
+| R12 | measurement 已校验 schema、顺序摘要、案例冲突、排除集合与计数；子集保留父身份、独立摘要，无逐例标签则计数未知 | 13 项先失败后修复；既有冻结协议字节未改，相关合同及源码/wheel baseline 验证通过，待审查 | M17 |
 | R13 | 多文件 registry 提交、route observation 独立性、promotion 返回/落盘状态一致性未充分证明 | 故障注入与独立 observation 身份测试，按实际证据决定修复 | M14/M15/M16 |
 | R14 | 机械定罪逐例身份已绑定实际校准视图，包含记录、corpus 核验、重测及消费的权限；未消费者不加载；同 arm 检查点拒绝权限漂移 | 17d3ae1：缓存 artifact/corpus 变化反例先失败后通过，相关 496 项、AST 67 文件、独立 4 项通过；周期尚未生成候选的能力工件冻结由 M13 接续 | M01/M03/M13 |
 
@@ -187,12 +187,12 @@ evolution/
 | M09 | 风险画像与候选选择 | M01/M02/M03/M07 | 2–3 | 实施中 | 1a4d156/595b468：只读信号及有界候选接入 Detector，PPL unsupported；扩展 515 项、修复后相关 148 项、独立复核 17 项/7 反例通过；审计/定位消费者待接续 |
 | M10 | 实际依赖图与闭包 | M02/M03/M09 | 2–3 | 实施中 | 1a4d156：call/result 及声明字段消费、远距离祖先/后缀/交付投影接通，未核验自然语言保持未知；有限审查除 M09 数值阻断外无新增问题，该阻断 595b468 关闭；完整审计/定位集成待接续 |
 | M11 | 有界因果审计与 shadow | M04/M06/M09/M10 | 2–3 | 待审查 | 8082ee9 已接通 shadow、局部证书/可选假说及共享预算；有限审查发现真实 provider wrapper 吞 RunStopped，已从异常类型与转换规则修复；相关 85 项/扩展 584 项通过，固定修复提交独立复核尚未完成：审查代理因账户额度终止 |
-| M12 | 定位上下文及受控阴性反馈 | M05/M06/M11 | 3–4 | 实施中 | 工作区：正式 Tracer 接收同 hearing 目标摘要与局部核验证据；冻结 Tracer 按实际上下文摘要复用，耗时不参与身份；上下文/repair 与新增复审链共享案例预算；生产无校准保持不激活，显式 OfflineFeedbackPolicy 仅无凭据 API 可注入；初始 11 项反例先失败，修复后相关 115 项、平台 6 项、AST 71 文件通过，报告 `artifacts/code_quality/009d6ad5403f675d65f76e6316448e799f6d052064188686f0763324dfe1dad4/ffbc0284e6a64faaa29743c3f53a2d12/summary.json`；完整 code_only：1320 通过/3 失败；其中两个旧夹具在 1601d9c 独立复现，稳定性用例单独及所在模块 23 项通过，套件次序风险待核验；同 claim 证书及完整审查待完成 |
+| M12 | 定位上下文及受控阴性反馈 | M05/M06/M11 | 3–4 | 实施中 | 664ca93：正式 Tracer 接收同 hearing 目标摘要与局部核验证据；冻结 Tracer 按实际上下文摘要复用，耗时不参与身份；上下文/repair 与新增复审链共享案例预算；生产无校准保持不激活，显式 OfflineFeedbackPolicy 仅无凭据 API 可注入；初始 11 项反例先失败，修复后相关 115 项、平台 6 项、AST 71 文件通过，报告 `artifacts/code_quality/009d6ad5403f675d65f76e6316448e799f6d052064188686f0763324dfe1dad4/ffbc0284e6a64faaa29743c3f53a2d12/summary.json`；完整 code_only：1320 通过/3 失败；其中两个旧夹具在 1601d9c 独立复现，稳定性用例单独及所在模块 23 项通过，套件次序风险待核验；同 claim 证书及完整审查待完成 |
 | M13 | 演化 backend、缓存、replay 与 harness | M01/M06/M08/M12 | 2–3 | 未开始 | — |
 | M14 | 因果失败族、机制、能力和提案 | M11/M12/M13 | 3–4 | 未开始 | — |
 | M15 | 开发、指标、覆盖、四门和晋升 | M00；集成依赖 M13/M14 | 3–4 | 实施中 | B09 已关闭；B10/B11 已实现：confusion_rows 拥有 expected coverage，check_l1 将缺覆盖/非法读值/不健康判为未测，定位回退要求基线原本命中；9dbf358 相关 87 项、独立 17 项通过，B10/B11 关闭；B14 指标 outcome 已接入周期收益集合及路线反馈，d14e5f9：182 项扩展回归/AST 67 文件及独立 22 项通过，B14 关闭；普通定位/联合单位提前机会检查已迁移 target_opportunity；ce6777d：18 个普通/替换/定位/联合入口用例及相关 136 项回归、独立 18 项通过，无阻断；完整门集成待完成 |
 | M16 | 周期编排、状态、registry 与记忆 | M13/M14/M15 | 3–5 | 实施中 | B13 reducer 按追加顺序关闭观察期，后续观察重新累计，重复事件不累计，解决记录幂等/冲突拒绝；9b3bac0 相关 62 项及独立 6 项通过，B13 关闭；独立观察身份及完整生命周期未完成 |
-| M17 | CLI/打包/脚本、全局清理与交付审查 | M00–M16 | 2–3 | 未开始 | — |
+| M17 | CLI/打包/脚本、全局清理与交付审查 | M00–M16 | 2–3 | 实施中 | B08 与默认 run ID、逐臂 causal policy、measurement 父/子身份及路径边界已实现；相关 125 项、目录链接平台 1 项、源码/wheel 完整入口平台 3 项通过。回环功能验证先发现 stdout 混入日志，源头统一写 stderr 后通过。数据/协议显式路径合同已写 README；全套 code_only 1365 项通过，报告 `artifacts/code_quality/af19f50a049c82e9f92e75a57964c573d348ad96a5b5bd305861cf360487337d/7fa94489554f4910a599579301e2c778/summary.json`；脚本核销、独立审查与最终归档未完成 |
 
 估计为熟悉仓库的工程实现与离线审查，不含任何模型实验。简单累计约 39–58 人日；经边界明确的并行实现可缩短日历时间，但共享 API/合同/identity/engine 文件须串行合入。发现新根因时在对应任务改范围和估计，禁止为守日期跳过验收。
 
@@ -495,10 +495,10 @@ python -m experiments --help
 
 四项检查点（就地覆盖）：
 
-- **当前任务**：恢复完整重构目标，接通 M12 后继续其余合同核验，最终清理与文档整合。
-- **进度**：2/18 工作包已验收；M11 取消传播相关 85 项有限复核通过。M12 正式定位上下文、生产校准缺失关闭、显式离线策略复审完整链已接通，初始 11 项反例先失败后通过；相关 115 项、AST 71 文件通过，全局 code_only：1320 通过/3 失败；两个旧夹具在 1601d9c 复现，稳定性用例单独及所在模块 23 项通过；相关平台 6 项通过。没有真实模型请求或新实验读数。
-- **下一步**：提交已验证 M12 接线；修正已复现的 L1/缓存旧夹具并核验稳定性套件风险，再修 B08 与 measurement 身份。
-- **未定事项**：M12 同 claim 核验证书、独立审查及 M01/M03–M17 完整包验收尚未完成；晋升/preflight 摘要、周期工件冻结、路径/成本/事务与包资源分发仍需实施。最终冗余清理和 doc 子目录归档随代码验收完成。
+- **当前任务**：继续完整重构目标，完成 M17 合同回归并核验 M08 成本/存储一致性，最终清理与文档整合。
+- **进度**：2/18 工作包已验收；664ca93 接通 M12 上下文和显式离线策略复审；旧 L1/缓存夹具修正，B08 默认 arm/run ID、measurement 父/子身份、路径验证已实现；全套 code_only 1365 通过/0 失败，AST/三 CLI/运行期间源码一致性通过；源码与仓库外 wheel 功能入口平台 3 项、实际目录链接 1 项通过。无真实模型请求或新增实验读数。
+- **下一步**：用先失败的确定性反例实施 M08 报告读取与恢复成本规则，再继续 M13。
+- **未定事项**：M12 同 claim 核验证书、独立审查及 M01/M03–M17 完整包验收尚未完成；晋升/preflight 摘要、周期工件冻结、存储/成本/事务与其余脚本路径仍需实施。最终冗余清理和 doc 子目录归档随代码验收完成。
 
 ## 12. 本期最终完成与延期项
 

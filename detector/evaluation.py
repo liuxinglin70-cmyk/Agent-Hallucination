@@ -22,6 +22,7 @@ from typing import Any, Mapping, Sequence
 from detector.dataset import load_case
 from detector.result import prediction_state
 from detector.runner import safe_case_id
+from detector.runtime import contained_path, validate_path_id
 
 
 def binary_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -89,14 +90,14 @@ def evaluate_run(
     errors: list[dict[str, Any]] = []
     degraded_rows: list[dict[str, Any]] = []
     missing_cases: list[str] = []
+    validate_path_id(run_id, nested=False)
     for case_id in cases:
         result_path = (
-            Path(runs_root) / run_id / "cases"
-            / safe_case_id(case_id) / "result.json"
+            contained_path(runs_root, run_id, "cases", safe_case_id(case_id), "result.json")
         )
         _record, gold = load_case(dataset_root, case_id)
         raw = json.loads(
-            (Path(dataset_root) / case_id).read_text(encoding="utf-8-sig")
+            contained_path(dataset_root, case_id).read_text(encoding="utf-8-sig")
         )
         gold_step = raw.get("hallucination_step")
         if str(gold_step or "").isdigit():

@@ -8,7 +8,7 @@ from contextvars import ContextVar, copy_context
 from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import tempfile
 import threading
 import time
@@ -29,6 +29,32 @@ _OWNER_LOCK = threading.RLock()
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def validate_path_id(value: str, *, nested: bool = True) -> str:
+    if not isinstance(value, str) or not value or value.startswith("/") or "\\" in value or PureWindowsPath(value).drive:
+        raise ValueError("path id must be a relative forward-slash identifier")
+    parts = value.split("/")
+    if not nested and len(parts) != 1:
+        raise ValueError("run id must be one path component")
+    reserved = {"CON", "PRN", "AUX", "NUL", "CLOCK$", "CONIN$", "CONOUT$",
+                *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
+    for part in parts:
+        if (not part or part in {".", ".."} or part.rstrip(" .") != part
+                or any(ord(char) < 32 or char in '<>:"|?*' for char in part)
+                or part.split(".", 1)[0].upper() in reserved):
+            raise ValueError("path id contains an unsafe component")
+    return value
+
+
+def contained_path(root: str | Path, *parts: str) -> Path:
+    resolved_root = Path(root).resolve()
+    for part in parts:
+        validate_path_id(part)
+    target = resolved_root.joinpath(*parts).resolve()
+    if not target.is_relative_to(resolved_root):
+        raise ValueError("path escapes its declared root")
+    return target
 
 
 def atomic_json(path: str | Path, payload: Any) -> None:

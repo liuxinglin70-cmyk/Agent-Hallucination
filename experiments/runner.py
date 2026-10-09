@@ -27,10 +27,12 @@ import time
 from typing import Any, Mapping, Sequence
 
 from detector.evaluation import evaluate_run
-from detector.interventions import load_intervention_registry
+from detector.config import load_config, validate_config
+from detector.interventions import build_intervention_registry, load_intervention_registry, validate_registry
+from detector.identity import digest
 from detector.result import prediction_state
-from detector.runner import run_batch, safe_case_id
-from detector.runtime import RunControl, exclusive_writer
+from detector.runner import new_run_id, run_batch, safe_case_id
+from detector.runtime import RunControl, contained_path, exclusive_writer, validate_path_id
 
 from experiments.plan import ExperimentPlan
 from experiments.report import summarize_stage
@@ -73,12 +75,21 @@ class StageOutcome:
         return prefix
 
 
-def _resolve_registry(arm: str, registry: Mapping[str, Any] | None,
-                      path: str | Path | None) -> Mapping[str, Any] | None:
+def _resolve_registry(plan: ExperimentPlan, arm: str, registry: Mapping[str, Any] | None,
+                      path: str | Path | None) -> Mapping[str, Any]:
+    spec = plan.arm(arm)
+    selector = spec["registry"]
+    if selector == "empty":
+        if path is not None or (registry is not None and registry.get("interventions")):
+            raise ValueError(f"arm {arm!r} declares an empty registry")
+        return build_intervention_registry([])
     if registry is not None:
+        validate_registry(registry, require_executable_bounds=True)
         return registry
-    if arm == "empty":
-        return None
+    if path is None and selector != "active":
+        path = Path(selector)
+        if not path.is_absolute():
+            path = (plan.source.parent if plan.source else REPO_ROOT) / path
     if path is None:
         raise ValueError(
             f"arm {arm!r} needs an intervention registry: pass --interventions"
@@ -89,8 +100,9 @@ def _resolve_registry(arm: str, registry: Mapping[str, Any] | None,
 def _load_rows(runs_root: Path, run_id: str, cases: Sequence[str]) -> list[dict[str, Any]]:
     """Read the run tree back into the row shape the report consumes."""
     rows: list[dict[str, Any]] = []
+    validate_path_id(run_id, nested=False)
     for case in cases:
-        case_dir = runs_root / run_id / "cases" / safe_case_id(case)
+        case_dir = contained_path(runs_root, run_id, "cases", safe_case_id(case))
         result_path = case_dir / "result.json"
         if not result_path.is_file():
             continue
@@ -111,6 +123,19 @@ def _load_rows(runs_root: Path, run_id: str, cases: Sequence[str]) -> list[dict[
     return rows
 
 
+def _effective_config(plan: ExperimentPlan, arm: str, config: Mapping[str, Any] | None):
+    overrides = plan.arm(arm).get("detector_policy")
+    if overrides is None:
+        return config
+    if (not isinstance(overrides, Mapping) or set(overrides) != {"causal_audit"}
+            or not isinstance(overrides["causal_audit"], Mapping)):
+        raise ValueError("arm detector_policy must contain a causal_audit object")
+    base = dict(config) if config is not None else load_config(require_credentials=False)
+    return validate_config({**base, "causal_audit": {
+        **(base.get("causal_audit") or {}), **overrides["causal_audit"],
+    }}, base_dir=plan.source.parent if plan.source else REPO_ROOT, require_credentials=False)
+
+
 def run_measurement_stage(
     *,
     plan: ExperimentPlan,
@@ -118,7 +143,7 @@ def run_measurement_stage(
     arm: str,
     cases: Sequence[str] | None = None,
     runs_root: str | Path,
-    run_id: str,
+    run_id: str | None,
     dataset_root: str | Path,
     registry: Mapping[str, Any] | None = None,
     interventions_path: str | Path | None = None,
@@ -130,12 +155,16 @@ def run_measurement_stage(
     notes: Sequence[str] = (),
 ) -> StageOutcome:
     """Run one arm over the measurement set (or a prefix of it) and report it."""
-    requested = [str(case) for case in (cases if cases is not None else plan.measurement.cases)]
-    resolved = _resolve_registry(arm, registry, interventions_path)
+    requested = list(cases if cases is not None else plan.measurement.cases)
+    plan.stage(stage)
+    resolved = _resolve_registry(plan, arm, registry, interventions_path)
+    selection = plan.measurement.select(requested)
+    config = _effective_config(plan, arm, config)
+    run_id = validate_path_id(run_id or new_run_id(prefix=f"{stage}_{arm}"), nested=False)
     runs_root = Path(runs_root)
     runs_root.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
-    with exclusive_writer(runs_root / run_id):
+    with exclusive_writer(contained_path(runs_root, run_id)):
         batch = run_batch(
             dataset_root=dataset_root, cases=requested, run_id=run_id,
             runs_root=runs_root, config=config, interventions=resolved,
@@ -169,6 +198,11 @@ def run_measurement_stage(
             "after the fact is not pre-registered"
         ),
     }
+    report["arm_role"] = plan.arm(arm)["role"]
+    report["registry_digest"] = digest(resolved)
+    report["selection"] = {"parent_manifest_digest": selection.parent_manifest_digest,
+                           "selected_cases_digest": selection.digest, "size": selection.size,
+                           "gold_positive": selection.gold_positive, "gold_negative": selection.gold_negative}
     if report_path is not None:
         out = Path(report_path)
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -195,7 +229,11 @@ def _prefix_of(requested: Sequence[str], measured: Sequence[str]) -> list[str]:
 
 def run_baseline_stage(**kwargs: Any) -> StageOutcome:
     """The baseline arm: no interventions, over the frozen measurement order."""
-    return run_measurement_stage(**{**kwargs, "arm": "empty"})
+    plan = kwargs["plan"]
+    baseline_arms = [name for name in plan.arms if plan.arm(name)["role"] == "baseline"]
+    if len(baseline_arms) != 1:
+        raise ValueError("experiment plan requires one baseline arm")
+    return run_measurement_stage(**{**kwargs, "arm": baseline_arms[0]})
 
 
 def _shared_registry(plan: ExperimentPlan, arms: Sequence[str]) -> bool:
@@ -208,7 +246,7 @@ def _shared_registry(plan: ExperimentPlan, arms: Sequence[str]) -> bool:
     corrections, so nothing at this scale is an effect either way.
     """
     registries = {
-        str((plan.arms.get(arm) or {}).get("registry") or "empty")
+        plan.arm(arm)["registry"]
         for arm in arms
     }
     return len(registries) <= 1

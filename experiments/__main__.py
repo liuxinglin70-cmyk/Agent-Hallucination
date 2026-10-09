@@ -22,6 +22,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from experiments.plan import load_plan
+from detector.config import load_config
 from experiments.runner import (
     _shared_registry,
     paired_sample,
@@ -58,7 +59,9 @@ def cmd_baseline(args: argparse.Namespace) -> int:
     outcome = run_measurement_stage(
         plan=plan, stage="baseline", arm=args.arm, cases=cases,
         runs_root=args.runs_root, run_id=args.run_id,
-        dataset_root=args.dataset_root, config=None,
+        dataset_root=args.dataset_root,
+        config=load_config(args.config, require_credentials=False) if args.config else None,
+        interventions_path=args.interventions,
         workers=args.workers, deadline_seconds=args.deadline_seconds,
         retry_unresolved=args.retry_unresolved,
         report_path=args.report,
@@ -157,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
 
     baseline = sub.add_parser("baseline", help="run a measurement arm")
     baseline.add_argument("--arm", default="g0")
+    baseline.add_argument("--config", default=None, help="explicit detector configuration")
+    baseline.add_argument("--interventions", default=None, help="registry required by an active arm")
     baseline.add_argument("--run-id", default=None)
     baseline.add_argument("--runs-root", default="artifacts/baseline/runs")
     baseline.add_argument(

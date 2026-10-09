@@ -42,6 +42,10 @@ python -m evolution experiment --mini
 
 默认配置为 detector/configs/autodl.json，凭据读取 AUTODL_API_KEY，.env 不入 Git。数据放在 datasets/raw/agenthallu/AgentHallu，由 datasets/integrity.json 校验。本地完整数据有 693 个案例，默认协议是开发复测，不是独立终审。
 
+实验入口按计划中声明的 arm 解析 registry；默认 `g0` 和 `g0_roll2` 使用显式空 registry。measurement 清单会核验案例顺序摘要、路径冲突、排除集合和标签计数。选择子集后报告保留父清单身份，使用独立选择摘要；无法从逐例标签核算的子集计数显示为未知。运行进度写入 stderr，stdout 保持 JSON 输出。
+
+wheel 包含三个运行包及运行配置；数据集和实验协议由调用方提供。仓库外运行实验时使用 `python -m experiments --measurement /absolute/path/measurement.json baseline --config /absolute/path/config.json --dataset-root /absolute/path/data --runs-root /absolute/path/runs`；自定义计划另加 `--plan /absolute/path/plan.json`。源码和仓库外 wheel 的回环检测、批次、评估及实验 baseline 入口已通过离线验证。
+
 ## 🗂️ 结构
 
 ```text

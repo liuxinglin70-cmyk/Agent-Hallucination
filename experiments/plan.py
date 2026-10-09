@@ -18,12 +18,30 @@ property, which is why the order is frozen and the size is not.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from copy import deepcopy
+import hashlib
 import json
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
+from detector.identity import digest
+from detector.runner import safe_case_id
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PLAN_SCHEMA = "experiments.plan.v1"
+MEASUREMENT_SCHEMA = "detector.measurement_manifest.v1"
+
+
+def case_list_digest(cases: list[str]) -> str:
+    return hashlib.sha256("\n".join(cases).encode("utf-8")).hexdigest()
+
+
+def _case_list(value: Any, name: str) -> list[str]:
+    if not isinstance(value, list) or any(not isinstance(case, str) for case in value):
+        raise ValueError(f"{name} must be a list of case identifiers")
+    paths = [safe_case_id(case).casefold() for case in value]
+    if len(paths) != len(set(paths)):
+        raise ValueError(f"{name} contains duplicate or colliding case identifiers")
+    return list(value)
 
 
 def _read_json(path: Path) -> Any:
@@ -38,20 +56,34 @@ class MeasurementSet:
     digest: str
     policy: str
     excluded: list[str]
-    gold_positive: int
-    gold_negative: int
+    gold_positive: int | None
+    gold_negative: int | None
     source: Path
+    parent_manifest_digest: str = ""
 
     @property
     def size(self) -> int:
         return len(self.cases)
 
     def prefix(self, count: int) -> "MeasurementSet":
+        if type(count) is not int or count < 0:
+            raise ValueError("prefix count must be a nonnegative integer")
+        return self.select(self.cases[:count])
+
+    def select(self, cases: Sequence[str]) -> "MeasurementSet":
+        selected = _case_list(list(cases), "selected cases")
+        positions = {case: index for index, case in enumerate(self.cases)}
+        if any(case not in positions for case in selected):
+            raise ValueError("selected cases are outside the measurement manifest")
+        if [positions[case] for case in selected] != sorted(positions[case] for case in selected):
+            raise ValueError("selected cases must preserve the frozen measurement order")
+        complete = len(selected) == len(self.cases)
         return MeasurementSet(
-            cases=self.cases[: max(0, int(count))], digest=self.digest,
-            policy=self.policy, excluded=self.excluded,
-            gold_positive=self.gold_positive, gold_negative=self.gold_negative,
-            source=self.source,
+            cases=list(selected), digest=case_list_digest(selected),
+            policy=self.policy, excluded=list(self.excluded),
+            gold_positive=self.gold_positive if complete else None if selected else 0,
+            gold_negative=self.gold_negative if complete else None if selected else 0,
+            source=self.source, parent_manifest_digest=self.parent_manifest_digest,
         )
 
     def stratification(self, count: int | None = None) -> dict[str, Any]:
@@ -85,6 +117,16 @@ class ExperimentPlan:
     source: Path | None = None
     notes: list[str] = field(default_factory=list)
 
+    def arm(self, name: str) -> dict[str, Any]:
+        spec = self.arms.get(name)
+        if not isinstance(spec, Mapping):
+            raise ValueError(f"arm {name!r} is not declared by the experiment plan")
+        if not isinstance(spec.get("registry"), str) or not spec["registry"].strip():
+            raise ValueError(f"arm {name!r} requires a registry selector")
+        if not isinstance(spec.get("role"), str) or not spec["role"].strip():
+            raise ValueError(f"arm {name!r} requires a role")
+        return deepcopy(dict(spec))
+
     def stage(self, name: str) -> dict[str, Any]:
         if name not in self.stages:
             raise KeyError(
@@ -99,6 +141,7 @@ class ExperimentPlan:
             "measurement": {
                 "cases": self.measurement.size,
                 "digest": self.measurement.digest,
+                "parent_manifest_digest": self.measurement.parent_manifest_digest,
                 "policy": self.measurement.policy,
                 "gold_positive": self.measurement.gold_positive,
                 "gold_negative": self.measurement.gold_negative,
@@ -161,17 +204,37 @@ DEFAULT_ARMS: dict[str, Any] = {
 def load_measurement(path: str | Path | None = DEFAULT_MEASUREMENT) -> MeasurementSet:
     path = Path(path) if path else Path(DEFAULT_MEASUREMENT)
     payload = _read_json(path)
-    cases = [str(case) for case in payload.get("cases") or ()]
+    if not isinstance(payload, Mapping) or payload.get("schema_version") != MEASUREMENT_SCHEMA:
+        raise ValueError("measurement manifest schema is unsupported")
+    cases = _case_list(payload.get("cases"), "measurement cases")
     if not cases:
         raise ValueError(f"{path} declares no cases")
+    if payload.get("cases_digest") != case_list_digest(cases):
+        raise ValueError("measurement case digest differs from its ordered case list")
+    excluded = _case_list(payload.get("excluded_mini_split", []), "excluded mini split")
+    unlabeled = _case_list(payload.get("excluded_unlabeled", []), "excluded unlabeled")
+    all_paths = [safe_case_id(case).casefold() for case in [*cases, *excluded, *unlabeled]]
+    if len(all_paths) != len(set(all_paths)):
+        raise ValueError("measurement and exclusion sets overlap or collide")
+    for key in ("gold_positive", "gold_negative"):
+        if type(payload.get(key)) is not int or payload[key] < 0:
+            raise ValueError(f"measurement {key} must be a nonnegative integer")
+    if payload["gold_positive"] + payload["gold_negative"] != len(cases):
+        raise ValueError("measurement gold counts differ from case count")
+    counts = payload.get("counts")
+    if counts is not None:
+        expected = {"corpus": len(all_paths), "measurable": len(cases),
+                    "excluded_mini_split": len(excluded), "excluded_unlabeled": len(unlabeled)}
+        if not isinstance(counts, Mapping) or any(type(counts.get(key)) is not int or counts[key] != value
+                                                  for key, value in expected.items()):
+            raise ValueError("measurement manifest counts differ from its declared sets")
     return MeasurementSet(
         cases=cases,
-        digest=str(payload.get("cases_digest") or payload.get("digest") or ""),
+        digest=case_list_digest(cases),
         policy=str(payload.get("policy") or ""),
-        excluded=[str(case) for case in payload.get("excluded_mini_split") or ()],
-        gold_positive=int(payload.get("gold_positive") or 0),
-        gold_negative=int(payload.get("gold_negative") or 0),
-        source=path,
+        excluded=[*excluded, *unlabeled],
+        gold_positive=payload["gold_positive"], gold_negative=payload["gold_negative"],
+        source=path, parent_manifest_digest=digest(payload),
     )
 
 

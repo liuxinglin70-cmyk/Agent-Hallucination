@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from detector.packet import ALLOWED_RECORD_KEYS
+from detector.runtime import contained_path
 
 
 def project_record(raw: Mapping[str, Any]) -> dict[str, Any]:
@@ -34,6 +35,6 @@ def gold_fields(raw: Mapping[str, Any]) -> dict[str, Any]:
 
 def load_case(dataset_root: str | Path, case_id: str) -> tuple[dict, dict]:
     raw = json.loads(
-        (Path(dataset_root) / case_id).read_text(encoding="utf-8-sig")
+        contained_path(dataset_root, case_id).read_text(encoding="utf-8-sig")
     )
     return project_record(raw), gold_fields(raw)

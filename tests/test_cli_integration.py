@@ -6,13 +6,45 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import threading
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_detect_batch_evaluate_through_http(tmp_path):
+@pytest.fixture(params=["source", "wheel"])
+def cli_runtime(request, tmp_path):
+    if request.param == "source":
+        return ROOT, os.environ["PYTHONPATH"]
+    source = tmp_path / "package_source"
+    source.mkdir()
+    shutil.copy2(ROOT / "pyproject.toml", source / "pyproject.toml")
+    for package in ("detector", "evolution", "experiments"):
+        shutil.copytree(ROOT / package, source / package, ignore=shutil.ignore_patterns("tests", "__pycache__"))
+    wheels = tmp_path / "wheels"
+    installed = tmp_path / "installed"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    guard = str(ROOT / "scripts" / "offline_guard")
+    environment = {**os.environ, "PYTHONPATH": guard, "PIP_DISABLE_PIP_VERSION_CHECK": "1"}
+    def pip_command(arguments):
+        result = subprocess.run([sys.executable, "-m", "pip", *arguments], cwd=outside, env=environment,
+                                capture_output=True, text=True, encoding="utf-8", timeout=60)
+        assert result.returncode == 0, result.stdout + result.stderr
+    pip_command(["wheel", str(source), "--no-deps", "--no-build-isolation", "--no-cache-dir", "--wheel-dir", str(wheels)])
+    pip_command(["install", str(next(wheels.glob("*.whl"))), "--no-deps", "--no-cache-dir", "--target", str(installed)])
+    pythonpath = os.pathsep.join([guard, str(installed)])
+    probe = subprocess.run([sys.executable, "-c", "import detector; print(detector.__file__)"],
+                           cwd=outside, env={**environment, "PYTHONPATH": pythonpath}, capture_output=True,
+                           text=True, encoding="utf-8", timeout=10)
+    assert probe.returncode == 0 and str(installed) in probe.stdout, probe.stdout + probe.stderr
+    return outside, pythonpath
+
+
+def test_detect_batch_evaluate_through_http(tmp_path, cli_runtime):
+    working_directory, pythonpath = cli_runtime
     requests = []
     judge = {"is_hallucination": False, "hallucination_step": None,
              "hallucination_reason": None, "delivered_result": "4", "correct_result": "4",
@@ -52,10 +84,10 @@ def test_detect_batch_evaluate_through_http(tmp_path):
         cases.write_text('["clean.json"]', encoding="utf-8")
         env = {**os.environ, "CLI_INTEGRATION_KEY": "local-test-only", "PYTHONDONTWRITEBYTECODE": "1",
                "PYTHONUTF8": "1", "DETECTOR_ENDPOINT": route["endpoint"],
-               "DETECTOR_API_KEY_ENV": "CLI_INTEGRATION_KEY"}
+               "DETECTOR_API_KEY_ENV": "CLI_INTEGRATION_KEY", "PYTHONPATH": pythonpath}
 
         def command(*args):
-            result = subprocess.run([sys.executable, "-m", "detector", *args], cwd=ROOT, env=env,
+            result = subprocess.run([sys.executable, "-m", "detector", *args], cwd=working_directory, env=env,
                                     capture_output=True, text=True, encoding="utf-8", timeout=60)
             assert result.returncode == 0, result.stdout + result.stderr
 
@@ -72,6 +104,22 @@ def test_detect_batch_evaluate_through_http(tmp_path):
         assert report["metrics"]["tn"] == 1
         assert report["metrics"]["unresolved"] == 0
         assert len(requests) == 6
+        from experiments.plan import case_list_digest
+        measurement = tmp_path / "measurement.json"
+        measurement.write_text(json.dumps({"schema_version": "detector.measurement_manifest.v1",
+            "cases": ["clean.json"], "cases_digest": case_list_digest(["clean.json"]),
+            "gold_positive": 0, "gold_negative": 1}), encoding="utf-8")
+        result = subprocess.run([sys.executable, "-m", "experiments", "--measurement", str(measurement),
+            "baseline", "--config", str(config), "--dataset-root", str(data),
+            "--runs-root", str(tmp_path / "experiments"), "--run-id", "baseline"],
+            cwd=working_directory, env=env, capture_output=True, text=True, encoding="utf-8", timeout=60)
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert json.loads(result.stdout)["coverage"]["measured"] == 1
+        assert len(requests) == 9
+        for package in ("detector", "evolution", "experiments"):
+            help_result = subprocess.run([sys.executable, "-m", package, "--help"], cwd=working_directory,
+                                         env=env, capture_output=True, text=True, encoding="utf-8", timeout=10)
+            assert help_result.returncode == 0, help_result.stdout + help_result.stderr
         assert "hidden-gold-marker" not in json.dumps(requests)
     finally:
         server.shutdown()

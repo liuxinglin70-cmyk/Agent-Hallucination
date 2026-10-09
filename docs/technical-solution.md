@@ -71,6 +71,10 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 
 批次 `run_summary.v3` 分别记录 requested/returned/not_started/missing，completed 只统计实际返回的非 not_started 行。工作线程登记完成结果，调度器中断后仍保留已提交案例；没有返回行的已开始案例记为 missing，不写成阴性或未开始。重复及额外案例行拒绝进入汇总。
 
+案例 ID 由 `runtime.validate_path_id` 统一验证为正斜杠分隔的相对路径，run/attempt ID 限定为单个路径段；拒绝 drive/UNC、遍历、Windows 保留名、控制字符及尾随点或空格。`contained_path` 核验解析后的目标仍在声明根目录内，包含目录链接；批次和 measurement 同时拒绝大小写或扁平化输出路径碰撞。
+
+实验 arm 的角色、registry selector 和可选 `detector_policy.causal_audit` 由计划解析。空 registry 显式传入，防止意外继承配置中的活动 registry；未知 arm 或与空臂冲突的 registry 参数拒绝。measurement.v1 清单核验 schema、顺序摘要、案例/排除集合和计数；选择子集保持冻结顺序并生成自己的摘要，保留父清单摘要，缺逐例标签时不继承全量正负计数。wheel 使用调用方提供的数据及 `--measurement`/`--plan` 协议路径；三个包的 help 与回环功能入口均在仓库外安装验证。批次日志写 stderr，实验 stdout 是 JSON。
+
 | 维度 | 合同 | 解释 |
 | --- | --- | --- |
 | 终态 | verified_error / verified_clean / unresolved | 未决不等于 clean |

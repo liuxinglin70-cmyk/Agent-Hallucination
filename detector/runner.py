@@ -33,6 +33,7 @@ import json
 import copy
 from pathlib import Path
 import threading
+import sys
 import time
 from typing import Any, Callable, Mapping, Sequence
 
@@ -60,12 +61,14 @@ from detector.runtime import (
     atomic_json,
     bounded_map,
     current_control,
+    contained_path,
     deadline_scope,
     exclusive_writer,
     remaining_seconds,
     run_scope,
     utc_now,
     usage_scope,
+    validate_path_id,
 )
 
 DEFAULT_RUNS_ROOT = Path("artifacts/detector/runs")
@@ -78,10 +81,7 @@ def new_run_id(prefix: str = "detector") -> str:
 
 
 def safe_case_id(case_id: str) -> str:
-    return (
-        str(case_id).replace("/", "__").replace("\\", "__")
-        .replace(":", "_") or "case"
-    )
+    return validate_path_id(case_id).replace("/", "__")
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -201,10 +201,13 @@ def record_case(
     what this case previously produced. ``result.json`` beside it is the
     reader's path and always holds a *completed* attempt.
     """
-    case_dir = Path(runs_root) / run_id / "cases" / safe_case_id(case_id)
+    validate_path_id(run_id, nested=False)
+    if attempt_id is not None:
+        validate_path_id(attempt_id, nested=False)
+    case_dir = contained_path(runs_root, run_id, "cases", safe_case_id(case_id))
     _write_json(case_dir / "input.json", input_record)
     if attempt_id:
-        attempt_dir = case_dir / "attempts" / attempt_id
+        attempt_dir = contained_path(case_dir, "attempts", attempt_id)
         _write_json(attempt_dir / "result.json", result)
         (attempt_dir / "elapsed_seconds.json").write_text(
             json.dumps({"elapsed_seconds": elapsed_seconds, "attempt_id": attempt_id}) + "\n",
@@ -292,12 +295,13 @@ def run_batch(
     a cancelled run -- the batch stops submitting new work instead of
     reproducing the same failure once per remaining case.
     """
-    if len(cases) != len(set(map(str, cases))):
+    run_id = validate_path_id(run_id or new_run_id(), nested=False)
+    if len(cases) != len(set(cases)):
         raise ValueError("batch cases must be unique")
     normalized_paths = {}
     for case_id in cases:
         safe = safe_case_id(case_id)
-        previous = normalized_paths.setdefault(safe, str(case_id))
+        previous = normalized_paths.setdefault(safe.casefold(), str(case_id))
         if previous != str(case_id):
             raise ValueError(
                 f"case ids collide in result path {safe!r}: {previous!r} and {case_id!r}"
@@ -316,8 +320,7 @@ def run_batch(
             packet=build_packet(record), registry=interventions,
             authority=authority_identity(interventions),
         )
-    run_id = run_id or new_run_id()
-    run_dir = Path(runs_root) / run_id
+    run_dir = contained_path(runs_root, run_id)
     case_root = run_dir / "cases"
     manifest_path = run_dir / "run.json"
     identity = {
@@ -406,10 +409,10 @@ def run_batch(
                     row = register({"case": case_id, "result": result, "elapsed_seconds": 0.0,
                                     "source": "cached"})
                     print(f"  [{case_id}] reused cached {result.get('state')} row",
-                          flush=True)
+                          file=sys.stderr, flush=True)
                     return row
                 print(f"  [{case_id}] re-running cached {result.get('state')} row",
-                      flush=True)
+                      file=sys.stderr, flush=True)
             started = time.monotonic()
             execution_started_at = utc_now()
             case_dir = case_root / safe_case_id(case_id)
@@ -450,6 +453,7 @@ def run_batch(
             print(
                 f"  [{case_id}] state={result.get('state')} "
                 f"authority={result.get('decision_authority')}",
+                file=sys.stderr,
                 flush=True,
             )
             return row
