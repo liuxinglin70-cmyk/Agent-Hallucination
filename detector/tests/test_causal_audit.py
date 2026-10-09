@@ -65,7 +65,7 @@ def test_deterministic_check_proves_only_local_result_without_provider(monkeypat
     data = inputs()
     def unexpected(**kwargs):
         raise AssertionError("deterministic audit must not call a provider")
-    monkeypatch.setattr("detector.causal_audit.provider_call", unexpected)
+    monkeypatch.setattr("detector.provider._provider_call", unexpected)
     audit, health = run_causal_audit(**data, budget=AddedBudget(data["config"]["causal_audit"]))
     assert health["state"] == "ok"
     checked = audit["candidates"][0]
@@ -86,7 +86,7 @@ def test_model_opinion_and_valid_refs_do_not_upgrade_causal_truth(monkeypatch):
     def provider(**kwargs):
         seen.append(kwargs)
         return fake_hypotheses(**kwargs)
-    monkeypatch.setattr("detector.causal_audit.provider_call", provider)
+    monkeypatch.setattr("detector.provider._provider_call", provider)
     with usage_scope() as requests:
         audit, _ = run_causal_audit(**data, budget=AddedBudget(cfg))
     assert len(requests) == audit["cost"]["provider_attempts"] == 1
@@ -109,7 +109,7 @@ def test_model_opinion_and_valid_refs_do_not_upgrade_causal_truth(monkeypatch):
 ])
 def test_model_schema_errors_are_diagnostic_health_only(monkeypatch, bad):
     cfg = policy(counterfactual_mode="model_hypothesis", max_added_prompt_tokens_per_case=20000)
-    monkeypatch.setattr("detector.causal_audit.provider_call", lambda **kwargs: (bad, {}))
+    monkeypatch.setattr("detector.provider._provider_call", lambda **kwargs: (bad, {}))
     audit, health = run_causal_audit(**inputs(cfg), budget=AddedBudget(cfg))
     assert health["state"] == "contract_error"
     assert audit["hypotheses"] == []
@@ -125,7 +125,7 @@ def test_budget_refuses_request_before_provider(monkeypatch, limits, resource):
     cfg = policy(counterfactual_mode="model_hypothesis", **limits)
     def unexpected(**kwargs):
         raise AssertionError("budget must refuse before provider")
-    monkeypatch.setattr("detector.causal_audit.provider_call", unexpected)
+    monkeypatch.setattr("detector.provider._provider_call", unexpected)
     audit, health = run_causal_audit(**inputs(cfg), budget=AddedBudget(cfg))
     assert health == {"state": "budget_exhausted", "warnings": [resource]}
     assert audit["cost"]["provider_attempts"] == 0
@@ -169,7 +169,7 @@ def test_provider_declared_tool_inputs_also_consume_added_input_budget(monkeypat
     data["config"]["judge_route"] = {**CONFIG["judge_route"], "extra_body": {"tools": [{"description": "x" * 20000}]}}
     def unexpected(**kwargs):
         raise AssertionError("declared tool descriptions must consume input budget")
-    monkeypatch.setattr("detector.causal_audit.provider_call", unexpected)
+    monkeypatch.setattr("detector.provider._provider_call", unexpected)
     audit, health = run_causal_audit(**data, budget=AddedBudget(cfg))
     assert health == {"state": "budget_exhausted", "warnings": ["input"]}
     assert audit["cost"]["provider_attempts"] == 0
@@ -223,7 +223,7 @@ def test_shadow_provider_failure_preserves_base_result(monkeypatch):
     def unavailable(**kwargs):
         record_request({"purpose": "causal_audit", "usage": None})
         raise ProviderError("causal_audit", "offline failure")
-    monkeypatch.setattr("detector.causal_audit.provider_call", unavailable)
+    monkeypatch.setattr("detector.provider._provider_call", unavailable)
     result = Detector(detector_config(counterfactual_mode="model_hypothesis", max_added_prompt_tokens_per_case=20000),
                       require_credentials=False).detect(record())
     assert result["state"] == "verified_clean"
@@ -240,7 +240,7 @@ def test_shadow_fatal_retains_base_proof_and_existing_stop_classification(monkey
     def refused(**kwargs):
         record_request({"purpose": "causal_audit", "usage": None})
         raise fatal
-    monkeypatch.setattr("detector.causal_audit.provider_call", refused)
+    monkeypatch.setattr("detector.provider._provider_call", refused)
     result = Detector(detector_config(counterfactual_mode="model_hypothesis", max_added_prompt_tokens_per_case=20000),
                       require_credentials=False).detect(record())
     assert result["state"] == "unresolved"
@@ -257,7 +257,7 @@ def test_shadow_cancel_propagates_same_exception_and_journals_base_proof(monkeyp
     def interrupted(**kwargs):
         record_request({"purpose": "causal_audit", "usage": None})
         raise cancel
-    monkeypatch.setattr("detector.causal_audit.provider_call", interrupted)
+    monkeypatch.setattr("detector.provider._provider_call", interrupted)
     detector = Detector(detector_config(counterfactual_mode="model_hypothesis", max_added_prompt_tokens_per_case=20000),
                         require_credentials=False)
     attempts = []
@@ -311,7 +311,7 @@ def test_zero_added_time_skips_diagnostics_but_keeps_base_proof(monkeypatch):
 
 def test_multiple_audits_share_one_case_budget(monkeypatch):
     cfg = policy(counterfactual_mode="model_hypothesis", max_added_prompt_tokens_per_case=20000)
-    monkeypatch.setattr("detector.causal_audit.provider_call", fake_hypotheses)
+    monkeypatch.setattr("detector.provider._provider_call", fake_hypotheses)
     budget = AddedBudget(cfg)
     with usage_scope() as requests:
         first, _ = run_causal_audit(**inputs(cfg), budget=budget)
@@ -330,7 +330,7 @@ def test_deadline_after_provider_is_diagnostic_failure_with_actual_cost(monkeypa
     def slow(**kwargs):
         now[0] = 2
         return fake_hypotheses(**kwargs)
-    monkeypatch.setattr("detector.causal_audit.provider_call", slow)
+    monkeypatch.setattr("detector.provider._provider_call", slow)
     audit, health = run_causal_audit(**inputs(cfg), budget=AddedBudget(cfg))
     assert health["state"] == "budget_exhausted"
     assert audit["hypotheses"] == []
@@ -377,7 +377,7 @@ def test_applied_snapshot_reaches_model_and_identity(monkeypatch):
     def read(**kwargs):
         seen.append(json.loads(kwargs["user"]))
         return fake_hypotheses(**kwargs)
-    monkeypatch.setattr("detector.causal_audit.provider_call", read)
+    monkeypatch.setattr("detector.provider._provider_call", read)
     audit, _ = run_causal_audit(**data, budget=AddedBudget(cfg))
     assert seen[0]["snapshot"] == snap
     assert audit["snapshot_digest"] == data["profile"]["snapshot_digest"]

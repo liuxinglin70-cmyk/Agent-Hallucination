@@ -97,7 +97,7 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 
 ### 测量、故障与成本
 
-`measurement.py` 统一健康分类与重测策略。error_type 和 code 都可能携带致命错误，必须同时检查。凭据、权限、请求、配额等致命故障不在同轮重试，修复环境后可在后续运行重测。暂时性服务错误允许同轮重试；显式 retryable=false 及耗尽案例或批次时限后不能重新申请完整预算。各模型阶段共用 provider.raise_if_terminal，终止错误保持分类并传播，不能变成弃权或继续 topup。ProviderError 属于 runtime.CaseExecutionError；并行调度传播案例失败但不取消其他案例，运行中止和程序错误仍停止调度。
+`measurement.py` 统一健康分类与重测策略。error_type 和 code 都可能携带致命错误，必须同时检查。凭据、权限、请求、配额等致命故障不在同轮重试，修复环境后可在后续运行重测。暂时性服务错误允许同轮重试；显式 retryable=false 及耗尽案例或批次时限后不能重新申请完整预算。各模型阶段共用 provider.raise_if_terminal，终止错误保持分类并传播，不能变成弃权或继续 topup。ProviderError 和 AddedBudgetExceeded 属于 runtime.CaseExecutionError；并行调度传播案例失败但不取消其他案例，运行中止和程序错误仍停止调度。附加请求作用域保留整例 deadline，request_deadline 只计算请求的有效最短期限；check_request_deadline 区分整例超时与附加预算耗尽。容量等待和 transport 均遵守这两个界限；附加预算耗尽保留完成的基础裁决，不取消其他案例。因果模型审计与阴性复审共用该作用域，provider_call 为请求预算的单次预留入口。
 
 `runner.py` 统一结果落盘、尝试记录、断点复用和调度；`runtime.py` 提供运行控制、deadline、原子写入和单写者保护。整例重试共享案例 deadline。`measurement.request_execution` 汇总单次 Detector 的真实请求，`case_execution` 生成 execution.v2，保留每次整例尝试的结果、错误和请求成本；嵌套 usage scope 向父层归并一次。批次每次尝试结束即原子保存 attempt.json，程序错误和中断仍传播，汇总保留已发生的成本而不补造结果行。未知请求统计用 usage_unknown_cases 表示，旧 providers/hearings 统计仅为下界。
 

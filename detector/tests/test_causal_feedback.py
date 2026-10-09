@@ -69,8 +69,8 @@ def test_valid_offline_policy_reopens_full_chain_once(monkeypatch):
     calls = install_review(monkeypatch)
     result = Detector(cfg, require_credentials=False, offline_feedback_policy=offline_policy()).detect(record())
     assert [call["purpose"] for call in calls] == ["recall_scanner", *(["causal_upgrade"] * 3), "step_tracer", "defense"]
-    assert result["state"] == "verified_error"
-    assert result["proof"]["negative_feedback"]["state"] == "reviewed"
+    assert result["state"] == "verified_error", result["proof"]["negative_feedback"]
+    assert result["proof"]["negative_feedback"]["state"] == "reviewed", result["proof"]["negative_feedback"]
     assert result["execution"]["provider_attempts"] == 7
 
 
@@ -194,7 +194,7 @@ def test_internal_review_reuses_judge_with_an_active_judge_system_hook(monkeypat
     calls = install_review(monkeypatch)
     result = Detector(cfg, require_credentials=False, offline_feedback_policy=offline_policy()).detect(
         record(), interventions=build_intervention_registry([_candidate(hook="judge.system")]))
-    assert result["proof"]["negative_feedback"]["state"] == "reviewed"
+    assert result["proof"]["negative_feedback"]["state"] == "reviewed", result["proof"]["negative_feedback"]
     assert result["execution"]["provider_attempts"] == 1 + len(calls)
 
 
@@ -243,7 +243,7 @@ def test_separate_cases_each_receive_one_optional_review(monkeypatch):
     detector = Detector(cfg, require_credentials=False, offline_feedback_policy=offline_policy())
     for case_id in ("first", "second"):
         result = detector.detect(record(), case_id=case_id)
-        assert result["proof"]["negative_feedback"]["state"] == "reviewed"
+        assert result["proof"]["negative_feedback"]["state"] == "reviewed", result["proof"]["negative_feedback"]
     assert len([call for call in calls if call["purpose"] == "recall_scanner"]) == 2
 
 

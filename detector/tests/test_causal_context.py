@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import pytest
 
 from detector.api import Detector
@@ -18,7 +20,7 @@ def positive(**changes):
 
 
 def config(**changes):
-    return {**CONFIG, "causal_audit": validate_causal_config(
+    return {**deepcopy(CONFIG), "causal_audit": validate_causal_config(
         {"mode": "tracer_context", "max_added_prompt_tokens_per_case": 20000, **changes}, base_dir=".")}
 
 

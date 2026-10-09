@@ -17,7 +17,7 @@ from detector.measurement import request_execution
 from detector.packet import event_id_for_step, packet_reference_error, packet_reference_index, validate_packet
 from detector.provider import ProviderError, provider_call, raise_if_terminal
 from detector.predicates import run_predicate
-from detector.runtime import AddedBudget, AddedBudgetExceeded, deadline_scope, usage_scope, utc_now
+from detector.runtime import AddedBudget, AddedBudgetExceeded, added_request_scope, usage_scope, utc_now
 from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates
 
 AUDIT_SCHEMA = "detector.causal_audit.v1"
@@ -191,12 +191,8 @@ def run_causal_audit(
                                    "target": target, "snapshot": snapshot}, ensure_ascii=False)
                 route = dict(config["judge_route"])
                 route.update(_route_name="causal_audit", transport_retries=0)
-                route["max_tokens"] = budget.reserve(
-                    system=_SYSTEM, user=user,
-                    output_tokens=policy["max_added_output_tokens_per_case"],
-                    extra_input=route.get("extra_body"),
-                )
-                with deadline_scope(deadline=budget.deadline):
+                route["max_tokens"] = policy["max_added_output_tokens_per_case"]
+                with added_request_scope(budget):
                     parsed, _ = provider_call(route=route, system=_SYSTEM, user=user,
                                               purpose="causal_audit", cache_tag=digest({
                         "packet": digest(packet), "profile": profile["digest"], "projection": projection["digest"],

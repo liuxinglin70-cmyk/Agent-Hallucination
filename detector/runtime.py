@@ -138,9 +138,9 @@ class RunControl:
     def request_slot(self) -> Iterator[None]:
         while True:
             self.check()
-            remaining = remaining_seconds()
-            if remaining is not None and remaining <= 0:
-                raise CaseDeadlineExceeded("deadline exceeded waiting for provider capacity")
+            check_request_deadline()
+            deadline = request_deadline()
+            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
             if self._slots.acquire(timeout=min(0.1, remaining) if remaining is not None else 0.1):
                 break
         try:
@@ -190,7 +190,7 @@ def record_request(observation: Mapping[str, Any]) -> None:
         target.append(dict(observation))
 
 
-class AddedBudgetExceeded(RuntimeError):
+class AddedBudgetExceeded(CaseExecutionError):
     def __init__(self, resource: str):
         self.resource = resource
         super().__init__(f"added case budget exhausted: {resource}")
@@ -300,18 +300,34 @@ def current_added_budget() -> AddedBudget | None:
 
 @contextmanager
 def added_request_scope(budget: AddedBudget) -> Iterator[None]:
-    if budget is not current_added_budget():
+    parent = current_added_budget()
+    if parent is not None and budget is not parent:
         raise ValueError("added requests require the current case budget")
     token = _ADDED_REQUESTS.set(budget)
     try:
-        with deadline_scope(deadline=budget.deadline):
-            yield
+        yield
     finally:
         _ADDED_REQUESTS.reset(token)
 
 
 def current_added_request_budget() -> AddedBudget | None:
     return _ADDED_REQUESTS.get()
+
+
+def request_deadline() -> float | None:
+    budget = current_added_request_budget()
+    limits = [value for value in (current_deadline(), budget.deadline if budget else None)
+              if value is not None]
+    return min(limits) if limits else None
+
+
+def check_request_deadline() -> None:
+    deadline = current_deadline()
+    if deadline is not None and time.monotonic() >= deadline:
+        raise CaseDeadlineExceeded("case deadline exceeded")
+    budget = current_added_request_budget()
+    if budget is not None:
+        budget.check()
 
 
 def bounded_map(function: Callable[[T], R], items: Iterable[T], *, workers: int,

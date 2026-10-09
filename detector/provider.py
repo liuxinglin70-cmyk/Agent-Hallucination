@@ -25,7 +25,8 @@ from urllib import error as urlerror
 from urllib import request as urlrequest
 from contextlib import nullcontext
 from detector.runtime import (
-    CaseDeadlineExceeded, CaseExecutionError, current_added_request_budget, current_control, current_deadline, deadline_scope, record_request,
+    CaseDeadlineExceeded, CaseExecutionError, check_request_deadline, current_added_request_budget,
+    current_control, current_deadline, deadline_scope, record_request, request_deadline,
 )
 
 _DIRECT_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))
@@ -269,6 +270,7 @@ def provider_call(
     try:
         if control is not None:
             control.check()
+        check_request_deadline()
         budget = current_added_request_budget()
         if budget is not None:
             route = {**route, "transport_retries": 0, "max_tokens": budget.reserve(
@@ -277,8 +279,7 @@ def provider_call(
             )}
         result = _provider_call(route=route, system=system, user=user,
                                 purpose=purpose, cache_tag=cache_tag)
-        if budget is not None:
-            budget.check()
+        check_request_deadline()
         return result
     except CaseDeadlineExceeded as exc:
         raise ProviderError(
@@ -364,15 +365,13 @@ def _provider_call(
     growth = max(1.0, float(route.get("timeout_growth_factor", 1.5)))
     per_attempt = int(route.get("timeout_seconds", 120))
     total_timeout = max(1.0, float(route.get("total_timeout_seconds", 360)))
+    check_request_deadline()
     case_deadline = current_deadline()
-    if case_deadline is not None:
-        remaining_case = case_deadline - time.monotonic()
+    effective_deadline = request_deadline()
+    if effective_deadline is not None:
+        remaining_case = effective_deadline - time.monotonic()
         if remaining_case <= 0:
-            raise ProviderError(
-                route_name, "case deadline exceeded",
-                error_type="case_deadline_exceeded",
-                retryable=False,
-            )
+            check_request_deadline()
         total_timeout = min(total_timeout, remaining_case)
     deadline = time.monotonic() + total_timeout
     last_error = ""
@@ -419,8 +418,8 @@ def _provider_call(
         try:
             with control.request_slot() if control is not None else nullcontext():
                 queue_seconds = time.perf_counter() - request_started
-                if control is not None:
-                    timeout = min(timeout, max(0.001, deadline - time.monotonic()))
+                check_request_deadline()
+                timeout = min(timeout, max(0.001, deadline - time.monotonic()))
                 status, raw = _isolated_transport(
                     url=url, headers=headers, body=body, timeout=timeout,
                 )
@@ -533,6 +532,8 @@ def _provider_call(
             break
         return parsed, meta
     expired_case = case_deadline is not None and time.monotonic() >= case_deadline
+    if not expired_case:
+        check_request_deadline()
     error_type = ("case_deadline_exceeded" if expired_case else
                   "invalid_json" if "JSON" in last_error else
                   "rate_limited" if last_status == 429 else "provider_error")

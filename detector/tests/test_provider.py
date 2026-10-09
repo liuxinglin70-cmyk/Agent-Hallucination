@@ -195,13 +195,14 @@ def test_provider_call_missing_key():
 def test_provider_call_total_timeout_bounds_all_retries(monkeypatch):
     """A route-wide deadline must not be spent once per retry."""
     monkeypatch.setenv("DETECTOR_TEST_KEY", "secret")
-    time_values = iter([0.0, 0.0, 2.0, 2.0, 3.0, 3.0])
-    monkeypatch.setattr(provider_module.time, "monotonic", lambda: next(time_values))
+    now = [0.0]
+    monkeypatch.setattr(provider_module.time, "monotonic", lambda: now[0])
     monkeypatch.setattr(provider_module.time, "sleep", lambda _delay: None)
     timeouts: list[float] = []
 
     def _timed_out_transport(*, timeout, **_kwargs):
         timeouts.append(timeout)
+        now[0] = 3.0
         raise TimeoutError("simulated")
 
     monkeypatch.setattr(provider_module, "_isolated_transport", _timed_out_transport)
