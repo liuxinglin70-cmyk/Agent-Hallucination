@@ -154,7 +154,8 @@ def test_true_case_deadline_during_deterministic_audit_is_terminal(monkeypatch, 
 
 
 @pytest.mark.parametrize('kind',['deadline','cancel'])
-def test_tracer_feedback_eligibility_terminal_retains_completed_base(monkeypatch,kind):
+@pytest.mark.parametrize('allowed',[True,False])
+def test_tracer_feedback_eligibility_terminal_retains_completed_base(monkeypatch,kind,allowed):
     from detector.causal_audit import OfflineFeedbackPolicy
     from detector.tests.test_causal_feedback import feedback_config, install_base_judge as feedback_judge
     feedback_judge(monkeypatch)
@@ -167,7 +168,7 @@ def test_tracer_feedback_eligibility_terminal_retains_completed_base(monkeypatch
             now[0]=1.1
         else:
             control.stop({'error_type':'run_cancelled','message':'during feedback eligibility'})
-        return True
+        return allowed
     cfg=feedback_config(max_added_seconds_per_case=100)
     cfg['judge_route']['votes']=3
     detector=Detector(cfg,require_credentials=False,

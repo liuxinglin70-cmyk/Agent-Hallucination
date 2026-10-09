@@ -71,14 +71,14 @@ def causal_recall_decision(
     if offline_policy is None:
         return {**result, "reason": "calibration_unavailable"}
     allowed = offline_policy.allows(deepcopy(anomalies))
-    if type(allowed) is not bool:
-        raise ValueError("offline feedback policy must return a boolean")
-    if not allowed:
-        return {**result, "reason": "policy_refused"}
     try:
         budget.check()
     except AddedBudgetExceeded as exc:
         return {**result, "state": "budget_exhausted", "reason": exc.resource}
+    if type(allowed) is not bool:
+        raise ValueError("offline feedback policy must return a boolean")
+    if not allowed:
+        return {**result, "reason": "policy_refused"}
     return {**result, "state": "eligible", "reason": "verified_anomaly_allowed", "anomalies": anomalies}
 
 
