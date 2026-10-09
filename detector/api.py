@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from copy import deepcopy
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 from detector.adjudication import adjudicate
@@ -52,6 +53,15 @@ _FROZEN_STAGE_HOOKS: dict[str, frozenset[str]] = {
     "tracer_result": frozenset({"tracer.system"}),
     "defense_result": frozenset({"defense.pre", "defense.system"}),
 }
+
+
+@dataclass(frozen=True)
+class _CausalReview:
+    input_digest: str
+    judge_result: Mapping[str, Any]
+    judge_status: Mapping[str, Any]
+    diagnostics: Mapping[str, Any]
+    context: Mapping[str, Any]
 
 
 def _judge_negative_needs_recall(
@@ -361,7 +371,7 @@ class Detector:
         frozen_judge: Mapping[str, Any] | None = None,
         frozen_stages: Mapping[str, Any] | None = None,
         evidence: Mapping[str, Any] | None = None,
-        causal_review: Mapping[str, Any] | None = None,
+        causal_review: _CausalReview | None = None,
     ) -> dict[str, Any]:
         validate_record(record)
         packet = build_packet(record)
@@ -409,11 +419,18 @@ class Detector:
 
         replay_payload = frozen_judge if frozen_judge is not None else frozen_stages
         frozen = replay_payload
+        review_input_digest = digest({"case_id": case_id, "packet": packet, "config": self.config,
+                                     "registry": effective_interventions, "evidence": attached_snapshot})
         if frozen is not None and any(
             str(key).endswith(("_result", "_status")) for key in frozen
         ) and "judge_result" not in frozen:
             raise ValueError("frozen stage replay must include judge_result")
-        if frozen is not None and "judge_result" in frozen:
+        if causal_review is not None:
+            if frozen is not None or causal_review.input_digest != review_input_digest:
+                raise ValueError("causal review continuation input identity differs")
+            judge_result = deepcopy(causal_review.judge_result)
+            judge_status = deepcopy(causal_review.judge_status)
+        elif frozen is not None and "judge_result" in frozen:
             # A frozen stage that consumes the snapshot may only be replayed
             # under the same evidence: replaying one recorded without it (or
             # with another snapshot) would mask the evidence under test.
@@ -453,14 +470,7 @@ class Detector:
         judge_parsed = judge_result.get("parsed") or {}
         judge_positive = bool(judge_parsed.get("is_hallucination"))
         causal_policy = self.config["causal_audit"]
-        causal_diagnostics = causal_review["diagnostics"] if causal_review is not None else None
-        if causal_diagnostics is None and causal_policy["mode"] == "tracer_context":
-            target_id = event_id_for_step(packet, judge_parsed.get("hallucination_step"))
-            causal_diagnostics = build_causal_diagnostics(
-                packet=packet, config=self.config, budget=current_added_budget(),
-                mandatory_event_ids=[target_id] if target_id else [],
-                context=None, snapshot=snapshot,
-            )
+        causal_diagnostics = causal_review.diagnostics if causal_review is not None else None
         plan.evidence_for(
             "judge.post",
             packet,
@@ -499,7 +509,7 @@ class Detector:
                 recall_result, recall_status = run_recall_scan(
                     packet=packet, config=self.config, plan=plan,
                     **(stage_kwargs),
-                    **({"causal_context": causal_review["context"]} if causal_review is not None else {}),
+                    **({"causal_context": causal_review.context} if causal_review is not None else {}),
                 )
             if recall_result.get("ok") and recall_result.get("candidates"):
                 if frozen is not None and "upgrade_result" in frozen:
@@ -648,6 +658,13 @@ class Detector:
             dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any],
         ]:
             """Tracer + defense for one positive; defense is decisive."""
+            nonlocal causal_diagnostics
+            if causal_diagnostics is None and causal_policy["mode"] == "tracer_context":
+                target_id = event_id_for_step(packet, positive.get("step"))
+                causal_diagnostics = build_causal_diagnostics(
+                    packet=packet, config=self.config, budget=current_added_budget(),
+                    mandatory_event_ids=[target_id] if target_id else [], context=None, snapshot=snapshot,
+                )
             entry = frozen_hearing(positive)
             causal_context = None
             if causal_diagnostics is not None and causal_diagnostics.get("audit") is not None:
@@ -891,8 +908,11 @@ class Detector:
             try:
                 output["proof"]["causal_diagnostics"] = build_causal_diagnostics(
                     packet=packet, config=self.config, budget=current_added_budget(),
-                    mandatory_event_ids=mandatory, context=judge_predicate_context(judge_parsed), snapshot=snapshot,
+                    mandatory_event_ids=mandatory,
+                    context=None if causal_policy["mode"] == "tracer_context" else judge_predicate_context(judge_parsed),
+                    snapshot=snapshot,
                 )
+                causal_diagnostics = output["proof"]["causal_diagnostics"]
             except BaseException as exc:
                 exc.base_detection_result = deepcopy(output)
                 raise
@@ -905,15 +925,19 @@ class Detector:
             )
             output["proof"]["negative_feedback"] = decision
             if decision["state"] == "eligible":
-                review = {"diagnostics": causal_diagnostics, "context": seal({
+                review = _CausalReview(review_input_digest, deepcopy(judge_result), deepcopy(judge_status),
+                                       deepcopy(causal_diagnostics), seal({
                     "schema_version": "detector.causal_recall_context.v1", "packet_digest": digest(packet),
                     "anomalies": decision["anomalies"], "decision_authority": "none",
-                })}
+                }))
                 try:
+                    if not budget.start_negative_review():
+                        output["proof"]["negative_feedback"] = {
+                            **decision, "state": "inactive", "reason": "review_already_attempted"}
+                        return output
                     with added_request_scope(budget):
                         reviewed = self._detect(
                             record, case_id=case_id, interventions=effective_interventions,
-                            frozen_stages={"judge_result": judge_result, "judge_status": judge_status},
                             evidence=evidence, causal_review=review,
                         )
                 except AddedBudgetExceeded as exc:

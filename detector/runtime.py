@@ -202,6 +202,7 @@ class AddedBudget:
         self.requests = 0
         self.input_bytes = 0
         self.output_tokens = 0
+        self.negative_review_started = False
         self._lock = threading.RLock()
 
     def begin(self) -> None:
@@ -253,6 +254,14 @@ class AddedBudget:
             if self.input_bytes + size > self._policy["max_added_prompt_tokens_per_case"]:
                 raise AddedBudgetExceeded("input")
             self.input_bytes += size
+
+    def start_negative_review(self) -> bool:
+        with self._lock:
+            if self.negative_review_started:
+                return False
+            self.check()
+            self.negative_review_started = True
+            return True
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:

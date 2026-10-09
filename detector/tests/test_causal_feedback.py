@@ -183,3 +183,106 @@ def test_optional_request_cannot_finish_past_added_deadline(monkeypatch):
         budget.begin()
         with added_request_scope(budget), pytest.raises(AddedBudgetExceeded, match="time"):
             provider_call(route=cfg["judge_route"], system="s", user="u", purpose="test")
+
+
+def test_internal_review_reuses_judge_with_an_active_judge_system_hook(monkeypatch):
+    from detector.interventions import build_intervention_registry
+    from detector.tests.test_interventions import _candidate
+    install_base_judge(monkeypatch)
+    cfg = feedback_config()
+    cfg["judge_route"]["votes"] = 3
+    calls = install_review(monkeypatch)
+    result = Detector(cfg, require_credentials=False, offline_feedback_policy=offline_policy()).detect(
+        record(), interventions=build_intervention_registry([_candidate(hook="judge.system")]))
+    assert result["proof"]["negative_feedback"]["state"] == "reviewed"
+    assert result["execution"]["provider_attempts"] == 1 + len(calls)
+
+
+def test_internal_review_refuses_changed_record(monkeypatch):
+    install_base_judge(monkeypatch)
+    cfg = feedback_config()
+    cfg["judge_route"]["votes"] = 3
+    detector = Detector(cfg, require_credentials=False, offline_feedback_policy=offline_policy())
+    original = detector._detect
+    def changed(value, **kwargs):
+        if kwargs.get("causal_review") is not None:
+            value = {**value, "question": "Changed question"}
+        return original(value, **kwargs)
+    monkeypatch.setattr(detector, "_detect", changed)
+    with pytest.raises(ValueError, match="continuation input identity"):
+        detector.detect(record())
+
+
+def test_optional_review_is_not_reopened_by_whole_case_retries(monkeypatch):
+    from detector.provider import ProviderError
+    from detector.runtime import record_request
+    from detector.runner import detect_with_transport_retry
+    install_base_judge(monkeypatch)
+    cfg = feedback_config()
+    cfg["judge_route"]["votes"] = 3
+    calls = []
+    def unavailable(**kwargs):
+        calls.append(kwargs["purpose"])
+        record_request({"purpose": kwargs["purpose"], "usage": None})
+        raise ProviderError(kwargs["purpose"], "offline transient failure", error_type="provider_error")
+    monkeypatch.setattr("detector.provider._provider_call", unavailable)
+    result = detect_with_transport_retry(
+        Detector(cfg, require_credentials=False, offline_feedback_policy=offline_policy()),
+        record(), case_id="test")
+    assert calls == ["recall_scanner"]
+    assert result["proof"]["negative_feedback"]["reason"] == "review_already_attempted"
+    assert result["execution"]["provider_attempts"] == 3
+    assert len(result["execution"]["case_attempts"]) == 2
+
+
+def test_separate_cases_each_receive_one_optional_review(monkeypatch):
+    install_base_judge(monkeypatch)
+    cfg = feedback_config()
+    cfg["judge_route"]["votes"] = 3
+    calls = install_review(monkeypatch)
+    detector = Detector(cfg, require_credentials=False, offline_feedback_policy=offline_policy())
+    for case_id in ("first", "second"):
+        result = detector.detect(record(), case_id=case_id)
+        assert result["proof"]["negative_feedback"]["state"] == "reviewed"
+    assert len([call for call in calls if call["purpose"] == "recall_scanner"]) == 2
+
+
+@pytest.mark.parametrize("mode", ["shadow", "tracer_context"])
+def test_optional_audit_fatal_preserves_completed_clean_proof(monkeypatch, mode):
+    from detector.provider import ProviderError
+    from detector.runtime import record_request
+    install_base_judge(monkeypatch)
+    cfg = feedback_config()
+    cfg["causal_audit"].update(mode=mode, counterfactual_mode="model_hypothesis")
+    cfg["judge_route"]["votes"] = 3
+    def refused(**kwargs):
+        record_request({"purpose": kwargs["purpose"], "usage": None})
+        raise ProviderError(kwargs["purpose"], "bad credentials", error_type="authentication_error", retryable=False)
+    monkeypatch.setattr("detector.provider._provider_call", refused)
+    result = Detector(cfg, require_credentials=False).detect(record())
+    assert result["state"] == "unresolved"
+    assert result["execution"]["provider_attempts"] == 2
+    assert result["base_detection_result"]["state"] == "verified_clean"
+    assert result["base_detection_result"]["proof"]["judge"]["is_hallucination"] is False
+
+
+def test_optional_audit_cancellation_journals_completed_clean_proof(monkeypatch):
+    from detector.runtime import RunStopped, record_request
+    from detector.runner import detect_with_transport_retry
+    install_base_judge(monkeypatch)
+    cfg = feedback_config()
+    cfg["causal_audit"]["counterfactual_mode"] = "model_hypothesis"
+    cfg["judge_route"]["votes"] = 3
+    stop = RunStopped({"error_type": "cancelled"})
+    def cancelled(**kwargs):
+        record_request({"purpose": kwargs["purpose"], "usage": None})
+        raise stop
+    monkeypatch.setattr("detector.provider._provider_call", cancelled)
+    attempts = []
+    with pytest.raises(RunStopped) as failure:
+        detect_with_transport_retry(Detector(cfg, require_credentials=False), record(),
+                                    case_id="test", attempt_observer=attempts.append)
+    assert failure.value is stop
+    assert len(attempts) == 1
+    assert attempts[0]["result"]["state"] == "verified_clean"
+    assert attempts[0]["execution"]["provider_attempts"] == 2
