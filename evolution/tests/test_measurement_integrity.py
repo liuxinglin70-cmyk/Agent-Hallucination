@@ -61,6 +61,7 @@ def _config(tmp_path: Path) -> dict:
     config["memory_root"] = str(tmp_path / "memory")
     config["backend"]["name"] = "mock"
     config["backend"]["cache"] = False
+    config["proposer"]["mode"] = "offline"
     config["budget"]["patrol_cases"] = 8
     return config
 
@@ -74,6 +75,15 @@ def _split(cases: list[str]) -> EvolutionSplit:
         patrol_pool=cases[12:],
         mini=True,
     )
+
+
+def test_synthetic_measurement_does_not_construct_a_provider_proposer(tmp_path, monkeypatch):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("synthetic measurement attempted a provider proposer")
+    monkeypatch.setattr("evolution.proposer.LLMProposer", forbidden)
+    cases = _make_dataset(tmp_path / "data")
+    with EvolutionEngine(_config(tmp_path), backend=MockDetectorBackend(), split=_split(cases), mini=True):
+        pass
 
 
 def _row(case: str, *, gold, prediction, authority="authoritative"):
