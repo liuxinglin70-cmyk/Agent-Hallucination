@@ -130,8 +130,10 @@ def _write_case(run_root: Path, case: str, *, state: str, authoritative: bool = 
         "providers": {},
     }
     from detector.runner import record_case
+    from detector.dataset import load_case
+    record, _ = load_case(DATASET_ROOT, case)
     record_case(runs_root=run_root.parent, run_id=run_root.name, case_id=case,
-                input_record={"question": "q", "history": []}, result=result, elapsed_seconds=1)
+                input_record=record, result=result, elapsed_seconds=1)
 
 
 def _make_arm(root: Path, cases: list[str], verdicts: dict[str, str]) -> Path:

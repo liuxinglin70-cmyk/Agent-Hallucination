@@ -81,7 +81,7 @@ def _write_result(runs_root, run_id, case_id, **overrides):
     }
     payload.update(overrides)
     record_case(runs_root=runs_root, run_id=run_id, case_id=case_id,
-                input_record={"question": "q", "history": []}, result=payload, elapsed_seconds=0)
+                input_record={"question": "q", "history": [{"content": "a"}]}, result=payload, elapsed_seconds=0)
 
 
 def test_degraded_readings_do_not_enter_the_accuracy_line(tmp_path):
@@ -303,3 +303,18 @@ def test_a_row_without_a_recorded_step_kind_is_unclassified_not_guessed(tmp_path
     assert "unclassified" in kinds
     assert "content_step" not in kinds
     assert "action_step" not in kinds
+
+
+
+def test_evaluation_refuses_changed_task_input(tmp_path):
+    import pytest
+    data, runs = tmp_path / "data", tmp_path / "runs"
+    case = "clean.json"
+    _write_case(data, case, False)
+    _write_result(runs, "g0", case)
+    path = data / case
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["question"] = "A different task"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    with pytest.raises(ValueError, match="input"):
+        evaluate_run(runs_root=runs, run_id="g0", dataset_root=data, cases=[case])

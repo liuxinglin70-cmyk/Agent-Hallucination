@@ -129,7 +129,7 @@ def evaluate_run(
                 })
                 continue
             result = json.loads(result_path.read_text(encoding="utf-8-sig"))
-            validate_case_commit(result, run_id=run_id, case_id=case_id)
+            validate_case_commit(result, run_id=run_id, case_id=case_id, input_record=_record)
             # Two readings of one envelope, kept apart on purpose.
             #
             # ``prediction`` is what the accuracy line may count: only an

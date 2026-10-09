@@ -222,7 +222,8 @@ def record_case(
     return case_dir
 
 
-def validate_case_commit(result: Mapping[str, Any], *, run_id: str, case_id: str) -> Mapping[str, Any]:
+def validate_case_commit(result: Mapping[str, Any], *, run_id: str, case_id: str,
+                         input_record: Mapping[str, Any] | None = None) -> Mapping[str, Any]:
     commit = result.get("case_commit")
     if not isinstance(commit, Mapping) or commit.get("schema_version") != CASE_COMMIT_SCHEMA:
         raise ValueError("case result lacks a supported commit")
@@ -238,6 +239,8 @@ def validate_case_commit(result: Mapping[str, Any], *, run_id: str, case_id: str
             or commit.get("result_digest") != digest({k: v for k, v in result.items() if k != "case_commit"})
             or commit.get("input_digest") != digest(commit.get("input_record"))):
         raise ValueError("case commit digest differs from its content")
+    if input_record is not None and commit["input_digest"] != digest(input_record):
+        raise ValueError("case commit input differs from the evaluation task")
     return commit
 
 
