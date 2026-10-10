@@ -102,15 +102,6 @@ def _valid_stage_entry(
     return bool(result.get("ok")) == (str(status.get("state") or "") == "ok")
 
 
-def file_digest(path: str | Path | None) -> str:
-    if not path:
-        return "missing"
-    target = Path(path)
-    if not target.exists():
-        return "missing"
-    return hashlib.sha256(target.read_bytes()).hexdigest()[:16]
-
-
 def source_digest() -> str:
     """Digest of the detector + evolution source trees.
 
@@ -143,14 +134,7 @@ def source_digest() -> str:
 
 
 def artifact_digest(path: str | Path) -> str:
-    """Content digest of one learned artifact (weights, tokenizer, config).
-
-    Deliberately a different function from ``file_digest``: this one refuses a
-    missing path instead of returning the ``"missing"`` sentinel, because a
-    declared artifact that cannot be read is a broken freeze rather than a
-    legitimate "no artifact here". A sentinel that hashes like a value is how
-    "the weights were replaced by nothing" would pass a digest check.
-    """
+    """Content digest of a declared artifact; missing inputs invalidate the freeze."""
     target = Path(path)
     if target.is_dir():
         digest = hashlib.sha256()
@@ -1263,7 +1247,6 @@ __all__ = [
     "DetectionBackend",
     "LiveDetectorBackend",
     "MockDetectorBackend",
-    "file_digest",
     "fingerprint",
     "make_backend",
     "registry_key",

@@ -65,6 +65,49 @@ def _config(tmp_path: Path, *, case_timeout: int = 3600,
     return cfg
 
 
+def _run_identity_preflight(preflight, tmp_path, monkeypatch, config):
+    config_path = tmp_path / "evolution.json"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    report_path = tmp_path / "preflight.json"
+    for name in preflight.CHECK_ORDER:
+        if name != "source_identity":
+            monkeypatch.setattr(preflight, f"check_{name}", lambda *args: [])
+    monkeypatch.setattr(sys, "argv", ["preflight", "--config", str(config_path),
+                                     "--json", str(report_path)])
+    status = preflight.main()
+    return status, json.loads(report_path.read_text(encoding="utf-8"))
+
+
+@pytest.mark.code_only
+def test_json_preflight_records_canonical_source_and_actual_detector_config(
+    preflight, tmp_path, monkeypatch,
+):
+    from detector.identity import artifact_digest, source_identity
+
+    config = _config(tmp_path)
+    status, report = _run_identity_preflight(preflight, tmp_path, monkeypatch, config)
+    assert status == 0 and report["passed"]
+    source = next(item for item in report["checks"] if item["check"] == "source_identity")
+    identity = source["identity"]
+    assert identity["source_digest"] == source_identity("detector", "evolution")
+    assert len(identity["source_digest"]) == 64
+    actual_path = str(Path(config["detector_config"]).resolve())
+    assert identity["detector_config"] == {"path": actual_path, "digest": artifact_digest(actual_path)}
+
+
+@pytest.mark.code_only
+def test_preflight_missing_declared_detector_config_blocks_identity(
+    preflight, tmp_path, monkeypatch,
+):
+    config = _config(tmp_path)
+    Path(config["detector_config"]).unlink()
+    status, report = _run_identity_preflight(preflight, tmp_path, monkeypatch, config)
+    assert status == 1 and not report["passed"]
+    source = next(item for item in report["checks"] if item["check"] == "source_identity")
+    assert source["status"] == "BLOCKER"
+    assert "does not exist" in source["detail"]
+
+
 # ---------------------------------------------------------------------------
 # Corpus and labels
 def test_the_shipped_corpus_reconciles(preflight, tmp_path):

@@ -663,17 +663,18 @@ def check_runner_admission(report: Report) -> None:
             f"{len(rows)} runner(s) admitted by the metamorphic gate")
 
 
-def check_source_identity(report: Report) -> dict:
-    from evolution.backends import file_digest, source_digest
+def check_source_identity(report: Report, cfg: dict) -> None:
+    from detector.identity import artifact_digest, source_identity
 
-    identity = {"source_digest": source_digest()}
-    for name in ("detector/configs/autodl.json",):
-        path = REPO / name
-        identity[name] = file_digest(path) if path.is_file() else ""
+    path = Path(cfg["detector_config"]).resolve()
+    if not path.is_file():
+        _blocker(report, "source_identity", f"declared detector config does not exist: {path}")
+        return
+    identity = {"source_digest": source_identity("detector", "evolution"),
+                "detector_config": {"path": str(path), "digest": artifact_digest(path)}}
     _ok(report, "source_identity",
-        f"source digest {identity['source_digest'][:16]}… recorded; a run's "
-        "own reports cite this to prove the code did not drift while it ran")
-    return identity
+        f"source digest {identity['source_digest'][:16]}… and declared detector config recorded",
+        identity=identity)
 
 
 def check_cost(report: Report, phase: str, cfg: dict) -> None:
@@ -735,7 +736,7 @@ def main() -> int:
     check_path_length(report, cfg, cases)
     check_calibration(report)
     check_runner_admission(report)
-    check_source_identity(report)
+    check_source_identity(report, cfg)
     check_cost(report, args.phase, cfg)
 
     payload = report.payload(args.phase, str(config_path))
