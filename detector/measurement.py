@@ -128,6 +128,42 @@ def request_execution(
     }
 
 
+def _measurement_sequence_id(values: Sequence[Any]) -> str | None:
+    if not values or not all(
+        isinstance(value, str) and len(value) == 32
+        and all(char in "0123456789abcdef" for char in value)
+        for value in values
+    ):
+        return None
+    return digest({"schema_version": "detector.measurement_sequence.v1", "attempts": list(values)})
+
+
+def measurement_sources(execution: Mapping[str, Any]) -> tuple[str, ...]:
+    """Verified original invocation identities; unknown lineage yields no sources."""
+    if execution.get("schema_version") == "detector.execution.v1":
+        value = execution.get("measurement_id")
+        return (value,) if _measurement_sequence_id([value]) is not None else ()
+    if execution.get("schema_version") != "detector.execution.v2":
+        return ()
+    attempts = execution.get("case_attempts")
+    if not isinstance(attempts, list) or not attempts:
+        return ()
+    values = []
+    for attempt in attempts:
+        if not isinstance(attempt, Mapping) or not isinstance(attempt.get("execution"), Mapping):
+            return ()
+        child = attempt["execution"]
+        if child.get("schema_version") != "detector.execution.v1":
+            return ()
+        sources = measurement_sources(child)
+        if not sources:
+            return ()
+        values.extend(sources)
+    if len(set(values)) != len(values) or execution.get("measurement_id") != _measurement_sequence_id(values):
+        return ()
+    return tuple(values)
+
+
 def case_execution(
     attempts: Sequence[Mapping[str, Any]], *, started_at: str, finished_at: str,
     elapsed_seconds: float,
@@ -149,14 +185,7 @@ def case_execution(
     return {
         "schema_version": "detector.execution.v2", "started_at": started_at,
         # Aggregation must not turn cached attempts into fresh measurements.
-        "measurement_id": digest({
-            "schema_version": "detector.measurement_sequence.v1",
-            "attempts": measurement_ids,
-        }) if measurement_ids and all(
-            isinstance(value, str) and len(value) == 32
-            and all(char in "0123456789abcdef" for char in value)
-            for value in measurement_ids
-        ) else None,
+        "measurement_id": _measurement_sequence_id(measurement_ids),
         "finished_at": finished_at, "elapsed_seconds": elapsed_seconds,
         "case_attempts": list(attempts), "requests": requests,
         "provider_attempts": sum(counts) if all(type(value) is int for value in counts) else None,

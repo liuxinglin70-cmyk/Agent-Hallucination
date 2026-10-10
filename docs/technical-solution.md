@@ -164,16 +164,18 @@ L1 开发回放要求两臂恰好覆盖预定 target∪neighbor，每例各一�
 
 指标模块 target_outcome 统一读取 detection/localization/joint/resolution 的收益与损伤，并携带目标类型和 delta_basis。周期入口按实际 benefit set 为每个候选成员产生 outcome；即使行为门未通过，读值仍保留。缺少相应指标归为未测；joint_broken、检测损伤及健康退化归为损伤，路线反馈只记录可测且未改善、未损伤的结果。定位机会来自基线可纠正的 annotated positive，不能用检测 FN/FP 机会替代。
 
-路线状态按 JSONL 追加顺序归约：resolution 清除对应 mechanism/route 的当前观察期，后续 observation 从零累计，历史字节保留。相同 cycle/route 事件重放不重复累计，冲突内容拒绝；解决记录写入幂等。当前仍需接入候选、measurement 和上下文身份，不能把跨 cycle 次数当成已证明独立的测量证据。
+路线状态按 JSONL 追加顺序归约：resolution 清除对应 mechanism/route 的当前观察期，后续独立测量重新累计，历史字节保留。`route_observations.build_route_measurement` 在门控丢弃原始 result 前，从实际配对收益集合投影案例、输入摘要、注册表、候选/伙伴、原始调用身份和冻结阶段；输入与预测、配置、两臂案例或候选注册表不一致、目标阶段冻结、来源缺失时不生成有效测量信封。冻结范围复用 detector.replay.HOOK_POLICIES，未另定义 hook 政策。
 
-`measurement.request_execution` 在每次实际调用完成时生成 `measurement_id`，输入或时钟读数相同仍得到不同标识；缓存、归档和复制保留原标识。`case_execution` 从有序原始尝试标识派生整例标识，重新汇总相同尝试不会制造独立测量；任一尝试缺少有效标识时整例标识为 `None`。这些标识只描述测量来源，不赋予结果权威，也不证明阶段未使用冻结回放。路线负反馈尚未消费它们，B32 仍待接通实际候选、配对案例、运行上下文和测量来源校验。
+信封以 evolution.route_measurement.v1 保存，拥有独立快照。`measurement_for_candidate` 核对信封确实属于报告中的候选或伙伴；正式周期的两条成员报告路径传递同一单位信封。route_failure_record 记录其来源；reducer 和能力规划按当前 backend_runtime_identity 校验适用性，配置含实际离线反馈策略。没有当前范围、无有效信封、部分或全部候选调用来源复用时仅增加 diagnostic_observations，不认定路线能力不足。两次独立候选测量达到原阈值才排除路线；可共享配对控制基线，但不能复用候选调用来源。解决记录也不会让旧来源变成新测量。同周期可保留多份独立测量；相同事件重放幂等，内容冲突拒绝。数字 revisions_observed 只作诊断元数据，不能单独赋予路线排除权限。旧 JSONL 缺来源的记录继续可读，原始字节不改，不补造身份。
+
+`measurement.request_execution` 在每次实际调用完成时生成 `measurement_id`，输入或时钟读数相同仍得到不同标识；缓存、归档和复制保留原标识。`case_execution` 从有序原始尝试标识派生整例标识，重新汇总相同尝试不会制造独立测量；任一尝试缺少有效标识时整例标识为 `None`。这些标识只描述测量来源，不赋予结果权威，也不证明阶段未使用冻结回放。路线来源校验使用 measurement_sources 验证原始尝试与整例派生摘要，拒绝缺失、重复或篡改的尝试；标识本身不证明语义因果关系。 实际Mock调用也产生调用标识，并以measurement_kind=synthetic及backend=mock隔离其来源；有效packet才能生成输入身份。Mock使用的gold仅在评估器/Fake oracle边界，以摘要绑定，不作为真实测量或真实后端的路线排除证据。
 
 ### 模块职责
 
 | 模块组 | 文件 | 职责 |
 | --- | --- | --- |
 | 循环 | engine.py、cycle_preparation.py、config.py、splits.py | 阶段顺序、预算、划分、审计、巡检、准入、治理 |
-| 失败建模 | worksheet.py、causal_failures.py、mechanisms.py、route_failures.py | 稳定失败族、机制机会、定位错/缺、路径缺口 |
+| 失败建模 | worksheet.py、causal_failures.py、mechanisms.py、route_observations.py、route_failures.py | 稳定失败族、机制机会、定位错/缺、路径缺口 |
 | 开发 | proposer.py、development.py、development_adapter.py、capability_planning.py | L0/L1 检查、修订、预算和反馈 |
 | 研究入口 | research.py、scripts/run_research_round.py | 冻结机制研究、重复验证，不替代生产准入 |
 | 晋升 | promotion.py、promotion_alignment.py、candidate_versions.py | 统一候选、协议冻结、自哈希、对照身份、晋升终态 |

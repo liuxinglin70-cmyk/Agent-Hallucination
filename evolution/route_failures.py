@@ -2,15 +2,17 @@
 
 A route is insufficient only after its hook fires and changes the promised
 behavior, while a measurable outcome records neither benefit nor harm.
-Repeated independent observations or a targeted revision admit falsification.
+Only independent observations in the applicable runtime admit falsification.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
 from evolution.contracts import append_jsonl, read_jsonl
+from evolution.route_observations import route_measurement_sources
 
 ROUTE_FAILURE_SCHEMA = "evolution.route_failure.v1"
 ROUTE_FAILURE_NAME = "route_failures.jsonl"
@@ -178,6 +180,11 @@ def insufficiency_evidence(
     }
 
 
+def _measurement_stamp(value: Any) -> str | None:
+    stamp = value.get("digest") if isinstance(value, Mapping) else None
+    return stamp if isinstance(stamp, str) else None
+
+
 def route_failure_record(
     *,
     cycle: int,
@@ -194,7 +201,8 @@ def route_failure_record(
         "family_id": str(family_id or ""),
         "route": str(observation.get("route") or ""),
         "status": str(observation.get("status") or ""),
-        "evidence": dict(observation.get("evidence") or {}),
+        "evidence": deepcopy(observation.get("evidence") or {}),
+        "measurement": deepcopy(observation.get("measurement")),
         "revisions_observed": (
             None if revisions_observed is None else int(revisions_observed)
         ),
@@ -221,22 +229,11 @@ def record_route_failures(
     cycle: int,
     observations: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Append this cycle's route-insufficiency records.
-
-    A resumed cycle replays its writes, so an observation already stored for
-    this ``(cycle, mechanism, route)`` is skipped rather than duplicated: a
-    duplicate would silently count as a second independent observation and
-    falsify a route on one cycle's evidence.
-    """
-    seen = {
-        (
-            int(record.get("cycle") or -1),
-            str(record.get("mechanism_id") or ""),
-            str(record.get("route") or ""),
-        )
-        for record in load_route_failures(path)
-        if record.get("kind") != "resolution"
-    }
+    """Append distinct measurements; replaying an identical event is idempotent."""
+    seen = {(
+        int(record.get("cycle") or -1), str(record.get("mechanism_id") or ""),
+        str(record.get("route") or ""), _measurement_stamp(record.get("measurement")),
+    ): record for record in load_route_failures(path) if record.get("kind") != "resolution"}
     appended: list[dict[str, Any]] = []
     for observation in observations:
         mechanism_id = str(observation.get("mechanism_id") or "")
@@ -244,40 +241,42 @@ def record_route_failures(
             "route") or "")
         if not mechanism_id or not route:
             continue
-        key = (int(cycle), mechanism_id, route)
-        if key in seen:
-            continue
         record = route_failure_record(
-            cycle=cycle,
-            mechanism_id=mechanism_id,
+            cycle=cycle, mechanism_id=mechanism_id,
             family_id=str(observation.get("family_id") or ""),
             observation=observation.get("observation") or observation,
             revisions_observed=observation.get("revisions_observed"),
         )
+        key = (int(cycle), mechanism_id, route, _measurement_stamp(record.get("measurement")))
+        if key in seen:
+            if seen[key] != record:
+                raise ValueError("conflicting route observation for the same measurement")
+            continue
         append_jsonl(path, record)
-        seen.add(key)
+        seen[key] = record
         appended.append(record)
     return appended
 
 
 def route_failure_state(
     records: Sequence[Mapping[str, Any]],
+    *, runtime_identity: Mapping[str, Any] | None,
 ) -> dict[tuple[str, str], dict[str, Any]]:
     """Reduce append order into the current observation epoch for each route."""
     state: dict[tuple[str, str], dict[str, Any]] = {}
-    seen: dict[tuple[str, str, str, int], Mapping[str, Any]] = {}
+    seen: dict[tuple[Any, ...], Mapping[str, Any]] = {}
+    used_sources: dict[tuple[str, str], set[str]] = {}
     for record in records:
-        key = (
-            str(record.get("mechanism_id") or ""),
-            str(record.get("route") or ""),
-        )
+        key = (str(record.get("mechanism_id") or ""), str(record.get("route") or ""))
         if not all(key):
             continue
         kind = str(record.get("kind") or "observation")
         if kind != "resolution" and record.get("status") != "insufficient_for_mechanism":
             continue
         cycle = int(record.get("cycle") or 0)
-        event_key = (*key, kind, cycle)
+        measurement = record.get("measurement")
+        stamp = _measurement_stamp(measurement)
+        event_key = (*key, kind, cycle, stamp)
         if event_key in seen:
             if dict(seen[event_key]) != dict(record):
                 raise ValueError(f"conflicting route event: {event_key}")
@@ -287,25 +286,20 @@ def route_failure_state(
             state.pop(key, None)
             continue
         entry = state.setdefault(key, {
-            "mechanism_id": key[0],
-            "route": key[1],
-            "observations": 0,
-            "insufficient": False,
-            "basis": "",
-            "cycles": [],
-            "evidence": {},
+            "mechanism_id": key[0], "route": key[1], "observations": 0,
+            "diagnostic_observations": 0, "insufficient": False, "basis": "",
+            "cycles": [], "evidence": {},
         })
-        entry["observations"] = int(entry["observations"]) + 1
-        entry["cycles"] = [*entry["cycles"], cycle]
-        entry["evidence"] = dict(record.get("evidence") or {})
-        revisions = record.get("revisions_observed")
-        if revisions is not None and int(revisions) > 0:
-            entry["insufficient"] = True
-            entry["basis"] = "revision"
-    for entry in state.values():
-        if entry["insufficient"]:
+        sources = route_measurement_sources(measurement)
+        used = used_sources.setdefault(key, set())
+        if not sources or runtime_identity is None or measurement["runtime"] != runtime_identity or used.intersection(sources):
+            entry["diagnostic_observations"] += 1
             continue
-        if int(entry["observations"]) >= REPEAT_OBSERVATION_THRESHOLD:
+        used.update(sources)
+        entry["observations"] += 1
+        entry["cycles"] = [*entry["cycles"], cycle]
+        entry["evidence"] = deepcopy(record.get("evidence") or {})
+        if entry["observations"] >= REPEAT_OBSERVATION_THRESHOLD:
             entry["insufficient"] = True
             entry["basis"] = "repeat_observation"
     return state
@@ -314,18 +308,19 @@ def route_failure_state(
 def falsified_routes(
     records: Sequence[Mapping[str, Any]],
     mechanism_id: str,
+    *, runtime_identity: Mapping[str, Any] | None,
 ) -> dict[str, dict[str, Any]]:
     """Routes admitted as insufficient for one mechanism."""
-    state = route_failure_state(records)
+    state = route_failure_state(records, runtime_identity=runtime_identity)
     return {
         route: entry for (mid, route), entry in state.items()
         if mid == str(mechanism_id or "") and entry.get("insufficient")
     }
 
 
-def route_failure_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+def route_failure_summary(records: Sequence[Mapping[str, Any]], *, runtime_identity: Mapping[str, Any] | None) -> dict[str, Any]:
     """A report-shaped view: what has been tried, what is admitted."""
-    state = route_failure_state(records)
+    state = route_failure_state(records, runtime_identity=runtime_identity)
     admitted = {key: entry for key, entry in state.items() if entry["insufficient"]}
     return {
         "records": len([
@@ -337,6 +332,7 @@ def route_failure_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, Any
                 "mechanism_id": entry["mechanism_id"],
                 "route": entry["route"],
                 "observations": entry["observations"],
+                "diagnostic_observations": entry["diagnostic_observations"],
                 "basis": entry["basis"],
                 "evidence": entry["evidence"],
             }
@@ -347,6 +343,7 @@ def route_failure_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, Any
                 "mechanism_id": entry["mechanism_id"],
                 "route": entry["route"],
                 "observations": entry["observations"],
+                "diagnostic_observations": entry["diagnostic_observations"],
             }
             for _key, entry in sorted(state.items())
             if not entry["insufficient"]

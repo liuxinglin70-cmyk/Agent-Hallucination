@@ -2,7 +2,7 @@ from copy import deepcopy
 
 import pytest
 
-from detector.measurement import case_execution, request_execution
+from detector.measurement import case_execution, request_execution, measurement_sources
 
 
 def _execution():
@@ -97,3 +97,52 @@ def test_actual_cache_hit_preserves_measurement_and_new_run_changes_it(tmp_path,
     assert replayed["execution"]["measurement_id"] == original["execution"]["measurement_id"]
     fresh = backend.run_case(record, case_id="a")
     assert fresh["execution"]["measurement_id"] != original["execution"]["measurement_id"]
+
+
+@pytest.mark.parametrize("fault", ["changed_id", "missing_child", "duplicate_child", "nested_schema"])
+def test_unverifiable_case_lineage_never_returns_original_sources(fault):
+    children = [_execution(), _execution()]
+    combined = case_execution(
+        [{"execution": child} for child in children],
+        started_at="same", finished_at="same", elapsed_seconds=0,
+    )
+    assert measurement_sources(combined) == tuple(child["measurement_id"] for child in children)
+    if fault == "changed_id":
+        combined["measurement_id"] = "0" * 64
+    elif fault == "missing_child":
+        combined["case_attempts"][0]["execution"].pop("measurement_id")
+    elif fault == "duplicate_child":
+        combined = case_execution(
+            [{"execution": children[0]}, {"execution": children[0]}],
+            started_at="same", finished_at="same", elapsed_seconds=0,
+        )
+    else:
+        combined["case_attempts"][0]["execution"]["schema_version"] = "unknown"
+    assert measurement_sources(combined) == ()
+
+
+def test_actual_mock_invocations_own_synthetic_measurements(sample_record):
+    from evolution.backends import MockDetectorBackend
+
+    backend = MockDetectorBackend()
+    first = backend.run_case(sample_record, case_id="a", gold=False)
+    second = backend.run_case(sample_record, case_id="a", gold=False)
+    assert measurement_sources(first["execution"]) != measurement_sources(second["execution"])
+    assert first["provenance"]["measurement_kind"] == "synthetic"
+    assert first["provenance"]["execution_identity"] == second["provenance"]["execution_identity"]
+
+
+def test_mock_cache_hit_preserves_original_invocation(sample_record, tmp_path):
+    from evolution.backends import CachingBackend, MockDetectorBackend
+
+    cached = CachingBackend(MockDetectorBackend(), tmp_path / "cache")
+    first = cached.run_case(sample_record, case_id="a", gold=False)
+    second = cached.run_case(sample_record, case_id="a", gold=False)
+    assert measurement_sources(first["execution"]) == measurement_sources(second["execution"])
+
+
+def test_mock_without_a_packet_cannot_certify_route_provenance():
+    from evolution.backends import MockDetectorBackend
+
+    result = MockDetectorBackend().run_case({"question": "q", "history": []}, case_id="a", gold=False)
+    assert result["provenance"]["execution_identity"] is None

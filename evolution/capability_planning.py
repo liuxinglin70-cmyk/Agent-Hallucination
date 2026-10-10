@@ -281,6 +281,7 @@ def analyze_capability_requirement(
     *,
     routes: Sequence[str] = (),
     route_failure_records: Sequence[Mapping[str, Any]] = (),
+    runtime_identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Whether the harness can repair one mechanism, and if not, what is missing.
 
@@ -298,7 +299,7 @@ def analyze_capability_requirement(
         requirement.get("required_capabilities") or ()
     )
     semantic_relation = bool(requirement.get("semantic_relation"))
-    state = route_failure_state(list(route_failure_records))
+    state = route_failure_state(list(route_failure_records), runtime_identity=runtime_identity)
     falsified = {
         route: entry for (mid, route), entry in state.items()
         if mid == mechanism_id
@@ -434,6 +435,7 @@ def plan_capabilities(
     families: Sequence[Mapping[str, Any]],
     *,
     route_failure_records: Sequence[Mapping[str, Any]] = (),
+    runtime_identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Plan every family's mechanism in one pass.
 
@@ -453,6 +455,7 @@ def plan_capabilities(
             mechanism,
             routes=routes,
             route_failure_records=route_failure_records,
+            runtime_identity=runtime_identity,
         )
         requirements.append(requirement)
         if requirement["classification"] == "actionable":

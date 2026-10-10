@@ -38,6 +38,7 @@ from evolution.backends import (
     make_backend,
 )
 from evolution.config import ensure_dirs, load_config, resolve_path
+from evolution.route_observations import build_route_measurement, measurement_for_candidate
 from detector.runtime import exclusive_writer
 from evolution.contracts import (
     empty_registry,
@@ -2183,6 +2184,7 @@ class EvolutionEngine:
             )
             if observation is None:
                 continue
+            observation["measurement"] = measurement_for_candidate(report.get("route_measurement"), candidate)
             observations.append({
                 "mechanism_id": mechanism_id,
                 "family_id": family_id,
@@ -2209,7 +2211,7 @@ class EvolutionEngine:
             "observed": len(observations),
             "appended": len(appended),
             "state": route_failure_summary(
-                load_route_failures(self.route_failure_store),
+                load_route_failures(self.route_failure_store), runtime_identity=backend_runtime_identity(self.backend),
             ),
         }
 
@@ -2894,6 +2896,12 @@ class EvolutionEngine:
             "measurement_gain_cases": measurement_gain,
             "coverage_response": response,
             "candidate_rows": _summarise_rows(candidate_rows),
+            "route_measurement": build_route_measurement(
+                candidate=candidate, partners=partners, cases=measurement_gain,
+                control_rows=control_g, candidate_rows=candidate_g,
+                runtime=backend_runtime_identity(self.backend),
+                control_registry=make_registry(active_entries), candidate_registry=registry,
+            ),
             "target_outcome": member_outcomes[intervention_id],
             "member_target_outcomes": member_outcomes,
             "localization_opportunities": localization_opportunities,
@@ -3079,6 +3087,7 @@ class EvolutionEngine:
         preparation = prepare_families(
             patrol.families, patrol_rows, dataset_root=self.config["dataset_root"],
             causal_policy=self._causal_policy(), route_failure_records=route_failure_records,
+            runtime_identity=backend_runtime_identity(self.backend),
         )
         diagnosed = preparation.families
         mechanism_excluded = preparation.excluded
@@ -3154,7 +3163,7 @@ class EvolutionEngine:
             # see which routes can act on each mechanism, not only which routes
             # were enumerated.
             "capability_plan": capability_plan,
-            "route_failures": route_failure_summary(route_failure_records),
+            "route_failures": route_failure_summary(route_failure_records, runtime_identity=backend_runtime_identity(self.backend)),
             "capability_gaps": capability_gaps,
             "candidates": proposal_batch.candidates,
             "joint_groups": proposal_batch.joint_groups,
@@ -3377,6 +3386,7 @@ class EvolutionEngine:
         preparation = prepare_families(
             patrol.families, patrol_rows, dataset_root=self.config["dataset_root"],
             causal_policy=self._causal_policy(), route_failure_records=route_failure_records,
+            runtime_identity=backend_runtime_identity(self.backend),
         )
         diagnosed_families = preparation.families
         mechanism_excluded = preparation.excluded
@@ -3411,7 +3421,7 @@ class EvolutionEngine:
         worksheet["capability_gaps"] = capability_gaps
         worksheet["capability_plan"] = capability_plan
         worksheet["route_failures"] = route_failure_summary(
-            route_failure_records,
+            route_failure_records, runtime_identity=backend_runtime_identity(self.backend),
         )
         patrol_measurement_counts: dict[str, int] = {}
         for row in patrol_rows:
@@ -3840,6 +3850,7 @@ class EvolutionEngine:
                 "mechanism_opportunity": unit.get("mechanism_opportunity"),
                 "measurement_gain_cases": unit["measurement_gain_cases"],
                 "target_outcome": unit.get("target_outcome"),
+                "route_measurement": unit.get("route_measurement"),
                 "localization_opportunities": unit.get("localization_opportunities"),
                 "coverage_response": unit.get("coverage_response"),
             })
@@ -3875,6 +3886,7 @@ class EvolutionEngine:
                 "harmlessness": unit["harmlessness"],
                 "behavior": (unit.get("member_behavior") or {}).get(identifier),
                 "target_outcome": (unit.get("member_target_outcomes") or {}).get(identifier),
+                "route_measurement": unit.get("route_measurement"),
                 "localization_opportunities": unit.get("localization_opportunities"),
                 "m": unit["m"],
                 "fresh": unit["fresh"],

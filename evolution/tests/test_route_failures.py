@@ -16,6 +16,7 @@ from __future__ import annotations
 import pytest
 
 from evolution.metrics import target_outcome, target_opportunity
+from evolution.tests.route_observation_fixture import measured_fixture
 
 from evolution.route_failures import (
     REPEAT_OBSERVATION_THRESHOLD,
@@ -340,6 +341,7 @@ def _observation(mechanism="M-aaa", route="tracer_directive") -> dict:
         "observation": {
             "route": route,
             "status": "insufficient_for_mechanism",
+            "measurement": measured_fixture()[-1],
             "evidence": {"hook_fired": 0.9, "output_changed": 7,
                          "target_outcome_changed": 0},
         },
@@ -366,8 +368,9 @@ def test_a_resumed_cycle_does_not_duplicate_its_own_observations(tmp_path):
     and falsify a route on a single round's evidence.
     """
     path = tmp_path / "route_failures.jsonl"
-    record_route_failures(path, cycle=1, observations=[_observation()])
-    again = record_route_failures(path, cycle=1, observations=[_observation()])
+    observation = _observation()
+    record_route_failures(path, cycle=1, observations=[observation])
+    again = record_route_failures(path, cycle=1, observations=[observation])
     assert again == []
     assert len(load_route_failures(path)) == 1
 
@@ -375,11 +378,11 @@ def test_a_resumed_cycle_does_not_duplicate_its_own_observations(tmp_path):
 def test_one_observation_is_not_yet_a_falsification(tmp_path):
     path = tmp_path / "route_failures.jsonl"
     record_route_failures(path, cycle=1, observations=[_observation()])
-    state = route_failure_state(load_route_failures(path))
+    state = route_failure_state(load_route_failures(path), runtime_identity=measured_fixture()[1])
     entry = state[("M-aaa", "tracer_directive")]
     assert entry["observations"] == 1
     assert entry["insufficient"] is False
-    assert falsified_routes(load_route_failures(path), "M-aaa") == {}
+    assert falsified_routes(load_route_failures(path), "M-aaa", runtime_identity=measured_fixture()[1]) == {}
 
 
 def test_repeated_observations_falsify_the_route(tmp_path):
@@ -387,26 +390,26 @@ def test_repeated_observations_falsify_the_route(tmp_path):
     for cycle in (1, 2):
         record_route_failures(path, cycle=cycle, observations=[_observation()])
     records = load_route_failures(path)
-    state = route_failure_state(records)
+    state = route_failure_state(records, runtime_identity=measured_fixture()[1])
     entry = state[("M-aaa", "tracer_directive")]
     assert entry["observations"] == REPEAT_OBSERVATION_THRESHOLD
     assert entry["insufficient"] is True
     assert entry["basis"] == "repeat_observation"
-    assert "tracer_directive" in falsified_routes(records, "M-aaa")
+    assert "tracer_directive" in falsified_routes(records, "M-aaa", runtime_identity=measured_fixture()[1])
 
 
-def test_revision_evidence_falsifies_on_its_own(tmp_path):
-    """The plan's condition: the route was revised and still repaired nothing."""
+def test_numeric_revision_metadata_does_not_falsify_on_its_own(tmp_path):
+    """A revision count alone does not prove independent measured revisions."""
     path = tmp_path / "route_failures.jsonl"
     record_route_failures(path, cycle=1, observations=[
         {**_observation(), "revisions_observed": 1},
     ])
-    entry = route_failure_state(load_route_failures(path))[
+    entry = route_failure_state(load_route_failures(path), runtime_identity=measured_fixture()[1])[
         ("M-aaa", "tracer_directive")
     ]
     assert entry["observations"] == 1
-    assert entry["insufficient"] is True
-    assert entry["basis"] == "revision"
+    assert entry["insufficient"] is False
+    assert entry["basis"] == ""
 
 
 def test_falsification_is_scoped_to_the_mechanism(tmp_path):
@@ -417,8 +420,8 @@ def test_falsification_is_scoped_to_the_mechanism(tmp_path):
             _observation(mechanism="M-aaa"),
         ])
     records = load_route_failures(path)
-    assert set(falsified_routes(records, "M-aaa")) == {"tracer_directive"}
-    assert falsified_routes(records, "M-bbb") == {}
+    assert set(falsified_routes(records, "M-aaa", runtime_identity=measured_fixture()[1])) == {"tracer_directive"}
+    assert falsified_routes(records, "M-bbb", runtime_identity=measured_fixture()[1]) == {}
 
 
 def test_resolution_is_history_not_deletion(tmp_path):
@@ -432,8 +435,8 @@ def test_resolution_is_history_not_deletion(tmp_path):
     records = load_route_failures(path)
     assert len(records) == 3
     assert any(record.get("kind") == "resolution" for record in records)
-    assert falsified_routes(records, "M-aaa") == {}
-    assert route_failure_summary(records)["pairs"] == 0
+    assert falsified_routes(records, "M-aaa", runtime_identity=measured_fixture()[1]) == {}
+    assert route_failure_summary(records, runtime_identity=measured_fixture()[1])["pairs"] == 0
 
 
 @pytest.mark.parametrize("new_cycles,insufficient", [([], False), ([4], False), ([4, 5], True)])
@@ -448,7 +451,7 @@ def test_resolution_closes_the_observation_epoch(tmp_path, new_cycles, insuffici
         record_route_failures(path, cycle=cycle, observations=[_observation()])
     records = load_route_failures(path)
     assert path.read_bytes().startswith(original)
-    state = route_failure_state(records)
+    state = route_failure_state(records, runtime_identity=measured_fixture()[1])
     entry = state.get(("M-aaa", "tracer_directive"))
     if not new_cycles:
         assert entry is None
@@ -462,9 +465,9 @@ def test_resolution_is_scoped_and_duplicate_observations_do_not_count_twice(tmp_
     path = tmp_path / "route_failures.jsonl"
     record_route_failures(path, cycle=1, observations=[_observation(), _observation(mechanism="M-other")])
     records = load_route_failures(path)
-    assert route_failure_state([*records, *records])[("M-aaa", "tracer_directive")]["insufficient"] is False
+    assert route_failure_state([*records, *records], runtime_identity=measured_fixture()[1])[("M-aaa", "tracer_directive")]["insufficient"] is False
     resolve_route_failure(path, mechanism_id="M-aaa", route="tracer_directive", cycle=2, note="repaired")
-    state = route_failure_state(load_route_failures(path))
+    state = route_failure_state(load_route_failures(path), runtime_identity=measured_fixture()[1])
     assert ("M-aaa", "tracer_directive") not in state
     assert state[("M-other", "tracer_directive")]["observations"] == 1
 

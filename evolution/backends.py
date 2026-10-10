@@ -30,10 +30,10 @@ from detector.interventions import (
     authority_identity,
 )
 from detector.identity import build_execution_identity, digest, source_identity, artifact_digest
-from detector.measurement import measurement_status
-from detector.packet import build_packet
+from detector.measurement import measurement_status, request_execution
+from detector.packet import build_packet, PacketError
 from detector.result import prediction_state
-from detector.runtime import bounded_map, deadline_scope
+from detector.runtime import bounded_map, deadline_scope, utc_now
 
 from evolution.config import resolve_path
 from evolution.contracts import save_json
@@ -117,11 +117,15 @@ def _hooks_of(registry: Mapping[str, Any] | None) -> list[str]:
 def backend_runtime_identity(backend: Any, *, cases: Sequence[str] = ()) -> dict[str, Any]:
     underlying = getattr(backend, "backend", backend)
     config = getattr(getattr(underlying, "detector", None), "config", {})
+    feedback_policy = getattr(getattr(underlying, "detector", None), "offline_feedback_policy", None)
+    if feedback_policy is not None:
+        config = {**config, "offline_feedback_policy": feedback_policy.policy_id}
     scorer = (config.get("causal_audit") or {}).get("scorer_artifact")
     evidence_for = getattr(underlying, "evidence_for", None)
     payload = {
         "schema_version": "evolution.backend_runtime_identity.v1",
         "source": source_identity("detector", "evolution"),
+        "detector_source": source_identity("detector"),
         "backend": underlying.name, "effective_config": digest(config),
         "artifacts": {"scorer": artifact_digest(scorer)} if scorer is not None else {},
         "evidence": {str(case): digest(evidence_for(str(case))) for case in sorted(cases)}
@@ -822,6 +826,7 @@ class MockDetectorBackend(DetectionBackend):
         registry: Mapping[str, Any] | None = None,
         gold: bool | None = None,
     ) -> dict[str, Any]:
+        started, started_at = time.monotonic(), utc_now()
         active_ids = {
             str(entry.get("intervention_id") or "")
             for entry in self._active_ids(registry)
@@ -860,6 +865,7 @@ class MockDetectorBackend(DetectionBackend):
             deployment["guard_actions"] = list(actions)
         else:
             deployment = self._deployment(registry)
+        provenance = self._measurement_provenance(record, registry=registry, gold=gold)
         return {
             "schema_version": "detector.detection_result.v1",
             "case_id": case_id,
@@ -894,10 +900,29 @@ class MockDetectorBackend(DetectionBackend):
                 else [{"component": "mock", "code": "injected_unresolved"}]
             ),
             "evidence_health": {},
-            "provenance": {},
+            "execution": request_execution(
+                [], started_at=started_at, finished_at=utc_now(),
+                elapsed_seconds=time.monotonic() - started,
+            ),
+            "provenance": provenance,
             "_packet_event_count": len(list(
                 (record or {}).get("history") or ()
             )),
+        }
+
+    def _measurement_provenance(
+        self, record: Mapping[str, Any], *, registry: Mapping[str, Any] | None, gold: bool | None,
+    ) -> dict[str, Any]:
+        try:
+            packet = build_packet(record)
+        except PacketError:
+            return {"measurement_kind": "synthetic", "execution_identity": None}
+        return {
+            "measurement_kind": "synthetic",
+            "execution_identity": build_execution_identity(
+                source=source_identity("detector"), config={}, record=record, packet=packet,
+                registry=registry, authority={"mock_gold": gold},
+            ),
         }
 
 

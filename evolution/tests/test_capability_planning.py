@@ -30,6 +30,7 @@ from evolution.capability_planning import (
 )
 from evolution.mechanisms import infer_mechanism, repair_requirements
 from evolution.route_failures import record_route_failures
+from evolution.tests.route_observation_fixture import measured_fixture
 
 
 def mechanism(
@@ -74,6 +75,7 @@ def observation(mid: str, route: str) -> dict:
         "observation": {
             "route": route,
             "status": "insufficient_for_mechanism",
+            "measurement": measured_fixture()[-1],
             "evidence": {"hook_fired": 0.9, "output_changed": 7,
                          "target_outcome_changed": 0},
         },
@@ -232,6 +234,7 @@ def test_a_falsified_route_is_no_longer_sufficient(tmp_path):
         ),
         routes=["tracer_directive"],
         route_failure_records=records,
+        runtime_identity=measured_fixture()[1],
     )
     assert result["sufficient_routes"] == []
     assert result["classification"] == "research_only"
@@ -259,6 +262,7 @@ def test_a_single_observation_does_not_close_a_route(tmp_path):
         ),
         routes=["tracer_directive"],
         route_failure_records=load_route_failures(path),
+        runtime_identity=measured_fixture()[1],
     )
     assert result["sufficient_routes"] == ["tracer_directive"]
 
@@ -281,6 +285,7 @@ def test_falsification_on_another_mechanism_does_not_close_the_route(tmp_path):
         ),
         routes=["tracer_directive"],
         route_failure_records=load_route_failures(path),
+        runtime_identity=measured_fixture()[1],
     )
     assert result["sufficient_routes"] == ["tracer_directive"]
 
@@ -303,6 +308,7 @@ def test_one_falsified_route_leaves_the_others_available(tmp_path):
         ),
         routes=["tracer_directive", "upgrade_directive"],
         route_failure_records=load_route_failures(path),
+        runtime_identity=measured_fixture()[1],
     )
     assert result["sufficient_routes"] == ["upgrade_directive"]
     assert [item["route"] for item in result["insufficient_routes"]] == [

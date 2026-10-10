@@ -79,6 +79,7 @@ def prepare_families(
     families: Sequence[Mapping[str, Any]], rows: Sequence[Mapping[str, Any]], *,
     dataset_root: str, causal_policy: Mapping[str, Any] | None,
     route_failure_records: Sequence[Mapping[str, Any]],
+    runtime_identity: Mapping[str, Any],
 ) -> FamilyPreparation:
     diagnosed = diagnose_failure_families(families, rows, dataset_root=dataset_root, causal_policy=causal_policy)
     diagnosed = refine_failure_families(diagnosed)
@@ -86,5 +87,5 @@ def prepare_families(
     diagnosed, unrepresented = mechanism_subgroups(diagnosed)
     diagnosed = attach_normal_neighbors(diagnosed, rows)
     diagnosed, gaps = split_actionable_families(diagnosed)
-    plan = plan_capabilities(diagnosed, route_failure_records=route_failure_records)
+    plan = plan_capabilities(diagnosed, route_failure_records=route_failure_records, runtime_identity=runtime_identity)
     return FamilyPreparation(diagnosed, excluded, unrepresented, gaps, plan)
