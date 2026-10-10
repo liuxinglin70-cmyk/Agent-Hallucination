@@ -2,7 +2,7 @@
 
 The v1 protocol scores a candidate by polarity over a frozen batch, which lets a
 candidate collect credit for repairing cases that belong to other mechanisms
-(plan §2.4) and lets unrelated regressions cancel against gains. The v2 protocol
+(plan §2.4) and lets unrelated regressions cancel against gains. The mechanism-aligned protocol
 freezes four things together -- the mechanism, the evaluator's membership
 evidence, the candidate content hash and the baseline registry -- and scores the
 candidate only on confirmed members of its own mechanism.
@@ -378,7 +378,7 @@ def _run(tmp_path: Path, *, protocol: dict, candidate: dict, backend,
 def test_v2_freezes_mechanism_membership_candidate_and_baseline(tmp_path):
     mechanism = _mechanism()
     protocol = _freeze(tmp_path, mechanism=mechanism)
-    assert protocol["schema_version"] == "evolution.promotion_protocol.v2"
+    assert protocol["schema_version"] == "evolution.promotion_protocol.v4"
     assert protocol["mechanism_id"] == mechanism["mechanism_id"]
     assert protocol["candidate_content_hash"] == protocol["candidate_content_hash"]
     assert sorted(protocol["mechanism_gain_cases"]) == sorted(GAIN)
@@ -519,7 +519,7 @@ def test_mechanism_bound_candidate_cannot_be_used_with_a_v1_protocol(tmp_path):
     v1["resolved_cases"] = sorted(GAIN + PROTECTION)
     report = _run(tmp_path, protocol=v1, candidate=candidate, backend=_Backend({}))
     assert report["state"] == "promotion_blocked_preflight"
-    assert "v2 protocol" in report["terminal_reason"]
+    assert "mechanism-aligned protocol" in report["terminal_reason"]
 
 
 # ---------------------------------------------------------------------------
@@ -935,7 +935,7 @@ def test_verify_alignment_rederives_the_localization_precondition(tmp_path):
 
 
 def test_verify_alignment_requires_the_baseline_registry_identity(tmp_path):
-    """A v2 protocol without the frozen baseline cannot be verified."""
+    """A mechanism-aligned protocol without the frozen baseline cannot be verified."""
     import copy
 
     import evolution.promotion_alignment as alignment_module

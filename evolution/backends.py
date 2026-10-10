@@ -29,7 +29,7 @@ from detector.interventions import (
     compile_runtime_plan,
     authority_identity,
 )
-from detector.identity import build_execution_identity, digest, source_identity, artifact_digest as declared_artifact_digest
+from detector.identity import build_execution_identity, digest, source_identity, artifact_digest
 from detector.measurement import measurement_status
 from detector.packet import build_packet
 from detector.result import prediction_state
@@ -89,9 +89,6 @@ def _prediction_from_result(result: Mapping[str, Any]) -> bool | None:
 # this invalidates stale result caches instead of silently reusing them.
 CACHE_FORMAT = "stage-replay-bound-hearings"
 
-ARTIFACT_MANIFEST_SCHEMA = "evolution.artifact_manifest.v1"
-
-
 def _valid_stage_entry(
     result: Mapping[str, Any] | None,
     status: Mapping[str, Any] | None,
@@ -100,85 +97,6 @@ def _valid_stage_entry(
     if not isinstance(result, Mapping) or not isinstance(status, Mapping):
         return False
     return bool(result.get("ok")) == (str(status.get("state") or "") == "ok")
-
-
-def source_digest() -> str:
-    """Digest of the detector + evolution source trees.
-
-    Execution-semantics fingerprint: any change to how arms are replayed or
-    gated must invalidate derived caches (audit verdicts, row caches).
-
-    Recursive, so a subpackage or a module moved into one is covered. The
-    non-recursive form missed every file below a package root, which meant a
-    new runner implementation dropped into a subdirectory could change results
-    without changing any fingerprint that was supposed to pin them.
-
-    Test trees are excluded. They are the only subdirectory that exists today,
-    and they are not execution semantics: a test never runs during a detection,
-    so letting its edits invalidate every cache and refuse every frozen
-    protocol would spend the digest's authority on something it is not
-    describing. Runtime code, including anything future subpackaged, stays
-    covered.
-    """
-    root = Path(__file__).resolve().parent.parent
-    digest = hashlib.sha256()
-    for package in (root / "detector", root / "evolution"):
-        for path in sorted(package.rglob("*.py")):
-            if "__pycache__" in path.parts:
-                continue
-            if "tests" in path.relative_to(package).parts:
-                continue
-            digest.update(str(path.relative_to(root)).encode("utf-8"))
-            digest.update(path.read_bytes())
-    return digest.hexdigest()[:16]
-
-
-def artifact_digest(path: str | Path) -> str:
-    """Content digest of a declared artifact; missing inputs invalidate the freeze."""
-    target = Path(path)
-    if target.is_dir():
-        digest = hashlib.sha256()
-        for item in sorted(
-            p for p in target.rglob("*") if p.is_file()
-            and "__pycache__" not in p.parts
-        ):
-            digest.update(str(item.relative_to(target)).encode("utf-8"))
-            digest.update(item.read_bytes())
-        return digest.hexdigest()
-    if not target.is_file():
-        raise ValueError(f"artifact not found or not a file: {target}")
-    return hashlib.sha256(target.read_bytes()).hexdigest()
-
-
-def artifact_manifest(*paths: str | Path) -> dict[str, Any]:
-    """A freeze-ready manifest of the artifacts a runner depends on.
-
-    Shape: ``{"schema_version", "artifacts": {label: digest}, "digest"}``. The
-    manifest digest covers the labels and the per-artifact digests together, so
-    swapping two artifacts' contents cannot leave the manifest digest intact.
-    An empty manifest is legal and means "this runner declares no external
-    artifact" -- which is what a deterministic runner must declare, and is a
-    different statement from declaring one and failing to read it.
-    """
-    artifacts: dict[str, str] = {}
-    for path in paths:
-        target = Path(path)
-        artifacts[str(target)] = artifact_digest(target)
-    payload = {
-        "schema_version": ARTIFACT_MANIFEST_SCHEMA,
-        "artifacts": artifacts,
-    }
-    return {
-        **payload,
-        "digest": hashlib.sha256(json.dumps(
-            payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
-        ).encode("utf-8")).hexdigest(),
-    }
-
-
-def fingerprint(value: Any) -> str:
-    canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:12]
 
 
 def registry_key(registry: Mapping[str, Any] | None) -> str:
@@ -205,7 +123,7 @@ def backend_runtime_identity(backend: Any, *, cases: Sequence[str] = ()) -> dict
         "schema_version": "evolution.backend_runtime_identity.v1",
         "source": source_identity("detector", "evolution"),
         "backend": underlying.name, "effective_config": digest(config),
-        "artifacts": {"scorer": declared_artifact_digest(scorer)} if scorer is not None else {},
+        "artifacts": {"scorer": artifact_digest(scorer)} if scorer is not None else {},
         "evidence": {str(case): digest(evidence_for(str(case))) for case in sorted(cases)}
         if callable(evidence_for) else {},
         "mock": {"base": getattr(underlying, "base_predictions", None),
@@ -1178,7 +1096,7 @@ def evidence_namespace(
     corpus = load_corpus(resolve_path(str(block["corpus"]))) if block.get("corpus") else None
     return {
         "enabled": True,
-        "corpus": declared_artifact_digest(
+        "corpus": artifact_digest(
             resolve_path(str(block["corpus"])) / "corpus.json"
         ) if block.get("corpus") else "none",
         "cases": sorted(str(key) for key in (block.get("cases") or {})),
@@ -1187,7 +1105,7 @@ def evidence_namespace(
             for doc in (corpus["documents"] if corpus else [])
         },
         "pins": {
-            str(key): declared_artifact_digest(resolve_path(str(path)))
+            str(key): artifact_digest(resolve_path(str(path)))
             for key, path in (block.get("cases") or {}).items()
         },
         "questions": digest(block.get("questions") or {}),
@@ -1237,18 +1155,13 @@ def make_backend(
 
 
 __all__ = [
-    "ARTIFACT_MANIFEST_SCHEMA",
     "CACHE_FORMAT",
-    "artifact_digest",
-    "artifact_manifest",
     "backend_execution_identity",
     "backend_runtime_identity",
     "CachingBackend",
     "DetectionBackend",
     "LiveDetectorBackend",
     "MockDetectorBackend",
-    "fingerprint",
     "make_backend",
     "registry_key",
-    "source_digest",
 ]

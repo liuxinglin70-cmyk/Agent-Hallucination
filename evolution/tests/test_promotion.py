@@ -129,7 +129,7 @@ class _ScriptedBackend:
 
     def evaluate_fresh(self, cases, *, dataset_root, registry=None, gold_map=None,
                        gold_step_map=None, workers=1, deadline=None):
-        from evolution.backends import fingerprint
+        from detector.identity import digest
 
         entries = list((registry or {}).get("interventions") or ())
         active = bool(entries)
@@ -176,7 +176,7 @@ class _ScriptedBackend:
                     "stage_status": {},
                 },
                 "backend": self.name,
-                "registry_hash": fingerprint(registry),
+                "registry_hash": digest(registry),
             })
         return rows
 
@@ -383,7 +383,7 @@ def test_load_protocol_rejects_a_changed_batch(tmp_path, monkeypatch):
         "E/001.json", "F/001.json", "G/001.json",
     ]), encoding="utf-8")
     monkeypatch.setattr(
-        "evolution.promotion.source_digest", lambda: _frozen_source(tmp_path),
+        "evolution.promotion.source_identity", lambda *packages: _frozen_source(tmp_path),
     )
     protocol = json.loads((tmp_path / "protocol.json").read_text(encoding="utf-8-sig"))
     with pytest.raises(PromotionProtocolError) as exc:
@@ -909,5 +909,77 @@ def test_a_protocol_without_learned_artifacts_records_that_explicitly(tmp_path):
     )
     manifest = protocol["artifact_manifest"]
     assert manifest["artifacts"] == {}
-    assert manifest["schema_version"] == "evolution.artifact_manifest.v1"
+    assert manifest["schema_version"] == "evolution.artifact_manifest.v2"
     assert manifest["digest"]
+
+
+@pytest.mark.parametrize("has_artifact", [False, True])
+@pytest.mark.parametrize("field,value", [
+    ("schema_version", "unsupported.manifest"),
+    ("digest", "0" * 64),
+    ("artifacts", None),
+])
+def test_loaded_protocol_validates_artifact_manifest_after_outer_hash(
+    tmp_path, monkeypatch, has_artifact, field, value,
+):
+    from evolution.promotion import protocol_self_hash
+
+    roles, gold, batch, detector_config = _artifact_fixture(tmp_path)
+    weights = tmp_path / "weights.bin"
+    weights.write_bytes(b"model-v1")
+    protocol_path = tmp_path / "protocol.json"
+    protocol = freeze_protocol(
+        protocol_path, batch_path=batch, roles=roles, gold=gold,
+        detector_config=detector_config, workers=2,
+        artifact_paths=[weights] if has_artifact else [],
+        framework_config={"registry_dir": str(tmp_path / "registry")},
+    )
+    protocol["artifact_manifest"][field] = value
+    # Re-sealing the outer envelope isolates the inner manifest contract.
+    protocol["protocol_hash"] = protocol_self_hash(protocol)
+    protocol_path.write_text(json.dumps(protocol), encoding="utf-8")
+    monkeypatch.setattr("evolution.promotion.artifact_digest",
+                        lambda path: pytest.fail("invalid manifest must be refused before artifact IO"))
+    with pytest.raises(PromotionProtocolError, match="artifact manifest"):
+        load_protocol(protocol_path, dataset_root=tmp_path / "data", stages=("structural",))
+
+
+def test_promotion_freeze_uses_shared_complete_content_identities(tmp_path):
+    from detector.identity import artifact_digest, digest, source_identity
+
+    roles, gold, batch, detector_config = _artifact_fixture(tmp_path)
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "weights.bin").write_bytes(b"model-v1")
+    (bundle / "tokenizer.json").write_text('{"tokens": ["a", "b"]}', encoding="utf-8")
+    protocol = freeze_protocol(
+        tmp_path / "protocol.json", batch_path=batch, roles=roles, gold=gold,
+        detector_config=detector_config, workers=2, artifact_paths=[bundle],
+        framework_config={"registry_dir": str(tmp_path / "registry")},
+    )
+    assert protocol["batch_hash"] == digest(json.loads(batch.read_text(encoding="utf-8")))
+    assert protocol["detector_config_hash"] == digest(json.loads(detector_config.read_text(encoding="utf-8")))
+    assert protocol["code_baseline"] == source_identity("detector", "evolution")
+    manifest = protocol["artifact_manifest"]
+    assert manifest["artifacts"][str(bundle)] == artifact_digest(bundle)
+    assert manifest["digest"] == digest({key: value for key, value in manifest.items() if key != "digest"})
+
+
+@pytest.mark.parametrize("schema", ["evolution.promotion_protocol.v1", "evolution.promotion_protocol.v2"])
+def test_old_promotion_identity_contracts_are_not_reused_or_rewritten(tmp_path, schema):
+    from evolution.promotion import protocol_self_hash
+
+    roles, gold, batch, detector_config = _artifact_fixture(tmp_path)
+    protocol_path = tmp_path / "protocol.json"
+    protocol = freeze_protocol(
+        protocol_path, batch_path=batch, roles=roles, gold=gold,
+        detector_config=detector_config, workers=2,
+        framework_config={"registry_dir": str(tmp_path / "registry")},
+    )
+    protocol["schema_version"] = schema
+    protocol["protocol_hash"] = protocol_self_hash(protocol)
+    protocol_path.write_text(json.dumps(protocol), encoding="utf-8")
+    before = protocol_path.read_bytes()
+    with pytest.raises(PromotionProtocolError, match="unsupported promotion protocol schema"):
+        load_protocol(protocol_path, dataset_root=tmp_path / "data", stages=("structural",))
+    assert protocol_path.read_bytes() == before

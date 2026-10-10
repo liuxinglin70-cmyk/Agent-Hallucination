@@ -44,13 +44,8 @@ from detector.interventions import (
 
 from evolution import promotion_alignment as alignment
 from evolution.candidate_versions import canonical_hash
-from evolution.backends import (
-    artifact_digest,
-    artifact_manifest,
-    fingerprint,
-    make_backend,
-    source_digest,
-)
+from detector.identity import artifact_digest, digest, source_identity
+from evolution.backends import make_backend
 from evolution.config import resolve_path
 from evolution.contracts import (
     candidate_contains_case_id,
@@ -82,7 +77,8 @@ from evolution.metrics import (
 from evolution.registry import load_active_registry
 from evolution.splits import bool_gold, load_gold, load_gold_step
 
-PROMOTION_PROTOCOL_SCHEMA = "evolution.promotion_protocol.v1"
+PROMOTION_PROTOCOL_SCHEMA = "evolution.promotion_protocol.v3"
+ARTIFACT_MANIFEST_SCHEMA = "evolution.artifact_manifest.v2"
 PROMOTION_STATE_SCHEMA = "evolution.promotion_state.v1"
 CANDIDATE_SCHEMA = "evolution.candidate.v1"
 
@@ -108,17 +104,7 @@ _PROTOCOL_HASH_EXCLUDED = frozenset(
 
 
 def protocol_self_hash(protocol: Mapping[str, Any]) -> str:
-    """The digest of a protocol's own frozen content.
-
-    v2 protocols carry this from ``build_alignment``; v1 protocols carry it
-    from ``freeze_protocol``. Without it "a frozen protocol may not be
-    rewritten" is unenforceable, because every run re-reads the file and the
-    loader has nothing to compare against.
-
-    The digest is ``promotion_alignment.digest`` over the same exclusion set
-    ``verify_alignment`` uses, so both schemas are checked by one rule and a
-    v2 protocol frozen by an earlier build still verifies.
-    """
+    """Bind frozen content using the same exclusions as alignment verification."""
     raw = {
         key: value for key, value in protocol.items()
         if key not in _PROTOCOL_HASH_EXCLUDED
@@ -500,7 +486,7 @@ def freeze_protocol(
         mechanism, mechanism_membership, candidate, dataset_root, baseline_registry_hash,
     )):
         raise PromotionProtocolError(
-            "v2 freeze needs candidate, mechanism, membership, dataset_root and baseline_registry_hash"
+            "mechanism-aligned freeze needs candidate, mechanism, membership, dataset_root and baseline_registry_hash"
         )
     if aligned:
         _validate_candidate_identity(candidate)
@@ -596,7 +582,7 @@ def freeze_protocol(
         "frozen_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "reason": str(reason),
         "batch_path": str(batch_path),
-        "batch_hash": fingerprint(json.loads(
+        "batch_hash": digest(json.loads(
             batch_path.read_text(encoding="utf-8-sig")
         )),
         "cases": case_ids,
@@ -608,24 +594,15 @@ def freeze_protocol(
         "classes": labeled,
         "development_cases": sorted(str(case) for case in development_cases),
         "detector_config": str(resolved_detector),
-        "detector_config_hash": fingerprint(config_payload),
-        "code_baseline": source_digest(),
-        # Trajectory content, not just the list of case ids. The batch hash
-        # covers ids and roles; without this, replacing a case file -- cleaning
-        # it up, re-capturing it, fixing a bug in it -- silently changes what a
-        # "frozen" batch measures. v2 has carried this from the start. Null
-        # means the freeze had no dataset root to hash, which ``load_protocol``
-        # refuses: absent evidence of what was frozen is not a pass.
+        "detector_config_hash": digest(config_payload),
+        "code_baseline": source_identity("detector", "evolution"),
+        # Case membership alone does not pin the trajectory content.
         "case_digests": (
             alignment.data_digests(dataset_root, case_ids)
             if dataset_root is not None else None
         ),
-        # Learned artifacts (weights, tokenizer, calibration output) are not
-        # covered by the code digest: replacing a weight file changes no source
-        # byte while changing every decision the runner makes. Frozen empty
-        # when the registry declares none, which is a statement ("no external
-        # artifact") rather than a missing value.
-        "artifact_manifest": artifact_manifest(*artifact_paths),
+        # External model artifacts can change independently of source/config.
+        "artifact_manifest": _artifact_manifest(*artifact_paths),
         "workers": int(workers),
         "timeout_seconds": (
             float(timeout_seconds) if timeout_seconds else None
@@ -650,19 +627,7 @@ def freeze_protocol(
         except (ValueError, OSError) as exc:
             raise PromotionProtocolError(str(exc)) from exc
     else:
-        # v1 gets the same self-hash v2 has carried since it was introduced.
-        # Without it the freeze promise ("a frozen protocol may not be
-        # rewritten") is unenforceable: every run re-reads the file, so moving
-        # one role string after the control arm's behaviour is known re-scores
-        # the same batch against a different meaning, leaving no trace.
-        #
-        # The active registry is pinned the same way v2 pins it. Freezing
-        # reasons about the current deployment (protection coverage, repairable
-        # directions); if a deployment lands between freeze and run, the
-        # control arm is no longer the version those readings were taken on.
-        # A caller may hand the identity in directly; otherwise it is read from
-        # the framework configuration, falling back to the ambient defaults
-        # for the registry location when the caller supplied a partial config.
+        # Protection coverage and repair directions depend on the active deployment.
         if baseline_registry_hash is None:
             from evolution.config import DEFAULTS, load_config
 
@@ -803,25 +768,35 @@ def _verify_frozen_policy(
         )
 
 
-def _verify_artifact_manifest(protocol: Mapping[str, Any]) -> None:
-    """Re-check every learned artifact the frozen protocol names.
+def _artifact_manifest(*paths: str | Path) -> dict[str, Any]:
+    payload = {"schema_version": ARTIFACT_MANIFEST_SCHEMA,
+               "artifacts": {str(path): artifact_digest(path) for path in paths}}
+    return {**payload, "digest": digest(payload)}
 
-    A protocol that declares no artifact has nothing to re-derive and passes.
-    A protocol that declares one is checked byte for byte: replacing a weights
-    file changes no source line and no detector config, so without this the
-    frozen protocol would happily evaluate a different model than the one it
-    was frozen against.
-    """
+
+def _verify_artifact_manifest(protocol: Mapping[str, Any]) -> None:
+    """Validate the manifest before re-reading its declared artifact contents."""
     manifest = protocol.get("artifact_manifest")
     if not isinstance(manifest, Mapping):
         raise PromotionProtocolError(
             "frozen protocol carries no artifact manifest; refusing to "
             "evaluate a protocol whose learned artifacts are unpinned"
         )
-    declared = manifest.get("artifacts") or {}
-    if not declared:
-        return
-    for path, digest in sorted(declared.items()):
+    if (set(manifest) != {"schema_version", "artifacts", "digest"}
+            or manifest["schema_version"] != ARTIFACT_MANIFEST_SCHEMA):
+        raise PromotionProtocolError("unsupported artifact manifest schema or fields")
+    declared = manifest["artifacts"]
+    if not isinstance(declared, Mapping) or any(
+        not isinstance(path, str) or not path
+        or not isinstance(expected, str) or len(expected) != 64
+        or any(char not in "0123456789abcdef" for char in expected)
+        for path, expected in declared.items()
+    ):
+        raise PromotionProtocolError("invalid artifact manifest entries")
+    payload = {"schema_version": ARTIFACT_MANIFEST_SCHEMA, "artifacts": dict(declared)}
+    if manifest["digest"] != digest(payload):
+        raise PromotionProtocolError("artifact manifest digest mismatch")
+    for path, expected in sorted(declared.items()):
         try:
             actual = artifact_digest(path)
         except ValueError as exc:
@@ -829,7 +804,7 @@ def _verify_artifact_manifest(protocol: Mapping[str, Any]) -> None:
                 f"learned artifact is missing after the protocol was frozen: "
                 f"{exc}"
             ) from exc
-        if actual != digest:
+        if actual != expected:
             raise PromotionProtocolError(
                 "learned artifact changed after the protocol was frozen: "
                 f"{path}. The frozen protocol is evaluated on the artifacts "
@@ -886,7 +861,7 @@ def _freeze_baseline_roll(
             )
     return {
         "path": roll_path.as_posix(),
-        "roll_hash": fingerprint(dict(payload)),
+        "roll_hash": digest(dict(payload)),
         "declared_path": (
             str(baseline_roll.get("declared_path"))
             if baseline_roll.get("declared_path") is not None else None
@@ -937,10 +912,6 @@ def load_protocol(
     schema = str(protocol.get("schema_version"))
     if schema not in {PROMOTION_PROTOCOL_SCHEMA, alignment.ALIGNED_PROTOCOL_SCHEMA}:
         raise PromotionProtocolError("unsupported promotion protocol schema")
-    # The protocol's own hash, for both schemas. For v1 this is the check that
-    # makes the freeze promise enforceable at all: without it, roles, gold and
-    # gold steps can be edited in place after the control arm is known, and the
-    # run measures a batch with a different meaning under the same name.
     frozen_hash = str(protocol.get("protocol_hash") or "")
     if not frozen_hash:
         raise PromotionProtocolError(
@@ -960,12 +931,7 @@ def load_protocol(
         except (ValueError, KeyError, OSError) as exc:
             raise PromotionProtocolError(str(exc)) from exc
     else:
-        # v1 pins the trajectory content the same way v2 does. The batch file
-        # hash covers the list of case ids only, so without this a case file
-        # can be replaced (cleaned up, re-captured, fixed) and the "frozen"
-        # batch silently measures different trajectories. A null value is what
-        # a freeze without a dataset root records (a synthetic batch); the
-        # measurement path refuses those, see ``PromotionRun.run``.
+        # Synthetic freezes have no trajectory identity and cannot be measured.
         case_digests = protocol.get("case_digests")
         if isinstance(case_digests, Mapping) and case_digests:
             current = alignment.data_digests(dataset_root, list(case_digests))
@@ -983,12 +949,12 @@ def load_protocol(
     if not batch_path.is_file():
         raise PromotionProtocolError(f"promotion batch is missing: {batch_path}")
     batch_payload = json.loads(batch_path.read_text(encoding="utf-8-sig"))
-    if fingerprint(batch_payload) != str(protocol.get("batch_hash") or ""):
+    if digest(batch_payload) != str(protocol.get("batch_hash") or ""):
         raise PromotionProtocolError(
             "promotion batch changed after it was frozen; refusing to measure "
             "a different case set than the frozen protocol describes"
         )
-    if str(protocol.get("code_baseline") or "") != source_digest():
+    if str(protocol.get("code_baseline") or "") != source_identity("detector", "evolution"):
         raise PromotionProtocolError(
             "detector/evolution source changed after the promotion protocol was "
             "frozen; a frozen protocol is evaluated on the machinery it froze"
@@ -1002,7 +968,7 @@ def load_protocol(
             f"detector config is missing: {detector_config}"
         )
     config_payload = json.loads(detector_config.read_text(encoding="utf-8-sig"))
-    if fingerprint(config_payload) != str(
+    if digest(config_payload) != str(
         protocol.get("detector_config_hash") or ""
     ):
         raise PromotionProtocolError(
@@ -1149,7 +1115,7 @@ class PromotionRun:
             return {}
         path = resolve_path(str(spec.get("path")))
         payload = json.loads(path.read_text(encoding="utf-8-sig"))
-        if fingerprint(dict(payload)) != spec.get("roll_hash"):
+        if digest(dict(payload)) != spec.get("roll_hash"):
             raise PromotionProtocolError(
                 "pinned baseline roll changed after the protocol was frozen: "
                 f"{path}"
@@ -1397,7 +1363,7 @@ class PromotionRun:
                 "state": "promotion_blocked_preflight", "admitted": False,
                 "candidate_id": self.candidate.get("candidate_id"),
                 "candidate_content_hash": self.candidate.get("content_hash"),
-                "terminal_reason": "mechanism-bound candidates require a v2 protocol",
+                "terminal_reason": "mechanism-bound candidates require a mechanism-aligned protocol",
                 "promotion_diagnosis": alignment.diagnosis("mechanism_alignment_missing"),
             }
             self._write(report)
@@ -1888,7 +1854,7 @@ class PromotionRun:
             _validate_candidate_identity(candidate)
             if set(self.stages) != set(alignment.FORMAL_STAGES):
                 raise ValueError(
-                    "all four formal gates are mandatory in a v2 promotion"
+                    "all four formal gates are mandatory in a mechanism-aligned promotion"
                 )
             if candidate["content_hash"] != protocol["candidate_content_hash"]:
                 raise ValueError("candidate changed after the protocol was frozen")
@@ -1900,9 +1866,9 @@ class PromotionRun:
                 raise ValueError("protocol omits candidate development exposure")
             if alignment.frozen_policy(self.config) != protocol["policy"]:
                 raise ValueError("gate or library policy changed after freeze")
-            if source_digest() != protocol["code_baseline"]:
+            if source_identity("detector", "evolution") != protocol["code_baseline"]:
                 raise ValueError("source changed after protocol freeze")
-            if fingerprint(json.loads(Path(protocol["detector_config"]).read_text(encoding="utf-8-sig"))) != protocol["detector_config_hash"]:
+            if digest(json.loads(Path(protocol["detector_config"]).read_text(encoding="utf-8-sig"))) != protocol["detector_config_hash"]:
                 raise ValueError("detector configuration changed after freeze")
             if protocol["case_digests"] != alignment.data_digests(self.dataset_root, protocol["cases"]):
                 raise ValueError("promotion trajectory content changed after freeze")
@@ -2104,7 +2070,7 @@ class PromotionRun:
     def _claim_aligned_protocol(self) -> None:
         path = Path(str(self.protocol.get("loaded_from") or ""))
         if not path.is_file():
-            raise ValueError("v2 protocol must have a persisted source path")
+            raise ValueError("mechanism-aligned protocol must have a persisted source path")
         claim_path = path.with_name(path.name + ".attempt.json")
         identity = {"protocol_hash": self.protocol["protocol_hash"],
                     "candidate_content_hash": self.candidate["content_hash"],

@@ -117,6 +117,8 @@ GOLD = {c: True for c in CASES}
 
 
 def test_a_roll_that_covers_the_batch_is_frozen_with_its_hash(tmp_path):
+    from detector.identity import digest
+
     roll_path = tmp_path / "roll.json"
     roll_path.write_text(json.dumps(_roll(CASES)), encoding="utf-8")
     protocol = _freeze(
@@ -131,9 +133,7 @@ def test_a_roll_that_covers_the_batch_is_frozen_with_its_hash(tmp_path):
     assert spec is not None
     assert spec["declared_path"] == "recall_upgrade"
     assert spec["source_run"] == "archived-run"
-    # ``fingerprint`` is the repository's short content digest; the point is
-    # that a stable hash of the roll is frozen with the protocol.
-    assert spec["roll_hash"]
+    assert spec["roll_hash"] == digest(_roll(CASES))
     assert protocol["require_fresh"] is False
 
 

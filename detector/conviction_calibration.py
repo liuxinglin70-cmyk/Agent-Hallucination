@@ -45,7 +45,7 @@ Two deliberate neighbours:
   measurement is an admission decision. The two are different subjects (an LLM's
   ordinal certainty vs. a deterministic parser's error rate on a labelled set)
   and neither can answer for the other.
-* ``evolution.backends.source_digest`` fingerprints the whole source tree so a
+* ``detector.identity.source_identity`` fingerprints the whole source tree so a
   cache cannot outlive the code. That is the right shape for "any code change
   invalidates derived data"; it is the wrong shape here, because a predicate's
   record must survive edits that cannot change its verdicts and must not survive

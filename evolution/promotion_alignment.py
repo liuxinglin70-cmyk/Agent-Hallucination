@@ -1,4 +1,4 @@
-"""Frozen mechanism, candidate, data roles and evidence for promotion v2."""
+"""Frozen mechanism, candidate, data roles and evidence for promotion."""
 
 from __future__ import annotations
 
@@ -9,10 +9,11 @@ import math
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping, Sequence
 
+from detector.identity import digest
 from evolution.mechanisms import MECHANISM_SCHEMA, mechanism_key
 from evolution.metrics import mechanism_opportunity, mechanism_row_healthy
 
-ALIGNED_PROTOCOL_SCHEMA = "evolution.promotion_protocol.v2"
+ALIGNED_PROTOCOL_SCHEMA = "evolution.promotion_protocol.v4"
 ALIGNED_CANDIDATE_SCHEMA = "evolution.candidate.v2"
 MEMBERSHIP_SCHEMA = "evolution.mechanism_membership.v1"
 FORMAL_STAGES = ("structural", "harmlessness", "behavior", "m")
@@ -57,13 +58,6 @@ LEGACY_STATE_REASONS = {
     "promotion_unmeasurable": "runtime_unresolved",
     "promotion_blocked_preflight": "protocol_invalid",
 }
-
-
-def digest(payload: Any) -> str:
-    return hashlib.sha256(json.dumps(
-        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
-        allow_nan=False,
-    ).encode("utf-8")).hexdigest()
 
 
 def case_ids(values: Sequence[str], *, name: str) -> list[str]:
@@ -204,7 +198,7 @@ def build_alignment(
     cases = case_ids(protocol["cases"], name="promotion cases")
     roles = protocol["roles"]
     if set(roles) != set(cases) or set(roles.values()) != {"benefit", "protection", "challenge"}:
-        raise ValueError("v2 needs disjoint, nonempty gain, protection and challenge sets")
+        raise ValueError("mechanism-aligned protocol needs disjoint, nonempty gain, protection and challenge sets")
     membership = validate_membership(membership, cases, mechanism, roles)
     exposed = sorted(set(development_cases(candidate)) | set(protocol["development_cases"]))
     if set(exposed) & set(cases):
@@ -212,21 +206,21 @@ def build_alignment(
     if any(type(protocol["gold"].get(case)) is not bool for case in cases):
         raise ValueError("formal gold labels must be boolean")
     if not baseline_registry_hash:
-        raise ValueError("v2 must freeze the active baseline registry identity")
+        raise ValueError("mechanism-aligned protocol must freeze the active baseline registry identity")
     policy = frozen_policy(config)
     for key in ("harmlessness_new_fn_allowed", "harmlessness_new_fp_allowed",
                 "harmlessness_new_unresolved_allowed", "m_new_errors_allowed",
                 "localization_joint_broken_allowed"):
         if policy["gates"].get(key) != 0:
-            raise ValueError(f"v2 does not allow relaxing {key}")
+            raise ValueError(f"mechanism-aligned protocol does not allow relaxing {key}")
     for key in ("harmlessness_min_protected_tp", "harmlessness_min_protected_tn"):
         if type(policy["gates"].get(key)) is not int or policy["gates"][key] < 2:
-            raise ValueError(f"v2 requires {key} >= 2")
+            raise ValueError(f"mechanism-aligned protocol requires {key} >= 2")
     if policy["gates"].get("behavior_require_fired") is not True:
-        raise ValueError("v2 requires actual hook firing")
+        raise ValueError("mechanism-aligned protocol requires actual hook firing")
     for key in ("m_min_marginal_cases", "localization_min_joint_cases"):
         if type(policy["gates"].get(key)) is not int or policy["gates"][key] < 1:
-            raise ValueError(f"v2 requires {key} >= 1")
+            raise ValueError(f"mechanism-aligned protocol requires {key} >= 1")
     if mechanism["objective"] in {"localization", "joint"}:
         for case in cases:
             if protocol["gold"][case]:

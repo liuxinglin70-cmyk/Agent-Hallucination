@@ -335,7 +335,7 @@ def test_unsatisfiable_run_parameters_are_refused(
     gold = _gold(roles)
     data, batch, detector_config = _batch(tmp_path, roles=roles, gold=gold)
     protocol = {
-        "schema_version": "evolution.promotion_protocol.v1",
+        "schema_version": "evolution.promotion_protocol.v3",
         "batch_path": str(batch), "workers": workers,
         "timeout_seconds": timeout,
     }
