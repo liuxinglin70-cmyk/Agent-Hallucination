@@ -540,13 +540,7 @@ def test_detect_rejects_extra_fields(sample_record):
 def test_frozen_hearing_is_reused_instead_of_rerunning_tracer_and_defense(
     sample_record, monkeypatch,
 ):
-    """A frozen hearing must actually replay.
-
-    ``frozen_hearing`` compared ``contracts``/``confidence``, which
-    ``proof.hearings[].positive`` never projects, so the comparison always
-    failed and every "frozen" hearing silently re-ran the live tracer and
-    defense -- re-introducing exactly the provider noise freezing removes.
-    """
+    from detector.hearing import judge_target
     judge_result = {
         "ok": True,
         "parsed": {
@@ -573,15 +567,7 @@ def test_frozen_hearing_is_reused_instead_of_rerunning_tracer_and_defense(
         "hearings": [{
             "source": "judge",
             "candidate_id": None,
-            "positive": {
-                "source": "judge",
-                "step": 2,
-                "reason": "said 5",
-                "evidence_refs": ["event_002"],
-                "quote": "5",
-                "delivered_result": "5",
-                "correct_result": "4",
-            },
+            "positive": judge_target(judge_result["parsed"]),
             "tracer_result": {"ok": True, "parsed": {
                 "step": 2, "quote": "5", "referent": "4",
                 "evidence_refs": ["event_002"], "reason": "frozen tracer",
@@ -610,3 +596,37 @@ def test_frozen_hearing_is_reused_instead_of_rerunning_tracer_and_defense(
     assert result["state"] == "verified_error"
     assert result["proof"]["defense"]["verdict"] == "substantiated"
     assert result["proof"]["step_tracer"]["reason"] == "frozen tracer"
+
+
+@pytest.mark.parametrize("field,value", [
+    ("confidence", "low"), ("contracts", [{"kind": "exact_value", "requirement": "6"}]),
+])
+def test_frozen_hearing_rechecks_fields_actually_consumed_by_defense(sample_record, monkeypatch, field, value):
+    from copy import deepcopy
+    from evolution.backends import LiveDetectorBackend
+    parsed = {"is_hallucination": True, "hallucination_step": 2,
+              "hallucination_reason": "said 5", "delivered_result": "5", "correct_result": "4",
+              "basis": "derivation", "confidence": "high", "evidence_refs": ["event_002"],
+              "root_cause": {"step": 2, "quote": "5", "referent": "4"},
+              "contracts": [{"kind": "exact_value", "requirement": "4"}]}
+    monkeypatch.setattr("detector.api.run_judge", lambda **kwargs: (
+        {"ok": True, "parsed": deepcopy(parsed)}, {"stage": "judge", "state": "ok"}))
+    calls = []
+    monkeypatch.setattr("detector.api.run_step_tracer", lambda **kwargs: (
+        {"ok": True, "parsed": {"step": 2, "quote": "5", "referent": "4", "reason": "trace",
+                                 "evidence_refs": ["event_002"]}}, {"stage": "step_tracer", "state": "ok"}))
+    def defense(**kwargs):
+        calls.append(deepcopy(kwargs["positive"]))
+        return {"ok": True, "parsed": {"verdict": "substantiated", "confirmed_step": 2,
+                                        "reason": "review", "evidence_refs": ["event_002"]}}, {
+            "stage": "defense", "state": "ok"}
+    monkeypatch.setattr("detector.api.run_defense", defense)
+    detector = Detector(CONFIG, require_credentials=False)
+    baseline = detector.detect(sample_record)
+    frozen = LiveDetectorBackend._frozen_stages(baseline, set())
+    frozen["judge_result"]["parsed"][field] = deepcopy(value)
+    calls.clear()
+    result = detector.detect(sample_record, frozen_stages=frozen)
+    assert len(calls) == 1
+    assert calls[0][field] == value
+    assert result["proof"]["hearings"][0]["positive"][field] == value

@@ -14,6 +14,7 @@ from detector.causal_audit import (
 )
 from detector.causal_contracts import seal
 from detector.identity import build_execution_identity, digest, source_identity
+from detector.hearing import hearing_target, judge_target, recall_target
 from detector.defense import _parse_defense, _validate_defense_evidence, run_defense
 from detector.evidence import (
     snapshot_digest,
@@ -550,40 +551,9 @@ class Detector:
             )
             return [dict(c) for c in candidates if c]
 
-        def positive_from_judge() -> dict[str, Any]:
-            return {
-                "source": "judge",
-                "step": judge_parsed.get("hallucination_step"),
-                "reason": judge_parsed.get("hallucination_reason"),
-                "delivered_result": judge_parsed.get("delivered_result"),
-                "correct_result": judge_parsed.get("correct_result"),
-                "evidence_refs": judge_parsed.get("evidence_refs") or [],
-                "contracts": judge_parsed.get("contracts") or [],
-                "confidence": judge_parsed.get("confidence") or "",
-                "quote": (judge_parsed.get("root_cause") or {}).get("quote") or "",
-            }
-
-        def positive_from_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
-            return {
-                "source": "recall_upgrade",
-                "step": candidate.get("corrected_step"),
-                "reason": candidate.get("claim"),
-                # Information asymmetry: defense/tracer for a recall upgrade
-                # receive candidate + trajectory + task contract only, never
-                # the judge's correct_result / is_hallucination.
-                "delivered_result": "",
-                "correct_result": "",
-                "evidence_refs": candidate.get("evidence_refs") or [],
-                "evidence_citations": candidate.get("evidence_citations") or [],
-                "quote": candidate.get("quote") or "",
-                "confidence": "",
-                # Task contracts are allowed; judge verdict anchors are not.
-                "contracts": judge_parsed.get("contracts") or [],
-            }
-
         hearings: list[dict[str, Any]] = []
         if judge_status.get("state") == "ok" and judge_positive:
-            hearings.append(positive_from_judge())
+            hearings.append(judge_target(judge_parsed))
 
         # Upstream replay may introduce new hearings. Reuse a hearing only
         # when its actual input is unchanged, not merely its candidate id.
@@ -600,19 +570,7 @@ class Detector:
                     == str(positive.get("source") or "")
                     and str(entry.get("candidate_id") or "")
                     == str(positive.get("candidate_id") or "")
-                    # Compare exactly the fields the frozen envelope carries
-                    # (proof.hearings[].positive is the projected 7-key shape).
-                    # Including contracts/confidence, which the projection
-                    # drops, made this comparison always fail, so every
-                    # "frozen" hearing silently re-ran the live tracer and
-                    # defense and re-introduced the provider noise the freeze
-                    # exists to remove.
-                    and all(
-                        (entry.get("positive") or {}).get(key) == positive.get(key)
-                        for key in ("source", "step", "reason", "quote",
-                                    "evidence_refs", "delivered_result",
-                                    "correct_result")
-                    )
+                    and entry.get("positive") == hearing_target(positive)
                 ),
                 None,
             )
@@ -681,8 +639,7 @@ class Detector:
             # overturned: the recall net hears the case next.
             run_recall_net()
             for candidate in positives_from_upgrade():
-                hearing = positive_from_candidate(candidate)
-                hearing["candidate_id"] = candidate.get("candidate_id")
+                hearing = recall_target(candidate, judge_parsed.get("contracts") or [])
                 (
                     hearing["tracer_result"],
                     hearing["tracer_status"],
@@ -841,12 +798,7 @@ class Detector:
             {
                 "source": hearing.get("source"),
                 "candidate_id": hearing.get("candidate_id"),
-                "positive": {
-                    key: hearing.get(key) for key in (
-                        "source", "step", "reason", "evidence_refs", "quote",
-                        "delivered_result", "correct_result",
-                    )
-                },
+                "positive": hearing_target(hearing),
                 "evidence_citations": hearing.get("evidence_citations") or [],
                 "tracer_result": hearing.get("tracer_result"),
                 "tracer_status": hearing.get("tracer_status"),

@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from detector.hearing import judge_target, recall_target
+
 STATE_ERROR = "verified_error"
 STATE_CLEAN = "verified_clean"
 STATE_UNRESOLVED = "unresolved"
@@ -93,18 +95,7 @@ def _positive_from_judge(judge_result: Mapping[str, Any]) -> dict[str, Any] | No
     parsed = (judge_result.get("parsed") or {}) if isinstance(judge_result, Mapping) else {}
     if not parsed.get("is_hallucination"):
         return None
-    root = parsed.get("root_cause") or {}
-    return {
-        "source": "judge",
-        "step": int(parsed.get("hallucination_step") or 0),
-        "reason": str(parsed.get("hallucination_reason") or ""),
-        "delivered_result": str(parsed.get("delivered_result") or ""),
-        "correct_result": str(parsed.get("correct_result") or ""),
-        "evidence_refs": list(parsed.get("evidence_refs") or []),
-        "quote": str(root.get("quote") or ""),
-        "referent": str(root.get("referent") or ""),
-        "confidence": str(parsed.get("confidence") or ""),
-    }
+    return judge_target(parsed)
 
 
 def _positive_from_upgrade(upgrade_result: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -120,16 +111,7 @@ def _positive_from_upgrade(upgrade_result: Mapping[str, Any]) -> dict[str, Any] 
     if not candidates:
         return None
     candidate = candidates[0]
-    return {
-        "source": "recall_upgrade",
-        "step": int(candidate.get("corrected_step") or 0),
-        "reason": str(candidate.get("claim") or ""),
-        "delivered_result": "",
-        "correct_result": "",
-        "evidence_refs": list(candidate.get("evidence_refs") or []),
-        "quote": str(candidate.get("quote") or ""),
-        "referent": "",
-    }
+    return recall_target(candidate, [])
 
 
 def _clean_positive(positive: Mapping[str, Any], step: int | None) -> dict[str, Any]:
