@@ -16,7 +16,8 @@ CONFIG = {
 
 
 @pytest.mark.parametrize("frozen_argument", ["frozen_stages", "frozen_judge"])
-def test_full_view_guard_refuses_external_frozen_local_defense(monkeypatch, frozen_argument):
+@pytest.mark.parametrize("envelope", ["complete", "hearings_only"])
+def test_full_view_guard_refuses_external_frozen_local_defense(monkeypatch, frozen_argument, envelope):
     from detector.interventions import compile_runtime_plan
     from detector.packet import build_packet
     from detector.tests.test_causal_audit import record
@@ -71,8 +72,10 @@ def test_full_view_guard_refuses_external_frozen_local_defense(monkeypatch, froz
                                 "defense_view_degraded": "false"}, record=False)
     assert "require_full_view_defense" in actions
     frozen = LiveDetectorBackend._frozen_stages(baseline, set())
+    if envelope == "hearings_only":
+        frozen = {"hearings": frozen["hearings"], "packet_hash": frozen["packet_hash"]}
     calls.clear()
-    with pytest.raises(ValueError, match="frozen stage replay is refused"):
+    with pytest.raises(ValueError, match="frozen stage replay"):
         detector.detect(current, interventions=registry, **{frozen_argument: frozen})
     assert calls == []
     defense_inputs.clear()

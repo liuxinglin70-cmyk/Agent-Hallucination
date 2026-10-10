@@ -386,9 +386,7 @@ class Detector:
         frozen = replay_payload
         review_input_digest = digest({"case_id": case_id, "packet": packet, "config": self.config,
                                      "registry": effective_interventions, "evidence": attached_snapshot})
-        if frozen is not None and any(
-            str(key).endswith(("_result", "_status")) for key in frozen
-        ) and "judge_result" not in frozen:
+        if frozen is not None and "judge_result" not in frozen:
             raise ValueError("frozen stage replay must include judge_result")
         if causal_review is not None:
             if frozen is not None or causal_review.input_digest != review_input_digest:
