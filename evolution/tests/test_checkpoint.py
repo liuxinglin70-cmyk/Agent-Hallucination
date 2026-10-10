@@ -16,6 +16,50 @@ def test_checkpoint_rejects_old_schema_without_rewriting_it(tmp_path):
     assert path.read_bytes() == original
 
 
+def test_checkpoint_requires_explicit_authority_snapshot(tmp_path):
+    path = tmp_path / "checkpoint.json"
+    original = json.dumps({"schema_version": "evolution.cycle_checkpoint.v3", "contract": {}}).encode()
+    path.write_bytes(original)
+    with pytest.raises(RuntimeError, match="authority snapshot"):
+        CycleJournal(tmp_path, {}, resume=True)
+    assert path.read_bytes() == original
+
+
+def test_unused_cycle_authority_never_loads_calibration(tmp_path, monkeypatch):
+    def forbidden():
+        raise AssertionError("unused calibration was read")
+    monkeypatch.setattr("detector.conviction_calibration.default_calibration", forbidden)
+    journal = CycleJournal(tmp_path, {}, resume=False)
+    args = dict(registry=empty_registry(), fresh=False, kwargs={"workers": 1},
+                evaluate=lambda cases, **kwargs: [{"case": cases[0]}])
+    journal.evaluate(["case"], **args)
+    resumed = CycleJournal(tmp_path, {}, resume=True)
+    assert resumed.state["authority"] is None
+    assert resumed.evaluate(["case"], **args) == [{"case": "case"}]
+
+
+def test_cycle_authority_extends_predicates_without_changing_view(tmp_path, monkeypatch):
+    from detector.identity import digest
+
+    class SyntheticView:
+        def identity(self, names):
+            payload = {"schema_version": "detector.calibration_identity.v1",
+                       "inputs": {"synthetic_artifact": "immutable"},
+                       "status": {name: {"admitted": False} for name in sorted(names)}}
+            return {**payload, "digest": digest(payload)}
+
+    view = SyntheticView()
+    monkeypatch.setattr("detector.conviction_calibration.default_calibration", lambda: view)
+    monkeypatch.setattr("evolution.checkpoint.authority_identity", lambda registry: view.identity(registry["names"]))
+    journal = CycleJournal(tmp_path, {}, resume=False)
+    args = dict(fresh=False, kwargs={"workers": 1},
+                evaluate=lambda cases, **kwargs: [{"case": cases[0]}])
+    for name in ["first", "second"]:
+        journal.evaluate(["case"], registry={"names": [name]}, **args)
+    assert journal.state["authority"] == view.identity(["first", "second"])
+    assert CycleJournal(tmp_path, {}, resume=True).state["authority"] == journal.state["authority"]
+
+
 @pytest.mark.parametrize("drift", ["config", "backend", "record"])
 def test_completed_cycle_resume_checks_execution_contract_before_reusing_report(tmp_path, drift, monkeypatch):
     from evolution.backends import MockDetectorBackend

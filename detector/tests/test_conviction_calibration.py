@@ -244,6 +244,66 @@ def test_journal_refuses_calibration_drift_without_redrawing(big_corpus, good_re
     assert calls == ["case"]
 
 
+def test_journal_freezes_authority_across_new_candidate_arms(big_corpus, good_record, tmp_path, monkeypatch):
+    from evolution.checkpoint import CycleJournal
+    first_view = ConvictionCalibration(artifact=good_record, corpus_root=big_corpus)
+    monkeypatch.setattr("detector.conviction_calibration.default_calibration", lambda: first_view)
+    journal = CycleJournal(tmp_path / "journal", {}, resume=False)
+    calls = []
+
+    def evaluate(cases, **kwargs):
+        calls.append(cases[0])
+        return [{"case": cases[0], "prediction": False}]
+
+    registry = _mechanical_registry()
+    args = {"fresh": False, "evaluate": evaluate, "kwargs": {"workers": 1}}
+    journal.evaluate(["case"], registry=registry, **args)
+    before = journal.path.read_bytes()
+    changed = _sealed({**good_record, "generated_at_utc": "changed between candidate arms"})
+    second_view = ConvictionCalibration(artifact=changed, corpus_root=big_corpus)
+    monkeypatch.setattr("detector.conviction_calibration.default_calibration", lambda: second_view)
+    entries = [dict(entry) for entry in registry["interventions"]]
+    entries[0]["intervention_id"] += "-another"
+    for entry in entries:
+        entry.pop("content_hash", None)
+    with pytest.raises(RuntimeError, match="authority input changed"):
+        journal.evaluate(["case"], registry=build_intervention_registry(entries), **args)
+    assert calls == ["case"]
+    assert journal.path.read_bytes() == before
+
+
+def test_completed_cycle_resume_refuses_consumed_authority_drift(big_corpus, good_record, tmp_path, monkeypatch):
+    from evolution.backends import MockDetectorBackend
+    from evolution.engine import EvolutionEngine
+    from evolution.proposer import ProposalBatch
+    from evolution.splits import EvolutionSplit
+    from evolution.tests.test_measurement_integrity import _config, _make_dataset
+
+    first_view = ConvictionCalibration(artifact=good_record, corpus_root=big_corpus)
+    monkeypatch.setattr("detector.conviction_calibration.default_calibration", lambda: first_view)
+    cases = _make_dataset(tmp_path / "data")
+    config = _config(tmp_path)
+    config["audit"]["enabled"] = False
+    split = EvolutionSplit(name="synthetic", pool=cases, sentinel=cases[:4],
+                           gain=cases[4:12], patrol_pool=cases[12:], mini=True)
+    with EvolutionEngine(config, backend=MockDetectorBackend(), split=split, mini=True) as engine:
+        engine.registry.write(_mechanical_registry()["interventions"], cycle=0,
+                              reason="synthetic authority", library_cfg=config["library"])
+        report = engine.run_cycle(1, proposal_batch=ProposalBatch(candidates=[], joint_groups=[], notes=[]))
+        assert report["state"] == "completed"
+        assert engine.run_cycle(1, resume=True) == report
+        path = tmp_path / "work/checkpoints/cycle001/checkpoint.json"
+        before = path.read_bytes()
+        second_view = ConvictionCalibration(
+            artifact=_sealed({**good_record, "generated_at_utc": "changed after cycle"}),
+            corpus_root=big_corpus,
+        )
+        monkeypatch.setattr("detector.conviction_calibration.default_calibration", lambda: second_view)
+        with pytest.raises(RuntimeError, match="authority input changed"):
+            engine.run_cycle(1, resume=True)
+        assert path.read_bytes() == before
+
+
 def test_record_is_bound_to_the_predicate_source(tmp_path, big_corpus):
     """A record whose source fingerprint no longer matches is stale.
 

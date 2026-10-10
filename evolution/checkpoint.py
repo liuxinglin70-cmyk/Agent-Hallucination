@@ -38,8 +38,9 @@ class CycleJournal:
             if resume:
                 raise RuntimeError("no checkpoint: historical incomplete cycles cannot be reconstructed")
             self.state = {
-                "schema_version": "evolution.cycle_checkpoint.v2",
+                "schema_version": "evolution.cycle_checkpoint.v3",
                 "contract": contract, "status": "started", "used_seconds": 0.0,
+                "authority": None,
             }
         if registry_before is not None and "registry_before" not in self.state:
             # The registry the cycle started from. Resuming needs it to
@@ -54,10 +55,11 @@ class CycleJournal:
         if not path.exists():
             raise RuntimeError("no checkpoint: historical incomplete cycles cannot be reconstructed")
         state = json.loads(path.read_text(encoding="utf-8"))
-        if state.get("schema_version") != "evolution.cycle_checkpoint.v2":
+        if state.get("schema_version") != "evolution.cycle_checkpoint.v3":
             raise RuntimeError("unsupported cycle checkpoint schema")
         if state["contract"] != contract:
             raise RuntimeError("resume fingerprint mismatch (code/config/data/split/registry changed)")
+        CycleJournal._verify_authority(state)
         if state.get("proposing") and "proposal" not in state:
             raise RuntimeError(
                 "proposal call interrupted before persistence; refusing a "
@@ -68,15 +70,47 @@ class CycleJournal:
             )
         return state
 
+    @staticmethod
+    def _verify_authority(state: dict) -> None:
+        if "authority" not in state:
+            raise RuntimeError("checkpoint lacks its authority snapshot")
+        previous = state["authority"]
+        if previous is None:
+            return
+        from detector.conviction_calibration import default_calibration
+        current = default_calibration().identity(list(previous["status"]))
+        if current != previous:
+            raise RuntimeError("checkpoint authority input changed; refusing a new observation")
+
+    def _persist_state(self):
+        self.state["used_seconds"] = self.previous_seconds + time.monotonic() - self.started
+        save_json(self.path, self.state)
+
     def save(self, **updates):
         with self.lock:
             self.state.update(updates)
-            self.state["used_seconds"] = self.previous_seconds + time.monotonic() - self.started
-            save_json(self.path, self.state)
+            self._persist_state()
+
+    def _bind_authority(self, authority):
+        with self.lock:
+            self._verify_authority(self.state)
+            if authority is None:
+                return
+            previous = self.state["authority"]
+            names = sorted(set(authority["status"]) | set((previous or {}).get("status", {})))
+            from detector.conviction_calibration import default_calibration
+            view = default_calibration()
+            if view.identity(list(authority["status"])) != authority:
+                raise RuntimeError("checkpoint authority input changed; refusing a new observation")
+            combined = view.identity(names)
+            if combined != previous:
+                self.state["authority"] = combined
+                self._persist_state()
 
     def evaluate(self, cases, *, registry, fresh, evaluate, kwargs):
         arm = digest({"registry": registry, "fresh": fresh})
         authority = authority_identity(registry)
+        self._bind_authority(authority)
 
         def one(case):
             path = self.directory / "arms" / arm[:20] / (digest(case)[:20] + ".json")
