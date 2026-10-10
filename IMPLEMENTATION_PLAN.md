@@ -4,11 +4,11 @@
 
 | 项目 | 当前值 |
 |---|---|
-| 当前任务 | 继续完整 18 包代码重构；提交 M08 成本/原子提交，开展获准的只读独立审查并实施 M13 回放合同，最终清理和文档归档 |
+| 当前任务 | 按2026-10-10用户要求完成本轮文档收尾并暂停后续重构；完整18包目标保留，不标记最终完成 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | 2/18工作包已验收。固定811662f完整code_only1568通过、platform57通过，两个范围的AST/三CLI/源码不变均通过；local_data未运行。M13外部冻结信封P1经5c6b0ed/7e45ecb修复，相关155及固定独立38+相关120通过；fresh证据caea1a8独立39通过。校准冷加载竞争P2和两项Fake factory条件反例经a85edf6修复，3正式反例先失败后通过、相关61通过，固定独立14+相关42通过（1项范围外未选）。晋升13c91f4统一完整身份和manifest.v2校验，7正式反例修复、相关120通过；独立发现的空路径P2经615e8e8共享标签校验修复，2正式反例及相关96通过。合成backend合同夹具经9efeb41明确offline；固定复核限定回归132、独立11通过。engine smoke共享夹具的28项默认LLMProposer构造依赖已用autouse禁用桩正式复现（44通过/28失败）；明确offline后72通过，无模型构造/请求。M12新增12项局部claim绑定合同用例先失败后实现；context.v2只投影唯一被引用且quote/观察/修正值一致的算术证书，多工具歧义/缺值/已纠正/第二错误误绑回退；Tracer重算重新封装的证书并拒绝实际结果输入漂移（2反例先失败后修），相关173通过，c6b6fd6固定独立46+相关138通过并完成证据/清理，本局部范围无阻断。语义传播/首次因果引入仍未知，无定罪或定位权限；M05/M06两个正式API反例确认contracts/confidence改变仍复用旧Defense，已统一hearing目标构造/证明投影/完整字段回放比较；Recall目标剥离候选注入的Judge答案/判定字段，嵌套输入独立副本。相关243通过；hearing811662f固定独立30+相关111通过，本范围无阻断；M03全包审查已发现regex资源P1与两项证据冲突P2，待正式根因修复；新engine离线夹具修复已相关72通过；provider完整snapshot tag的6正式反例先失败后修（另6无snapshot邻接通过）；两个重复forwarding已删除，17个旧Fake签名迁移到公共cache_tag合同，初次/repair与fatal/预算相关158通过；固定复核待完成。无真实模型请求。 |
-| 代码实施 | 2/18 个工作包已验收；M12 实施中，M11 取消传播已有限复核；其余完整合同和独立审查仍按 §6 验收 |
-| 下一工作包 | M12同claim局部证书与多错误/纠正边界；M05听证目标合同 |
+| 本轮已完成 | 2/18包已验收（M00/M02）。最近全量验证针对固定811662f：code_only1568、platform57通过，AST/三CLI/源码不变均通过，local_data未运行；后续提交仅有各自相关验证。M12局部claim绑定c6b6fd6相关173、固定独立46+相关138通过；M05/M06完整hearing目标811662f相关243、固定独立30+相关111通过。engine离线夹具7d04878正式72通过，固定独立完整模块72+probe4通过，29次默认工厂均为OfflineProposer。provider forwarding与完整snapshot tag的38b6f56相关158通过；固定审查产出54独立+141相关通过（2未选），报告因额度中断未完成，仍待复核，根代理已保全脚本/XML并安全清理checkout。M03固定811662f审查39通过/14失败，代表5个未修复根因：regex资源P1、逐冲突说明P2、resolution归属P2、answer后terminate交付识别P2、直接adjudicate自定义权限表P2；邻接235通过/1未选。全部为离线代码验证，无真实模型请求或新增测量收益。 |
+| 代码实施 | 2/18包已验收；后续重构按用户本轮结束请求暂停，各未验收包保留原状态 |
+| 下一工作包 | M03已确认的5个根因，先处理正则资源P1 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
 | 更新时间 | 2026-10-10，Asia/Shanghai |
 
@@ -99,6 +99,11 @@ Python 的真源标注使用合法的 `# SOURCE: <symbol>`，只指向符号，�
 | B12 | scoped semantic refs 未验证存在/范围，空 refs 自动填满窗口；executor 可修改待校验投影 | packet_reference_error 为轨迹引用验证真源；正向 verdict 必须有真实窗口引用，executor 输入独立副本，移除重复 identity/vocabulary 执行代码 | M03/M07 | 关闭；77a48c4，7 种非法引用及修改窗口反例先失败后通过；detector 430 项、跨包 80 项、AST 67 文件及独立 49 项通过，无阻断 |
 | B13 | `route_failures.py:325–327,405–427`：追加 resolution 后 reducer 跳过它，已解决路线仍 insufficient | 按顺序归约 observation/resolution，关闭当前观察 epoch，保留历史并允许后续重新开放 | M16 真源；M14 消费 | 关闭；9b3bac0，6 项反例修复前失败，相关 route/capability 62 项及独立 6 项/旧解决记录重放反例通过，无阻断；历史字节保留，独立 measurement identity 仍属 M16 未完成项 |
 | B14 | `route_failures.py:152–229`、`engine.py:2273–2275`：只读检测 delta，定位 joint_broken=1 被记为无改善无损伤 | outcome 明确 target_kind 与 delta basis；定位/联合损伤不能写为路线能力不足 | M15 真源；M14/M16 消费 | 关闭；d14e5f9，7 项反例先失败后通过，182 项扩展回归/AST 67 文件及独立 22 项通过，无新增阻断；普通/替换定位与联合机会迁移 ce6777d，136 项回归及独立 18 个正式单位入口用例通过 |
+| B15 | 固定811662f独立子进程确认两种合法DSL正则在匹配开始后超过1.5秒；输入长度和模式启发式不能约束re执行时间 | 在标准库运行时实现可终止的匹配资源边界，共享case deadline/取消；超时不得授权not_matches或定罪 | M03 | 已复现，未修复；两种反例见review-evidence-811662f/test_review_m03.py |
+| B16 | 两个未解决冲突只解释其中一个，citation_error/live Defense/frozen仍接受全部引用 | 对每个相关未解决冲突分别要求说明，保持单冲突业务合同 | M03 | 已复现，未修复；固定独立三入口反例 |
+| B17 | Alpha属性冲突的resolution可选择无关Gamma来源，三入口都接受 | resolved_by必须属于对应规范entity/attribute来源组 | M03 | 已复现，未修复；固定独立三入口反例 |
+| B18 | 直接adjudicate自定义权限表可授权诊断内置/未知deterministic行；正常validated registry未复现此绑定 | terminal消费者始终核验deterministic谓词词汇与校准权限，保留声明typed DSL权限合同 | M03/M07 | 条件反例已复现，未修复；不扩大为普通registry路径越权 |
+| B19 | submit_final_answer已交付，随后无内容terminate覆盖最后工具锚点，final_delivery_present误报missing | 交付身份保留实质answer工具通道，终止状态不能抹掉此前交付 | M03/M02 | 已复现，未修复；实际build_packet/run_predicate反例 |
 
 B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fake 对象，无真实 provider、无历史测量写入。B12 修复保持 evidence-only 权限，反例证明引用和投影可信性缺陷，不声称直接越权定罪。
 
@@ -179,9 +184,9 @@ evolution/
 | M00 | 离线验证、合同基线、静态清理机制 | 本台账 | 1–2 | 已验收 | 4000669；4fcffecc/68845067：code_only 1020、AST/三 CLI 检查退出 0；平台 97f55299/8f21461a 52 通过；独立只读审查 review_4000669（12 项反例通过，无阻断） |
 | M01 | 配置与执行身份真源 | M00 | 2–3 | 实施中 | config.validate_config 为文件/直接配置唯一入口，causal 块保留且默认 off；数字范围/未知键/工件缺失验证；c58a147 配置独立 69 项通过；identity.py 已供 packet/api/runner 共用，B05 三项反例修复后 detector/repository/offline/backend/env 共 469 通过、5 未选，AST 67 文件通过；演化 backend baseline/cache 已绑定实际配置、record/packet、evidence、registry/replay 与完整源码；eb49756：2 项旧缓存反例先失败后通过，扩展 143 项及 backend 20 项、独立 34 项/3 个篡改缓存反例通过；harness.v2/checkpoint.v2/审计消费实际 backend runtime 身份，完成报告复用的 3 个漂移反例先失败后通过，64c1919：扩展 133 项及最终相关 55 项/AST 67 文件、独立 7 项通过，无新增阻断；preflight正式JSON保存规范完整source_identity和实际配置工件身份，缺声明配置阻断；2反例修复/相关43通过；旧file_digest删除。晋升13c91f4共享完整摘要/manifest.v2验证7反例修复与相关120通过；固定复核空工件路径P2已正式2反例修复，共享写者/读者路径约束，相关96通过，9efeb41固定回归132+独立11通过；当前811662f完整code_only1568/platform57通过，完整包验收未完成 |
 | M02 | Packet、投影、事件引用规范 | M00 | 2–3 | 已验收 | 565f191；detector 326、跨包 41、AST 66 文件通过；独立 review_offline_review 39 项通过，无阻断；window v2 技术合同已同步 |
-| M03 | 外部证据、谓词与引用权限 | M02 | 1–2 | 实施中 | packet_reference_error 已统一阶段/谓词/scoped semantic 的轨迹引用校验，工具引用使用实际 owner；17d3ae1 实际校准视图绑定逐例身份，496 项及独立 4 项通过；外部 citation/DSL 完整模块核验待接续 |
+| M03 | 外部证据、谓词与引用权限 | M02 | 1–2 | 实施中 | 共享packet/citation合同及校准身份已落地；完整固定811662f审查39通过/14失败（5根因），邻接235通过/1未选；B15–B19均待源头修复，不能验收。报告：artifacts/code_quality/review-evidence-811662f/report.md |
 | M04 | Provider、并发、预算、取消、请求记录 | M00 | 2–3 | 实施中 | B04/B06 已关闭；8082ee9 新增预算共享且跨重试不重领；全运行 RunStopped 与案例 CaseDeadlineExceeded 分型，取消不再被 provider/backend 转成案例失败；两个反例先失败后通过，相关 85 项、扩展 584 项、AST 71 文件通过；recaller/defense重复forwarding已删除，直接消费provider_call的统一cache_tag签名，snapshot完整摘要覆盖初次/repair，6反例修复后相关158通过；模块完整收尾/复核待完成 |
-| M05 | Judge/Recall/Tracer/Defense 阶段合同 | M03/M04 | 2–3 | 实施中 | hearing目标字段由detector.hearing生产并投影，API/Adjudication复用Judge/Recall构造；Recall只带候选与允许任务合同，禁止Judge答案/判定锚点。冻结contracts/confidence遗漏2正式反例先失败后修，完整目标比较保留同输入零调用；相关243通过，811662f目标合同固定独立30+相关111通过，本范围无阻断；两个重复provider forwarding已删除，初次/repair相关158通过；阶段quote与完整包审查待完成 |
+| M05 | Judge/Recall/Tracer/Defense 阶段合同 | M03/M04 | 2–3 | 实施中 | hearing完整目标与Recall输入隔离已相关243及固定独立30+相关111通过；38b6f56删除重复forwarding并传递完整snapshot tag，相关158通过，固定审查54+141通过但报告额度中断未完成；阶段quote及完整包验收待继续 |
 | M06 | API、听证、冻结验证与回放 | M01/M02/M03/M05 | 3–4 | 实施中 | B01/B02 源头修复；evidence_flow/api/recaller/voting/upgrade/backend/localization 共 69 通过、17 未选；hearing目标已统一完整输入投影，contracts/confidence变化不再复用旧听证，2反例及相关243通过；完整阶段identity与编排验收待完成 |
 | M07 | 干预执行器和 scope 合同 | M02/M03/M04 | 2–3 | 实施中 | B12：scope refs 非空/存在/范围验证、executor packet/context 独立副本、去除重复 semantic 执行校验；77a48c4：detector 430 项/跨包 80 项/AST 67 文件及独立 49 项通过，B12 已关闭；完整 executor 合同继续实施 |
 | M08 | 批处理、存储、恢复、成本和分母 | M01/M04/M06 | 2–3 | 实施中 | B05 已关闭（7f91c3e）；B07 已关闭（9c40b5c），相关 51 项、2 项 CLI 回环及独立覆盖分区通过；B06 已关闭（a2fed20），尝试 journal 与失败成本通过独立 51 项及多票反例；路径/存储一致性及 invocation/lifetime 成本继续实施 |
@@ -496,10 +501,10 @@ python -m experiments --help
 
 四项检查点（就地覆盖）：
 
-- **当前任务**：继续完整重构目标，完成 M12/M17/M08 独立审查并实施 M13 回放合同，最终清理与文档整合。
-- **进度**：2/18工作包已验收。固定811662f完整code_only1568通过、platform57通过，两个范围的AST/三CLI/源码不变均通过；local_data未运行。M13外部冻结信封P1经5c6b0ed/7e45ecb修复，相关155及固定独立38+相关120通过；fresh证据caea1a8独立39通过。校准冷加载竞争P2和两项Fake factory条件反例经a85edf6修复，3正式反例先失败后通过、相关61通过，固定独立14+相关42通过（1项范围外未选）。晋升13c91f4统一完整身份和manifest.v2校验，7正式反例修复、相关120通过；独立发现的空路径P2经615e8e8共享标签校验修复，2正式反例及相关96通过。合成backend合同夹具经9efeb41明确offline；固定复核限定回归132、独立11通过。engine smoke共享夹具的28项默认LLMProposer构造依赖已用autouse禁用桩正式复现（44通过/28失败）；明确offline后72通过，无模型构造/请求。M12新增12项局部claim绑定合同用例先失败后实现；context.v2只投影唯一被引用且quote/观察/修正值一致的算术证书，多工具歧义/缺值/已纠正/第二错误误绑回退；Tracer重算重新封装的证书并拒绝实际结果输入漂移（2反例先失败后修），相关173通过，c6b6fd6固定独立46+相关138通过并完成证据/清理，本局部范围无阻断。语义传播/首次因果引入仍未知，无定罪或定位权限；M05/M06两个正式API反例确认contracts/confidence改变仍复用旧Defense，已统一hearing目标构造/证明投影/完整字段回放比较；Recall目标剥离候选注入的Judge答案/判定字段，嵌套输入独立副本。相关243通过；hearing811662f固定独立30+相关111通过，本范围无阻断；M03全包审查已发现regex资源P1与两项证据冲突P2，待正式根因修复；新engine离线夹具修复已相关72通过；provider完整snapshot tag的6正式反例先失败后修（另6无snapshot邻接通过）；两个重复forwarding已删除，17个旧Fake签名迁移到公共cache_tag合同，初次/repair与fatal/预算相关158通过；固定复核待完成。无真实模型请求。
-- **下一步**：统一provider forwarding并传递完整snapshot tag，完成hearing/M03固定审查；继续M05阶段引用/quote合同。
-- **未定事项**：M12 同 claim 核验证书、独立审查及 M01/M03–M17 完整包验收尚未完成；晋升/preflight当前完整摘要已核验；周期工件冻结、存储/成本/事务及其余脚本路径仍需完整包验收。最终冗余清理和 doc 子目录归档随代码验收完成。
+- **当前任务**：按用户要求完成当前阶段收尾并暂停；18包完整重构目标未完成。
+- **进度**：2/18包已验收（M00/M02）。最近全量验证针对固定811662f：code_only1568、platform57通过，AST/三CLI/源码不变均通过，local_data未运行；后续提交仅有各自相关验证。M12局部claim绑定c6b6fd6相关173、固定独立46+相关138通过；M05/M06完整hearing目标811662f相关243、固定独立30+相关111通过。engine离线夹具7d04878正式72通过，固定独立完整模块72+probe4通过，29次默认工厂均为OfflineProposer。provider forwarding与完整snapshot tag的38b6f56相关158通过；固定审查产出54独立+141相关通过（2未选），报告因额度中断未完成，仍待复核，根代理已保全脚本/XML并安全清理checkout。M03固定811662f审查39通过/14失败，代表5个未修复根因：regex资源P1、逐冲突说明P2、resolution归属P2、answer后terminate交付识别P2、直接adjudicate自定义权限表P2；邻接235通过/1未选。全部为离线代码验证，无真实模型请求或新增测量收益。
+- **下一步**：恢复后先修M03正则执行资源边界，随后逐项修复其余4根因并复核；补完38b6f56审查报告，再继续M05引用/quote和其余工作包验收。
+- **未定事项**：其余16包未验收，完整同claim因果引入与演化消费等合同仍未完成。正则子进程方案只完成设计讨论，未实施；真实实验不在本期范围。最终冗余脚本/文档清理、docs迁至doc及组会子目录归档尚未执行，依原要求在代码重构完成后处理。
 
 ## 12. 本期最终完成与延期项
 

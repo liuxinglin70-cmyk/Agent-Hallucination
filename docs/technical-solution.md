@@ -1,6 +1,6 @@
 # 核心技术文档
 
-更新：2026-10-09。本文描述当前实现及约束；历史实验、旧方案和数值统一见 [实验日志](experiment-log.md)。
+更新：2026-10-10。本文描述当前实现及约束；历史实验、旧方案和数值统一见 [实验日志](experiment-log.md)。
 
 > **研究方向与验收目标**：详见 [疑惑度引导的双向因果轨迹审计技术设计](uncertainty-guided-causal-audit-design-20261008.md)，简明版见 [2026-10-08 组会汇报](group-meeting-uncertainty-causal-feedback-20261008.md)。
 
@@ -68,6 +68,8 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 `backend_runtime_identity` 绑定已构造 backend 的有效配置、声明工件、Mock 参数及选定案例的实际证据快照；harness.v2、cycle_checkpoint.v3 和缺陷审计消费此身份并使用规范完整摘要。完成报告和中断检查点的恢复均经 CycleJournal.load_state 验证。cycle_checkpoint.v3保存显式authority字段，以首次消费绑定校准视图并在同一视图上扩展谓词；新候选臂、所有后续测量与恢复均核验已消费身份，未消费时为None并不加载校准。输入漂移在写入前拒绝，旧 checkpoint/harness 不作为新运行复用。Live/Caching fresh 评估沿用原 backend 的逐例证据快照，同时重跑全部阶段、不使用冻结 baseline。阶段回放策略唯一来源为detector.replay：hook reach、直接冻结失效和fresh要求分别描述；judge.post仍执行确定性后处理。full-view guard与未知hook要求全阶段重跑，边界摘要绑定实际阶段、fresh、未知hook与策略schema，使用完整SHA-256。Live/Caching构造消费完整干预条目的fresh规则；所有非None冻结信封必须含judge_result，仅含hearings或空信封在模型请求前拒绝；Detector拒绝冻结信封时把完整plan.entries传入共享mask，包括full-view action，fresh规则拒绝信封内所有已冻结模型阶段，拒绝前不发模型请求。judge.system同样不能复用下游冻结听证；直接失效仍是独立的窄规则。engine、promotion和development直接引用共享规则，旧graph/mask/fresh定义已删除。preflight的JSON source_identity检查项保存共享source_identity(detector,evolution)的完整摘要及有效配置声明的detector_config文件路径/完整工件摘要；缺声明配置为BLOCKER，截断值只用于终端显示。晋升普通协议v3与机制协议v4使用共享source_identity、规范完整batch/config/roll摘要以及artifact_digest；工件manifest.v2即使为空也必须有合法schema/闭合字段/映射及自身digest，验证后才访问所声明工件。冻结写者和加载读者共用非空字符串路径标签约束；写者在任何所声明artifact IO之前验证全部标签，空路径不会被解释为当前目录或写成不能加载的协议。旧协议v1/v2不作为新运行复用，加载拒绝且不回写历史字节。外层protocol_hash校验仍先执行；内层反例重封外层用于隔离manifest合同。旧backend source_digest/fingerprint/artifact_digest/manifest及alignment重复digest已删除。默认校准factory以缓存锁保证同key单一对象，ConvictionCalibration以实例锁串行解析并发布status/inputs；解析完成后同一视图不再重读文件。CycleJournal绑定时用同一次取得的视图核验已消费身份和新请求，观察落盘前再次校验；未消费校准时不读视图。真实冷加载竞争及两项可替换factory条件反例已正式失败后修，相关61通过，a85edf6固定独立14+相关42通过。空工件路径和明确offline的backend合同夹具经9efeb41固定回归132+独立11通过，固定811662f完整code_only1568及platform57通过；local_data未运行。这些离线结果不证明真实测量收益。
 
 `packet_reference_error` 统一 Judge、Recall、Tracer、Defense、引用谓词和 scoped semantic 的轨迹引用类型、存在性及范围验证；外部 snapshot citation 仍由 evidence.citation_error 验证。scoped semantic 的 supported/contradicted 必须带生产者提供的非空引用，abstained 可明确提供空列表，运行时不填造窗口引用。工具引用按实际所属 event 核验窗口范围。semantic executor 接收 packet/context 的独立副本，校验使用未被 executor 修改的投影；artifact/vocabulary 校验只有一个执行路径，证据仍不获得定罪权限。
+
+**尚未闭合的证据与权限边界**：M03 独立审查确认，DSL 的正则模式检查和 4096 字符输入上限不能约束标准库 `re` 的执行时间；可终止匹配方案尚未实施。多冲突说明仍以全局任一匹配接受，resolution 的来源尚未绑定对应实体/属性组；已交付 answer 工具后追加无内容 terminate 可能误报交付缺失。直接调用 `adjudicate` 并自定义权限表还可授权诊断内置或未知 deterministic 行；正常已验证 registry 未复现此绑定。这 5 个根因均未修复，不能据既有离线通过结果宣称 M03 已验收，证据与修复顺序见实施台账 B15–B19。
 
 批次 `run_summary.v3` 分别记录 requested/returned/not_started/missing，completed 只统计实际返回的非 not_started 行。工作线程登记完成结果，调度器中断后仍保留已提交案例；没有返回行的已开始案例记为 missing，不写成阴性或未开始。重复及额外案例行拒绝进入汇总。
 
@@ -223,5 +225,7 @@ python scripts/cost_model_693.py --json artifacts/cost_model_693.json
 ```
 
 verify.py 默认执行 code_only（合成输入与临时夹具），可显式选择 platform（回环 HTTP、worker、锁、沙箱）、local_data（本地数据和证据完整性）或 all。所有测试禁公网，Python 子进程继承同一回环边界；code_only 拒绝访问原始数据及历史 artifacts。验证报告按源码摘要及独立运行 ID 写入 artifacts/code_quality，不覆盖历史报告；源码 AST 检查覆盖重复定义、包依赖边界和循环依赖。成本工具从实验日志的命名 JSON 块读取冻结样本并保留 original_source；旧样本有选择偏差，不代表完整语料的最新成本。
+
+engine smoke 的共享合成配置明确选择 `proposer.mode=offline`，模块级 autouse fixture 禁止构造 LLMProposer；显式 Scripted/Recording 注入对象继续由 Engine 使用，生产默认配置保持原语义。固定 7d04878 独立复核完整模块 72 项及 4 项注入/配置隔离检查通过，29 次默认工厂调用全部返回 OfflineProposer。最近全量验证对应固定 811662f；其后实现提交使用各自相关回归，当前文档收尾没有重新运行全套，也没有新增实验结果。
 
 新增实验先冻结输入、源码/配置身份、角色、预算和判据；结束后将日期、分母、结果、失败、中断、更正和成本追加到唯一实验日志。运行缓存不作为永久文档提交。算法文件按职责命名，日期放运行 ID；夹具只服务具体测试断言，不存放任意实验备份。
