@@ -15,6 +15,74 @@ CONFIG = {
 }
 
 
+@pytest.mark.parametrize("frozen_argument", ["frozen_stages", "frozen_judge"])
+def test_full_view_guard_refuses_external_frozen_local_defense(monkeypatch, frozen_argument):
+    from detector.interventions import compile_runtime_plan
+    from detector.packet import build_packet
+    from detector.tests.test_causal_audit import record
+    from evolution.backends import LiveDetectorBackend
+    from evolution.contracts import make_intervention, make_registry
+
+    calls = []
+    defense_inputs = []
+
+    def transport(**kwargs):
+        purpose = kwargs["purpose"]
+        calls.append(purpose)
+        if purpose == "judge":
+            parsed = {"is_hallucination": True, "hallucination_step": 1,
+                      "hallucination_reason": "wrong arithmetic", "confidence": "high",
+                      "contracts": [{"kind": "exact_value", "requirement": "calculate expression"}],
+                      "delivered_result": "5", "correct_result": "4",
+                      "root_cause": {"step": 1, "quote": "5", "referent": "4"},
+                      "evidence_refs": ["event_001"]}
+        elif purpose == "step_tracer":
+            parsed = {"step": 1, "quote": "5", "referent": "4",
+                      "reason": "wrong arithmetic", "evidence_refs": ["event_001"]}
+        elif purpose == "defense":
+            defense_inputs.append(kwargs["user"])
+            parsed = {"verdict": "substantiated", "confirmed_step": 1,
+                      "evidence_refs": ["event_001"], "reason": "verified"}
+        else:
+            raise AssertionError(purpose)
+        return parsed, {"attempts": 1}
+
+    monkeypatch.setattr("detector.provider._provider_call", transport)
+    detector = Detector(CONFIG, require_credentials=False)
+    current = record()
+    current["history"].extend([
+        {"role": "assistant", "content": f"intermediate note {index}"}
+        for index in range(30)
+    ])
+    baseline = detector.detect(current)
+    assert baseline["state"] == "verified_error"
+    assert baseline["proof"]["hearings"][0]["defense_result"]["view_meta"]["omitted_event_ids"]
+    guard = make_intervention(
+        intervention_id="IV-FULL", intervention_type="decision_guard",
+        hook="adjudicate.guard", packet_features=["has_tool_calls"], facts=["positive_source=judge"],
+        body={"action": "require_full_view_defense", "action_not_when": "Never when confidence is low",
+              "action_not_when_facts": ["judge_confidence=low"]},
+        expected_behavior="defense sees the complete case", target_polarity="precision", cycle=1,
+        failure_family="FAM-fp", failure_cases=["A/1.json", "A/2.json"],
+    )
+    registry = make_registry([guard])
+    actions = compile_runtime_plan(registry).guard_actions(
+        build_packet(current), {"positive_source": "judge", "judge_confidence": "high",
+                                "defense_view_degraded": "false"}, record=False)
+    assert "require_full_view_defense" in actions
+    frozen = LiveDetectorBackend._frozen_stages(baseline, set())
+    calls.clear()
+    with pytest.raises(ValueError, match="frozen stage replay is refused"):
+        detector.detect(current, interventions=registry, **{frozen_argument: frozen})
+    assert calls == []
+    defense_inputs.clear()
+    fresh = detector.detect(current, interventions=registry)
+    assert calls == ["judge", "step_tracer", "defense"]
+    assert not fresh["provenance"].get("frozen_judge_replay")
+    assert all(f"intermediate note {index}" in defense_inputs[0] for index in range(30))
+    assert not fresh["proof"]["hearings"][0]["defense_result"]["view_meta"].get("omitted_event_ids")
+
+
 def test_unanimous_high_confidence_negative_skips_recall():
     result = {
         "parsed": {"is_hallucination": False, "confidence": "high"},

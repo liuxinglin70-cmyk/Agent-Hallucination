@@ -28,7 +28,24 @@ def test_runtime_hook_vocabulary_has_complete_replay_policies():
 def test_unknown_hook_refuses_top_level_and_hearing_stage_reuse():
     from detector.replay import frozen_masked_stages
     frozen = {"judge_result": {}, "hearings": [{"tracer_result": {}, "defense_result": {}}]}
-    assert frozen_masked_stages(frozen, ["unknown.system"]) == ["defense", "judge", "tracer"]
+    assert frozen_masked_stages(frozen, [{"hook": "unknown.system"}]) == ["defense", "judge", "tracer"]
+
+
+def test_full_view_action_refuses_all_frozen_stages():
+    from detector.replay import frozen_masked_stages
+    frozen = {"judge_result": {}, "recall_result": {}, "upgrade_result": {},
+              "hearings": [{"tracer_result": {}, "defense_result": {}}]}
+    ordinary = {"hook": "adjudicate.guard", "type": "decision_guard",
+                "body": {"action": "withhold_conviction"}}
+    full_view = {**ordinary, "body": {"action": "require_full_view_defense"}}
+    assert frozen_masked_stages(frozen, [ordinary]) == []
+    assert frozen_masked_stages(frozen, [full_view]) == ["defense", "judge", "recall", "tracer", "upgrade"]
+
+
+def test_judge_system_fresh_policy_refuses_downstream_frozen_hearings():
+    from detector.replay import frozen_masked_stages
+    frozen = {"judge_result": {}, "hearings": [{"tracer_result": {}, "defense_result": {}}]}
+    assert frozen_masked_stages(frozen, [{"hook": "judge.system"}]) == ["defense", "judge", "tracer"]
 
 
 def test_active_full_view_guard_changes_candidate_boundary():

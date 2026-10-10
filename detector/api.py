@@ -382,10 +382,6 @@ class Detector:
             semantic_executor=self.semantic_executor,
             component_executors=self._component_executors(effective_interventions),
         )
-        targeted_hooks = {
-            str(entry.get("hook") or "") for entry in plan.entries
-        }
-
         replay_payload = frozen_judge if frozen_judge is not None else frozen_stages
         frozen = replay_payload
         review_input_digest = digest({"case_id": case_id, "packet": packet, "config": self.config,
@@ -425,7 +421,7 @@ class Detector:
             frozen = _validate_frozen_stages(frozen, packet, snapshot)
             judge_result = frozen["judge_result"]
             judge_status = frozen["judge_status"]
-            masked = frozen_masked_stages(frozen, targeted_hooks)
+            masked = frozen_masked_stages(frozen, plan.entries)
             if masked:
                 raise ValueError(
                     "frozen stage replay is refused: active interventions "

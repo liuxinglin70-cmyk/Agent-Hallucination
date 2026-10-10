@@ -56,11 +56,13 @@ def stage_invalidated(frozen_key: str, hooks: Iterable[str]) -> bool:
     return False
 
 
-def frozen_masked_stages(frozen: Mapping[str, Any], hooks: Iterable[str]) -> list[str]:
+def frozen_masked_stages(frozen: Mapping[str, Any],
+                         entries: Sequence[Mapping[str, Any]]) -> list[str]:
     keys = {policy.frozen_key for policy in HOOK_POLICIES.values() if policy.frozen_key}
-    targeted = tuple(hooks)
+    targeted = tuple(str(entry.get("hook") or "") for entry in entries)
+    fresh = requires_fresh_evaluation(entries)
     return sorted(key.removesuffix("_result") for key in keys
-                  if stage_invalidated(key, targeted) and (
+                  if (fresh or stage_invalidated(key, targeted)) and (
                       key in frozen or any(key in row for row in frozen.get("hearings") or ())
                   ))
 

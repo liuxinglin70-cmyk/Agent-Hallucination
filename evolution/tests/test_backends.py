@@ -578,5 +578,5 @@ def test_direct_stage_invalidation_is_within_declared_hook_reach():
     for hook, policy in HOOK_POLICIES.items():
         if policy.frozen_key:
             assert policy.stage in policy.reach
-            assert frozen_masked_stages({policy.frozen_key: {}}, {hook}) == [policy.frozen_key.removesuffix("_result")]
-    assert frozen_masked_stages({"judge_result": {}}, {"judge.post"}) == []
+            assert frozen_masked_stages({policy.frozen_key: {}}, [{"hook": hook}]) == [policy.frozen_key.removesuffix("_result")]
+    assert frozen_masked_stages({"judge_result": {}}, [{"hook": "judge.post"}]) == []
