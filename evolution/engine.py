@@ -23,7 +23,6 @@ from __future__ import annotations
 from detector.replay import requires_fresh_evaluation
 
 import json
-import random
 from contextvars import Context
 from functools import wraps
 from threading import RLock
@@ -109,7 +108,7 @@ from evolution.memory import (
     write_recall,
 )
 from evolution.development import DevelopmentUnmeasurable
-from evolution.capability_planning import plan_capabilities
+from evolution.cycle_preparation import prepare_patrol, prepare_families
 from evolution.mechanisms import mechanism_prompt_view, repair_requirements
 from evolution.archive import retrieve_components
 from evolution.route_failures import (
@@ -130,13 +129,7 @@ from evolution.splits import (
     split_manifest_report,
 )
 from evolution.worksheet import (
-    attach_normal_neighbors,
-    classify_family_actionability,
-    diagnose_failure_families,
-    excluded_failure_cases,
     mechanism_report,
-    mechanism_subgroups,
-    refine_failure_families,
     stable_failure_families,
     stable_localization_families,
     worksheet_report,
@@ -494,35 +487,6 @@ def _defect_rejection_after_exclusions(
             "measurable cases"
         )
     return ""
-
-
-def split_actionable_families(
-    families: Sequence[Mapping[str, Any]],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Partition diagnosed families into actionable ones and capability gaps.
-
-    Gap families stay first-class in the cycle report (a gap is a measured
-    outcome about the action space, not a silent empty batch), but they never
-    reach the proposer: drafting against them can only produce contracts the
-    validators must reject.
-    """
-    actionable: list[dict[str, Any]] = []
-    gaps: list[dict[str, Any]] = []
-    for family in families:
-        verdict = classify_family_actionability(family)
-        item = dict(family)
-        item["actionability"] = verdict
-        if verdict["classification"] == "actionable":
-            actionable.append(item)
-        else:
-            gaps.append({
-                "failure_family": item.get("failure_family"),
-                "count": item.get("count"),
-                "sources": item.get("sources"),
-                "classification": verdict["classification"],
-                "reason": verdict["reason"],
-            })
-    return actionable, gaps
 
 
 class _ArmRunner:
@@ -3215,67 +3179,24 @@ class EvolutionEngine:
         """
         # Preview runs without a journal, so the runner evaluates directly.
         arms = _ArmRunner(self, None)
-        patrol_size = int(
-            (self.config.get("budget") or {}).get("patrol_cases", 120)
+        patrol = prepare_patrol(
+            cycle=cycle, split=self.split, budget=self.config.get("budget") or {}, arms=arms,
+            evaluate=self._patrol_arms, find_families=self._all_families, extend=self._extend_patrol,
         )
-        patrol_cases = self.split.patrol_sample(cycle, patrol_size)
-        # Preview measures the same version as the real cycle, so a preview
-        # that finds no family means the deployed version has no family left
-        # on that sample rather than the bare base having none.
-        patrol_rows, bare_patrol_rows, patrol_contrast = self._patrol_arms(
-            arms, patrol_cases,
-        )
-        families = self._all_families(patrol_rows)
-        bootstrap_cases: list[str] = []
-        if not families:
-            rerun_budget = int(
-                (self.config.get("budget") or {}).get(
-                    "stable_failure_rerun_cases", 40
-                )
-            )
-            remaining = [
-                case for case in self.split.patrol_pool
-                if case not in set(patrol_cases)
-            ]
-            if rerun_budget > 0 and remaining:
-                rng = random.Random(
-                    int(self.split.seed) + int(cycle) * 104729 + 17
-                )
-                bootstrap_cases = rng.sample(
-                    remaining, min(rerun_budget, len(remaining)),
-                )
-                patrol_cases = [*patrol_cases, *bootstrap_cases]
-                patrol_rows, bare_patrol_rows, patrol_contrast = (
-                    self._extend_patrol(
-                        arms,
-                        patrol_rows=patrol_rows,
-                        bare_rows=bare_patrol_rows,
-                        bootstrap_cases=bootstrap_cases,
-                    )
-                )
-                families = self._all_families(patrol_rows)
-        diagnosed = diagnose_failure_families(
-            families,
-            patrol_rows,
-            dataset_root=self.config["dataset_root"],
-            causal_policy=self._causal_policy(),
-        )
-        diagnosed = refine_failure_families(diagnosed)
-        # Cases the profile split left behind, plus the mechanism reading of
-        # each surviving family. Both are reported by the preview for the same
-        # reason the cycle reports them: a preview that shows only family ids
-        # cannot answer what a cycle would aim a candidate at.
-        mechanism_excluded = excluded_failure_cases(families, diagnosed)
-        diagnosed, mechanism_unrepresented = mechanism_subgroups(diagnosed)
-        # The healthy half of the patrol becomes each mechanism's neighbour
-        # set, so the development loop's "did the neighbours hold" check has
-        # cases to run on instead of passing over an empty list.
-        diagnosed = attach_normal_neighbors(diagnosed, patrol_rows)
-        diagnosed, capability_gaps = split_actionable_families(diagnosed)
+        patrol_cases = patrol.cases
+        patrol_rows = patrol.rows
+        patrol_contrast = patrol.contrast
+        bootstrap_cases = patrol.bootstrap_cases
         route_failure_records = self.route_failure_records()
-        capability_plan = plan_capabilities(
-            diagnosed, route_failure_records=route_failure_records,
+        preparation = prepare_families(
+            patrol.families, patrol_rows, dataset_root=self.config["dataset_root"],
+            causal_policy=self._causal_policy(), route_failure_records=route_failure_records,
         )
+        diagnosed = preparation.families
+        mechanism_excluded = preparation.excluded
+        mechanism_unrepresented = preparation.unrepresented
+        capability_gaps = preparation.capability_gaps
+        capability_plan = preparation.capability_plan
         proposal_batch = self.proposer.propose(
             diagnosed,
             cycle=cycle,
@@ -3555,81 +3476,25 @@ class EvolutionEngine:
             self.cycle_reports.append(report)
             return report
 
-        patrol_size = int(
-            (self.config.get("budget") or {}).get("patrol_cases", 120)
+        patrol = prepare_patrol(
+            cycle=cycle, split=self.split, budget=self.config.get("budget") or {}, arms=arms,
+            evaluate=self._patrol_arms, find_families=self._all_families, extend=self._extend_patrol,
         )
-        patrol_cases = self.split.patrol_sample(cycle, patrol_size)
-        # Patrol measures the deployed version (see ``_patrol_registry_mode``),
-        # with the bare base kept as the reference arm so newly introduced
-        # failures and the standing residual stay distinguishable.
-        patrol_rows, bare_patrol_rows, patrol_contrast = self._patrol_arms(
-            arms, patrol_cases,
-        )
-        families = self._all_families(patrol_rows)
-
-        # Source-quality bootstrap: a random patrol sample can legitimately
-        # miss the second member of a failure family. The protocol budget has
-        # up to 40 stable-failure reruns; use them before declaring no family.
-        bootstrap_cases: list[str] = []
-        if not families:
-            rerun_budget = int(
-                (self.config.get("budget") or {}).get(
-                    "stable_failure_rerun_cases", 40
-                )
-            )
-            remaining = [
-                case for case in self.split.patrol_pool
-                if case not in set(patrol_cases)
-            ]
-            if rerun_budget > 0 and remaining:
-                rng = random.Random(
-                    int(self.split.seed) + int(cycle) * 104729 + 17
-                )
-                bootstrap_cases = rng.sample(
-                    remaining, min(rerun_budget, len(remaining)),
-                )
-                patrol_cases = [*patrol_cases, *bootstrap_cases]
-                patrol_rows, bare_patrol_rows, patrol_contrast = (
-                    self._extend_patrol(
-                        arms,
-                        patrol_rows=patrol_rows,
-                        bare_rows=bare_patrol_rows,
-                        bootstrap_cases=bootstrap_cases,
-                    )
-                )
-                families = self._all_families(patrol_rows)
-
-        diagnosed_families = diagnose_failure_families(
-            families,
-            patrol_rows,
-            dataset_root=self.config["dataset_root"],
-            causal_policy=self._causal_policy(),
-        )
-        diagnosed_families = refine_failure_families(diagnosed_families)
-        # Cases the profile split left behind, reported with the mechanisms so
-        # the patrol's failure count stays reconstructible.
-        mechanism_excluded = excluded_failure_cases(
-            families, diagnosed_families,
-        )
-        diagnosed_families, mechanism_unrepresented = mechanism_subgroups(
-            diagnosed_families,
-        )
-        diagnosed_families = attach_normal_neighbors(
-            diagnosed_families, patrol_rows,
-        )
-        (
-            diagnosed_families, capability_gaps,
-        ) = split_actionable_families(diagnosed_families)
-        # Route falsification memory, read before planning: a route that already
-        # fired on this mechanism without moving the outcome is not evidence
-        # that the mechanism is repairable, and the planner must not offer it
-        # as if it were. This is the read side; the write side runs after the
-        # gates, where the behaviour and delta readings exist.
+        patrol_size = patrol.initial_size
+        patrol_cases = patrol.cases
+        patrol_rows = patrol.rows
+        patrol_contrast = patrol.contrast
+        bootstrap_cases = patrol.bootstrap_cases
         route_failure_records = load_route_failures(self.route_failure_store)
-        capability_plan = plan_capabilities(
-            diagnosed_families,
-            route_failure_records=route_failure_records,
+        preparation = prepare_families(
+            patrol.families, patrol_rows, dataset_root=self.config["dataset_root"],
+            causal_policy=self._causal_policy(), route_failure_records=route_failure_records,
         )
+        diagnosed_families = preparation.families
+        mechanism_excluded = preparation.excluded
+        mechanism_unrepresented = preparation.unrepresented
+        capability_gaps = preparation.capability_gaps
+        capability_plan = preparation.capability_plan
         worksheet = worksheet_report(
             patrol_rows,
             diagnosed_families,

@@ -170,7 +170,7 @@ L1 开发回放要求两臂恰好覆盖预定 target∪neighbor，每例各一�
 
 | 模块组 | 文件 | 职责 |
 | --- | --- | --- |
-| 循环 | engine.py、config.py、splits.py | 阶段顺序、预算、划分、审计、巡检、准入、治理 |
+| 循环 | engine.py、cycle_preparation.py、config.py、splits.py | 阶段顺序、预算、划分、审计、巡检、准入、治理 |
 | 失败建模 | worksheet.py、causal_failures.py、mechanisms.py、route_failures.py | 稳定失败族、机制机会、定位错/缺、路径缺口 |
 | 开发 | proposer.py、development.py、capability_planning.py | L0/L1 检查、修订、预算和反馈 |
 | 研究入口 | research.py、scripts/run_research_round.py | 冻结机制研究、重复验证，不替代生产准入 |
@@ -232,7 +232,7 @@ engine、backends、promotion、interventions 仍承担较多职责，后续物�
 
 **开发侧因果失败记录**：Tracer结果保存独立复制的完整causal_context及摘要。`evolution/causal_failures.py` 从当前无标签轨迹和实际backend策略重算听证证书，核对目标、上下文摘要、有效Tracer/Defense、终局定位权限和Tracer步与结果步的一致性。漏检、误报、运行不可测、证据缺失、多指控歧义分别记录；只有单个成立听证中的材料性、首个规范结果声明及符号修复均核验通过，才能分类同claim的early/late/aligned。责任步与首次位置比较使用packet.position，source_step_id只作为原始来源标识保留。
 
-`localization_repair_viability` 接受结构不可能，或证书独立指出与注释一致的首次声明；证书与注释不一致、重封伪证书、输入/策略漂移、定位冲突及多错误均保持needs_review。开发侧标签只判断失败类型或核对机会，不作为目标答案回传。Engine的preview/cycle将实际backend策略传给家族筛选和诊断；两入口共用的准备流程尚待提取。
+`localization_repair_viability` 接受结构不可能，或证书独立指出与注释一致的首次声明；证书与注释不一致、重封伪证书、输入/策略漂移、定位冲突及多错误均保持needs_review。开发侧标签只判断失败类型或核对机会，不作为目标答案回传。Engine的preview/cycle将实际backend策略传给家族筛选和诊断；`cycle_preparation.prepare_patrol`统一采样与确定性补样；`prepare_families`统一诊断、机制分组、正常邻居、可行路线与能力规划，engine的preview/cycle消费同一结果。准备职责只调用入口提供的测量回调，不写账本或注册表；preview保留报告写入，正式cycle保留journal与准入边界。补样两臂使用相同case集合与已有seed公式，初始没有家族才补样。
 
 诊断的显式proposer投影只保留失败类型、证据状态、作用范围和修复操作，不含case、步号、packet/target摘要或正确数值。真实member_summaries进入LLM提案prompt，机制以同claim偏差及repair_localization_source分组，能力规划复用已有定位输入与能力需求。Hybrid定位提案允许有同claim首次引入证据时前移，排除无证据、另一错误、已纠正和未知修复效应。完整父版本修订、正常邻居反证及M15/M16生命周期集成继续按实施台账验收；现有L0/L1与四门不因该证书放宽。
 

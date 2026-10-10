@@ -24,9 +24,9 @@
 
 ## 2026-10-09 至 10-11：代码重构离线验证
 
-按用户请求继续完整18包重构。M12受限任务合同及既有字段路径修复见 [实施台账](../IMPLEMENTATION_PLAN.md)。本轮M14保存当前听证证据，从无标签轨迹和实际backend策略重算开发侧失败记录，接通Engine家族筛选、viability、诊断、机制与Fake LLM/Hybrid提案。输入/目标/策略漂移、伪证书、多指控及定位冲突不授权修复；责任步比较使用packet.position，原source_step_id保留。R09的交付步前移限制改为同claim证据约束，提案投影不含正确数值或注释答案。
+按用户请求继续完整18包重构。M12/M14受限任务证据及实际演化消费链见 [实施台账](../IMPLEMENTATION_PLAN.md)。本轮将preview/cycle的采样、确定性补样及家族诊断、机制、正常邻居、可行路线和能力规划迁入唯一cycle_preparation，删除engine旧算法和无消费者字段；实际测量仍使用入口的_ArmRunner，journal与准入写入边界保留。
 
-新增20项、相关136项及提案/能力/周期67项通过；63fb723a完整code_only1802/platform57、AST77文件/三个CLI/源码不变通过，[因果失败消费核验](../artifacts/code_quality/63fb723aaf821b3dab1ccc58f85820a9def2423f87b3263daa3f53170410ecaf/a8b4a439cc664af0b87d8e97a814bff2/causal-failure-verification.md)记录实际范围。实施核验不是独立复审，完整M14与整体验收未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。preview/cycle共用准备、完整父版本/邻居/开发生命周期、最终脚本/文档清理与doc组会归档仍未完成。
+真实入口相关114项及新增2项一致性检查通过；c2931448完整code_only1804/platform57、AST78文件/三个CLI/源码不变通过，[准备职责核验](../artifacts/code_quality/c2931448157d21e80192f8197ad3a773ee277b1c3fd991782163aa9cc0308428/b5be9921ddaf4547bbccfb85a0d9eecb/cycle-preparation-verification.md)记录实际范围。有效父候选在临时proposer反馈被修改时身份改变，反馈恢复仍不能恢复父版本，B31已复现待修复；完整开发适配和整包独立复审尚未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。完整M15/M16生命周期、最终脚本/文档清理与doc组会归档仍未完成。
 
 ## 2026-09-24 至 09-27：三轮自进化与 G0 检测器基线
 
