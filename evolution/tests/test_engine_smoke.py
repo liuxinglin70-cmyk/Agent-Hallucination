@@ -14,6 +14,13 @@ from evolution.proposer import OfflineProposer, ProposalBatch
 from evolution.splits import EvolutionSplit, FinalHoldout
 
 
+@pytest.fixture(autouse=True)
+def forbid_model_proposer(monkeypatch):
+    def unexpected(*args, **kwargs):
+        pytest.fail("synthetic engine smoke constructed a model proposer")
+    monkeypatch.setattr("evolution.proposer.LLMProposer", unexpected)
+
+
 def _scripted_proposer(candidate):
     class _Scripted:
         name = "scripted"
@@ -198,6 +205,7 @@ def _config(tmp_path: Path) -> dict:
     config["memory_root"] = str(tmp_path / "memory")
     config["backend"]["name"] = "mock"
     config["backend"]["cache"] = False
+    config["proposer"]["mode"] = "offline"
     config["budget"]["patrol_cases"] = 8
     return config
 
