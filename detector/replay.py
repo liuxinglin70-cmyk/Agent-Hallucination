@@ -23,6 +23,19 @@ REPLAY_STAGES = ("judge", "recall_scanner", "causal_upgrade", "step_tracer",
 REPLAY_INPUTS_SCHEMA = "detector.replay_inputs.v1"
 
 
+def match_frozen_hearing(
+    frozen: Mapping[str, Any] | None, target: Mapping[str, Any],
+) -> Mapping[str, Any] | None:
+    """Select a validated hearing by its complete model input."""
+    if frozen is None:
+        return None
+    return next((entry for entry in frozen.get("hearings") or ()
+                 if isinstance(entry, Mapping)
+                 and str(entry.get("source") or "") == str(target.get("source") or "")
+                 and str(entry.get("candidate_id") or "") == str(target.get("candidate_id") or "")
+                 and entry.get("positive") == target), None)
+
+
 def build_replay_inputs(
     *, packet: Mapping[str, Any], config: Mapping[str, Any], source: str,
     snapshot: Mapping[str, Any] | None = None,

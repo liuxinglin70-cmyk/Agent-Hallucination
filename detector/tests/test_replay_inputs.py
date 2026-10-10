@@ -37,8 +37,8 @@ def setup_stages(monkeypatch):
         }}, {"state": "ok"}
 
     monkeypatch.setattr("detector.api.run_judge", judge)
-    monkeypatch.setattr("detector.api.run_step_tracer", tracer)
-    monkeypatch.setattr("detector.api.run_defense", defense)
+    monkeypatch.setattr("detector.hearing.run_step_tracer", tracer)
+    monkeypatch.setattr("detector.hearing.run_defense", defense)
     return calls
 
 
@@ -138,11 +138,11 @@ def setup_recall_stages(monkeypatch):
         "scanner", envelope["recall_result"], envelope["recall_status"]))
     monkeypatch.setattr("detector.api.run_causal_upgrade", stage(
         "upgrade", envelope["upgrade_result"], envelope["upgrade_status"]))
-    monkeypatch.setattr("detector.api.run_step_tracer", stage("tracer", {
+    monkeypatch.setattr("detector.hearing.run_step_tracer", stage("tracer", {
         "ok": True, "parsed": {"step": 2, "quote": "76 tons", "referent": "116 tons",
                                 "evidence_refs": ["event_002"], "reason": "wrong value"},
     }, {"state": "ok"}))
-    monkeypatch.setattr("detector.api.run_defense", stage("defense", {
+    monkeypatch.setattr("detector.hearing.run_defense", stage("defense", {
         "ok": True, "parsed": {"verdict": "substantiated", "confirmed_step": 2,
                                 "evidence_refs": ["event_002"], "reason": "wrong value"},
     }, {"state": "ok"}))

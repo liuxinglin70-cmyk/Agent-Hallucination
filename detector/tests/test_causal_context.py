@@ -137,7 +137,7 @@ def test_valid_local_context_falls_back_for_a_prose_claim_without_any_extra_prov
               "evidence_refs": ["event_001"]}
     monkeypatch.setattr("detector.api.run_judge", lambda **kwargs: (
         {"ok": True, "parsed": parsed}, {"stage": "judge", "state": "ok"}))
-    monkeypatch.setattr("detector.api.run_defense", lambda **kwargs: (
+    monkeypatch.setattr("detector.hearing.run_defense", lambda **kwargs: (
         {"ok": True, "parsed": {"verdict": "substantiated", "confirmed_step": 1,
                                  "evidence_refs": ["event_001"], "reason": "independent hearing"}},
         {"stage": "defense", "state": "ok"}))
@@ -215,7 +215,7 @@ def test_official_hearing_passes_context_to_real_tracer(monkeypatch):
               "delivered_result": "5", "correct_result": "4", "evidence_refs": ["event_001"]}
     monkeypatch.setattr("detector.api.run_judge", lambda **kwargs: (
         {"ok": True, "parsed": parsed}, {"stage": "judge", "state": "ok"}))
-    monkeypatch.setattr("detector.api.run_defense", lambda **kwargs: (
+    monkeypatch.setattr("detector.hearing.run_defense", lambda **kwargs: (
         {"ok": True, "parsed": {"verdict": "substantiated", "confirmed_step": 1,
                                  "evidence_refs": ["event_001"], "reason": "verified"}},
         {"stage": "defense", "state": "ok"}))
@@ -243,7 +243,7 @@ def test_frozen_tracer_reuse_checks_actual_context_identity(monkeypatch, changed
               "evidence_refs": ["event_001"]}
     monkeypatch.setattr("detector.api.run_judge", lambda **kwargs: (
         {"ok": True, "parsed": parsed}, {"stage": "judge", "state": "ok"}))
-    monkeypatch.setattr("detector.api.run_defense", lambda **kwargs: (
+    monkeypatch.setattr("detector.hearing.run_defense", lambda **kwargs: (
         {"ok": True, "parsed": {"verdict": "substantiated", "confirmed_step": 1,
                                  "evidence_refs": ["event_001"], "reason": "verified"}},
         {"stage": "defense", "state": "ok"}))

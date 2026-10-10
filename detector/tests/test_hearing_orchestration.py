@@ -3,6 +3,7 @@ from copy import deepcopy
 import pytest
 
 import detector.api as api
+import detector.hearing as hearing_execution
 from detector.api import Detector
 from detector.tests.test_replay_inputs import setup_recall_stages
 from detector.tests.test_api import CONFIG
@@ -18,7 +19,7 @@ from evolution.backends import LiveDetectorBackend
 def test_recall_first_hearing_reaches_every_envelope_mirror(monkeypatch, component, field):
     _, cfg, record = setup_recall_stages(monkeypatch)
     for name in ("step_tracer", "defense"):
-        original = getattr(api, f"run_{name}")
+        original = getattr(hearing_execution, f"run_{name}")
 
         def run(original=original, name=name, **kwargs):
             result, status = original(**kwargs)
@@ -26,7 +27,7 @@ def test_recall_first_hearing_reaches_every_envelope_mirror(monkeypatch, compone
             status["stage"] = name
             return result, status
 
-        monkeypatch.setattr(f"detector.api.run_{name}", run)
+        monkeypatch.setattr(f"detector.hearing.run_{name}", run)
     result = Detector(cfg, require_credentials=False).detect(record)
     first = result["proof"]["hearings"][0]
     prefix = "tracer" if component == "step_tracer" else "defense"
@@ -89,8 +90,8 @@ def multi_hearing_stages(monkeypatch, judge_positive):
             "evidence_refs": [f"event_{positive['step']:03d}"],
         }, "provider": {"model": f"defense-{positive['step']}"}}, {"state": "ok", "view": "complete"}
 
-    monkeypatch.setattr(api, "run_step_tracer", tracer)
-    monkeypatch.setattr(api, "run_defense", defense)
+    monkeypatch.setattr(hearing_execution, "run_step_tracer", tracer)
+    monkeypatch.setattr(hearing_execution, "run_defense", defense)
     return record, calls
 
 

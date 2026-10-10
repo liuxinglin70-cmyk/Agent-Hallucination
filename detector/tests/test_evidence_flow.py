@@ -142,7 +142,7 @@ def _install(monkeypatch, judge_result, recall, upgrade, defense=None):
         def fake_defense(*, packet, positive, config, plan, **kwargs):
             seen["defense_snapshot"] = kwargs.get("snapshot")
             return defense
-        monkeypatch.setattr("detector.api.run_step_tracer", lambda **k: (
+        monkeypatch.setattr("detector.hearing.run_step_tracer", lambda **k: (
             {"ok": True, "parsed": {
                 "step": 2, "quote": "76 tons", "referent": "116 tons",
                 "evidence_refs": ["event_002"], "reason": "r",
@@ -150,7 +150,7 @@ def _install(monkeypatch, judge_result, recall, upgrade, defense=None):
             {"stage": "step_tracer", "state": "ok", "attempts": 0,
              "view": "complete", "warnings": []},
         ))
-        monkeypatch.setattr("detector.api.run_defense", fake_defense)
+        monkeypatch.setattr("detector.hearing.run_defense", fake_defense)
     return seen
 
 
@@ -214,8 +214,8 @@ def test_frozen_recall_preserves_snapshot_citations_through_hearing(monkeypatch,
             "verdict": "substantiated", "confirmed_step": 2,
             "evidence_refs": ["event_002"], "reason": "wrong value",
         }}, {"stage": "defense", "state": "ok", "view": "complete"}
-    monkeypatch.setattr("detector.api.run_step_tracer", tracer)
-    monkeypatch.setattr("detector.api.run_defense", defense)
+    monkeypatch.setattr("detector.hearing.run_step_tracer", tracer)
+    monkeypatch.setattr("detector.hearing.run_defense", defense)
     result = Detector(CONFIG, require_credentials=False).detect(
         LISETTE_RECORD, evidence=snapshot(), frozen_stages=frozen,
     )

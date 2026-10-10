@@ -10,12 +10,11 @@ from typing import Any, Mapping
 from detector.adjudication import adjudicate
 from detector.config import load_config, validate_config
 from detector.causal_audit import (
-    OfflineFeedbackPolicy, build_causal_diagnostics, causal_recall_decision, context_for_hearing,
+    OfflineFeedbackPolicy, build_causal_diagnostics, causal_recall_decision,
 )
 from detector.causal_contracts import seal
 from detector.identity import build_execution_identity, digest, source_identity
-from detector.hearing import hearing_target, judge_target, recall_target
-from detector.defense import run_defense
+from detector.hearing import hearing_target, judge_target, recall_target, run_hearing
 from detector.evidence import (
     snapshot_digest,
     touches_packet,
@@ -42,7 +41,6 @@ from detector.recaller import (
 )
 from detector.replay import build_replay_inputs, validate_frozen_stages
 from detector.result import build_detection_output
-from detector.step_tracer import run_step_tracer
 
 
 @dataclass(frozen=True)
@@ -429,30 +427,9 @@ class Detector:
         if judge_status.get("state") == "ok" and judge_positive:
             hearings.append(judge_target(judge_parsed))
 
-        # Upstream replay may introduce new hearings. Reuse a hearing only
-        # when its actual input is unchanged, not merely its candidate id.
-        flow_frozen = frozen is not None
-
-        def frozen_hearing(positive: Mapping[str, Any]) -> dict[str, Any] | None:
-            if not flow_frozen:
-                return None
-            return next(
-                (
-                    entry for entry in frozen.get("hearings") or ()
-                    if isinstance(entry, Mapping)
-                    and str(entry.get("source") or "")
-                    == str(positive.get("source") or "")
-                    and str(entry.get("candidate_id") or "")
-                    == str(positive.get("candidate_id") or "")
-                    and entry.get("positive") == hearing_target(positive)
-                ),
-                None,
-            )
-
-        def run_hearing(positive: Mapping[str, Any]) -> tuple[
+        def hear(positive: Mapping[str, Any]) -> tuple[
             dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any],
         ]:
-            """Tracer + defense for one positive; defense is decisive."""
             nonlocal causal_diagnostics
             if causal_diagnostics is None and causal_policy["mode"] == "tracer_context":
                 target_id = event_id_for_step(packet, positive.get("step"))
@@ -460,44 +437,17 @@ class Detector:
                     packet=packet, config=self.config, budget=current_added_budget(),
                     mandatory_event_ids=[target_id] if target_id else [], context=None, snapshot=snapshot,
                 )
-            entry = frozen_hearing(positive)
-            causal_context = None
-            if causal_diagnostics is not None and causal_diagnostics.get("audit") is not None:
-                causal_context = context_for_hearing(causal_diagnostics["audit"], positive=positive, packet=packet)
-            context_digest = causal_context["digest"] if causal_context is not None else None
-            if (entry is not None and "tracer_result" in entry
-                    and entry["tracer_result"].get("causal_context_digest") == context_digest):
-                tracer_r = dict(entry["tracer_result"])
-                tracer_s = dict(entry["tracer_status"])
-            else:
-                tracer_r, tracer_s = run_step_tracer(
-                    packet=packet,
-                    delivered_result=str(positive.get("delivered_result") or ""),
-                    correct_result=str(positive.get("correct_result") or ""),
-                    config=self.config,
-                    plan=plan,
-                    positive=positive,
-                    **({"causal_context": causal_context} if causal_context is not None else {}),
-                )
-            if entry is not None and "defense_result" in entry:
-                defense_r = dict(entry["defense_result"])
-                defense_s = dict(entry["defense_status"])
-            else:
-                defense_r, defense_s = run_defense(
-                    packet=packet,
-                    positive=positive,
-                    config=self.config,
-                    plan=plan,
-                    **stage_kwargs,
-                )
-            return tracer_r, tracer_s, defense_r, defense_s
+            return run_hearing(
+                packet=packet, positive=positive, config=self.config, plan=plan,
+                frozen=frozen, diagnostics=causal_diagnostics, snapshot=snapshot,
+            )
 
         judge_overturned = False
         if hearings:
             (
                 hearings[0]["tracer_result"], hearings[0]["tracer_status"],
                 hearings[0]["defense_result"], hearings[0]["defense_status"],
-            ) = run_hearing(hearings[0])
+            ) = hear(hearings[0])
             defense_result = hearings[0]["defense_result"]
             defense_parsed = (
                 defense_result.get("parsed")
@@ -517,7 +467,7 @@ class Detector:
                     hearing["tracer_status"],
                     hearing["defense_result"],
                     hearing["defense_status"],
-                ) = run_hearing(hearing)
+                ) = hear(hearing)
                 hearings.append(hearing)
 
         if hearings:

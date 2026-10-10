@@ -235,8 +235,8 @@ def test_detect_recall_upgrade_path(sample_record, monkeypatch):
     monkeypatch.setattr("detector.api.run_judge", fake_judge)
     monkeypatch.setattr("detector.api.run_recall_scan", fake_recall)
     monkeypatch.setattr("detector.api.run_causal_upgrade", fake_upgrade)
-    monkeypatch.setattr("detector.api.run_step_tracer", fake_tracer)
-    monkeypatch.setattr("detector.api.run_defense", fake_defense)
+    monkeypatch.setattr("detector.hearing.run_step_tracer", fake_tracer)
+    monkeypatch.setattr("detector.hearing.run_defense", fake_defense)
     detector = Detector(CONFIG, require_credentials=False)
     result = detector.detect(sample_record, case_id="x")
     assert result["state"] == "verified_error"
@@ -370,8 +370,8 @@ def test_recall_trigger_forces_recall_net_for_unanimous_clean_judge(
     monkeypatch.setattr("detector.api.run_judge", fake_judge)
     monkeypatch.setattr("detector.api.run_recall_scan", fake_recall)
     monkeypatch.setattr("detector.api.run_causal_upgrade", fake_upgrade)
-    monkeypatch.setattr("detector.api.run_step_tracer", fake_tracer)
-    monkeypatch.setattr("detector.api.run_defense", fake_defense)
+    monkeypatch.setattr("detector.hearing.run_step_tracer", fake_tracer)
+    monkeypatch.setattr("detector.hearing.run_defense", fake_defense)
     detector = Detector(CONFIG, require_credentials=False)
     frozen = None
     if replay:
@@ -445,8 +445,8 @@ def test_detect_judge_conviction_is_authoritative(sample_record, monkeypatch):
     monkeypatch.setattr("detector.api.run_judge", fake_judge)
     monkeypatch.setattr("detector.api.run_recall_scan", fake_recall)
     monkeypatch.setattr("detector.api.run_causal_upgrade", fake_upgrade)
-    monkeypatch.setattr("detector.api.run_step_tracer", fake_tracer)
-    monkeypatch.setattr("detector.api.run_defense", fake_defense)
+    monkeypatch.setattr("detector.hearing.run_step_tracer", fake_tracer)
+    monkeypatch.setattr("detector.hearing.run_defense", fake_defense)
     detector = Detector(CONFIG, require_credentials=False)
     result = detector.detect(sample_record, case_id="x")
     assert result["state"] == "verified_error"
@@ -517,8 +517,8 @@ def test_detect_judge_refuted_and_recall_empty_is_clean(sample_record, monkeypat
     monkeypatch.setattr("detector.api.run_judge", fake_judge)
     monkeypatch.setattr("detector.api.run_recall_scan", fake_recall)
     monkeypatch.setattr("detector.api.run_causal_upgrade", fake_upgrade)
-    monkeypatch.setattr("detector.api.run_step_tracer", fake_tracer)
-    monkeypatch.setattr("detector.api.run_defense", fake_defense)
+    monkeypatch.setattr("detector.hearing.run_step_tracer", fake_tracer)
+    monkeypatch.setattr("detector.hearing.run_defense", fake_defense)
     detector = Detector(CONFIG, require_credentials=False)
     result = detector.detect(sample_record, case_id="x")
     assert result["state"] == "verified_clean"
@@ -591,8 +591,8 @@ def test_frozen_hearing_is_reused_instead_of_rerunning_tracer_and_defense(
     monkeypatch.setattr("detector.api.run_judge", unexpected)
     monkeypatch.setattr("detector.api.run_recall_scan", unexpected)
     monkeypatch.setattr("detector.api.run_causal_upgrade", unexpected)
-    monkeypatch.setattr("detector.api.run_step_tracer", unexpected)
-    monkeypatch.setattr("detector.api.run_defense", unexpected)
+    monkeypatch.setattr("detector.hearing.run_step_tracer", unexpected)
+    monkeypatch.setattr("detector.hearing.run_defense", unexpected)
     detector = Detector(CONFIG, require_credentials=False)
     frozen["replay_inputs"] = replay_inputs_for(sample_record, CONFIG)
     result = detector.detect(sample_record, case_id="x", frozen_stages=frozen)
@@ -616,7 +616,7 @@ def test_frozen_hearing_rechecks_fields_actually_consumed_by_defense(sample_reco
     monkeypatch.setattr("detector.api.run_judge", lambda **kwargs: (
         {"ok": True, "parsed": deepcopy(parsed)}, {"stage": "judge", "state": "ok"}))
     calls = []
-    monkeypatch.setattr("detector.api.run_step_tracer", lambda **kwargs: (
+    monkeypatch.setattr("detector.hearing.run_step_tracer", lambda **kwargs: (
         {"ok": True, "parsed": {"step": 2, "quote": "5", "referent": "4", "reason": "trace",
                                  "evidence_refs": ["event_002"]}}, {"stage": "step_tracer", "state": "ok"}))
     def defense(**kwargs):
@@ -624,7 +624,7 @@ def test_frozen_hearing_rechecks_fields_actually_consumed_by_defense(sample_reco
         return {"ok": True, "parsed": {"verdict": "substantiated", "confirmed_step": 2,
                                         "reason": "review", "evidence_refs": ["event_002"]}}, {
             "stage": "defense", "state": "ok"}
-    monkeypatch.setattr("detector.api.run_defense", defense)
+    monkeypatch.setattr("detector.hearing.run_defense", defense)
     detector = Detector(CONFIG, require_credentials=False)
     baseline = detector.detect(sample_record)
     frozen = LiveDetectorBackend._frozen_stages(baseline, set())
