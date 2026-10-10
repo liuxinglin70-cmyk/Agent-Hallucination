@@ -91,7 +91,9 @@ def run_step_tracer(
             + "\nThe certificate binds this referenced literal arithmetic result and its observed "
             "declared field copies. An observed consistent result does not prove that stale copies "
             "were corrected. The certificate has no decision or localization authority and does not "
-            "prove task materiality, semantic propagation or the first causal introduction. "
+            "prove general task materiality, semantic propagation or the first causal introduction. "
+            "A verified task_certificate applies only to its stated literal arithmetic contract; "
+            "verified_symbolic repair assumes the same declared copies and proves no tool/state replay. "
             "Corrected and unrelated errors cannot replace the target."
         )
     warnings: list[dict[str, str]] = []

@@ -13,6 +13,7 @@ from detector.causal_contracts import (
     seal, validate_seal,
 )
 from detector.causal_graph import build_observed_claim_lineage, build_observed_dependencies, project_dependency_closure
+from detector.causal_task import build_task_claim_certificate
 from detector.identity import digest
 from detector.measurement import request_execution
 from detector.packet import packet_reference_error, validate_packet
@@ -22,7 +23,7 @@ from detector.runtime import AddedBudget, AddedBudgetExceeded, added_request_sco
 from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates
 
 AUDIT_SCHEMA = "detector.causal_audit.v1"
-CONTEXT_SCHEMA = "detector.causal_context.v3"
+CONTEXT_SCHEMA = "detector.causal_context.v4"
 CAUSAL_ROLES = frozenset({"introduction", "propagation", "delivery", "corrected", "unknown"})
 CLAIM_STATUSES = frozenset({"supported", "refuted", "inconclusive"})
 _SYSTEM = (
@@ -253,6 +254,7 @@ def context_for_hearing(
                and row["verification_status"] == "verified" for row in audit["candidates"]):
         return None
     candidates = [_local_candidate(binding["event_id"], [check])]
+    lineage = build_observed_claim_lineage(packet, binding=binding, policy=policy)
     return seal({
         "schema_version": CONTEXT_SCHEMA, "packet_digest": audit["packet_digest"],
         "policy_digest": audit["policy_digest"],
@@ -261,7 +263,8 @@ def context_for_hearing(
         "target_digest": digest(positive), "candidates": candidates,
         "scope": "hearing_literal_result_and_declared_copies", "claim_equivalence": "same_local_result",
         "claim_binding": binding,
-        "observed_lineage": build_observed_claim_lineage(packet, binding=binding, policy=policy),
+        "observed_lineage": lineage,
+        "task_certificate": build_task_claim_certificate(packet, binding=binding, lineage=lineage, policy=policy),
         "closure_state": audit["closure_state"], "decision_authority": "none",
     })
 
@@ -274,7 +277,7 @@ def validate_hearing_context(
     if (set(context) != {
             "schema_version", "packet_digest", "policy_digest", "audit_evidence_digest",
             "target_digest", "candidates", "scope", "claim_equivalence", "claim_binding",
-            "observed_lineage", "closure_state", "decision_authority", "digest",
+            "observed_lineage", "task_certificate", "closure_state", "decision_authority", "digest",
         } or context.get("scope") != "hearing_literal_result_and_declared_copies"
             or context.get("closure_state") not in ("complete", "unknown")):
         raise ValueError("causal context contract fields differ")
@@ -299,8 +302,11 @@ def validate_hearing_context(
             or context.get("claim_equivalence") != "same_local_result"
             or context.get("decision_authority") != "none"):
         raise ValueError("causal context local claim certificate differs")
-    if context.get("observed_lineage") != build_observed_claim_lineage(packet, binding=binding, policy=policy):
+    lineage = build_observed_claim_lineage(packet, binding=binding, policy=policy)
+    if context.get("observed_lineage") != lineage:
         raise ValueError("causal context observed claim lineage differs")
+    if context.get("task_certificate") != build_task_claim_certificate(packet, binding=binding, lineage=lineage, policy=policy):
+        raise ValueError("causal context task claim certificate differs")
 
 
 def build_causal_diagnostics(

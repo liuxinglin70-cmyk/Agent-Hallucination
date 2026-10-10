@@ -86,12 +86,8 @@ def numeric_literal(value: Any) -> Decimal | None:
         return None
 
 
-def arithmetic_check(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
-    """Check a calculator's literal arithmetic result, without executing tool code."""
-    if str(interaction.get("tool_name") or "").lower() != "calculator":
-        return None
-    arguments = interaction.get("arguments")
-    expression = arguments.get("expr") if isinstance(arguments, Mapping) else None
+def literal_arithmetic_value(expression: Any) -> Fraction | None:
+    """Evaluate only bounded finite-decimal literal arithmetic."""
     if not isinstance(expression, str) or len(expression) > 256:
         return None
     try:
@@ -132,10 +128,20 @@ def arithmetic_check(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
                 denominator //= factor
         if denominator != 1:
             return None
-        observed = numeric_literal(interaction.get("observation"))
-        if observed is None:
-            return None
     except (SyntaxError, ValueError, InvalidOperation, ArithmeticError):
+        return None
+    return expected
+
+
+def arithmetic_check(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Check a calculator's literal arithmetic result, without executing tool code."""
+    if str(interaction.get("tool_name") or "").lower() != "calculator":
+        return None
+    arguments = interaction.get("arguments")
+    expression = arguments.get("expr") if isinstance(arguments, Mapping) else None
+    expected = literal_arithmetic_value(expression)
+    observed = numeric_literal(interaction.get("observation"))
+    if expected is None or observed is None:
         return None
     return {
         "verifier": "literal_arithmetic.v1", "expression": expression,
