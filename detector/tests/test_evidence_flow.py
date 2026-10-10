@@ -60,6 +60,42 @@ LISETTE_RECORD = {
 }
 
 
+@pytest.mark.parametrize("stage", ["scanner", "upgrade", "defense"])
+@pytest.mark.parametrize("repair", [False, True])
+@pytest.mark.parametrize("with_evidence", [False, True])
+def test_acting_stages_forward_the_complete_snapshot_identity(monkeypatch, stage, repair, with_evidence):
+    from detector.defense import run_defense
+    from detector.packet import build_packet
+    from detector.recaller import run_causal_upgrade, run_recall_scan
+    packet = build_packet(LISETTE_RECORD)
+    evidence = snapshot() if with_evidence else None
+    seen = []
+    replies = {
+        "scanner": {"candidates": []},
+        "upgrade": {"upgrades": [{"candidate_id": "c1", "content_error": False, "causal": False,
+                                    "corrected_step": None, "reason": "not established"}]},
+        "defense": {"verdict": "inconclusive", "confirmed_step": None,
+                     "evidence_refs": [], "reason": "not established"},
+    }
+    def provider(**kwargs):
+        seen.append(kwargs)
+        return ({}, {}) if repair and len(seen) == 1 else (replies[stage], {"attempts": 1})
+    module = "defense" if stage == "defense" else "recaller"
+    monkeypatch.setattr(f"detector.{module}.provider_call", provider)
+    if stage == "scanner":
+        result, status = run_recall_scan(packet=packet, config=CONFIG, snapshot=evidence)
+    elif stage == "upgrade":
+        result, status = run_causal_upgrade(packet=packet, config=CONFIG, snapshot=evidence,
+                                           candidates=[CANDIDATE])
+    else:
+        result, status = run_defense(packet=packet, config=CONFIG, snapshot=evidence,
+                                     positive={"source": "judge", "step": 2, "reason": "wrong value"})
+    assert result["ok"] and status["state"] == "ok"
+    assert len(seen) == (2 if repair else 1)
+    expected = snapshot_digest(evidence) if evidence is not None else ""
+    assert all(call.get("cache_tag", "") == expected for call in seen)
+
+
 def _judge(positive=False):
     return {
         "ok": True,

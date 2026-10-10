@@ -20,7 +20,7 @@ CONFIG = {
 
 
 def test_recall_scan_and_upgrade(sample_packet, monkeypatch):
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         if "upgrade" in purpose:
             return {
                 "upgrades": [{
@@ -53,7 +53,7 @@ def test_recall_scan_and_upgrade(sample_packet, monkeypatch):
 
 
 def test_recall_candidate_rejects_refs_for_another_locus(sample_packet, monkeypatch):
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {"candidates": [{
             "candidate_id": "c1",
             "claim": "wrong value",

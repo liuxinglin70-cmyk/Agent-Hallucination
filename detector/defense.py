@@ -33,22 +33,6 @@ from detector.provider import (
 from detector.runtime import parallel_ordered
 
 
-def _provider_call(
-    *, route: Mapping[str, Any], system: str, user: str, purpose: str,
-    cache_tag: str = "",
-) -> tuple[Any, dict[str, Any]]:
-    """``provider_call`` forwarding the snapshot cache tag when one exists.
-
-    Keeping the no-snapshot call shape unchanged preserves every existing
-    replay/caching contract; the tag exists solely to key prompt caches on
-    the evidence digest that rides outside the prompt text.
-    """
-    if cache_tag:
-        return provider_call(
-            route=route, system=system, user=user, purpose=purpose,
-            cache_tag=cache_tag,
-        )
-    return provider_call(route=route, system=system, user=user, purpose=purpose)
 from detector.semantics import (
     DEFENSE_CONTRACT_REPAIR,
     DEFENSE_SYSTEM,
@@ -180,10 +164,10 @@ def _call_defense(
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Sample one defense ballot; a ``None`` verdict abstains."""
     cache_tag = (
-        snapshot_digest(snapshot)[:16] if snapshot is not None else ""
+        snapshot_digest(snapshot) if snapshot is not None else ""
     )
     try:
-        parsed, meta = _provider_call(
+        parsed, meta = provider_call(
             route=route, system=system, user=user, purpose="defense",
             cache_tag=cache_tag,
         )
@@ -203,7 +187,7 @@ def _call_defense(
     if result is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
         try:
-            parsed, meta = _provider_call(
+            parsed, meta = provider_call(
                 route=route, system=system,
                 user=user + DEFENSE_CONTRACT_REPAIR,
                 purpose="defense_repair",

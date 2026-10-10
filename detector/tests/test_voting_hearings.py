@@ -136,7 +136,7 @@ def test_defense_tie_upgrades_substantiated(sample_packet, monkeypatch):
         _defense_output("refuted"),
     ]
 
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         if outputs:
             return outputs.pop(0)
         # Third vote abstains: contract violation, repair also broken.
@@ -163,7 +163,7 @@ def test_defense_majority_substantiated_stays_plain(sample_packet, monkeypatch):
         _defense_output("refuted"),
     ]
 
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         return outputs.pop(0)
 
     monkeypatch.setattr("detector.defense.provider_call", fake_call)
@@ -199,7 +199,7 @@ def _candidates():
 
 
 def test_upgrade_returns_all_positive_candidates(sample_packet, monkeypatch):
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {
             "upgrades": [
                 {"candidate_id": "c1", "content_error": True, "causal": True,
@@ -241,7 +241,7 @@ def test_upgrade_majority_per_candidate(sample_packet, monkeypatch):
         ]},
     ]
 
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         return outputs.pop(0), {"attempts": 1, "model": "m", "usage": {}}
 
     monkeypatch.setattr("detector.recaller.provider_call", fake_call)
@@ -410,7 +410,7 @@ def test_judge_topup_absent_keeps_abstention_contract(sample_packet, monkeypatch
 def test_defense_topup_refills_abstained_ballots(sample_packet, monkeypatch):
     calls = []
 
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         calls.append(1)
         # Ballot 1 fails both its initial call and its contract repair.
         if len(calls) <= 2:
@@ -457,7 +457,7 @@ def test_defense_no_majority_never_overturns_and_is_order_independent(sample_pac
     ):
         queue = [_defense_output(v) for v in outputs]
 
-        def fake_call(*, route, system, user, purpose, queue=queue):
+        def fake_call(*, route, system, user, purpose, cache_tag="", queue=queue):
             return queue.pop(0)
 
         monkeypatch.setattr("detector.defense.provider_call", fake_call)
@@ -492,7 +492,7 @@ def test_defense_quorum_keeps_conviction_and_degrades(sample_packet, monkeypatch
     """An under-quorum defense keeps the conviction instead of clearing it."""
     calls = []
 
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         calls.append(1)
         if len(calls) == 1:
             return _defense_output("refuted")
@@ -514,7 +514,7 @@ def test_upgrade_quorum_rejects_a_single_surviving_sample(sample_packet, monkeyp
 
     calls = []
 
-    def failing_call(*, route, system, user, purpose):
+    def failing_call(*, route, system, user, purpose, cache_tag=""):
         calls.append(1)
         if len(calls) == 1:
             return {"upgrades": [

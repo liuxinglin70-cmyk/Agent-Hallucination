@@ -45,23 +45,6 @@ from detector.semantics import (
 )
 
 
-def _provider_call(
-    *, route: Mapping[str, Any], system: str, user: str, purpose: str,
-    cache_tag: str = "",
-) -> tuple[Any, dict[str, Any]]:
-    """``provider_call`` forwarding the snapshot cache tag when one exists.
-
-    Keeping the no-snapshot call shape unchanged preserves every existing
-    replay/caching contract; the tag exists solely to key prompt caches on
-    the evidence digest that rides outside the prompt text.
-    """
-    if cache_tag:
-        return provider_call(
-            route=route, system=system, user=user, purpose=purpose,
-            cache_tag=cache_tag,
-        )
-    return provider_call(route=route, system=system, user=user, purpose=purpose)
-
 
 def _parse_candidates(
     parsed: Any, packet: Mapping[str, Any],
@@ -140,7 +123,7 @@ def run_recall_scan(
         "\n\n" + render_evidence_block(snapshot) if snapshot is not None else ""
     )
     cache_tag = (
-        snapshot_digest(snapshot)[:16] if snapshot is not None else ""
+        snapshot_digest(snapshot) if snapshot is not None else ""
     )
     user = (
         "Scan the trajectory below for candidate deviations. Do not judge "
@@ -156,7 +139,7 @@ def run_recall_scan(
         user += "\n\nCAUSAL ANOMALIES: " + json.dumps(causal_context, ensure_ascii=False)
         cache_tag = digest({"snapshot": cache_tag, "causal_context": causal_context["digest"]})
     try:
-        parsed, meta = _provider_call(
+        parsed, meta = provider_call(
             route=route, system=system, user=user, purpose="recall_scanner",
             cache_tag=cache_tag,
         )
@@ -176,7 +159,7 @@ def run_recall_scan(
     if candidates is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
         try:
-            parsed, meta = _provider_call(
+            parsed, meta = provider_call(
                 route=route, system=system,
                 user=user + RECALL_CONTRACT_REPAIR,
                 purpose="recall_scanner_repair",
@@ -377,10 +360,10 @@ def _upgrade_sample(
     """
     warnings: list[dict[str, str]] = []
     cache_tag = (
-        snapshot_digest(snapshot)[:16] if snapshot is not None else ""
+        snapshot_digest(snapshot) if snapshot is not None else ""
     )
     try:
-        parsed, meta = _provider_call(
+        parsed, meta = provider_call(
             route=route, system=system, user=user, purpose="causal_upgrade",
             cache_tag=cache_tag,
         )
@@ -396,7 +379,7 @@ def _upgrade_sample(
     if upgrades is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
         try:
-            parsed, meta = _provider_call(
+            parsed, meta = provider_call(
                 route=route, system=system,
                 user=user + UPGRADE_CONTRACT_REPAIR,
                 purpose="causal_upgrade_repair",
@@ -425,7 +408,7 @@ def _upgrade_sample(
             missing=", ".join(missing)
         )
         try:
-            parsed, meta = _provider_call(
+            parsed, meta = provider_call(
                 route=route, system=system, user=repair_user,
                 purpose="causal_upgrade_coverage_repair",
                 cache_tag=cache_tag,

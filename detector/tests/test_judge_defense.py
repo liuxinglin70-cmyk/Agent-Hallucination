@@ -102,7 +102,7 @@ def test_run_defense_not_needed(sample_packet):
 
 
 def test_run_defense_refuted(sample_packet, monkeypatch):
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {
             "verdict": "refuted",
             "confirmed_step": None,
@@ -121,7 +121,7 @@ def test_run_defense_refuted(sample_packet, monkeypatch):
 def test_run_defense_rejects_refuted_without_resolved_evidence(
     sample_packet, monkeypatch,
 ):
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {
             "verdict": "refuted",
             "confirmed_step": None,
@@ -140,7 +140,7 @@ def test_run_defense_rejects_refuted_without_resolved_evidence(
 def test_run_defense_rejects_unknown_evidence_reference(
     sample_packet, monkeypatch,
 ):
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {
             "verdict": "refuted",
             "confirmed_step": None,
@@ -159,7 +159,7 @@ def test_run_defense_rejects_unknown_evidence_reference(
 def test_run_defense_rejects_confirmation_for_another_step(
     sample_packet, monkeypatch,
 ):
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {
             "verdict": "substantiated",
             "confirmed_step": 1,
@@ -178,7 +178,7 @@ def test_run_defense_rejects_confirmation_for_another_step(
 def test_run_defense_inconclusive_keeps_judge_on_failure(
     sample_packet, monkeypatch,
 ):
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         raise ProviderError("defense", "boom", attempts=1)
 
     monkeypatch.setattr("detector.defense.provider_call", fake_call)

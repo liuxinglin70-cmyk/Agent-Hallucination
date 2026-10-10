@@ -31,7 +31,7 @@ def _candidates():
 def test_missing_row_is_repaired_not_silently_negative(sample_packet, monkeypatch):
     purposes = []
 
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         purposes.append(purpose)
         if "coverage" in purpose:
             return {
@@ -55,7 +55,7 @@ def test_missing_row_is_repaired_not_silently_negative(sample_packet, monkeypatc
 
 
 def test_still_missing_row_is_explicit_degraded(sample_packet, monkeypatch):
-    def fake_call(*, route, system, user, purpose):
+    def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {"upgrades": []}, {"attempts": 1, "model": "m", "usage": {}}
 
     monkeypatch.setattr("detector.recaller.provider_call", fake_call)
