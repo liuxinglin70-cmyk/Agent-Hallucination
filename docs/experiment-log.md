@@ -24,7 +24,7 @@
 
 ## 2026-10-09 至 10-10：代码重构离线验证
 
-本轮接通目标绑定因果上下文与显式离线阴性复审，统一实验、路径、成本和提交。2/18工作包已验收。f2a1933完整code_only1521通过（local_data/platform未运行），AST、三CLI与源码不变校验通过。M13 fresh证据caea1a8独立39通过；共享回放3874d6b独立101通过/1失败，发现外部Detector冻结信封绕过full-view guard的P1。full-view完整信封与仅含hearings信封4正式API反例先失败后修：所有非None信封必须包含judge_result，mask消费完整plan.entries和共享fresh规则，拒绝前无模型请求，正常Defense收到完整事件；相关155通过，第二次修复待固定复核。周期权限冻结f2a1933相关50/全量通过，独立审查进行中。preflight实际配置/JSON身份2反例先失败后修，共享完整摘要已记录，相关43通过。无真实模型请求。后续以 [实施台账](../IMPLEMENTATION_PLAN.md) 为准。
+本轮接通目标绑定因果上下文与显式离线阴性复审，统一实验、路径、成本和提交。2/18工作包已验收。f2a1933完整code_only1521通过（local_data/platform未运行），AST、三CLI与源码不变校验通过。M13 fresh证据caea1a8独立39通过；外部冻结信封P1经5c6b0ed/7e45ecb修复，4正式API反例与完整Defense输入相关155通过，固定7e45ecb独立38+相关120通过。周期权限f2a1933独立9通过/3失败：真实冷加载竞争P2待修，另2为可替换Fake factory条件反例。preflight e1632be实际配置/JSON身份2反例修复、相关43通过；晋升13c91f4的7反例修复，source/batch/config/roll/目录工件消费共享完整摘要，manifest.v2先验证再读工件，协议v3/v4拒绝旧身份格式；相关120通过，固定复核待完成。无真实模型请求。后续以 [实施台账](../IMPLEMENTATION_PLAN.md) 为准。
 
 本轮没有真实模型请求、基准测量或新增准确率与进化收益读数；本节记录代码验证，不把离线替身结果解释为算法收益。历史测量原始字节保持不变。
 

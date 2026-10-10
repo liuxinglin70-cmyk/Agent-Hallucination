@@ -6,7 +6,7 @@
 |---|---|
 | 当前任务 | 继续完整 18 包代码重构；提交 M08 成本/原子提交，开展获准的只读独立审查并实施 M13 回放合同，最终清理和文档归档 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | 2/18工作包已验收。f2a1933完整code_only1521通过（local_data/platform未运行），AST、三CLI与源码不变校验通过。M13 fresh证据caea1a8独立39通过；共享回放3874d6b独立101通过/1失败，发现外部Detector冻结信封绕过full-view guard的P1。full-view完整信封与仅含hearings信封4正式API反例先失败后修：所有非None信封必须包含judge_result，mask消费完整plan.entries和共享fresh规则，拒绝前无模型请求，正常Defense收到完整事件；相关155通过，第二次修复待固定复核。周期权限冻结f2a1933相关50/全量通过，独立审查进行中。preflight实际配置/JSON身份2反例先失败后修，共享完整摘要已记录，相关43通过。无真实模型请求。 |
+| 本轮已完成 | 2/18工作包已验收。f2a1933完整code_only1521通过（local_data/platform未运行），AST、三CLI与源码不变校验通过。M13 fresh证据caea1a8独立39通过；外部冻结信封P1经5c6b0ed/7e45ecb修复，4正式API反例与完整Defense输入相关155通过，固定7e45ecb独立38+相关120通过。周期权限f2a1933独立9通过/3失败：真实冷加载竞争P2待修，另2为可替换Fake factory条件反例。preflight e1632be实际配置/JSON身份2反例修复、相关43通过；晋升13c91f4的7反例修复，source/batch/config/roll/目录工件消费共享完整摘要，manifest.v2先验证再读工件，协议v3/v4拒绝旧身份格式；相关120通过，固定复核待完成。无真实模型请求。 |
 | 代码实施 | 2/18 个工作包已验收；M12 实施中，M11 取消传播已有限复核；其余完整合同和独立审查仍按 §6 验收 |
 | 下一工作包 | M13外部冻结full-view修复复核；M01晋升/preflight身份迁移 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
@@ -108,7 +108,7 @@ B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fak
 |---|---|---|---|
 | R01 | M02 已实现 event_window_projection.v2：内容/packet 摘要、独立数据、遗漏 ID/截断原因、交付锚点；后续活动仅名 has_subsequent_activity | 565f191 已核销（独立 39 项）；实际依赖闭包和已纠正证据由 M10/M11 实现 | M02/M07/M10 |
 | R02 | M01 已实现文件/直接配置共用校验，保留 causal 块，拒绝未知键、负数、NaN、无穷及 bool 混作整数，无凭据解析不读 .env | 校验子任务 c58a147 独立 69 项核销；有效配置已进入 Detector/批次 execution identity，演化侧继续实施 | M01 |
-| R03 | frozen Tracer 已比较实际 causal_context_digest；上下文证据摘要排除耗时/成本，策略变化重新执行 Tracer | 相同输入复用及策略变化重跑 2 个反例通过；共享detector.replay阶段reach、直接失效与fresh来源唯一；固定复核发现外部API丢失full-view action，完整/仅hearings信封共4正式反例修复后相关155通过，第二次修复待复核；Scanner身份与完整周期仍由M06/M13核验 | M06/M12/M13 |
+| R03 | frozen Tracer 已比较实际 causal_context_digest；上下文证据摘要排除耗时/成本，策略变化重新执行 Tracer | 相同输入复用及策略变化重跑 2 个反例通过；共享detector.replay阶段reach、直接失效与fresh来源唯一；固定复核发现外部API丢失full-view action，完整/仅hearings信封共4正式反例修复后相关155通过，7e45ecb固定复核独立38+相关120通过；Scanner身份与完整周期仍由M06/M13核验 | M06/M12/M13 |
 | R04 | 引用集合枚举、step→event、provider forwarding、executor 身份验证重复 | 证明职责相同后归一，保持阶段信息权限差异 | M02/M03/M05/M07 |
 | R05 | `engine.py` 5532 行、`_run_cycle` 936 行；preview 与 cycle 准备流程相似 | 沿既有职责提取家族准备、开发适配和门编排；先用入口测试确认重复 | M14/M16 |
 | R06 | `stable_localization_families` 默认仅自动接受结构不可能定位；普通晚判仍 needs_review | 引入有核验的同指控因果证书；多错误和仅模型意见继续待审查 | M14 |
@@ -119,7 +119,7 @@ B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fak
 | R11 | 引擎独立 Context/work root 租约、活跃作用域计数、关闭后拒绝调用、init/reset 及 smoke 新目录保护、独立配置快照已实现 | b7d6a8f 固定独立63项全部通过：原43、新20，含真实嵌套操作与with、同线程和其他线程close、初始化BaseException/GC、双向配置快照；e0d4d40 完整1431项通过。跨臂run_snapshot已整合paired/status/旧endpoint读者，完整复验与审查待完成 | M04/M08/M16/M17 |
 | R12 | measurement加载/导出共用验证器，排除角色独立保存；子集保留父身份与当前manifest身份、选择摘要；未知计数不能导出 | 前缀导出7c39f17独立16通过/1失败、相关81通过；悬空输出链接缺口已复现并修复，相关43通过，待固定复核；完整协议字节未改 | M17 |
 | R13 | 多文件 registry 提交、route observation 独立性、promotion 返回/落盘状态一致性未充分证明 | 故障注入与独立 observation 身份测试，按实际证据决定修复 | M14/M15/M16 |
-| R14 | 机械定罪逐例身份绑定实际校准视图；周期以首次消费绑定同一视图并拒绝新候选臂和完成resume中的漂移，未消费者不加载 | 17d3ae1逐例核销；周期2反例先失败后修，cycle_checkpoint.v3相关50/f2a1933全量1521通过；周期独立复核进行中 | M01/M03/M13 |
+| R14 | 机械定罪逐例身份绑定实际校准视图；周期以首次消费绑定同一视图并拒绝新候选臂和完成resume中的漂移，未消费者不加载 | 17d3ae1逐例核销；周期2反例先失败后修，cycle_checkpoint.v3相关50/f2a1933全量1521通过；周期固定复核发现真实冷加载竞争P2，待修复 | M01/M03/M13 |
 | R15 | 整个可选诊断/反馈阶段统一证明保留，允许/拒绝策略回调后检查整例期限与取消 | d97364f固定独立原反例56、新边界12、相关101通过，原拒绝分支P1核销；023c516完整1457项通过 | M04/M12/M13 |
 
 没有调用图、反例或复现支持的事项只能留在风险栏，不能声称 bug 已证实，更不能据此删除代码。
@@ -177,7 +177,7 @@ evolution/
 | ID | 工作包 | 前置 | 预计人日 | 状态 | 最新证据/提交/审查 |
 |---|---|---|---:|---|---|
 | M00 | 离线验证、合同基线、静态清理机制 | 本台账 | 1–2 | 已验收 | 4000669；4fcffecc/68845067：code_only 1020、AST/三 CLI 检查退出 0；平台 97f55299/8f21461a 52 通过；独立只读审查 review_4000669（12 项反例通过，无阻断） |
-| M01 | 配置与执行身份真源 | M00 | 2–3 | 实施中 | config.validate_config 为文件/直接配置唯一入口，causal 块保留且默认 off；数字范围/未知键/工件缺失验证；c58a147 配置独立 69 项通过；identity.py 已供 packet/api/runner 共用，B05 三项反例修复后 detector/repository/offline/backend/env 共 469 通过、5 未选，AST 67 文件通过；演化 backend baseline/cache 已绑定实际配置、record/packet、evidence、registry/replay 与完整源码；eb49756：2 项旧缓存反例先失败后通过，扩展 143 项及 backend 20 项、独立 34 项/3 个篡改缓存反例通过；harness.v2/checkpoint.v2/审计消费实际 backend runtime 身份，完成报告复用的 3 个漂移反例先失败后通过，64c1919：扩展 133 项及最终相关 55 项/AST 67 文件、独立 7 项通过，无新增阻断；preflight正式JSON保存规范完整source_identity和实际配置工件身份，缺声明配置阻断；2反例修复/相关43通过；旧file_digest删除。晋升协议摘要/manifest及完整包验收未完成 |
+| M01 | 配置与执行身份真源 | M00 | 2–3 | 实施中 | config.validate_config 为文件/直接配置唯一入口，causal 块保留且默认 off；数字范围/未知键/工件缺失验证；c58a147 配置独立 69 项通过；identity.py 已供 packet/api/runner 共用，B05 三项反例修复后 detector/repository/offline/backend/env 共 469 通过、5 未选，AST 67 文件通过；演化 backend baseline/cache 已绑定实际配置、record/packet、evidence、registry/replay 与完整源码；eb49756：2 项旧缓存反例先失败后通过，扩展 143 项及 backend 20 项、独立 34 项/3 个篡改缓存反例通过；harness.v2/checkpoint.v2/审计消费实际 backend runtime 身份，完成报告复用的 3 个漂移反例先失败后通过，64c1919：扩展 133 项及最终相关 55 项/AST 67 文件、独立 7 项通过，无新增阻断；preflight正式JSON保存规范完整source_identity和实际配置工件身份，缺声明配置阻断；2反例修复/相关43通过；旧file_digest删除。晋升13c91f4源码/JSON/目录工件共享完整摘要、manifest.v2验证已迁移；7反例修复与相关120通过，固定复核待完成，完整包验收未完成 |
 | M02 | Packet、投影、事件引用规范 | M00 | 2–3 | 已验收 | 565f191；detector 326、跨包 41、AST 66 文件通过；独立 review_offline_review 39 项通过，无阻断；window v2 技术合同已同步 |
 | M03 | 外部证据、谓词与引用权限 | M02 | 1–2 | 实施中 | packet_reference_error 已统一阶段/谓词/scoped semantic 的轨迹引用校验，工具引用使用实际 owner；17d3ae1 实际校准视图绑定逐例身份，496 项及独立 4 项通过；外部 citation/DSL 完整模块核验待接续 |
 | M04 | Provider、并发、预算、取消、请求记录 | M00 | 2–3 | 实施中 | B04/B06 已关闭；8082ee9 新增预算共享且跨重试不重领；全运行 RunStopped 与案例 CaseDeadlineExceeded 分型，取消不再被 provider/backend 转成案例失败；两个反例先失败后通过，相关 85 项、扩展 584 项、AST 71 文件通过；模块完整收尾/复核待恢复 |
@@ -189,7 +189,7 @@ evolution/
 | M10 | 实际依赖图与闭包 | M02/M03/M09 | 2–3 | 实施中 | 1a4d156：call/result 及声明字段消费、远距离祖先/后缀/交付投影接通，未核验自然语言保持未知；有限审查除 M09 数值阻断外无新增问题，该阻断 595b468 关闭；完整审计/定位集成待接续 |
 | M11 | 有界因果审计与 shadow | M04/M06/M09/M10 | 2–3 | 待审查 | 8082ee9 已接通 shadow、局部证书/可选假说及共享预算；有限审查发现真实 provider wrapper 吞 RunStopped，已从异常类型与转换规则修复；相关 85 项/扩展 584 项通过，固定修复提交独立复核尚未完成：审查代理因账户额度终止 |
 | M12 | 定位上下文及受控阴性反馈 | M05/M06/M11 | 3–4 | 实施中 | 664ca93：正式 Tracer 接收同 hearing 目标摘要与局部核验证据；冻结 Tracer 按实际上下文摘要复用，耗时不参与身份；上下文/repair 与新增复审链共享案例预算；生产无校准保持不激活，显式 OfflineFeedbackPolicy 仅无凭据 API 可注入；初始 11 项反例先失败，修复后相关 115 项、平台 6 项、AST 71 文件通过，报告 `artifacts/code_quality/009d6ad5403f675d65f76e6316448e799f6d052064188686f0763324dfe1dad4/ffbc0284e6a64faaa29743c3f53a2d12/summary.json`；完整 code_only：1320 通过/3 失败；其中两个旧夹具在 1601d9c 独立复现，稳定性用例单独及所在模块 23 项通过，套件次序风险待核验；同 claim 证书及完整审查待完成 |
-| M13 | Backend、缓存、harness与回放合同 | M01/M06/M12 | 2–3 | 实施中 | fresh快照caea1a8独立39通过；共享replay固定复核101通过/1失败，外部API full-view P1完整/仅hearings共4正式反例修复，相关155通过，第二次修复待复核。周期已消费校准身份统一绑定/恢复验证，相关50/f2a1933全量1521通过，独立复核进行中。晋升/preflight摘要及完整包验收仍未完成 |
+| M13 | Backend、缓存、harness与回放合同 | M01/M06/M12 | 2–3 | 实施中 | fresh快照caea1a8独立39通过；共享replay固定复核101通过/1失败，外部API full-view P1完整/仅hearings共4正式反例修复，相关155通过，7e45ecb固定复核独立38+相关120通过。周期已消费校准身份统一绑定/恢复验证，相关50/f2a1933全量1521通过，独立复核进行中。preflight e1632be相关43、晋升13c91f4身份/manifest相关120通过，晋升固定复核及完整包验收未完成 |
 | M14 | 因果失败族、机制、能力和提案 | M11/M12/M13 | 3–4 | 未开始 | — |
 | M15 | 开发、指标、覆盖、四门和晋升 | M00；集成依赖 M13/M14 | 3–4 | 实施中 | B09 已关闭；B10/B11 已实现：confusion_rows 拥有 expected coverage，check_l1 将缺覆盖/非法读值/不健康判为未测，定位回退要求基线原本命中；9dbf358 相关 87 项、独立 17 项通过，B10/B11 关闭；B14 指标 outcome 已接入周期收益集合及路线反馈，d14e5f9：182 项扩展回归/AST 67 文件及独立 22 项通过，B14 关闭；普通定位/联合单位提前机会检查已迁移 target_opportunity；ce6777d：18 个普通/替换/定位/联合入口用例及相关 136 项回归、独立 18 项通过，无阻断；完整门集成待完成 |
 | M16 | 周期编排、状态、registry 与记忆 | M13/M14/M15 | 3–5 | 实施中 | B13 reducer 按追加顺序关闭观察期，后续观察重新累计，重复事件不累计，解决记录幂等/冲突拒绝；9b3bac0 相关 62 项及独立 6 项通过，B13 关闭；独立观察身份及完整生命周期未完成 |
@@ -497,8 +497,8 @@ python -m experiments --help
 四项检查点（就地覆盖）：
 
 - **当前任务**：继续完整重构目标，完成 M12/M17/M08 独立审查并实施 M13 回放合同，最终清理与文档整合。
-- **进度**：2/18工作包已验收。f2a1933完整code_only1521通过（local_data/platform未运行），AST、三CLI与源码不变校验通过。M13 fresh证据caea1a8独立39通过；共享回放3874d6b独立101通过/1失败，发现外部Detector冻结信封绕过full-view guard的P1。full-view完整信封与仅含hearings信封4正式API反例先失败后修：所有非None信封必须包含judge_result，mask消费完整plan.entries和共享fresh规则，拒绝前无模型请求，正常Defense收到完整事件；相关155通过，第二次修复待固定复核。周期权限冻结f2a1933相关50/全量通过，独立审查进行中。preflight实际配置/JSON身份2反例先失败后修，共享完整摘要已记录，相关43通过。无真实模型请求。
-- **下一步**：固定复核外部API full-view修复和f2a1933周期权限冻结；实施晋升/preflight规范摘要与manifest验证。
+- **进度**：2/18工作包已验收。f2a1933完整code_only1521通过（local_data/platform未运行），AST、三CLI与源码不变校验通过。M13 fresh证据caea1a8独立39通过；外部冻结信封P1经5c6b0ed/7e45ecb修复，4正式API反例与完整Defense输入相关155通过，固定7e45ecb独立38+相关120通过。周期权限f2a1933独立9通过/3失败：真实冷加载竞争P2待修，另2为可替换Fake factory条件反例。preflight e1632be实际配置/JSON身份2反例修复、相关43通过；晋升13c91f4的7反例修复，source/batch/config/roll/目录工件消费共享完整摘要，manifest.v2先验证再读工件，协议v3/v4拒绝旧身份格式；相关120通过，固定复核待完成。无真实模型请求。
+- **下一步**：修复校准视图真实冷加载竞争及周期同次视图绑定；固定复核晋升/preflight身份迁移，运行当前源码全量。
 - **未定事项**：M12 同 claim 核验证书、独立审查及 M01/M03–M17 完整包验收尚未完成；晋升/preflight 摘要、周期工件冻结、存储/成本/事务与其余脚本路径仍需实施。最终冗余清理和 doc 子目录归档随代码验收完成。
 
 ## 12. 本期最终完成与延期项
