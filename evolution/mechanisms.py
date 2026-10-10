@@ -135,6 +135,8 @@ _OPERATION_BY_FAILURE = {
     ("judge", "mechanical_false_positive"): "tighten_predicate",
     ("adjudication", "false_conviction"): "withhold_conviction",
     ("step_tracer", "unhostable_step"): "constrain_localization",
+    ("step_tracer", "same_claim_late"): "repair_localization_source",
+    ("step_tracer", "same_claim_early"): "repair_localization_source",
 }
 
 # The coarse family prefix encodes the same failure reading, derived from the
@@ -468,6 +470,9 @@ def _failure_from_member(
     otherwise positive finding.
     """
     if objective == "localization":
+        causal = member.get("causal_failure") or {}
+        if causal.get("evidence_state") == "verified" and causal.get("classification") in {"late", "early"}:
+            return "step_tracer", "same_claim_" + causal["classification"]
         if bool(member.get("upgrade_positive")):
             return "causal_upgrade", "unhostable_step"
         return "step_tracer", "unhostable_step"
@@ -663,6 +668,8 @@ def _assemble(
         for field in reading.get("obligation_bindings") or ()
     ]
     bindings.append({"field": "proof.stage_status", "role": "detector_failure"})
+    if mode in {"same_claim_late", "same_claim_early"}:
+        bindings.append({"field": "causal_failure", "role": "verified_declared_result"})
     if path_signature:
         bindings.append({
             "field": "proof.terminal_basis.decisive_facts",

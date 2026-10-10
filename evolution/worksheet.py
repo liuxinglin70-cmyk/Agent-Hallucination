@@ -16,6 +16,7 @@ from detector.dataset import load_case
 from detector.predicate_context import judge_predicate_context
 
 from evolution.metrics import source_of, binary_metrics
+from evolution.causal_failures import build_causal_failure_record, causal_failure_prompt_view
 from evolution.mechanisms import (
     infer_mechanism,
     member_reading,
@@ -387,30 +388,14 @@ def localization_repair_viability(
     record: Mapping[str, Any] | None = None,
     *,
     gold_steps: Mapping[str, Any] | None = None,
+    causal_policy: Mapping[str, Any] | None = None,
 ) -> tuple[str, str]:
-    """Classify one mislocated row for the development loop.
+    """Admit structural impossibility or a recomputed same-claim repair.
 
-    A named step that differs from the annotation is not by itself a defect.
-    When a trajectory holds more than one real error the annotation picks one
-    and the detector may legitimately name the other; a task demanding the
-    annotated step there would ask the detector to abandon a true detection,
-    which ``TRACER_SYSTEM`` explicitly forbids ("Never infer a step from a
-    benchmark annotation").
-
-    Only ``structurally_impossible`` is auto-usable, and the reason is
-    mechanical rather than annotation-driven: the named step cannot host a
-    content error at all. ``BFCL/008`` is the cleared example -- the recall
-    path names step 1, an ``ls`` call with only a boolean flag, in 16 of 21
-    convictions, while the deviation is the ``post_tweet`` content at step 3.
-
-    Everything else is ``needs_review``, including the case where the named
-    step sits *after* the annotation carrying its own error (``BFCL/148``
-    names step 15, a false escalation claim, while the annotation is the
-    ``card_id`` at step 6). That is an annotation choice, not a mechanism
-    failure, and the loop must not spend budget "fixing" it.
-
-    ``record`` is the label-free projected record, so this runs on the
-    detector's own inputs and never reads a gold label.
+    A different annotation alone cannot invalidate a hostable named step.
+    Scoped arithmetic evidence must identify the annotated position as the
+    first declared result and show that symbolic repair reaches delivery.
+    Multiple substantiated claims and invalid measurements remain reviewable.
     """
     from evolution.metrics import row_responsible_step
 
@@ -419,6 +404,9 @@ def localization_repair_viability(
         return "needs_review", "no responsible step to review"
     if record is None:
         return "needs_review", "record not available; viability not checked"
+    failure = build_causal_failure_record(row, record, policy=causal_policy)
+    if failure["evidence_state"] in {"invalid", "ambiguous", "unmeasurable"}:
+        return "needs_review", "; ".join(failure["reasons"])
     hostable, reason = step_can_host_text_error(record, step)
     if not hostable:
         return "structurally_impossible", reason
@@ -434,6 +422,9 @@ def localization_repair_viability(
             gold_step = int(gold_step)
         except (TypeError, ValueError):
             gold_step = None
+    if (failure["evidence_state"] == "verified" and failure["classification"] in {"late", "early"}
+            and failure["first_position"] == gold_step):
+        return "verified_same_claim", "recomputed single-task declaration and symbolic repair support the annotated origin"
     if gold_step is not None and step > gold_step:
         return (
             "needs_review",
@@ -453,12 +444,13 @@ def localization_repair_viable(
     record: Mapping[str, Any] | None = None,
     *,
     gold_steps: Mapping[str, Any] | None = None,
+    causal_policy: Mapping[str, Any] | None = None,
 ) -> tuple[bool, str]:
     """``localization_repair_viability`` reduced to a yes/no plus its reason."""
     classification, reason = localization_repair_viability(
-        row, record, gold_steps=gold_steps,
+        row, record, gold_steps=gold_steps, causal_policy=causal_policy,
     )
-    return classification == "structurally_impossible", reason
+    return classification in {"structurally_impossible", "verified_same_claim"}, reason
 
 
 def stable_localization_families(
@@ -468,6 +460,7 @@ def stable_localization_families(
     min_cases: int = 2,
     records: Mapping[str, Any] | None = None,
     require_viable: bool = True,
+    causal_policy: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Families of cases the detector convicts correctly but localizes wrongly.
 
@@ -507,6 +500,7 @@ def stable_localization_families(
                 row,
                 (records or {}).get(str(row.get("case") or "")),
                 gold_steps=gold_steps,
+                causal_policy=causal_policy,
             )
             if not viable:
                 annotation_choices.append({
@@ -822,6 +816,7 @@ def diagnose_failure_families(
     rows: Sequence[Mapping[str, Any]],
     *,
     dataset_root: str | None = None,
+    causal_policy: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Ground candidate templates in mechanical predicate evidence.
 
@@ -920,6 +915,8 @@ def diagnose_failure_families(
                     "defense_verdict": signature["defense_verdict"],
                     "predicates": member_predicates,
                     "typed_samples": profile,
+                    "causal_failure": causal_failure_prompt_view(
+                        build_causal_failure_record(row, record, policy=causal_policy)),
                 })
             signal["predicate_signals"] = {
                 predicate: {

@@ -130,6 +130,7 @@ def test_task_certificate_has_an_actual_hearing_consumer(monkeypatch):
     assert '"task_certificate"' in seen[0]
     assert '"verified_declared_result"' in seen[0]
     assert result["proof"]["hearings"][0]["tracer_result"]["causal_context_digest"]
+    assert result["proof"]["hearings"][0]["tracer_result"]["causal_context"]["task_certificate"]["materiality"] == "verified"
 
 
 def test_repairing_first_declaration_does_not_fix_an_independent_delivery_branch():

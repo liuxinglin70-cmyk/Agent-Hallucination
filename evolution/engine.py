@@ -3136,6 +3136,10 @@ class EvolutionEngine:
                 continue
         return records
 
+    def _causal_policy(self) -> Mapping[str, Any] | None:
+        backend = getattr(self.backend, "backend", self.backend)
+        return getattr(getattr(backend, "detector", None), "config", {}).get("causal_audit")
+
     def _all_families(
         self, patrol_rows: Sequence[Mapping[str, Any]],
     ) -> list[dict[str, Any]]:
@@ -3149,10 +3153,9 @@ class EvolutionEngine:
 
         Localization families are additionally filtered by
         ``localization_repair_viability``: a step that differs from the
-        annotation is only a defect when the named step cannot host the error
-        at all. Otherwise naming it may be a defensible answer to a different
-        real error, and "repairing" it would mean teaching the detector to
-        abandon a true detection.
+        annotation needs structural impossibility or recomputed same-claim
+        evidence. A second real error or an unsupported causal relation stays
+        outside automatically repairable localization families.
         """
         return [
             *stable_failure_families(patrol_rows),
@@ -3160,6 +3163,7 @@ class EvolutionEngine:
                 patrol_rows,
                 gold_steps=self.gold_step_map,
                 records=self._localization_records(patrol_rows),
+                causal_policy=self._causal_policy(),
             ),
         ]
 
@@ -3254,6 +3258,7 @@ class EvolutionEngine:
             families,
             patrol_rows,
             dataset_root=self.config["dataset_root"],
+            causal_policy=self._causal_policy(),
         )
         diagnosed = refine_failure_families(diagnosed)
         # Cases the profile split left behind, plus the mechanism reading of
@@ -3598,6 +3603,7 @@ class EvolutionEngine:
             families,
             patrol_rows,
             dataset_root=self.config["dataset_root"],
+            causal_policy=self._causal_policy(),
         )
         diagnosed_families = refine_failure_families(diagnosed_families)
         # Cases the profile split left behind, reported with the mechanisms so

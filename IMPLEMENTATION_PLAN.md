@@ -6,9 +6,9 @@
 |---|---|
 | 当前任务 | 根据本次用户请求恢复完整18包代码重构；按Pristine逐根因修复、离线验证并最终整理doc、README及实验日志 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | M12 context.v4已接入同claim的单一字面算术任务证书，核验实际交付材料性、首个规范结果声明及固定字段复制路径上的符号修复；一般语义因果和工具状态变化保持未知，无裁决/定位权限。独立分支、同事件参数/正文混源、分数标量三个反例先失败后修源规则。新增33项、相关232项及25237a47完整code_only1782/platform57、AST76文件/三CLI/源码不变通过。无新独立复审或真实实验。[任务合同核验](artifacts/code_quality/25237a471db00a60ec02b64d72d96b252051dab6b24d6c591df963997bafd206/6bbd113fec4c4186aad54405aabb5bf2/task-claim-verification.md)、[纯代码](artifacts/code_quality/25237a471db00a60ec02b64d72d96b252051dab6b24d6c591df963997bafd206/6bbd113fec4c4186aad54405aabb5bf2/summary.json)、[平台](artifacts/code_quality/25237a471db00a60ec02b64d72d96b252051dab6b24d6c591df963997bafd206/45521e06fc5f4080b97e5825609128cc/summary.json)。 |
+| 本轮已完成 | M14已接通当前听证上下文持久投影及开发侧重算失败记录，实际Engine家族筛选→viability→诊断→机制→Fake LLM/Hybrid提案消费同claim证据；核对输入/策略/目标/定位权威及结果步，多指控与未知仍待复核。R09取消无条件交付步前移禁令，保留同claim证据要求。新增20项、相关136项及提案/能力/周期67项通过；63fb723a完整code_only1802/platform57、AST77文件/三CLI/源码不变通过。完整M14、独立复审及真实实验均未完成。[因果失败消费核验](artifacts/code_quality/63fb723aaf821b3dab1ccc58f85820a9def2423f87b3263daa3f53170410ecaf/a8b4a439cc664af0b87d8e97a814bff2/causal-failure-verification.md)、[纯代码](artifacts/code_quality/63fb723aaf821b3dab1ccc58f85820a9def2423f87b3263daa3f53170410ecaf/a8b4a439cc664af0b87d8e97a814bff2/summary.json)、[平台](artifacts/code_quality/63fb723aaf821b3dab1ccc58f85820a9def2423f87b3263daa3f53170410ecaf/02117688a70c4071a747181e3f8168e5/summary.json)。 |
 | 代码实施 | M00已验收；M02原验收证据保留，本轮B19交付锚点修订待复审；M03修复待审查，其余包保持原状态 |
-| 下一工作包 | M14因果失败记录及实际family/viability/机制/提案消费链；先明确听证证据的持久投影与重算身份，再接M15/M16开发和周期。整包验收与本轮修复待独立复审。 |
+| 下一工作包 | 提取M14/M16 preview/cycle共用巡检补样与家族准备职责，删除engine重复路径；核验父版本修订、邻居反证及M15/M16实际开发/生命周期。整包验收和本轮修复待独立复审。 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
 | 更新时间 | 2026-10-11，Asia/Shanghai |
 
@@ -127,10 +127,10 @@ B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fak
 | R03 | frozen Tracer 已比较实际 causal_context_digest；上下文证据摘要排除耗时/成本，策略变化重新执行 Tracer | 相同输入复用及策略变化重跑 2 个反例通过；共享detector.replay阶段reach、直接失效与fresh来源唯一；固定复核发现外部API丢失full-view action，完整/仅hearings信封共4正式反例修复后相关155通过，7e45ecb固定复核独立38+相关120通过；Scanner身份与完整周期仍由M06/M13核验 | M06/M12/M13 |
 | R04 | 引用集合枚举、step→event、provider forwarding、executor 身份验证重复 | 证明职责相同后归一，保持阶段信息权限差异 | M02/M03/M05/M07 |
 | R05 | `engine.py` 5532 行、`_run_cycle` 936 行；preview 与 cycle 准备流程相似 | 沿既有职责提取家族准备、开发适配和门编排；先用入口测试确认重复 | M14/M16 |
-| R06 | `stable_localization_families` 默认仅自动接受结构不可能定位；普通晚判仍 needs_review | 引入有核验的同指控因果证书；多错误和仅模型意见继续待审查 | M14 |
+| R06 | 原viability仅接受结构不可能；本轮补齐当前听证/packet/实际策略重算的同claim任务证书 | 首个规范声明/实际交付材料性/符号修复均核验且独立指出与开发注释一致的首次位置，可接受verified_same_claim；另一指控、伪证书、漂移及定位冲突保持needs_review。20项新增及63fb723a完整1802/57通过，完整包和独立复审待完成 | M14 |
 | R07 | wheel 不包含数据/实验协议，运行使用调用方提供的 --measurement/--plan；README 已明确路径合同 | 仓库外 wheel 安装后检测、批次、评估、baseline 和三个 help 入口通过；默认缺资源错误提示继续核验 | M17 |
 | R08 | 一些测试使用历史 artifacts；禁真实 provider fixture 只在 evolution 测试域 | 全套离线网络护栏；改成最小合成夹具，不能依赖既往运行输出 | M00/M17 |
-| R09 | `HybridProposer._localization_candidates` 的交付步限制可能与首次引入目标冲突 | 用同一声明、已纠正与多错误反例审查 prompt，不强制迎合 gold | M14 |
+| R09 | Hybrid定位提案的无条件交付步限制与已核验首次引入冲突 | 排除规则改为无same-claim证据时不前移，保留另一错误、已纠正/未知修复及禁用注释约束；Engine→家族→机制→Fake LLM/Hybrid实际输入测试通过。63fb723a完整1802/57通过，独立复审待完成 | M14 |
 | R10 | runtime.validate_path_id/contained_path 已统一 dataset、batch、record、evaluation 和实验读取路径；拒绝 drive/UNC、遍历、保留名、大小写/扁平化碰撞与链接越界 | 22 项代码反例及实际目录链接平台反例通过，相关 125 项合同回归通过；Windows 点前空格和 COM/LPT 上标¹²³设备别名五反例先失败后源头修复，相关64项通过/1排除；六脚本读者已统一snapshot，拒绝外来commit/持锁读取；固定审查待完成 | M02/M08/M17 |
 | R11 | 引擎独立 Context/work root 租约、活跃作用域计数、关闭后拒绝调用、init/reset 及 smoke 新目录保护、独立配置快照已实现 | b7d6a8f 固定独立63项全部通过：原43、新20，含真实嵌套操作与with、同线程和其他线程close、初始化BaseException/GC、双向配置快照；e0d4d40 完整1431项通过。跨臂run_snapshot已整合paired/status/旧endpoint读者，完整复验与审查待完成 | M04/M08/M16/M17 |
 | R12 | measurement加载/导出共用验证器，排除角色独立保存；子集保留父身份与当前manifest身份、选择摘要；未知计数不能导出 | 前缀导出7c39f17独立16通过/1失败、相关81通过；悬空输出链接缺口已复现并修复，相关43通过，待固定复核；完整协议字节未改 | M17 |
@@ -206,7 +206,7 @@ evolution/
 | M11 | 有界因果审计与 shadow | M04/M06/M09/M10 | 2–3 | 待审查 | 8082ee9 已接通 shadow、局部证书/可选假说及共享预算；有限审查发现真实 provider wrapper 吞 RunStopped，已从异常类型与转换规则修复；相关 85 项/扩展 584 项通过，固定修复提交独立复核尚未完成：审查代理因账户额度终止 |
 | M12 | 定位上下文及受控阴性反馈 | M05/M06/M11 | 3–4 | 实施中 | 664ca93：正式 Tracer 接收同 hearing 目标摘要与局部核验证据；冻结 Tracer 按实际上下文摘要复用，耗时不参与身份；上下文/repair 与新增复审链共享案例预算；生产无校准保持不激活，显式 OfflineFeedbackPolicy 仅无凭据 API 可注入；初始 11 项反例先失败，修复后相关 115 项、平台 6 项、AST 71 文件通过，报告 `artifacts/code_quality/009d6ad5403f675d65f76e6316448e799f6d052064188686f0763324dfe1dad4/ffbc0284e6a64faaa29743c3f53a2d12/summary.json`；当前固定811662f完整code_only1568/platform57通过；局部claim绑定context.v2已接通，12项新合同用例及2项实际输入漂移反例先失败后通过，相关173通过；只核验被引用算术结果，不证明语义传播或首次因果引入，局部证书c6b6fd6固定独立46+相关138通过，无局部范围阻断；本轮context.v3绑定graph.v2的精确字段路径，22项新合同及相关199项通过，B30键顺序根因已修；bf05f7ce完整code_only1749/platform57及AST75文件/三CLI/源码不变通过；[核验](artifacts/code_quality/bf05f7ceba0f93874490829ef28a752134fd87ec006283412e85d3ec167479dd/720befaf3d5044f6b8ff02e9207c9b3b/claim-lineage-verification.md)。本轮context.v4增加单一字面算术任务证书，实际交付材料性/首次规范声明/固定声明复制路径符号修复已核验，一般语义及工具状态仍未知；新增33项/相关232项，25237a47完整code_only1782/platform57、AST76文件/三CLI/源码不变通过；[任务合同核验](artifacts/code_quality/25237a471db00a60ec02b64d72d96b252051dab6b24d6c591df963997bafd206/6bbd113fec4c4186aad54405aabb5bf2/task-claim-verification.md)、[纯代码](artifacts/code_quality/25237a471db00a60ec02b64d72d96b252051dab6b24d6c591df963997bafd206/6bbd113fec4c4186aad54405aabb5bf2/summary.json)、[平台](artifacts/code_quality/25237a471db00a60ec02b64d72d96b252051dab6b24d6c591df963997bafd206/45521e06fc5f4080b97e5825609128cc/summary.json)。完整包验收及独立复审待完成 |
 | M13 | Backend、缓存、harness与回放合同 | M01/M06/M12 | 2–3 | 实施中 | fresh快照caea1a8独立39通过；共享replay固定复核101通过/1失败，外部API full-view P1完整/仅hearings共4正式反例修复，相关155通过，7e45ecb固定复核独立38+相关120通过。周期已消费校准身份统一绑定/恢复验证，相关50/f2a1933全量1521通过，a85edf6校准加载/绑定/落盘核验固定独立14+相关42通过。preflight e1632be相关43、晋升13c91f4身份/manifest相关120通过，晋升固定复核发现空路径P2、正式2反例修复及相关96通过，9efeb41修复固定回归132+独立11通过，原P2核销；完整包验收未完成 |
-| M14 | 因果失败族、机制、能力和提案 | M11/M12/M13 | 3–4 | 未开始 | — |
+| M14 | 因果失败族、机制、能力和提案 | M11/M12/M13 | 3–4 | 实施中 | M14已接通当前听证上下文持久投影及开发侧重算失败记录，实际Engine家族筛选→viability→诊断→机制→Fake LLM/Hybrid提案消费同claim证据；核对输入/策略/目标/定位权威及结果步，多指控与未知仍待复核。R09取消无条件交付步前移禁令，保留同claim证据要求。新增20项、相关136项及提案/能力/周期67项通过；63fb723a完整code_only1802/platform57、AST77文件/三CLI/源码不变通过。完整M14、独立复审及真实实验均未完成。[因果失败消费核验](artifacts/code_quality/63fb723aaf821b3dab1ccc58f85820a9def2423f87b3263daa3f53170410ecaf/a8b4a439cc664af0b87d8e97a814bff2/causal-failure-verification.md)、[纯代码](artifacts/code_quality/63fb723aaf821b3dab1ccc58f85820a9def2423f87b3263daa3f53170410ecaf/a8b4a439cc664af0b87d8e97a814bff2/summary.json)、[平台](artifacts/code_quality/63fb723aaf821b3dab1ccc58f85820a9def2423f87b3263daa3f53170410ecaf/02117688a70c4071a747181e3f8168e5/summary.json)。preview/cycle准备提取、完整父版本/邻居/开发反馈及独立复审待完成 |
 | M15 | 开发、指标、覆盖、四门和晋升 | M00；集成依赖 M13/M14 | 3–4 | 实施中 | B09 已关闭；B10/B11 已实现：confusion_rows 拥有 expected coverage，check_l1 将缺覆盖/非法读值/不健康判为未测，定位回退要求基线原本命中；9dbf358 相关 87 项、独立 17 项通过，B10/B11 关闭；B14 指标 outcome 已接入周期收益集合及路线反馈，d14e5f9：182 项扩展回归/AST 67 文件及独立 22 项通过，B14 关闭；普通定位/联合单位提前机会检查已迁移 target_opportunity；ce6777d：18 个普通/替换/定位/联合入口用例及相关 136 项回归、独立 18 项通过，无阻断；完整门集成待完成 |
 | M16 | 周期编排、状态、registry 与记忆 | M13/M14/M15 | 3–5 | 实施中 | B13 reducer 按追加顺序关闭观察期，后续观察重新累计，重复事件不累计，解决记录幂等/冲突拒绝；9b3bac0 相关 62 项及独立 6 项通过，B13 关闭；独立观察身份及完整生命周期未完成 |
 | M17 | CLI/打包/脚本、全局清理与交付审查 | M00–M16 | 2–3 | 实施中 | CLI/measurement/snapshot/实际身份已实现；023c516完整1457通过。效果/健康独立9场景/63项核销；六脚本cfb461c独立25、相关64通过。前缀导出与加载共用验证，父/当前/选择身份独立、排除角色保留、实际标签计数，5反例修复及独立16通过/1失败；悬空链接源头修复相关43通过；全量1506通过/2旧测试失败，测试已迁移正式合同相关27通过；f5163e0固定复核17+2/相关26通过；f2a1933全量1521通过；剩余清理和最终归档待完成 |
@@ -513,9 +513,9 @@ python -m experiments --help
 四项检查点（就地覆盖）：
 
 - **当前任务**：按本次用户请求继续完整18包重构，遵守Pristine；整体完成后核销冗余脚本/文档、整合doc并将组会材料置于子目录。
-- **进度**：M00已验收；本轮M12受限任务证书已接通，新增33项及相关232项通过；25237a47完整code_only1782/platform57、AST76文件/三CLI/源码不变通过。M02/M03/M05/M06及本轮修改待独立复审。全量local_data和真实实验未运行，证据见§0/§6。
-- **下一步**：读取evolution.worksheet的localization_repair_viability和diagnose_failure_families，接入M14开发侧因果失败记录；证据必须重算、绑定当前听证及输入身份，再进入实际family/机制/提案链。随后完成M15/M16及整包审查、最终doc清理。
-- **未定事项**：完整18包目标未完成，M14–M16实际消费链未闭合；受限任务证书不证明通用语义首次因果引入或工具状态变化。历史校准失效且原始字节保留、本期不重测；最终脚本/文档清理和doc组会归档未执行。
+- **进度**：M00已验收；M12受限任务证书及M14当前听证→开发侧失败记录→实际family/机制/提案链已接通。新增20项、相关136项/提案能力周期67项通过；63fb723a完整code_only1802/platform57、AST77文件/三CLI/源码不变通过。整包与本轮修复待独立复审，local_data/真实实验未运行。
+- **下一步**：读取engine.preview_cycle与_run_cycle的重复巡检/诊断块，将补样、机制分组、邻居与能力规划提取至cycle_preparation，迁移两个真实入口并删除原重复实现；再核验父版本修订、正常邻居反证及M15/M16开发/生命周期。
+- **未定事项**：完整18包目标未完成；M14/M16准备职责尚重复，完整父版本/邻居/开发反馈和独立复审未闭合。受限符号证书不证明通用语义因果或工具状态变化；历史校准失效且原始字节保留，本期不重测；最终脚本/文档清理和doc组会归档未执行。
 
 ## 12. 本期最终完成与延期项
 

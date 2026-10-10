@@ -1,6 +1,7 @@
 """Root-cause step tracer for positive verdicts."""
 
 from __future__ import annotations
+from copy import deepcopy
 
 import json
 from typing import Any, Mapping
@@ -166,6 +167,7 @@ def run_step_tracer(
         "ok": True, "parsed": result, "provider": meta,
         "hearing_target": dict(positive) if positive is not None else None,
         "causal_context_digest": used_context_digest,
+        "causal_context": deepcopy(causal_context),
         "view_meta": view_meta,
     }, {
         "stage": "step_tracer", "state": "ok",

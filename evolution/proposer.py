@@ -1427,9 +1427,9 @@ class HybridProposer:
                     "have to change for the delivery to be correct."
                 ),
                 "not_when": (
-                    "do not move the named step away from an event the packet "
-                    "itself identifies as the delivery; do not use benchmark "
-                    "annotations"
+                    "do not move the named step without evidence for the same "
+                    "claim's earlier introduction; preserve unrelated or corrected "
+                    "errors and unknown repair effects; do not use benchmark annotations"
                 ),
             },
             "claim": {
