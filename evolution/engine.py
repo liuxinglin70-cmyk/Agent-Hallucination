@@ -108,6 +108,7 @@ from evolution.memory import (
     write_recall,
 )
 from evolution.development import DevelopmentUnmeasurable
+from evolution.development_adapter import make_development_drafter, feedback_delta
 from evolution.cycle_preparation import prepare_patrol, prepare_families
 from evolution.mechanisms import mechanism_prompt_view, repair_requirements
 from evolution.archive import retrieve_components
@@ -350,7 +351,7 @@ def evaluation_summary(report: Mapping[str, Any]) -> dict[str, Any]:
         flips = delta.get("flips") or {}
         localization = marginal.get("localization_delta") or {}
         utility = {
-            **(_feedback_delta(delta) or {}),
+            **(feedback_delta(delta) or {}),
             "tp_gain": int(flips.get("F->T") or 0),
             "fp_removed": int(flips.get("T->F") or 0),
             "tp_lost": int(delta.get("tp_lost") or 0),
@@ -1606,7 +1607,7 @@ class EvolutionEngine:
         Deliberately not appended to ``self.rejection_feedback``:
         ``proposer.set_rejection_feedback`` turns every non-unevaluable entry
         into a ``rejected_keys`` fingerprint that permanently refuses that
-        executable mechanism from later drafts, and ``_development_drafter``
+        executable mechanism from later drafts, and ``make_development_drafter``
         documents that a development failure is restored afterwards rather than
         banning the candidate. The memory write is what makes the failure
         visible to the next draft; a permanent ban would be a stronger claim
@@ -1767,11 +1768,6 @@ class EvolutionEngine:
                     development_cfg.get("allow_action_class_change", True),
                 ),
             )
-            # The id the drafter stamps on every version of this mechanism is
-            # computed here, before the loop, so the recovery branch below can
-            # name the version it recovered with the same id the drafter would
-            # have used. (It referenced a caller-scope name that does not exist
-            # in this scope: entering the branch raised NameError.)
             draft_identifier = f"IV-{int(cycle)}-D{len(runs) + 1:03d}"
             developer = CandidateDeveloper(
                 output_dir=run_dir,
@@ -1795,8 +1791,8 @@ class EvolutionEngine:
             # have used. (It referenced a caller-scope name that does not exist
             # in this scope: entering the branch raised NameError.)
             result = developer.develop(
-                self._development_drafter(
-                    cycle=cycle,
+                make_development_drafter(
+                    proposer=self.proposer, cycle=cycle,
                     family=target["family"],
                     mechanism_id=mechanism_id,
                     identifier=draft_identifier,
@@ -1951,114 +1947,6 @@ class EvolutionEngine:
                 "status": status,
             }
         return recovered
-
-    def _development_drafter(
-        self,
-        *,
-        cycle: int,
-        family: Mapping[str, Any],
-        mechanism_id: str,
-        identifier: str,
-    ):
-        """The drafting callback the development loop revises through.
-
-        The first draft is an ordinary proposal drawn against this one family,
-        so it travels the same prompt, memory and component context as a
-        single-shot cycle. A revision re-asks with the previous version's
-        L0/L1 verdicts attached as gate feedback, which is the only channel the
-        proposer has for being told why a draft was falsified; the feedback is
-        restored afterwards so a development failure does not permanently ban
-        the candidate from later cycles.
-
-        The intervention id is set here rather than left to the proposer,
-        because a proposer numbers its batch from one on every call: two
-        mechanisms developed in the same cycle would each come back as
-        ``IV-<cycle>-001`` and the resulting batch would have two candidates
-        sharing an id, which the proposal contract refuses. Assigning the id
-        before the version is recorded keeps the frozen candidate, its hash and
-        the batch entry describing the same object.
-
-        The proposer's own ``notes`` travel back with the candidates. They carry
-        *why* an empty answer was empty -- its call budget was spent, the
-        provider failed, it had nothing -- and a draft callback that returned a
-        bare list would drop the only machine-readable record of that difference
-        before the development loop could report it.
-        """
-        proposer = self.proposer
-
-        def renamed(batch: Any) -> ProposalBatch:
-            out: list[dict[str, Any]] = []
-            for candidate in batch.candidates:
-                item = dict(candidate)
-                item["intervention_id"] = identifier
-                item.pop("content_hash", None)
-                out.append(item)
-            return ProposalBatch(
-                candidates=out,
-                joint_groups=list(getattr(batch, "joint_groups", None) or ()),
-                notes=[dict(note) for note in getattr(batch, "notes", None) or ()],
-            )
-
-        def draft(
-            _mechanism: Mapping[str, Any],
-            _plan: Mapping[str, Any],
-            parent: Mapping[str, Any] | None,
-            diagnosis: Mapping[str, Any] | None,
-            _cycle: int,
-        ) -> ProposalBatch:
-            one = {
-                **dict(family),
-                "mechanism": dict(_mechanism),
-            }
-            if parent is None or not diagnosis:
-                batch = proposer.propose([one], cycle=int(cycle), max_proposals=1)
-                return renamed(batch)
-            previous = list(getattr(proposer, "rejection_feedback", []))
-            if hasattr(proposer, "set_rejection_feedback"):
-                feedback = list(previous)
-                l1 = diagnosis.get("l1") or {}
-                targets = [str(case) for case in _mechanism.get("member_cases") or ()]
-                neighbors = [str(case) for case in _mechanism.get("normal_neighbors") or ()]
-                aliases = {
-                    **{case: f"target_{index + 1}" for index, case in enumerate(targets)},
-                    **{case: f"normal_{index + 1}" for index, case in enumerate(neighbors)},
-                }
-                def case_refs(key: str) -> list[str]:
-                    return [aliases.get(str(case), "unlisted_case") for case in l1.get(key) or ()]
-
-                feedback.append({
-                    "gate": "DEVELOPMENT",
-                    "type": parent.get("type"),
-                    "hook": parent.get("hook"),
-                    "candidate": dict(parent),
-                    "parent_program": {
-                        "type": parent.get("type"),
-                        "hook": parent.get("hook"),
-                        "body": dict(parent.get("body") or {}),
-                    },
-                    "development_diagnosis": {
-                        "version_id": diagnosis.get("version_id"),
-                        "target_improved": case_refs("target_improved"),
-                        "target_unchanged": case_refs("target_unchanged"),
-                        "target_regressed": case_refs("target_regressed"),
-                        "neighbor_regressed": case_refs("neighbor_regressed"),
-                        "fired_cases": case_refs("fired_cases"),
-                        "reason_codes": list(l1.get("reason_codes") or ()),
-                    },
-                    "delta": _feedback_delta(l1.get("delta")),
-                    "reason": "; ".join(
-                        str(item) for item in (diagnosis.get("reasons") or ())
-                    ) or f"{mechanism_id} version {diagnosis.get('version_id')} failed development",
-                })
-                proposer.set_rejection_feedback(feedback)
-            try:
-                batch = proposer.propose([one], cycle=int(cycle), max_proposals=1)
-            finally:
-                if hasattr(proposer, "set_rejection_feedback"):
-                    proposer.set_rejection_feedback(previous)
-            return renamed(batch)
-
-        return draft
 
     @_engine_operation
     def archive_development_run(
@@ -4022,7 +3910,7 @@ class EvolutionEngine:
                 "hook": "multiple",
                 "gate": "COMBINATION_M",
                 "reason": combination["reason"],
-                "delta": _feedback_delta(combination.get("delta")),
+                "delta": feedback_delta(combination.get("delta")),
                 "not_evaluable": bool(combination.get("stability_limited")),
             }
             self._ledger("rejected", payload)
@@ -4051,9 +3939,9 @@ class EvolutionEngine:
                         ),
                         "gate": gate.upper(),
                         "reason": verdict["reason"],
-                        "delta": _feedback_delta(verdict.get("delta")),
+                        "delta": feedback_delta(verdict.get("delta")),
                         "gain_opportunities": report.get("gain_opportunities"),
-                        "behavior_delta": _feedback_delta((report.get("behavior") or {}).get("delta")),
+                        "behavior_delta": feedback_delta((report.get("behavior") or {}).get("delta")),
                         "behavior_note": (report.get("behavior") or {}).get("behavior_note"),
                         "evaluation_state": (report.get("evaluation") or {}).get("state"),
                         "next_action": (report.get("evaluation") or {}).get("next_action"),
@@ -5132,17 +5020,6 @@ def _time_monotonic() -> float:
     import time
 
     return time.monotonic()
-
-
-def _feedback_delta(value: Any) -> dict[str, int] | None:
-    if not isinstance(value, Mapping):
-        return None
-    keys = (
-        "marginal_cases", "new_fn", "new_fp", "new_errors",
-        "unresolved_added", "health_regressed", "correctness_improved",
-        "correctness_worsened",
-    )
-    return {key: int(value.get(key) or 0) for key in keys}
 
 
 def _recent_cycles(history: Sequence[Mapping[str, Any]], count: int) -> list[Mapping[str, Any]]:

@@ -17,6 +17,7 @@ proposer returns zero candidates (the cycle is reported, not padded).
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 import re
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
@@ -372,7 +373,7 @@ class LLMProposer:
     def set_rejection_feedback(
         self, feedback: Sequence[Mapping[str, Any]],
     ) -> None:
-        self.rejection_feedback = [dict(item) for item in feedback]
+        self.rejection_feedback = deepcopy(list(feedback))
         self.rejected_keys = {
             key for key in (
                 _proposal_fingerprint(item.get("candidate") or {})
@@ -1046,6 +1047,10 @@ class HybridProposer:
         # plain attribute assignment; forwarding the setter keeps the inner
         # LLM proposer in sync without changing that call site.
         self.llm.active_entries = [dict(entry) for entry in entries]
+
+    @property
+    def rejection_feedback(self) -> list[dict[str, Any]]:
+        return deepcopy(self.llm.rejection_feedback)
 
     def set_rejection_feedback(
         self, feedback: Sequence[Mapping[str, Any]],

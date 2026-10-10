@@ -172,7 +172,7 @@ L1 开发回放要求两臂恰好覆盖预定 target∪neighbor，每例各一�
 | --- | --- | --- |
 | 循环 | engine.py、cycle_preparation.py、config.py、splits.py | 阶段顺序、预算、划分、审计、巡检、准入、治理 |
 | 失败建模 | worksheet.py、causal_failures.py、mechanisms.py、route_failures.py | 稳定失败族、机制机会、定位错/缺、路径缺口 |
-| 开发 | proposer.py、development.py、capability_planning.py | L0/L1 检查、修订、预算和反馈 |
+| 开发 | proposer.py、development.py、development_adapter.py、capability_planning.py | L0/L1 检查、修订、预算和反馈 |
 | 研究入口 | research.py、scripts/run_research_round.py | 冻结机制研究、重复验证，不替代生产准入 |
 | 晋升 | promotion.py、promotion_alignment.py、candidate_versions.py | 统一候选、协议冻结、自哈希、对照身份、晋升终态 |
 | 门和指标 | gates.py、metrics.py、calibration.py | 结构、保护、行为、收益、定位、稳定性 |
@@ -234,7 +234,13 @@ engine、backends、promotion、interventions 仍承担较多职责，后续物�
 
 `localization_repair_viability` 接受结构不可能，或证书独立指出与注释一致的首次声明；证书与注释不一致、重封伪证书、输入/策略漂移、定位冲突及多错误均保持needs_review。开发侧标签只判断失败类型或核对机会，不作为目标答案回传。Engine的preview/cycle将实际backend策略传给家族筛选和诊断；`cycle_preparation.prepare_patrol`统一采样与确定性补样；`prepare_families`统一诊断、机制分组、正常邻居、可行路线与能力规划，engine的preview/cycle消费同一结果。准备职责只调用入口提供的测量回调，不写账本或注册表；preview保留报告写入，正式cycle保留journal与准入边界。补样两臂使用相同case集合与已有seed公式，初始没有家族才补样。
 
-诊断的显式proposer投影只保留失败类型、证据状态、作用范围和修复操作，不含case、步号、packet/target摘要或正确数值。真实member_summaries进入LLM提案prompt，机制以同claim偏差及repair_localization_source分组，能力规划复用已有定位输入与能力需求。Hybrid定位提案允许有同claim首次引入证据时前移，排除无证据、另一错误、已纠正和未知修复效应。完整父版本修订、正常邻居反证及M15/M16生命周期集成继续按实施台账验收；现有L0/L1与四门不因该证书放宽。
+诊断的显式proposer投影只保留失败类型、证据状态、作用范围和修复操作，不含case、步号、packet/target摘要或正确数值。真实member_summaries进入LLM提案prompt，机制以同claim偏差及repair_localization_source分组，能力规划复用已有定位输入与能力需求。Hybrid定位提案允许有同claim首次引入证据时前移，排除无证据、另一错误、已纠正和未知修复效应。正常邻居与M15/M16完整生命周期集成继续按实施台账验收；现有L0/L1与四门不因该证书放宽。
+
+**开发修订边界**：`development_adapter.make_development_drafter` 持有家族快照，每次调用提供独立的家族、机制、父程序及诊断反馈；返回候选、联合组和notes也独立复制。为当前机制指定唯一intervention_id，并在后续规范化/冻结前移除旧content_hash。engine实际开发入口使用该适配器，反馈delta投影只有一个定义。
+
+临时反馈通过try/finally恢复原有快照，provider异常、取消及反馈setter失败也执行恢复。LLM反馈setter独立拥有传入对象；Hybrid提供当前反馈快照的读取与写入合同，修订结束保留先前正式反馈及其拒绝状态。父程序投影保留type/hook/trigger/body/claim的完整可执行语义，排除case provenance与旧hash；父版本关系仍由CandidateDeveloper保存。
+
+L1逐例反证只从已生成配对delta.rows及已有target/normal回退、改善和触发集合投影，保留别名、实际两臂prediction及原评分结论，不重复定义收益或回退规则。金标、正确答案和原case身份不进入该投影。不可测修订标记not_evaluable及unmeasurable，不成为永久拒绝指纹；L0未运行或失败与L1实际测量状态区分。正式L1覆盖、健康、邻居保护和四门维持原规则。
 
 现有 `detector/provider.py` 没有对原 Agent 步骤计算teacher-forced PPL的接口，当前疑惑度表示语义风险代理。
 

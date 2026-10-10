@@ -24,9 +24,9 @@
 
 ## 2026-10-09 至 10-11：代码重构离线验证
 
-按用户请求继续完整18包重构。M12/M14受限任务证据及实际演化消费链见 [实施台账](../IMPLEMENTATION_PLAN.md)。本轮将preview/cycle的采样、确定性补样及家族诊断、机制、正常邻居、可行路线和能力规划迁入唯一cycle_preparation，删除engine旧算法和无消费者字段；实际测量仍使用入口的_ArmRunner，journal与准入写入边界保留。
+按用户请求继续完整18包重构。共用准备及既有同claim证据消费链见 [实施台账](../IMPLEMENTATION_PLAN.md)。本轮B31六项反例先失败，development_adapter迁移真实开发回调，独立拥有父程序、家族、机制、反馈和返回批次；异常/取消/setter失败恢复原反馈，Hybrid补齐读取合同，完整父语义程序与别名逐例损伤进入Fake LLM输入，金标/正确答案不投影。不可测保持not_evaluable；engine旧回调与重复delta定义删除。
 
-真实入口相关114项及新增2项一致性检查通过；c2931448完整code_only1804/platform57、AST78文件/三个CLI/源码不变通过，[准备职责核验](../artifacts/code_quality/c2931448157d21e80192f8197ad3a773ee277b1c3fd991782163aa9cc0308428/b5be9921ddaf4547bbccfb85a0d9eecb/cycle-preparation-verification.md)记录实际范围。有效父候选在临时proposer反馈被修改时身份改变，反馈恢复仍不能恢复父版本，B31已复现待修复；完整开发适配和整包独立复审尚未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。完整M15/M16生命周期、最终脚本/文档清理与doc组会归档仍未完成。
+新增14项、相关64项通过；7a512d25完整code_only1818/platform57、AST79文件/三个CLI/源码不变通过，[开发适配核验](../artifacts/code_quality/7a512d255f54bd8aff633e77d113fdd8eabb1e53dfd525bb2f7dc3577793dc93/bc5084ffee934e1f834923c5b422f3a9/development-adapter-verification.md)记录范围。R13相同观测只改cycle即累计两次并压制路线，B32已复现待修复；独立观察身份、registry/晋升/记忆生命周期及整包复审尚未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。最终脚本/文档清理与doc组会归档仍未完成。
 
 ## 2026-09-24 至 09-27：三轮自进化与 G0 检测器基线
 
