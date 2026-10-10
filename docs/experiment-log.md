@@ -24,9 +24,9 @@
 
 ## 2026-10-09 至 10-11：代码重构离线验证
 
-按用户请求继续完整18包重构。共用准备及既有同claim证据消费链见 [实施台账](../IMPLEMENTATION_PLAN.md)。本轮B31六项反例先失败，development_adapter迁移真实开发回调，独立拥有父程序、家族、机制、反馈和返回批次；异常/取消/setter失败恢复原反馈，Hybrid补齐读取合同，完整父语义程序与别名逐例损伤进入Fake LLM输入，金标/正确答案不投影。不可测保持not_evaluable；engine旧回调与重复delta定义删除。
+按用户请求继续完整18包重构。B31已提交65dde2c，开发适配与既有因果消费范围见 [实施台账](../IMPLEMENTATION_PLAN.md)。本轮为B32实现测量来源基础：实际Detector调用生成独立measurement_id，原始尝试按身份汇总，复制缓存与重新汇总保留来源；缺少或非法尝试身份时整例身份未知。6项反例先失败后修复，共12项新增、相关70项回归通过；实际Detector/Fake缓存入口均已核验。2b37f939完整code_only1830/platform57、AST79/三个CLI/源码不变通过，范围见 [来源核验](../artifacts/code_quality/2b37f939edc75c87dd4d4afdd3dd8282ebe00cd45544564967b4ba2b1aa12357/dee1d1147fe8456b9deb3e1cf95c018d/measurement-identity-verification.md)。
 
-新增14项、相关64项通过；7a512d25完整code_only1818/platform57、AST79文件/三个CLI/源码不变通过，[开发适配核验](../artifacts/code_quality/7a512d255f54bd8aff633e77d113fdd8eabb1e53dfd525bb2f7dc3577793dc93/bc5084ffee934e1f834923c5b422f3a9/development-adapter-verification.md)记录范围。R13相同观测只改cycle即累计两次并压制路线，B32已复现待修复；独立观察身份、registry/晋升/记忆生命周期及整包复审尚未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。最终脚本/文档清理与doc组会归档仍未完成。
+路线负反馈尚未消费新身份，相同观测跨cycle累积的B32仍待修复；独立观察需要实际配对案例、候选/伙伴、原始测量叶身份和运行/冻结上下文，不能只改周期或重新汇总。registry/晋升/记忆生命周期及整包复审尚未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。最终脚本/文档清理与doc组会归档仍未完成。
 
 ## 2026-09-24 至 09-27：三轮自进化与 G0 检测器基线
 

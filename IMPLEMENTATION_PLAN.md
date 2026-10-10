@@ -6,9 +6,9 @@
 |---|---|
 | 当前任务 | 根据本次用户请求恢复完整18包代码重构；按Pristine逐根因修复、离线验证并最终整理doc、README及实验日志 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | B31六项正式反例先失败后修复：development_adapter独立拥有家族/机制/父程序/原反馈及返回批次，异常/取消/setter失败恢复，完整父程序和L1逐例别名反证进入Fake LLM prompt；Hybrid补齐反馈读取，LLM setter独立拥有输入，不可测不作永久拒绝。engine旧回调及重复delta规则删除。新增14项、相关64项及7a512d25完整code_only1818/platform57、AST79文件/三CLI/源码不变通过。R13相同测量跨cycle计2次并压制路线的B32已复现待修复。无新独立复审、真实实验或整包验收。[开发适配核验](artifacts/code_quality/7a512d255f54bd8aff633e77d113fdd8eabb1e53dfd525bb2f7dc3577793dc93/bc5084ffee934e1f834923c5b422f3a9/development-adapter-verification.md)、[纯代码](artifacts/code_quality/7a512d255f54bd8aff633e77d113fdd8eabb1e53dfd525bb2f7dc3577793dc93/bc5084ffee934e1f834923c5b422f3a9/summary.json)、[平台](artifacts/code_quality/7a512d255f54bd8aff633e77d113fdd8eabb1e53dfd525bb2f7dc3577793dc93/4b2f8bcac10f43bda56244a398d2b2b8/summary.json)。 |
+| 本轮已完成 | B32测量来源基础：request_execution每次实际调用生成独立measurement_id；case_execution按原始尝试标识派生，重汇总不制造新测量，缺/非法身份保持None。6项反例先失败后修复，共12项新增、相关70项通过；2b37f939完整code_only1830/platform57、AST79/三CLI/源码不变通过。真实Detector与缓存入口已验证；路线状态尚未消费新身份，B32仍未修复完成。B31已提交65dde2c，整体及独立复审未完成。  [来源核验](artifacts/code_quality/2b37f939edc75c87dd4d4afdd3dd8282ebe00cd45544564967b4ba2b1aa12357/dee1d1147fe8456b9deb3e1cf95c018d/measurement-identity-verification.md)、[纯代码](artifacts/code_quality/2b37f939edc75c87dd4d4afdd3dd8282ebe00cd45544564967b4ba2b1aa12357/dee1d1147fe8456b9deb3e1cf95c018d/summary.json)、[平台](artifacts/code_quality/2b37f939edc75c87dd4d4afdd3dd8282ebe00cd45544564967b4ba2b1aa12357/51003550d94647788df2f4473c74d8b2/summary.json)。 |
 | 代码实施 | M00已验收；M14/M16实际因果消费及共用准备职责实施中；M02/M03及本轮修改待独立复审；其余包按§6状态 |
-| 下一工作包 | 先用正式B32反例核验route observation独立性，绑定真实测量/案例/候选/上下文身份；缓存重放、缺测/缺身份不累积路线负反馈，保留历史字节。再核验M15/M16 registry多文件提交、晋升返回/落盘和记忆生命周期，完成整包审查及doc收尾。 |
+| 下一工作包 | 为B32新增正式跨周期反例，在_gate_unit汇总丢弃result前绑定配对案例、候选/伙伴、真实测量叶身份、运行上下文及冻结来源，迁移两处report与路线记录/能力规划消费者。缓存重放、缺身份及数字revisions不得赋予独立观察权限，保留历史字节。随后核验registry、晋升与记忆生命周期及最终doc收尾。 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
 | 更新时间 | 2026-10-11，Asia/Shanghai |
 
@@ -116,7 +116,7 @@ Python 的真源标注使用合法的 `# SOURCE: <symbol>`，只指向符号，�
 | B29 | frozen把ok作truthy读取，failed阶段可携带parsed成功裁决值并被后续消费 | 共享冻结阶段合同要求布尔ok、结果/状态一致，failed不得携带parsed裁决；保留无裁决的合法失败回放 | M06 | 工作区修复待审查；3项failed载荷及4项非法权限标记反例先失败，合法失败回放3项及相关166通过；bc0d5e0f code_only1714/platform57及AST/三CLI/源码不变通过，独立复审未完成 |
 | B30 | 仅交换复合字段字典键顺序，packet摘要不变，但图/消费路径/上下文摘要改变 | bound_fields按规范字典键序遍历，保留列表顺序，所有画像/图/路径消费者使用同一源规则 | M01/M10/M12 | 修复待审查；正式键顺序反例先失败后通过，相关199项及bf05f7ce完整code_only1749/platform57/AST/三CLI/源码不变通过；[核验](artifacts/code_quality/bf05f7ceba0f93874490829ef28a752134fd87ec006283412e85d3ec167479dd/720befaf3d5044f6b8ff02e9207c9b3b/claim-lineage-verification.md)，独立复审未完成 |
 | B31 | 原开发回调浅复制导致父版本、家族、机制、原反馈与输出互相污染；完整父程序缺trigger/claim，Hybrid无反馈读取也无法恢复原反馈 | development_adapter拥有修订输入/反馈快照与输出，完整父程序及别名反证投影，LLM/Hybrid输入和反馈合同一致 | M14/M16 | 修复待审查；六项正式反例先失败后通过，共14项新增/相关64项，7a512d25完整1818/57/AST79/CLI/源码不变通过；[开发适配核验](artifacts/code_quality/7a512d255f54bd8aff633e77d113fdd8eabb1e53dfd525bb2f7dc3577793dc93/bc5084ffee934e1f834923c5b422f3a9/development-adapter-verification.md)、[纯代码](artifacts/code_quality/7a512d255f54bd8aff633e77d113fdd8eabb1e53dfd525bb2f7dc3577793dc93/bc5084ffee934e1f834923c5b422f3a9/summary.json)、[平台](artifacts/code_quality/7a512d255f54bd8aff633e77d113fdd8eabb1e53dfd525bb2f7dc3577793dc93/4b2f8bcac10f43bda56244a398d2b2b8/summary.json)，独立复审未完成 |
-| B32 | route_failure_state仅按cycle去重；相同measurement_identity的同一观测在cycle1/2被计2次并认定路线能力不足 | 独立观察绑定实际案例/测量/候选/上下文身份；缓存重放与缺身份只作诊断，修订证据也须核验；保留原记录字节 | M14/M16 | 已复现；7a512d25受控相同观测只改cycle，输出observations=2/insufficient=True；正式回归及修复待实施，证据见[开发核验](artifacts/code_quality/7a512d255f54bd8aff633e77d113fdd8eabb1e53dfd525bb2f7dc3577793dc93/bc5084ffee934e1f834923c5b422f3a9/development-adapter-verification.md) |
+| B32 | route_failure_state仅按cycle去重；相同measurement_identity的同一观测在cycle1/2被计2次并认定路线能力不足 | 独立观察绑定实际案例/测量/候选/上下文身份；缓存重放与缺身份只作诊断，修订证据也须核验；保留原记录字节 | M14/M16 | 已复现，修复实施中；测量来源基础12项新增/相关70通过，平台57通过；完整code_only1830通过；AST/CLI/源码不变通过。route reducer和门控报告尚未接入新身份，不声称B32关闭；[来源核验](artifacts/code_quality/2b37f939edc75c87dd4d4afdd3dd8282ebe00cd45544564967b4ba2b1aa12357/dee1d1147fe8456b9deb3e1cf95c018d/measurement-identity-verification.md)；原复现见7a512d25开发核验 |
 
 B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fake 对象，无真实 provider、无历史测量写入。B12 修复保持 evidence-only 权限，反例证明引用和投影可信性缺陷，不声称直接越权定罪。
 
@@ -515,8 +515,8 @@ python -m experiments --help
 四项检查点（就地覆盖）：
 
 - **当前任务**：按本次用户请求继续完整18包重构，遵守Pristine；整体完成后核销冗余脚本/文档、整合doc并将组会材料置于子目录。
-- **进度**：M00已验收；同claim消费、共用准备及开发适配接通。B31六项先失败后修复，共14项新增/相关64项；7a512d25完整code_only1818/platform57、AST79文件/三CLI/源码不变通过。B32同测量跨cycle伪独立观察已复现待修复，整包及本轮独立复审未完成。
-- **下一步**：为route_failure_state把同一观测在cycle1/2计为2次并判insufficient的B32新增正式回归；检查实际engine→insufficiency_evidence→记录→能力规划链，绑定案例/候选/上下文及真实执行身份，缓存重放和缺身份保持诊断，保留旧记录字节。
+- **进度**：M00已验收；B31已提交65dde2c。B32测量来源基础6项先失败后修复，共12项新增/相关70项通过；2b37f939完整code_only1830/platform57、AST79/三CLI/源码不变通过。独立观察消费者尚未接通，B32未关闭；整包及独立复审未完成。
+- **下一步**：对同一测量跨周期累积与缺身份/revisions直接压制路线新增正式反例，在_gate_unit丢弃result前绑定配对案例、候选/伙伴、原始测量叶身份、上下文及冻结来源，贯通report、route_failures和能力规划。
 - **未定事项**：完整18包目标未完成；B32独立观察、registry多文件提交/晋升落盘/完整M15/M16生命周期及独立复审未闭合。受限证书不证明通用语义或工具状态变化；历史校准失效且原始字节保留、本期不重测。最终脚本/文档清理与doc组会归档未执行；local_data/真实实验未运行。
 
 ## 12. 本期最终完成与延期项

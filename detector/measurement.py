@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
+from uuid import uuid4
+from detector.identity import digest
 from detector.provider import FATAL_PROVIDER_ERRORS, accumulate_usage
 from detector.result import RESULT_SCHEMA, prediction_state
 
@@ -118,6 +120,7 @@ def request_execution(
             accumulate_usage(usage, request["usage"])
     return {
         "schema_version": "detector.execution.v1", "started_at": started_at,
+        "measurement_id": uuid4().hex,
         "finished_at": finished_at, "elapsed_seconds": elapsed_seconds,
         "requests": list(requests), "provider_attempts": len(requests),
         "usage": usage or None,
@@ -133,8 +136,10 @@ def case_execution(
     requests: list[dict[str, Any]] = []
     counts: list[int | None] = []
     missing: list[int | None] = []
+    measurement_ids: list[Any] = []
     for number, attempt in enumerate(attempts, start=1):
         execution = attempt["execution"]
+        measurement_ids.append(execution.get("measurement_id"))
         if isinstance(execution.get("usage"), Mapping):
             accumulate_usage(usage, execution["usage"])
         counts.append(execution.get("provider_attempts"))
@@ -143,6 +148,15 @@ def case_execution(
                         for request in execution.get("requests") or ())
     return {
         "schema_version": "detector.execution.v2", "started_at": started_at,
+        # Aggregation must not turn cached attempts into fresh measurements.
+        "measurement_id": digest({
+            "schema_version": "detector.measurement_sequence.v1",
+            "attempts": measurement_ids,
+        }) if measurement_ids and all(
+            isinstance(value, str) and len(value) == 32
+            and all(char in "0123456789abcdef" for char in value)
+            for value in measurement_ids
+        ) else None,
         "finished_at": finished_at, "elapsed_seconds": elapsed_seconds,
         "case_attempts": list(attempts), "requests": requests,
         "provider_attempts": sum(counts) if all(type(value) is int for value in counts) else None,
