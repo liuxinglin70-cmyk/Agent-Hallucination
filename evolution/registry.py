@@ -174,10 +174,18 @@ class ActiveRegistry:
         return payload, artifacts
 
     def write(self, entries: Sequence[Mapping[str, Any]], *, cycle: int, reason: str,
-              library_cfg: Mapping[str, Any] | None = None) -> dict[str, Any]:
+              library_cfg: Mapping[str, Any] | None = None,
+              publication_id: str | None = None, publication: Mapping[str, Any] | None = None) -> dict[str, Any]:
         with self._mutation() as (current, state):
             payload, artifacts = self._prepare_write(entries, current=current, state=state,
                                                      cycle=cycle, reason=reason, library_cfg=library_cfg)
+            if (publication_id is None) != (publication is None):
+                raise ValueError("publication identity and record must be supplied together")
+            if publication is not None:
+                records = state.setdefault("publications", {})
+                if publication_id in records:
+                    raise RegistryConflictError("publication already committed; recover its record")
+                records[publication_id] = {"registry_hash": payload["content_hash"], "record": deepcopy(publication)}
             return self._publish(payload, state, artifacts)
 
     def record_marginal(self, intervention_id: str, marginal: int, *, cycle: int, fired_rate: float) -> None:
@@ -274,8 +282,11 @@ class ActiveRegistry:
             return self._publish(payload, state)
 
     def clear(self) -> None:
-        with self._mutation():
-            self._publish(empty_registry(), self._empty_state())
+        with self._mutation() as (_, current_state):
+            state = self._empty_state()
+            if "publications" in current_state:
+                state["publications"] = current_state["publications"]
+            self._publish(empty_registry(), state)
 
 
 def load_active_registry(config: Mapping[str, Any]) -> ActiveRegistry:

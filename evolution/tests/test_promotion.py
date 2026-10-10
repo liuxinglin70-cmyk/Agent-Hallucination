@@ -204,11 +204,14 @@ class _FakeRegistry:
     def check_limits(self, entries, *, library_cfg=None):
         return []
 
-    def write(self, entries, *, cycle, reason, library_cfg=None):
+    def write(self, entries, *, cycle, reason, library_cfg=None, publication_id=None, publication=None):
         from evolution.contracts import make_registry
 
         self.entries = [dict(entry) for entry in entries]
         self.writes.append(self.entries)
+        if publication is not None:
+            self.state.setdefault("publications", {})[publication_id] = {
+                "registry_hash": make_registry(self.entries)["content_hash"], "record": publication}
         return make_registry(self.entries)
 
 
@@ -216,7 +219,13 @@ class _FakeLedger:
     def __init__(self) -> None:
         self.events: list[tuple[str, dict]] = []
 
-    def append(self, event, payload):
+    def append(self, event, payload, *, idempotency_key=None):
+        if idempotency_key is not None:
+            existing = getattr(self, "_keys", {})
+            if idempotency_key in existing:
+                return existing[idempotency_key]
+            self._keys = existing
+            self._keys[idempotency_key] = {"event": event, "payload": payload}
         self.events.append((str(event), dict(payload)))
         return {"event": event, "payload": payload}
 
@@ -680,7 +689,7 @@ def test_candidate_from_research_refuses_an_unselected_run(tmp_path):
         candidate_from_research(run_dir)
 
 
-def test_completed_arm_is_resumed_not_redrawn(tmp_path):
+def test_completed_arm_is_resumed_not_redrawn(tmp_path, monkeypatch):
     """An interrupted run must not re-spend budget on an arm already measured."""
     protocol = _standard_protocol(tmp_path)
     candidate = _candidate()
@@ -707,8 +716,13 @@ def test_completed_arm_is_resumed_not_redrawn(tmp_path):
         ledger=_FakeLedger(),
         stages=("structural", "harmlessness", "behavior", "m"),
     )
-    first = run.run()
-    assert first["state"] == "promoted"
+    def interrupt_before_commit(*args, **kwargs):
+        raise OSError("interrupt after measuring arms")
+
+    monkeypatch.setattr(run.registry, "write", interrupt_before_commit)
+    with pytest.raises(OSError, match="interrupt after measuring arms"):
+        run.run()
+    assert run.registry.writes == []
     calls_after_first = backend.calls
 
     # A second attempt at the same identity reuses both stored arms.
@@ -732,7 +746,7 @@ def test_completed_arm_is_resumed_not_redrawn(tmp_path):
     assert calls_after_first > 0
 
 
-def test_changed_case_set_invalidates_a_stored_arm(tmp_path):
+def test_changed_case_set_invalidates_a_stored_arm(tmp_path, monkeypatch):
     """Resume must not reuse rows measured on a different input."""
     protocol = _standard_protocol(tmp_path)
     candidate = _candidate()
@@ -749,7 +763,13 @@ def test_changed_case_set_invalidates_a_stored_arm(tmp_path):
         ledger=_FakeLedger(),
         stages=("structural", "harmlessness", "behavior", "m"),
     )
-    run.run()
+    def interrupt_before_commit(*args, **kwargs):
+        raise OSError("interrupt after measuring arms")
+
+    monkeypatch.setattr(run.registry, "write", interrupt_before_commit)
+    with pytest.raises(OSError, match="interrupt after measuring arms"):
+        run.run()
+    assert run.registry.writes == []
 
     class _Counting(_ScriptedBackend):
         def __init__(self, **kwargs):

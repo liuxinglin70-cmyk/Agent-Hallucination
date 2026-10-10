@@ -24,11 +24,11 @@
 
 ## 2026-10-09 至 10-11：代码重构离线验证
 
-按用户请求继续完整18包重构，范围和证据见 [实施台账](../IMPLEMENTATION_PLAN.md)。B31开发适配与B32来源消费已由Git提交保留；B32实际门控、报告、记录和能力规划按当前运行身份核验原始测量叶来源，重复、部分重复、解决后重放和缺/错身份只作诊断。Mock显式标注synthetic，缓存保留原来源；bb62955c完整code_only1859/platform57、AST80/三个CLI/源码不变通过，首轮Mock缺来源的失败报告保留。
+按用户请求继续完整18包重构，范围和证据见 [实施台账](../IMPLEMENTATION_PLAN.md)。B32实际测量来源消费已提交7f87ac6，bb62955c完整code_only1859/platform57、AST80/三个CLI/源码不变通过，首轮Mock缺来源的失败报告保留。B33注册表唯一提交已提交73a3371，新17项/相关50项及3331d727完整1876/57、AST80/三CLI/源码不变通过，旧分离格式不迁移、历史字节不改。
 
-B33七条正式故障反例先失败后通过：写入、恢复、清空、退役、回滚和两种贡献记录均以active.json唯一提交发布registry与state，快照由提交索引引用。新增17项及相关50项通过；提交前失败保持原磁盘/内存并清理未引用快照，实际替换后中断读取新提交且传播原异常，陈旧实例拒绝写入。Detector与预检共享严格加载器；旧分离格式不迁移、不改字节。[提交核验](../artifacts/code_quality/3331d727e592712ce25d53cba38c2aa9fc98ad0b6e2c0d414fa2f1ac24aeef1b/60a4b5270156423faa9786ea2b812bac/registry-commit-verification.md)、[纯代码](../artifacts/code_quality/3331d727e592712ce25d53cba38c2aa9fc98ad0b6e2c0d414fa2f1ac24aeef1b/60a4b5270156423faa9786ea2b812bac/summary.json)、[平台](../artifacts/code_quality/3331d727e592712ce25d53cba38c2aa9fc98ad0b6e2c0d414fa2f1ac24aeef1b/bc2a7886a7b349f885dace446f24db98/summary.json)。3331d727完整纯代码1876项、平台57项、AST80/三CLI/源码不变检查通过。
+B34四条正式故障反例先失败后通过：version.json、promotion.json或晋升两个事件持久化失败后，原实现已部署却无完整终态。两种协议现在共用publication提交，将版本、终态和事件与部署绑定；外部文件和账本通过严格身份恢复及幂等追加补齐。新28项/相关134项及末次28项通过。提交前失败不部署，实际替换或事件追加后的OSError/KeyboardInterrupt传播且可恢复；同身份已提交恢复不重测、不重复部署，候选/协议/配置/源码/门集合漂移、既有输出和重封不一致记录拒绝。清空部署保留历史提交记录。临时目录的实际version/promotion写入后KeyboardInterrupt探针也成功恢复，原文件字节保留且两事件各一次。508b3bca第一轮1901/57全量通过；随后两条公共返回/落盘candidate_status不一致反例先失败后补修，公共入口现在直接返回终态生成处已决定状态的报告。最终eae68b5b完整1904/57、AST80/三CLI/源码不变检查通过；[晋升核验](../artifacts/code_quality/eae68b5b3cb516d7f59fbb28e60ed0c4cc3c9a236024a0101df10d7a226c4ef0/ca0828c4d48c48b6a9167d75f3eaa4c1/promotion-commit-verification.md)、[纯代码](../artifacts/code_quality/eae68b5b3cb516d7f59fbb28e60ed0c4cc3c9a236024a0101df10d7a226c4ef0/ca0828c4d48c48b6a9167d75f3eaa4c1/summary.json)、[平台](../artifacts/code_quality/eae68b5b3cb516d7f59fbb28e60ed0c4cc3c9a236024a0101df10d7a226c4ef0/2be24ae26b7f4ac6abd919ef2fb81ae7/summary.json)。
 
-B34在正式PromotionRun、四门与ScriptedBackend临时目录复现：version.json注入OSError后，活动条目已有1项，version.json及promotion.json不存在，candidate_promoted/promotion_attempt事件为空。正式故障回归与修复待实施。注册表/晋升/记忆完整生命周期、独立复审及18包验收尚未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。最终脚本/文档清理与doc组会归档仍未完成。
+B35三种记忆写入入口在临时目录复现：同一逻辑键第二次内容变化时，episodic/procedural/improvement都只有原1条，却返回未落盘的新记录；episode返回unevaluable=False而磁盘仍True。受控两线程在检查后会合、物理追加串行后，三类相同输入均落盘2条，确认检查/追加不是原子操作。正式反例与修复待实施。注册表/晋升/记忆完整生命周期、独立复审及18包验收尚未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。最终脚本/文档清理与doc组会归档仍未完成。
 
 ## 2026-09-24 至 09-27：三轮自进化与 G0 检测器基线
 

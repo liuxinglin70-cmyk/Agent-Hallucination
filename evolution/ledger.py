@@ -102,13 +102,25 @@ class Ledger:
             return "0" * 64
         return str(json.loads(last).get("entry_hash") or "0" * 64)
 
-    def append(self, event: str, payload: Mapping[str, Any]) -> dict[str, Any]:
+    def append(self, event: str, payload: Mapping[str, Any], *, idempotency_key: str | None = None) -> dict[str, Any]:
+        if idempotency_key is not None and (not isinstance(idempotency_key, str) or not idempotency_key):
+            raise ValueError("ledger idempotency key must be nonempty text")
         with self._lock, self._file_lock():
+            if idempotency_key is not None:
+                if not self.verify()["valid"]:
+                    raise ValueError("cannot append to an invalid ledger")
+                for previous in self.read():
+                    if previous.get("idempotency_key") == idempotency_key:
+                        if previous["event"] != str(event) or previous["payload"] != dict(payload):
+                            raise ValueError("ledger idempotency key conflicts with existing content")
+                        return previous
             record: dict[str, Any] = {
                 "event": str(event),
                 "payload": dict(payload),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
+            if idempotency_key is not None:
+                record["idempotency_key"] = idempotency_key
             prev_hash = self.last_hash()
             record["prev_hash"] = prev_hash
             canonical = json.dumps(

@@ -1493,7 +1493,7 @@ def validate_registry_commit(payload: Mapping[str, Any]) -> tuple[dict[str, Any]
     if not isinstance(state, Mapping) or state.get("active_hash") != registry["content_hash"]:
         raise ValueError("registry active/state mismatch")
     required = {"cycle", "active_hash", "net_contribution_history", "interventions", "snapshots"}
-    if not required <= set(state) or set(state) - required - {"rolled_back_to"}:
+    if not required <= set(state) or set(state) - required - {"rolled_back_to", "publications"}:
         raise ValueError("registry state fields do not match contract")
     if type(state["cycle"]) is not int or state["cycle"] < 0:
         raise ValueError("registry state cycle is invalid")
@@ -1546,6 +1546,17 @@ def validate_registry_commit(payload: Mapping[str, Any]) -> tuple[dict[str, Any]
         validate_path_id(target["snapshot"], nested=False)
         if not isinstance(target["hash"], str) or len(target["hash"]) != 64 or any(char not in "0123456789abcdef" for char in target["hash"]):
             raise ValueError("registry rollback hash is invalid")
+    publications = state.get("publications", {})
+    if not isinstance(publications, Mapping):
+        raise ValueError("registry publications are invalid")
+    for identifier, publication in publications.items():
+        if not isinstance(identifier, str) or len(identifier) != 64 or any(char not in "0123456789abcdef" for char in identifier):
+            raise ValueError("registry publication identity is invalid")
+        if not isinstance(publication, Mapping) or set(publication) != {"registry_hash", "record"} or not isinstance(publication["record"], Mapping):
+            raise ValueError("registry publication fields are invalid")
+        value = publication["registry_hash"]
+        if not isinstance(value, str) or len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
+            raise ValueError("registry publication hash is invalid")
     return deepcopy(dict(registry)), deepcopy(dict(state))
 
 

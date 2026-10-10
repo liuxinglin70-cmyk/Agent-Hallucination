@@ -288,9 +288,12 @@ class _Registry:
     def check_limits(self, entries, *, library_cfg=None):
         return []
 
-    def write(self, entries, *, cycle, reason, library_cfg=None):
+    def write(self, entries, *, cycle, reason, library_cfg=None, publication_id=None, publication=None):
         self.entries = [dict(entry) for entry in entries]
         self.writes.append(self.entries)
+        if publication is not None:
+            self.state.setdefault("publications", {})[publication_id] = {
+                "registry_hash": make_registry(self.entries)["content_hash"], "record": publication}
         return make_registry(self.entries)
 
 
@@ -299,7 +302,13 @@ class _Ledger:
         self.events: list[tuple[str, dict]] = []
         self.valid = valid
 
-    def append(self, event, payload):
+    def append(self, event, payload, *, idempotency_key=None):
+        if idempotency_key is not None:
+            existing = getattr(self, "_keys", {})
+            if idempotency_key in existing:
+                return existing[idempotency_key]
+            self._keys = existing
+            self._keys[idempotency_key] = {"event": event, "payload": payload}
         self.events.append((str(event), dict(payload)))
         return {"event": event, "payload": payload}
 

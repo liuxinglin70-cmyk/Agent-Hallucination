@@ -30,8 +30,10 @@ from __future__ import annotations
 
 from detector.replay import requires_fresh_evaluation
 
+from copy import deepcopy
 import hashlib
 import json
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -1341,6 +1343,9 @@ class PromotionRun:
         }
 
     def run(self) -> dict[str, Any]:
+        recovered = self._recover_publication()
+        if recovered is not None:
+            return recovered
         if self.protocol.get("schema_version") == alignment.ALIGNED_PROTOCOL_SCHEMA:
             return self._run_aligned()
         # All four formal gates are mandatory in every promotion, not only in
@@ -1806,7 +1811,7 @@ class PromotionRun:
                     admitted=False,
                 )
             else:
-                report["version"] = self._publish()
+                return self._publish(report)
         self._write(report)
         return report
 
@@ -2024,8 +2029,10 @@ class PromotionRun:
         if problems:
             return finish("promotion_blocked_preflight", "library_limit", "; ".join(problems))
         self._last_gates = dict(report.get("gates") or {})
-        report["version"] = self._publish()
-        return finish("promoted", "promoted")
+        report.update(state="promoted", terminal_reason="", admitted=True,
+                      elapsed_seconds=round(time.monotonic() - started, 3),
+                      promotion_diagnosis=alignment.diagnosis("promoted", mechanism_id=mechanism_id))
+        return self._publish(report)
 
     def _claim_protocol(self) -> None:
         """Claim a frozen protocol for exactly one promotion attempt.
@@ -2096,86 +2103,46 @@ class PromotionRun:
                 raise ValueError("protocol already consumed by another promotion attempt")
 
     # -- publication ------------------------------------------------------
-    def _publish(self) -> dict[str, Any]:
-        """Commit the admitted version and record it in registry and ledger.
+    def _publication_id(self) -> str:
+        return digest({"output_dir": os.path.normcase(str(self.output_dir.resolve()))})
 
-        This is the only place the active registry is written. The ledger
-        entry carries the candidate identity so a later round can attribute
-        the deployed version to the candidate and protocol that produced it.
-        """
-        artifacts = [dict(entry) for entry in self.candidate.get("artifacts") or ()]
-        # The registry cycle counter must not be reset to 0 by a promotion:
-        # rollback windows (`cycle - threshold`), the "start from an empty
-        # registry" precondition of the full evolution run, and the version id
-        # all read it. A protocol is free to carry no cycle field -- none was
-        # ever written -- so fall back to the count the registry already has
-        # rather than to zero.
-        current_cycle = int(
-            (self.registry.state or {}).get("cycle") or 0
-        )
-        cycle = int(self.protocol.get("cycle") or current_cycle or 0)
-        gates_evaluated = sorted(
-            name for name, verdict in (self._last_gates or {}).items()
-            if verdict.get("passed") is True
-        )
-        # The recorded admission reason names the gates that actually ran.
-        # A hardcoded "STRUCTURAL/HARMLESSNESS/BEHAVIOR/M" would make the
-        # registry assert four gates on a run whose gate set was cut down,
-        # which no later audit could detect from the record.
-        gate_names = "/".join(name.upper() for name in gates_evaluated) or "NO-GATES"
-        payload = self.registry.write(
-            [*self.registry.entries, *artifacts],
-            cycle=cycle,
-            reason=(
-                f"promotion: {gate_names} passed on the frozen promotion "
-                f"protocol {self.protocol.get('frozen_at')}"
-            ),
-            library_cfg=self.config.get("library") or {},
-        )
-        version = {
-            "version_id": (
-                f"V{self.registry.state.get('cycle', 0)}-"
-                f"{self.candidate.get('content_hash')}"
-            ),
-            "candidate_id": self.candidate.get("candidate_id"),
-            "candidate_content_hash": self.candidate.get("content_hash"),
-            "registry_hash": str(payload.get("content_hash") or ""),
-            "base_revision": self.candidate.get("base_revision"),
-            "change_kind": self.candidate.get("change_kind"),
-            "artifacts": [
-                str(entry.get("intervention_id") or "") for entry in artifacts
-            ],
-            "promoted_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "protocol": self.protocol.get("loaded_from"),
-        }
-        if self.protocol.get("schema_version") == alignment.ALIGNED_PROTOCOL_SCHEMA:
-            version.update(
-                mechanism_id=self.protocol["mechanism_id"],
-                protocol_hash=self.protocol["protocol_hash"],
-                parent_registry_hash=self.protocol["baseline_registry_hash"],
-                development_cases=list(self.candidate["development_cases"]),
-            )
-        save_json(self.output_dir / "version.json", version)
-        self.ledger.append("candidate_promoted", {
-            "candidate_id": self.candidate.get("candidate_id"),
-            "candidate_content_hash": self.candidate.get("content_hash"),
-            "target_kind": self.candidate.get("target_kind"),
-            "base_revision": self.candidate.get("base_revision"),
-            "registry_hash": version["registry_hash"],
-            "artifacts": version["artifacts"],
-            "protocol": self.protocol.get("loaded_from"),
-            "frozen_at": self.protocol.get("frozen_at"),
+    def _publication_identity(self) -> str:
+        return digest({
+            "candidate": deepcopy(self.candidate),
+            "protocol": deepcopy(self.protocol),
+            "config": deepcopy(self.config),
+            "stages": sorted(self.stages),
+            "output_dir": str(self.output_dir.resolve()),
+            "source": source_identity("detector", "evolution"),
         })
-        return version
 
-    def _write(self, report: Mapping[str, Any]) -> None:
-        if "promotion_diagnosis" not in report and isinstance(report, dict):
-            state = str(report.get("state") or "")
+    def _recover_publication(self) -> dict[str, Any] | None:
+        publication = self.registry.state.get("publications", {}).get(self._publication_id())
+        if publication is None:
+            return None
+        record = publication["record"]
+        if record.get("identity") != self._publication_identity():
+            raise ValueError("committed promotion identity changed; cannot resume this attempt")
+        report = record.get("report")
+        if not isinstance(report, Mapping) or report.get("state") != "promoted" or report.get("admitted") is not True:
+            raise ValueError("committed promotion terminal is invalid")
+        if publication["registry_hash"] != (report.get("version") or {}).get("registry_hash"):
+            raise ValueError("committed promotion deployment hash does not match version")
+        if record != self._publication_record(report):
+            raise ValueError("committed promotion record does not match its terminal")
+        return self._materialize_publication(record)
+
+    def _normalize_report(self, report: dict[str, Any]) -> None:
+        state = str(report.get("state") or "")
+        report["candidate_status"] = {"promoted": "active", "promotion_rejected": "frozen"}.get(
+            state, self.candidate.get("status"))
+        if "promotion_diagnosis" not in report:
             code = alignment.LEGACY_STATE_REASONS.get(state, "runtime_unresolved")
             report["promotion_diagnosis"] = alignment.diagnosis(code, reason=str(report.get("terminal_reason") or ""))
             report["evidence_scope"] = "legacy_polarity_evaluation"
-        save_json(self.output_dir / "promotion.json", report)
-        self.ledger.append("promotion_attempt", {
+
+    def _attempt_event(self, report: Mapping[str, Any]) -> dict[str, Any]:
+        return {
             "candidate_id": report.get("candidate_id"),
             "candidate_content_hash": report.get("candidate_content_hash"),
             "state": report.get("state"),
@@ -2185,7 +2152,88 @@ class PromotionRun:
             "protocol_hash": self.protocol.get("protocol_hash"),
             "mechanism_id": report.get("mechanism_id"),
             "promotion_diagnosis": report.get("promotion_diagnosis"),
-        })
+        }
+
+    def _publish(self, report: Mapping[str, Any]) -> dict[str, Any]:
+        if any((self.output_dir / name).exists() for name in ("version.json", "promotion.json")):
+            raise ValueError("promotion output already exists without its committed publication")
+        artifacts = deepcopy(self.candidate.get("artifacts") or [])
+        entries = [*self.registry.entries, *artifacts]
+        payload = make_registry(entries)
+        current_cycle = int(self.registry.state.get("cycle") or 0)
+        cycle = int(self.protocol.get("cycle") or current_cycle or 0)
+        gates_evaluated = sorted(name for name, verdict in self._last_gates.items() if verdict.get("passed") is True)
+        gate_names = "/".join(name.upper() for name in gates_evaluated) or "NO-GATES"
+        version = {
+            "version_id": f"V{cycle}-{self.candidate.get('content_hash')}",
+            "candidate_id": self.candidate.get("candidate_id"),
+            "candidate_content_hash": self.candidate.get("content_hash"),
+            "registry_hash": payload["content_hash"],
+            "base_revision": self.candidate.get("base_revision"),
+            "change_kind": self.candidate.get("change_kind"),
+            "artifacts": [str(entry.get("intervention_id") or "") for entry in artifacts],
+            "promoted_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "protocol": self.protocol.get("loaded_from"),
+        }
+        if self.protocol.get("schema_version") == alignment.ALIGNED_PROTOCOL_SCHEMA:
+            version.update(mechanism_id=self.protocol["mechanism_id"],
+                           protocol_hash=self.protocol["protocol_hash"],
+                           parent_registry_hash=self.protocol["baseline_registry_hash"],
+                           development_cases=list(self.candidate["development_cases"]))
+        report = deepcopy(dict(report))
+        report["version"] = version
+        self._normalize_report(report)
+        record = self._publication_record(report)
+        self.registry.write(entries, cycle=cycle,
+                            reason=f"promotion: {gate_names} passed on the frozen promotion protocol {self.protocol.get('frozen_at')}",
+                            library_cfg=self.config.get("library") or {},
+                            publication_id=self._publication_id(), publication=record)
+        return self._materialize_publication(record)
+
+    def _publication_record(self, report: Mapping[str, Any]) -> dict[str, Any]:
+        version = report["version"]
+        if report.get("state") != "promoted" or report.get("admitted") is not True or report.get("candidate_status") != "active":
+            raise ValueError("publication requires an admitted promotion terminal")
+        for key in ("candidate_id", "candidate_content_hash"):
+            expected = self.candidate.get("candidate_id" if key == "candidate_id" else "content_hash")
+            if report.get(key) != expected or version.get(key) != expected:
+                raise ValueError("promotion terminal candidate identity does not match")
+        for gate in alignment.FORMAL_STAGES:
+            verdict = report.get("gates", {}).get(gate, {})
+            if verdict.get("passed") is not True or verdict.get("skipped"):
+                raise ValueError("publication requires all formal gates to pass")
+        promoted_event = {
+            "candidate_id": self.candidate.get("candidate_id"),
+            "candidate_content_hash": self.candidate.get("content_hash"),
+            "target_kind": self.candidate.get("target_kind"),
+            "base_revision": self.candidate.get("base_revision"),
+            "registry_hash": version["registry_hash"],
+            "artifacts": version["artifacts"],
+            "protocol": self.protocol.get("loaded_from"),
+            "frozen_at": self.protocol.get("frozen_at"),
+        }
+        return {"identity": self._publication_identity(), "report": deepcopy(dict(report)),
+                "events": [{"event": "candidate_promoted", "payload": promoted_event},
+                           {"event": "promotion_attempt", "payload": self._attempt_event(report)}]}
+
+    def _materialize_publication(self, record: Mapping[str, Any]) -> dict[str, Any]:
+        report = deepcopy(record["report"])
+        for name, payload in (("version.json", report["version"]), ("promotion.json", report)):
+            path = self.output_dir / name
+            if path.exists():
+                if json.loads(path.read_text(encoding="utf-8-sig")) != payload:
+                    raise ValueError(f"promotion projection conflicts with committed content: {name}")
+            else:
+                save_json(path, payload)
+        for event in record["events"]:
+            self.ledger.append(event["event"], event["payload"],
+                               idempotency_key=f"{self._publication_id()}:{event['event']}")
+        return report
+
+    def _write(self, report: Mapping[str, Any]) -> None:
+        self._normalize_report(report)
+        save_json(self.output_dir / "promotion.json", report)
+        self.ledger.append("promotion_attempt", self._attempt_event(report))
 
 
 def _delta_summary(delta: Mapping[str, Any]) -> dict[str, Any]:
@@ -2271,13 +2319,7 @@ def promote(
         backend=backend,
         stages=stages,
     )
-    report = run.run()
-    if report.get("state") == "promoted":
-        _transition(candidate, "active")
-    elif report.get("state") == "promotion_rejected":
-        _transition(candidate, "frozen")
-    report["candidate_status"] = candidate.get("status")
-    return report
+    return run.run()
 
 
 __all__ = [
