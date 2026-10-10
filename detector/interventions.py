@@ -775,36 +775,13 @@ def conviction_verdicts_for(
     *,
     calibration: Any = None,
 ) -> frozenset[str]:
-    """The verdicts one evidence row may convict on; empty means "none".
+    """Bind conviction permissions to the evidence row's executor.
 
-    The table is keyed by ``(predicate, runner)``, and this reader accepts a
-    predicate-only key as well so a legacy call that hands over
-    :data:`detector.predicates.PREDICATE_CONVICTION_VERDICTS` keeps working.
-
-    Three rules decide the answer:
-
-    1. A row that names a runner is governed by that runner's declaration. A
-       runner whose ``terminal_authority`` is not ``conviction`` may report
-       anything and convict nothing, whatever the table holds under its
-       predicate name. This is the runtime half of the declaration -- before
-       it, ``terminal_authority`` was read by reports and audits only, so an
-       ``evidence_only`` runner's verdict could authorize
-       ``convict_mechanical_violation``.
-    2. The pair key is looked up first, then the predicate-only key. A
-       ``typed_semantic`` entry that reuses a typed-DSL program's predicate
-       name therefore never collects that program's conviction verdicts: the
-       pair is what the plan's guard binds against.
-    3. A *built-in* predicate additionally needs a calibration record proving
-       zero false positives on the gold-clean corpus
-       (``detector.conviction_calibration``). This holds whatever table the
-       caller passes -- including
-       :data:`detector.predicates.PREDICATE_CONVICTION_VERDICTS` itself -- so a
-       hand-built ``adjudicate`` call cannot restore an authority the plan
-       refused. The filter is applied here, at the binding, because "which table
-       did the caller hand over" is not a question the design table can answer.
-
-    A row that names no runner -- the shape a hand-built ``adjudicate`` call
-    uses -- falls back to the predicate-only key alone, still under rule 3.
+    Evidence-only and unknown runners cannot convict. Pair permissions take
+    precedence over predicate permissions. Deterministic or unnamed runners
+    can only use the built-in conviction vocabulary with current calibration;
+    caller-supplied tables cannot authorize diagnostics or unknown predicates.
+    Typed DSL permissions belong to the declared program under its own runner.
     """
     table = conviction_verdicts or {}
     predicate = str(predicate or "")
@@ -820,7 +797,10 @@ def conviction_verdicts_for(
         if candidate is None:
             candidate = table.get(predicate)
         allowed = frozenset(candidate or ())
-    if predicate in PREDICATE_CONVICTION_VERDICTS:
+    if not runner or runner == "deterministic" or predicate in PREDICATES:
+        allowed &= PREDICATE_CONVICTION_VERDICTS.get(predicate, frozenset())
+        if not allowed:
+            return frozenset()
         admitted, _reason = _calibrated_conviction_verdicts(
             predicate, allowed, calibration,
         )
@@ -1940,6 +1920,10 @@ class InterventionPlan:
                 (entry.get("provenance") or {}).get("failure_family") or ""
             )
             self.evidence.append(dict(result))
+            if result.get("execution_status") == "resource_exhausted":
+                self._record(entry, "evidence_unmeasurable", str(result.get("detail") or ""))
+                results.append(result)
+                continue
             # Namespace facts by predicate AND failure_family to prevent
             # cross-family contamination.  A guard whose trigger requires
             # ``required_action_present=violated`` must only see the fact
@@ -2037,6 +2021,7 @@ class InterventionPlan:
                     (
                         item for item in self.evidence
                         if str(item.get("predicate") or "") == predicate
+                        and item.get("execution_status") != "resource_exhausted"
                         and str(item.get("failure_family") or "") == str(
                             (entry.get("provenance") or {}).get(
                                 "failure_family"
@@ -2149,7 +2134,7 @@ class InterventionPlan:
                 entry, runner, predicate, packet, context,
             )
             verdict = str(result.get("verdict") or "")
-            if verdict in set(body.get("trigger_verdicts") or ()):
+            if result.get("execution_status") != "resource_exhausted" and verdict in set(body.get("trigger_verdicts") or ()):
                 self._record(
                     entry,
                     "recall_triggered",

@@ -6,11 +6,9 @@ module. There is no ``eval``, no import, no attribute traversal, and no loop:
 the interpreter selects one whitelisted typed view of the packet/context,
 applies one fixed operator, and maps the result to a declared verdict.
 
-This bounds what a program can *say*, not how long it may run: a validated
-program is a capability contract, not a hardened sandbox. The one operator
-that can cost unbounded time is ``matches`` regex backtracking, so the
-validator refuses backreferences and the ambiguous repeated-group shapes that
-cause catastrophic backtracking, and the matcher bounds its haystack.
+Regex matching runs in a killable subprocess under a shared program budget,
+case deadline and run cancellation. Validation also rejects known ambiguous
+patterns and bounds the pattern and input sizes.
 
 The proposer can grow the observation vocabulary of the detector at runtime,
 while the surface stays fail-closed: unknown fields, operators, verdicts,
@@ -24,6 +22,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
+import sys
+import time
 from typing import Any, Mapping, Sequence
 
 from detector.packet import (
@@ -31,6 +32,7 @@ from detector.packet import (
     delivered_result as packet_delivered_result,
     packet_features,
 )
+from detector.runtime import check_request_deadline, current_control
 
 PROGRAM_SCHEMA = "detector.predicate_program.v1"
 PROGRAM_RUNNER = "typed_dsl"
@@ -42,13 +44,73 @@ MAX_LITERAL_CHARS = 400
 MAX_REGEX_CHARS = 300
 MAX_CONDITIONS = 4
 
-# Regex is the only operator that can backtrack. A validated pattern is still
-# checked against a bounded haystack, but the real defence is refusing the
-# shape of pattern that makes backtracking catastrophic (see
-# ``_regex_has_quantified_ambiguity``); the cap alone cannot bound runtime.
 MAX_REGEX_HAYSTACK = 4096
+MAX_REGEX_SECONDS = 0.5
+MAX_PROGRAM_SECONDS = 1.0
+
+_REGEX_WORKER = (
+    "import json,re,sys; pattern,text=json.load(sys.stdin); "
+    "print(json.dumps(re.search(pattern,text,re.IGNORECASE) is not None))"
+)
+
+
+class PredicateResourceExceeded(RuntimeError):
+    """A regex could not establish a result within its execution budget."""
+
+
+def _check_execution() -> None:
+    control = current_control()
+    if control is not None:
+        control.check()
+    check_request_deadline()
+
+
+def _regex_matches(pattern: str, text: str, program_deadline: float) -> bool:
+    _check_execution()
+    limit = min(program_deadline, time.monotonic() + MAX_REGEX_SECONDS)
+    if time.monotonic() >= limit:
+        raise PredicateResourceExceeded("predicate regex budget exhausted")
+    process = subprocess.Popen(
+        [sys.executable, "-c", _REGEX_WORKER],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True, encoding="utf-8",
+    )
+    payload = json.dumps([pattern, text[:MAX_REGEX_HAYSTACK]], ensure_ascii=True)
+    try:
+        while True:
+            _check_execution()
+            remaining = limit - time.monotonic()
+            if remaining <= 0:
+                raise PredicateResourceExceeded("predicate regex budget exhausted")
+            try:
+                stdout, _ = process.communicate(payload, timeout=min(0.02, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                # communicate retains its input buffer across polls.
+                payload = None
+        _check_execution()
+        if time.monotonic() >= limit:
+            raise PredicateResourceExceeded("predicate regex budget exhausted")
+        if process.returncode != 0:
+            raise PredicateResourceExceeded("predicate regex worker failed")
+        result = json.loads(stdout)
+        if not isinstance(result, bool):
+            raise PredicateResourceExceeded("predicate regex worker returned an invalid result")
+        return result
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.communicate()
 
 _BACKREFERENCE_RE = re.compile(r"\\[1-9]")
+
+_WHEN_FACT_FIELDS = {
+    "judge_positive": "context_judge_positive",
+    "judge_confidence": "context_judge_confidence",
+    "judge_hallucination_reason": "context_judge_hallucination_reason",
+    "delivered_result": "context_judge_delivered_result",
+    "quote": "context_quote",
+}
 
 # Scalar views are string/number values. List views return a flat list of
 # strings. Aggregate views return an integer and may only be combined with
@@ -153,11 +215,9 @@ def _require_literal(value: Any, field: str, *, limit: int = MAX_LITERAL_CHARS) 
 def _regex_has_quantified_ambiguity(pattern: str) -> bool:
     """True when a quantified group can backtrack catastrophically.
 
-    Catastrophic backtracking needs an ambiguous repeated group: a group that
-    is itself quantified while its body already contains a quantifier or an
-    alternation (``(a+)+``, ``(a|aa)+``, ``(\\d{2})+``). Refusing that shape
-    covers the classic ReDoS family without a runtime timeout, which Python's
-    ``re`` cannot provide.
+    This conservative syntax check rejects repeated groups containing another
+    quantifier or alternation. It is not a complete ambiguity analysis; the
+    subprocess execution budget bounds accepted patterns.
     """
     stack: list[list[Any]] = []
     index = 0
@@ -320,6 +380,9 @@ def _validate_condition(
 def _validate_rule(rule: Any, index: int, verdicts: list[str], name: str) -> dict[str, Any]:
     if not isinstance(rule, Mapping):
         raise ValueError(f"{name}.rules[{index}] must be an object")
+    unknown = set(rule) - {"field", "operator", "value", "conditions", "verdict", "detail", "when"}
+    if unknown:
+        raise ValueError(f"{name}.rules[{index}] has unknown fields {sorted(unknown)}")
     has_single = ("field" in rule) or ("operator" in rule)
     has_conditions = "conditions" in rule
     if has_single and has_conditions:
@@ -377,28 +440,39 @@ def _validate_rule(rule: Any, index: int, verdicts: list[str], name: str) -> dic
             f"{name}.rules[{index}].detail exceeds {MAX_LITERAL_CHARS} characters"
         )
     when = rule.get("when")
-    when = when if isinstance(when, Mapping) else {}
-    when_features = set(str(item) for item in when.get("packet_features") or ())
+    if when is not None and not isinstance(when, Mapping):
+        raise ValueError(f"{name}.rules[{index}].when must be an object")
+    when = when or {}
+    unknown_when = set(when) - {"packet_features", "facts"}
+    if unknown_when:
+        raise ValueError(f"{name}.rules[{index}].when has unknown fields {sorted(unknown_when)}")
+    when_features = set(_clean_list(when.get("packet_features"), f"rules[{index}].when.packet_features"))
     if when_features and not when_features <= PACKET_FEATURE_NAMES:
         raise ValueError(
             f"{name}.rules[{index}].when.packet_features contains an unknown "
             "packet feature"
         )
     when_facts = _clean_list(when.get("facts"), f"rules[{index}].when.facts")
-    parsed_when_facts: list[tuple[str, str]] = []
+    fact_conditions = []
     for fact in when_facts:
         if "=" not in fact:
             raise ValueError(
                 f"{name}.rules[{index}].when.facts item {fact!r} must be name=value"
             )
         fact_name, fact_value = fact.split("=", 1)
-        parsed_when_facts.append((fact_name, fact_value))
+        field = _WHEN_FACT_FIELDS.get(fact_name, fact_name)
+        fact_conditions.append(_validate_condition(
+            {"field": field, "operator": "equals", "value": fact_value},
+            index, name,
+        ))
+    conditions = fact_conditions + conditions
+    if len(conditions) > MAX_CONDITIONS:
+        raise ValueError(f"{name}.rules[{index}] has {len(conditions)} combined conditions; limit is {MAX_CONDITIONS}")
     return {
         "conditions": conditions,
         "verdict": verdict,
         "detail": detail,
-        "when_features": sorted(when_features),
-        "when_facts": parsed_when_facts,
+        "when": {"packet_features": sorted(when_features)},
     }
 
 
@@ -672,7 +746,7 @@ def typed_field_profile(
     return profile
 
 
-def _matches_scalar(view: str, operator: str, value: str | None) -> bool:
+def _matches_scalar(view: str, operator: str, value: str | None, program_deadline: float) -> bool:
     hay = view.lower()
     needle = str(value or "").lower()
     if operator == "equals":
@@ -691,19 +765,9 @@ def _matches_scalar(view: str, operator: str, value: str | None) -> bool:
         return hay.endswith(needle)
     if operator == "not_ends_with":
         return not hay.endswith(needle)
-    if operator == "matches":
-        # Regex is the only backtracking operator. Both the pattern shape
-        # (validator) and the haystack (here) are bounded so a pathological
-        # pattern cannot turn a typed observation into unbounded computation.
-        # IGNORECASE keeps regex consistent with every other (case-folded)
-        # operator instead of being a silent exception to the rule.
-        return re.search(
-            value or "", view[:MAX_REGEX_HAYSTACK], re.IGNORECASE,
-        ) is not None
-    if operator == "not_matches":
-        return re.search(
-            value or "", view[:MAX_REGEX_HAYSTACK], re.IGNORECASE,
-        ) is None
+    if operator in {"matches", "not_matches"}:
+        matched = _regex_matches(value or "", view, program_deadline)
+        return matched if operator == "matches" else not matched
     if operator == "exists":
         return bool(view)
     if operator == "missing":
@@ -754,29 +818,11 @@ def _matches_aggregate(view: int, operator: str, value: str | None) -> bool:
     raise ValueError(f"unsupported aggregate operator {operator!r}")
 
 
-def _rule_matches(rule: Mapping[str, Any], packet: Mapping[str, Any], context: Mapping[str, Any]) -> bool:
-    when_features = set(rule.get("when_features") or ())
-    if when_features and not when_features <= packet_features(packet):
-        return False
-    fact_map = {
-        str(name): str(value).lower() if isinstance(value, bool) else str(value)
-        for name, value in context.items()
-        if name not in {
-            "contracts", "evidence_refs", "quote", "root_cause_quote",
-            "delivered_result",
-        }
-    }
-    fact_map["packet_features"] = ",".join(sorted(packet_features(packet)))
-    for fact_name, fact_value in rule.get("when_facts") or ():
-        if fact_map.get(fact_name) != fact_value:
-            return False
-    return True
-
-
 def _condition_matches(
     condition: Mapping[str, Any],
     packet: Mapping[str, Any],
     context: Mapping[str, Any],
+    program_deadline: float,
 ) -> bool:
     field = str(condition.get("field") or "")
     field_type = FIELD_TYPES[field]
@@ -784,7 +830,7 @@ def _condition_matches(
     operator = str(condition.get("operator") or "")
     value = condition.get("value")
     return (
-        _matches_scalar(view, operator, value)
+        _matches_scalar(view, operator, value, program_deadline)
         if field_type == "scalar"
         else _matches_list(view, operator, value)
         if field_type == "list"
@@ -798,18 +844,32 @@ def run_predicate_program(
     context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Execute one validated predicate program deterministically."""
+    _check_execution()
     spec = validate_predicate_program(program)
     context = dict(context or {})
+    program_deadline = time.monotonic() + MAX_PROGRAM_SECONDS
     for rule in spec["rules"]:
-        if not _rule_matches(rule, packet, context):
+        _check_execution()
+        if not set(rule["when"]["packet_features"]) <= packet_features(packet):
             continue
         conditions = list(rule.get("conditions") or ())
         if not conditions:
             continue
-        if all(
-            _condition_matches(condition, packet, context)
-            for condition in conditions
-        ):
+        try:
+            matched = all(
+                _condition_matches(condition, packet, context, program_deadline)
+                for condition in conditions
+            )
+        except PredicateResourceExceeded as exc:
+            # Unknown match results cannot authorize the inverse operator or
+            # let a later rule convict after the failed observation.
+            return {
+                "predicate": str(spec["name"]), "verdict": "not_applicable",
+                "detail": str(exc), "runner": PROGRAM_RUNNER,
+                "definition_hash": predicate_program_hash(spec),
+                "execution_status": "resource_exhausted",
+            }
+        if matched:
             return {
                 "predicate": str(spec["name"]),
                 "verdict": str(rule["verdict"]),

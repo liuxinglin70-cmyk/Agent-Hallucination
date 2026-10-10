@@ -12,7 +12,9 @@ from typing import Any, Mapping
 from detector.interventions import InterventionPlan, empty_plan
 from detector.packet import (
     evidence_refs_support_step,
+    event_id_for_step,
     packet_features,
+    packet_quote_error,
     packet_reference_error,
     render_judge_view,
 )
@@ -87,8 +89,12 @@ def _parse_judge(parsed: Any, packet: Mapping[str, Any]) -> tuple[dict | None, s
             return None, "root_cause.step must be an integer"
         if root_step != step_value:
             return None, "root_cause.step must equal hallucination_step"
-        if not str(root_cause.get("quote") or "").strip():
-            return None, "root_cause.quote is required"
+        quote_error = packet_quote_error(
+            packet, root_cause.get("quote"),
+            locus=event_id_for_step(packet, step_value), evidence_refs=refs,
+        )
+        if quote_error:
+            return None, f"root_cause.{quote_error}"
         if not str(root_cause.get("referent") or "").strip():
             return None, "root_cause.referent is required"
     else:
@@ -135,13 +141,13 @@ def _cast_vote(
     route: Mapping[str, Any],
     system: str,
     user: str,
-) -> tuple[dict | None, dict[str, Any] | None, list[dict[str, str]]]:
+) -> tuple[dict | None, dict[str, Any] | None, list[dict[str, str]], dict | None]:
     """A recoverable failed ballot abstains; terminal errors propagate."""
     warnings: list[dict[str, str]] = []
 
-    def abstain(message: str) -> tuple:
-        warnings.append({"attempt": "vote", "error": message})
-        return None, None, list(warnings)
+    def abstain(exc: ProviderError) -> tuple:
+        warnings.append({"attempt": "vote", "error": exc.message})
+        return None, {"attempts": exc.attempts}, list(warnings), exc.as_dict()
 
     try:
         parsed, meta = provider_call(
@@ -149,7 +155,7 @@ def _cast_vote(
         )
     except ProviderError as exc:
         raise_if_terminal(exc)
-        return abstain(exc.message)
+        return abstain(exc)
     result, error = _parse_judge(parsed, packet)
     if result is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
@@ -162,10 +168,13 @@ def _cast_vote(
             result, error = _parse_judge(parsed, packet)
         except ProviderError as exc:
             raise_if_terminal(exc)
-            return abstain(exc.message)
+            return abstain(exc)
     if result is None:
         warnings.append({"attempt": "final", "error": f"contract:{error}"})
-    return result, meta, list(warnings)
+        return None, meta, list(warnings), {
+            "error_type": "contract_error", "message": error,
+        }
+    return result, meta, list(warnings), None
 
 
 def run_judge(
@@ -205,22 +214,25 @@ def run_judge(
     ballots_usage: dict[str, Any] = {}
     total_attempts = 0
     warnings: list[dict[str, str]] = []
+    failures: list[dict[str, Any]] = []
     topups_used = 0
 
     # Independent ballots are exactly that, so they are cast concurrently: the
     # vote count is a majority requirement, not a serial protocol. Order is
     # preserved (see ``parallel_ordered``) so the returned sample does not
     # depend on which ballot happened to finish first.
-    def cast_at(_index: int) -> tuple[Any, Any, list]:
+    def cast_at(_index: int) -> tuple:
         return _cast_vote(
             packet=packet, route=route, system=system, user=user,
         )
 
-    def absorb(result: tuple[Any, Any, list]) -> None:
+    def absorb(result: tuple) -> None:
         nonlocal total_attempts, sample_meta
-        parsed, meta, vote_warnings = result
+        parsed, meta, vote_warnings, failure = result
         total_attempts += int((meta or {}).get("attempts") or 0)
         warnings.extend(vote_warnings)
+        if failure is not None:
+            failures.append(failure)
         if parsed is not None:
             ballots.append(parsed)
             sample_meta = dict(meta or {})
@@ -235,13 +247,16 @@ def run_judge(
         topups_used += 1
         absorb(cast_at(0))
     if not ballots:
+        failure_types = {failure["error_type"] for failure in failures}
+        error_type = next(iter(failure_types)) if len(failure_types) == 1 else "no_quorum"
         return {
             "ok": False,
             "parsed": None,
             "error": "every judge vote failed",
-            "error_type": "provider_error",
+            "error_type": error_type,
+            "vote_failures": failures,
         }, {
-            "stage": "judge", "state": "provider_error",
+            "stage": "judge", "state": error_type,
             "attempts": total_attempts, "view": view_state,
             "warnings": warnings,
         }
@@ -260,9 +275,10 @@ def run_judge(
                 f"judge quorum not reached: {len(ballots)} valid ballot(s) "
                 f"of {votes} (need {quorum})"
             ),
-            "error_type": "provider_error",
+            "error_type": "no_quorum",
+            "vote_failures": failures,
         }, {
-            "stage": "judge", "state": "provider_error",
+            "stage": "judge", "state": "no_quorum",
             "attempts": total_attempts, "view": view_state,
             "warnings": warnings,
         }

@@ -217,7 +217,7 @@ def _validate_resolutions(
     """
     if not isinstance(raw, list):
         raise EvidenceError("resolutions must be a list")
-    known = {str(source["evidence_id"]) for source in sources}
+    known = {str(source["evidence_id"]): source for source in sources}
     resolutions: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for index, entry in enumerate(raw, start=1):
@@ -233,6 +233,12 @@ def _validate_resolutions(
         if resolved_by not in known:
             raise EvidenceError(
                 f"{where}.resolved_by {resolved_by!r} is not a snapshot source"
+            )
+        verifies = known[resolved_by]["verifies"]
+        source_key = (_normalized(str(verifies["entity"])), _normalized(str(verifies["attribute"])))
+        if source_key != key:
+            raise EvidenceError(
+                f"{where}.resolved_by {resolved_by!r} does not belong to the entity/attribute group"
             )
         resolutions.append({
             "entity": entity,
@@ -417,6 +423,10 @@ def conflict_report(
         if len(values) < 2:
             continue
         resolution = by_key.get(key)
+        if resolution is not None and str(resolution["resolved_by"]) not in {
+            str(row["evidence_id"]) for row in rows
+        }:
+            resolution = None
         entry: dict[str, Any] = {
             "entity": key[0],
             "attribute": key[1],
@@ -494,18 +504,10 @@ def citation_error(
                     f"{conflict['resolved_by']}; cite the resolved source or "
                     "report the finding undecided"
                 )
-        if unresolved:
-            disputed = {
-                evidence_id
-                for conflict in unresolved
-                for evidence_id in conflict["evidence_ids"]
-            }
-            values = {
-                str(value)
-                for conflict in unresolved
-                for value in conflict["values"]
-            }
-            note = " ".join(str(conflict_note or "").split())
+        note = " ".join(str(conflict_note or "").split())
+        for conflict in unresolved:
+            disputed = set(conflict["evidence_ids"])
+            values = {str(value) for value in conflict["values"]}
             addressed = any(token in note for token in disputed | values)
             if not addressed:
                 return (

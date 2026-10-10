@@ -461,6 +461,8 @@ class LiveDetectorBackend(DetectionBackend):
         providers = baseline.get("providers") or {}
         frozen: dict[str, Any] = {}
         provenance = baseline.get("provenance") or {}
+        if isinstance(provenance.get("replay_inputs"), Mapping):
+            frozen["replay_inputs"] = provenance["replay_inputs"]
         packet_hash = provenance.get("packet_hash")
         if packet_hash:
             frozen["packet_hash"] = packet_hash
@@ -606,7 +608,7 @@ class LiveDetectorBackend(DetectionBackend):
                     }
                     for row in hearing_rows
                 ]
-        return frozen
+        return copy.deepcopy(frozen)
 
     def run_case(
         self,

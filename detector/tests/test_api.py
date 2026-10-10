@@ -247,7 +247,7 @@ def test_detect_recall_upgrade_path(sample_record, monkeypatch):
 
 @pytest.mark.parametrize("replay", [False, True])
 def test_recall_trigger_forces_recall_net_for_unanimous_clean_judge(
-    sample_record, monkeypatch, replay,
+    sample_record, monkeypatch, replay, replay_inputs_for,
 ):
     """A typed recall.trigger overrides the high-confidence skip decision."""
     judge_result = {
@@ -378,7 +378,8 @@ def test_recall_trigger_forces_recall_net_for_unanimous_clean_judge(
         from detector.identity import digest
         from detector.packet import build_packet
         frozen = {"judge_result": judge_result, "judge_status": judge_status,
-                  "packet_hash": digest(build_packet(sample_record)), "hearings": []}
+                  "packet_hash": digest(build_packet(sample_record)), "hearings": [],
+                  "replay_inputs": replay_inputs_for(sample_record, CONFIG)}
         def unexpected_judge(**kwargs):
             raise AssertionError("paired recall must not redraw judge")
         monkeypatch.setattr("detector.api.run_judge", unexpected_judge)
@@ -538,8 +539,9 @@ def test_detect_rejects_extra_fields(sample_record):
 
 
 def test_frozen_hearing_is_reused_instead_of_rerunning_tracer_and_defense(
-    sample_record, monkeypatch,
+    sample_record, monkeypatch, replay_inputs_for,
 ):
+    sample_record["history"][-1]["content"] = "The answer is 5."
     from detector.hearing import judge_target
     judge_result = {
         "ok": True,
@@ -592,6 +594,7 @@ def test_frozen_hearing_is_reused_instead_of_rerunning_tracer_and_defense(
     monkeypatch.setattr("detector.api.run_step_tracer", unexpected)
     monkeypatch.setattr("detector.api.run_defense", unexpected)
     detector = Detector(CONFIG, require_credentials=False)
+    frozen["replay_inputs"] = replay_inputs_for(sample_record, CONFIG)
     result = detector.detect(sample_record, case_id="x", frozen_stages=frozen)
     assert result["state"] == "verified_error"
     assert result["proof"]["defense"]["verdict"] == "substantiated"
@@ -602,6 +605,7 @@ def test_frozen_hearing_is_reused_instead_of_rerunning_tracer_and_defense(
     ("confidence", "low"), ("contracts", [{"kind": "exact_value", "requirement": "6"}]),
 ])
 def test_frozen_hearing_rechecks_fields_actually_consumed_by_defense(sample_record, monkeypatch, field, value):
+    sample_record["history"][-1]["content"] = "The answer is 5."
     from copy import deepcopy
     from evolution.backends import LiveDetectorBackend
     parsed = {"is_hallucination": True, "hallucination_step": 2,

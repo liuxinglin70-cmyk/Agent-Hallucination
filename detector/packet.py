@@ -296,6 +296,45 @@ def event_id_for_step(packet: Mapping[str, Any], step: int | None) -> str | None
     return None
 
 
+def packet_quote_error(
+    packet: Mapping[str, Any], quote: Any, *, locus: str,
+    evidence_refs: Sequence[str], required: bool = True,
+) -> str | None:
+    """Check an exact quote against separate source channels in its cited locus.
+
+    An event reference covers its prose and tools; an interaction reference
+    covers only that interaction. Rendering labels are not source evidence.
+    """
+    if quote is None and not required:
+        return None
+    if not isinstance(quote, str):
+        return "quote must be a string"
+    text = quote.strip()
+    if not text:
+        return "quote is required" if required else None
+    owners = packet_reference_index(packet)
+    owner = owners.get(locus)
+    if owner is None:
+        return "quote locus is an unknown packet reference"
+    channels = []
+    for event in packet.get("events") or ():
+        if event.get("event_id") != owner:
+            continue
+        event_cited = owner in evidence_refs and locus == owner
+        if event_cited:
+            channels.append(event.get("content"))
+        for interaction in event.get("tool_interactions") or ():
+            iid = interaction.get("interaction_id")
+            if locus != owner and iid != locus:
+                continue
+            if event_cited or iid in evidence_refs or owner in evidence_refs:
+                channels.extend(interaction.get(key) for key in
+                                ("tool_name", "arguments", "observation"))
+    if any(channel is not None and text in str(channel) for channel in channels):
+        return None
+    return "quote does not occur in a cited source channel at its locus"
+
+
 def step_kind(packet: Mapping[str, Any], step: int) -> str | None:
     """Classify one packet position by the *structure of its own event*.
 
@@ -447,11 +486,17 @@ def _answer_call(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def answer_tool_is_delivery(interaction: Mapping[str, Any]) -> bool:
+    name = str(interaction.get("tool_name") or "").lower()
+    return bool(interaction) and not any(marker in name for marker in ("terminate", "finish", "success"))
+
+
 def delivered_result(packet: Mapping[str, Any]) -> dict[str, Any]:
     """Mechanical extraction of the delivered-result anchors.
 
-    This is deliberately dumb: it finds the last prose event and the last
-    answer-like tool call. Semantic judgement belongs to the judge.
+    Prefer the last answer delivery over a closing status call. A status call
+    remains an anchor when there is no answer tool. Semantic judgement belongs
+    to the judge.
     """
     events = list(packet.get("events") or [])
     last_prose = None
@@ -461,11 +506,12 @@ def delivered_result(packet: Mapping[str, Any]) -> dict[str, Any]:
             last_prose = event
             break
     last_answer_tool = None
+    last_status_tool = None
     for event in reversed(events):
         for interaction in reversed(event.get("tool_interactions") or []):
             answer = _answer_call(interaction)
             if answer is not None:
-                last_answer_tool = {
+                anchored = {
                     **answer,
                     "event_id": event.get("event_id"),
                     "position": event.get("position"),
@@ -473,9 +519,15 @@ def delivered_result(packet: Mapping[str, Any]) -> dict[str, Any]:
                     "arguments": interaction.get("arguments"),
                     "observation": interaction.get("observation"),
                 }
-                break
+                if answer_tool_is_delivery(answer):
+                    last_answer_tool = anchored
+                    break
+                if last_status_tool is None:
+                    last_status_tool = anchored
         if last_answer_tool is not None:
             break
+    if last_answer_tool is None:
+        last_answer_tool = last_status_tool
     return {
         "last_prose_event_id": (
             last_prose.get("event_id") if last_prose else None

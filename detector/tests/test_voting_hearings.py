@@ -60,7 +60,7 @@ def test_majority_vote_strict_and_order_independent():
     assert majority_vote([True, True, False], on_tie=False) == (True, 3)
 
 
-def test_judge_three_votes_majority_positive(sample_packet, monkeypatch):
+def test_judge_three_votes_majority_positive(wrong_answer_packet, monkeypatch):
     outputs = [dict(JUDGE_FALSE), dict(JUDGE_TRUE), dict(JUDGE_TRUE)]
 
     def fake_call(*, route, system, user, purpose):
@@ -70,7 +70,7 @@ def test_judge_three_votes_majority_positive(sample_packet, monkeypatch):
     config = {
         "judge_route": {**CONFIG["judge_route"], "votes": 3},
     }
-    result, status = run_judge(packet=sample_packet, config=config)
+    result, status = run_judge(packet=wrong_answer_packet, config=config)
     assert result["ok"] is True
     assert result["parsed"]["is_hallucination"] is True
     vote = result["provider"]["vote"]
@@ -78,7 +78,7 @@ def test_judge_three_votes_majority_positive(sample_packet, monkeypatch):
                     "tie": False}
 
 
-def test_judge_three_votes_tie_keeps_negative(sample_packet, monkeypatch):
+def test_judge_three_votes_tie_keeps_negative(wrong_answer_packet, monkeypatch):
     calls = []
 
     def fake_call(*, route, system, user, purpose):
@@ -92,7 +92,7 @@ def test_judge_three_votes_tie_keeps_negative(sample_packet, monkeypatch):
 
     monkeypatch.setattr("detector.judge.provider_call", fake_call)
     config = {"judge_route": {**CONFIG["judge_route"], "votes": 3}}
-    result, status = run_judge(packet=sample_packet, config=config)
+    result, status = run_judge(packet=wrong_answer_packet, config=config)
     assert result["ok"] is True
     assert result["parsed"]["is_hallucination"] is False
     vote = result["provider"]["vote"]
@@ -101,7 +101,7 @@ def test_judge_three_votes_tie_keeps_negative(sample_packet, monkeypatch):
     assert vote["positives"] == 1
 
 
-def test_judge_vote_abstains_on_contract_error(sample_packet, monkeypatch):
+def test_judge_vote_abstains_on_contract_error(wrong_answer_packet, monkeypatch):
     calls = []
 
     def fake_call(*, route, system, user, purpose):
@@ -113,7 +113,7 @@ def test_judge_vote_abstains_on_contract_error(sample_packet, monkeypatch):
 
     monkeypatch.setattr("detector.judge.provider_call", fake_call)
     config = {"judge_route": {**CONFIG["judge_route"], "votes": 3}}
-    result, status = run_judge(packet=sample_packet, config=config)
+    result, status = run_judge(packet=wrong_answer_packet, config=config)
     # First vote abstained (contract error twice), second and third positive.
     assert result["ok"] is True
     assert result["parsed"]["is_hallucination"] is True
@@ -130,7 +130,7 @@ def _defense_output(verdict, step=2):
     }, {"attempts": 1, "model": "m", "usage": {}}
 
 
-def test_defense_tie_upgrades_substantiated(sample_packet, monkeypatch):
+def test_defense_tie_upgrades_substantiated(wrong_answer_packet, monkeypatch):
     outputs = [
         _defense_output("substantiated"),
         _defense_output("refuted"),
@@ -150,13 +150,13 @@ def test_defense_tie_upgrades_substantiated(sample_packet, monkeypatch):
         "evidence_refs": ["event_002"],
     }
     result, status = run_defense(
-        packet=sample_packet, positive=positive, config=config,
+        packet=wrong_answer_packet, positive=positive, config=config,
     )
     assert result["ok"] is True
     assert result["parsed"]["verdict"] == "substantiated_upgraded"
 
 
-def test_defense_majority_substantiated_stays_plain(sample_packet, monkeypatch):
+def test_defense_majority_substantiated_stays_plain(wrong_answer_packet, monkeypatch):
     outputs = [
         _defense_output("substantiated"),
         _defense_output("substantiated"),
@@ -174,7 +174,7 @@ def test_defense_majority_substantiated_stays_plain(sample_packet, monkeypatch):
         "evidence_refs": ["event_002"],
     }
     result, status = run_defense(
-        packet=sample_packet, positive=positive, config=config,
+        packet=wrong_answer_packet, positive=positive, config=config,
     )
     assert result["parsed"]["verdict"] == "substantiated"
 
@@ -198,7 +198,7 @@ def _candidates():
     ]
 
 
-def test_upgrade_returns_all_positive_candidates(sample_packet, monkeypatch):
+def test_upgrade_returns_all_positive_candidates(wrong_answer_packet, monkeypatch):
     def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {
             "upgrades": [
@@ -211,7 +211,7 @@ def test_upgrade_returns_all_positive_candidates(sample_packet, monkeypatch):
 
     monkeypatch.setattr("detector.recaller.provider_call", fake_call)
     result, status = run_causal_upgrade(
-        packet=sample_packet, candidates=_candidates(), config=CONFIG,
+        packet=wrong_answer_packet, candidates=_candidates(), config=CONFIG,
     )
     assert status["state"] == "ok"
     upgraded = result["upgraded_candidates"]
@@ -219,7 +219,7 @@ def test_upgrade_returns_all_positive_candidates(sample_packet, monkeypatch):
     assert result["upgraded_candidate"]["candidate_id"] == "c2"
 
 
-def test_upgrade_majority_per_candidate(sample_packet, monkeypatch):
+def test_upgrade_majority_per_candidate(wrong_answer_packet, monkeypatch):
     outputs = [
         {"upgrades": [
             {"candidate_id": "c1", "content_error": True, "causal": True,
@@ -247,7 +247,7 @@ def test_upgrade_majority_per_candidate(sample_packet, monkeypatch):
     monkeypatch.setattr("detector.recaller.provider_call", fake_call)
     config = {"judge_route": {**CONFIG["judge_route"], "votes": 3}}
     result, status = run_causal_upgrade(
-        packet=sample_packet, candidates=_candidates(), config=config,
+        packet=wrong_answer_packet, candidates=_candidates(), config=config,
     )
     assert status["state"] == "ok"
     assert [c["candidate_id"] for c in result["upgraded_candidates"]] == ["c1"]
@@ -292,7 +292,7 @@ def _hearing(source, step, verdict, candidate_id=None):
     }
 
 
-def test_second_hearing_convicts_when_first_refuted(sample_packet):
+def test_second_hearing_convicts_when_first_refuted(wrong_answer_packet):
     """The judge hearing is refuted but a recall candidate substantiates."""
     upgrade_result = {
         "ok": True,
@@ -315,7 +315,7 @@ def test_second_hearing_convicts_when_first_refuted(sample_packet):
         _hearing("recall_upgrade", 1, "substantiated", candidate_id="c1"),
     ]
     proof = adjudicate(
-        packet=sample_packet,
+        packet=wrong_answer_packet,
         judge_result=JUDGE_TRUE_RESULT, judge_status=JUDGE_OK,
         recall_result=RECALL_EMPTY[0], recall_status=RECALL_EMPTY[1],
         upgrade_result=upgrade_result,
@@ -331,7 +331,7 @@ def test_second_hearing_convicts_when_first_refuted(sample_packet):
     assert proof["responsible_step"] == 1
 
 
-def test_all_hearings_refuted_is_clean(sample_packet):
+def test_all_hearings_refuted_is_clean(wrong_answer_packet):
     upgrade_result = {
         "ok": True, "upgrades": [],
         "upgraded_candidate": None, "upgraded_candidates": [],
@@ -341,7 +341,7 @@ def test_all_hearings_refuted_is_clean(sample_packet):
         _hearing("recall_upgrade", 1, "refuted", candidate_id="c1"),
     ]
     proof = adjudicate(
-        packet=sample_packet,
+        packet=wrong_answer_packet,
         judge_result=JUDGE_TRUE_RESULT, judge_status=JUDGE_OK,
         recall_result=RECALL_EMPTY[0], recall_status=RECALL_EMPTY[1],
         upgrade_result=upgrade_result,
@@ -354,10 +354,10 @@ def test_all_hearings_refuted_is_clean(sample_packet):
     assert proof["terminal_basis"]["decisive_facts"]["defense"] == "refuted"
 
 
-def test_upgraded_verdict_degrades_authority(sample_packet):
+def test_upgraded_verdict_degrades_authority(wrong_answer_packet):
     hearings = [_hearing("judge", 2, "substantiated_upgraded")]
     proof = adjudicate(
-        packet=sample_packet,
+        packet=wrong_answer_packet,
         judge_result=JUDGE_TRUE_RESULT, judge_status=JUDGE_OK,
         recall_result=None, recall_status=None,
         upgrade_result=None, upgrade_status=None,
@@ -369,7 +369,7 @@ def test_upgraded_verdict_degrades_authority(sample_packet):
     assert proof["decision_authority"] == "degraded_judge_only"
 
 
-def test_judge_topup_refills_abstained_ballots(sample_packet, monkeypatch):
+def test_judge_topup_refills_abstained_ballots(wrong_answer_packet, monkeypatch):
     """vote_topup re-casts abstained ballots so quorum does not shrink."""
     calls = []
 
@@ -384,14 +384,14 @@ def test_judge_topup_refills_abstained_ballots(sample_packet, monkeypatch):
     config = {
         "judge_route": {**CONFIG["judge_route"], "votes": 2, "vote_topup": 2},
     }
-    result, status = run_judge(packet=sample_packet, config=config)
+    result, status = run_judge(packet=wrong_answer_packet, config=config)
     assert result["ok"] is True
     vote = result["provider"]["vote"]
     assert vote["cast"] == 2
     assert vote["topups"] == 1
 
 
-def test_judge_topup_absent_keeps_abstention_contract(sample_packet, monkeypatch):
+def test_judge_topup_absent_keeps_abstention_contract(wrong_answer_packet, monkeypatch):
     calls = []
 
     def fake_call(*, route, system, user, purpose):
@@ -400,14 +400,14 @@ def test_judge_topup_absent_keeps_abstention_contract(sample_packet, monkeypatch
 
     monkeypatch.setattr("detector.judge.provider_call", fake_call)
     config = {"judge_route": {**CONFIG["judge_route"], "votes": 3}}
-    result, status = run_judge(packet=sample_packet, config=config)
+    result, status = run_judge(packet=wrong_answer_packet, config=config)
     assert result["ok"] is False
     assert result["error"] == "every judge vote failed"
     # 3 ballots x (initial + contract repair) provider calls, no topup.
     assert len(calls) == 6
 
 
-def test_defense_topup_refills_abstained_ballots(sample_packet, monkeypatch):
+def test_defense_topup_refills_abstained_ballots(wrong_answer_packet, monkeypatch):
     calls = []
 
     def fake_call(*, route, system, user, purpose, cache_tag=""):
@@ -427,7 +427,7 @@ def test_defense_topup_refills_abstained_ballots(sample_packet, monkeypatch):
         "evidence_refs": ["event_002"],
     }
     result, status = run_defense(
-        packet=sample_packet, positive=positive, config=config,
+        packet=wrong_answer_packet, positive=positive, config=config,
     )
     assert result["ok"] is True
     assert result["parsed"]["verdict"] == "substantiated"
@@ -444,7 +444,7 @@ def _defense_positive():
     }
 
 
-def test_defense_no_majority_never_overturns_and_is_order_independent(sample_packet, monkeypatch):
+def test_defense_no_majority_never_overturns_and_is_order_independent(wrong_answer_packet, monkeypatch):
     """A tied defense must degrade, not overturn, whatever the order.
 
     The previous collapse fell back to ``ballots[0]`` when no verdict had a
@@ -463,14 +463,14 @@ def test_defense_no_majority_never_overturns_and_is_order_independent(sample_pac
         monkeypatch.setattr("detector.defense.provider_call", fake_call)
         config = {"defense_route": {**CONFIG["defense_route"], "votes": 2}}
         result, status = run_defense(
-            packet=sample_packet, positive=_defense_positive(), config=config,
+            packet=wrong_answer_packet, positive=_defense_positive(), config=config,
         )
         assert result["ok"] is True
         assert result["parsed"]["verdict"] == "inconclusive"
         assert result["provider"]["vote"]["tie"] is True
 
 
-def test_judge_quorum_rejects_a_single_surviving_ballot(sample_packet, monkeypatch):
+def test_judge_quorum_rejects_a_single_surviving_ballot(wrong_answer_packet, monkeypatch):
     """One valid ballot must not decide a 3-vote judge."""
     calls = []
 
@@ -482,13 +482,13 @@ def test_judge_quorum_rejects_a_single_surviving_ballot(sample_packet, monkeypat
 
     monkeypatch.setattr("detector.judge.provider_call", fake_call)
     config = {"judge_route": {**CONFIG["judge_route"], "votes": 3}}
-    result, status = run_judge(packet=sample_packet, config=config)
+    result, status = run_judge(packet=wrong_answer_packet, config=config)
     assert result["ok"] is False
     assert "quorum not reached" in result["error"]
-    assert status["state"] == "provider_error"
+    assert status["state"] == "no_quorum"
 
 
-def test_defense_quorum_keeps_conviction_and_degrades(sample_packet, monkeypatch):
+def test_defense_quorum_keeps_conviction_and_degrades(wrong_answer_packet, monkeypatch):
     """An under-quorum defense keeps the conviction instead of clearing it."""
     calls = []
 
@@ -501,14 +501,14 @@ def test_defense_quorum_keeps_conviction_and_degrades(sample_packet, monkeypatch
     monkeypatch.setattr("detector.defense.provider_call", fake_call)
     config = {"defense_route": {**CONFIG["defense_route"], "votes": 3}}
     result, status = run_defense(
-        packet=sample_packet, positive=_defense_positive(), config=config,
+        packet=wrong_answer_packet, positive=_defense_positive(), config=config,
     )
     assert result["ok"] is True
     assert result["parsed"]["verdict"] == "inconclusive"
     assert result["provider"]["vote"]["quorum_met"] is False
 
 
-def test_upgrade_quorum_rejects_a_single_surviving_sample(sample_packet, monkeypatch):
+def test_upgrade_quorum_rejects_a_single_surviving_sample(wrong_answer_packet, monkeypatch):
     """The causal upgrade had no top-up and no quorum floor at all."""
     from detector.provider import ProviderError
 
@@ -528,7 +528,7 @@ def test_upgrade_quorum_rejects_a_single_surviving_sample(sample_packet, monkeyp
     monkeypatch.setattr("detector.recaller.provider_call", failing_call)
     config = {"judge_route": {**CONFIG["judge_route"], "votes": 3}}
     result, status = run_causal_upgrade(
-        packet=sample_packet, candidates=_candidates(), config=config,
+        packet=wrong_answer_packet, candidates=_candidates(), config=config,
     )
     assert result["ok"] is False
     assert status["state"] == "no_quorum"

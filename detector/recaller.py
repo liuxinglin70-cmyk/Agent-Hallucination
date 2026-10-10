@@ -26,6 +26,7 @@ from detector.packet import (
     evidence_refs_support_event,
     evidence_refs_support_step,
     packet_features,
+    packet_quote_error,
     packet_reference_error,
     render_judge_view,
 )
@@ -81,6 +82,12 @@ def _parse_candidates(
             return None, (
                 f"candidate {candidate_id} evidence_refs do not support its locus"
             )
+        quote_error = packet_quote_error(
+            packet, raw.get("quote"), locus=locus, evidence_refs=refs,
+            required=False,
+        )
+        if quote_error:
+            return None, f"candidate {candidate_id}: {quote_error}"
         cited_raw = raw.get("evidence_citations")
         cited_raw = [] if cited_raw is None else cited_raw
         if not isinstance(cited_raw, list) or any(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import time
 
 from detector.interventions import (
     InterventionPlan,
@@ -46,6 +47,178 @@ def _packet():
             "tool_calls": [{"name": "python", "arguments": "{}"}],
         }],
     })
+
+
+@pytest.mark.parametrize("operator", ["matches", "not_matches"])
+@pytest.mark.parametrize("pattern,text", [
+    (r"^(a?){30}a{30}$", "a" * 30),
+    (r"^a+a+a+a+a+b$", "a" * 4096),
+])
+def test_regex_execution_is_bounded_without_authorizing_an_unknown_match(operator, pattern, text):
+    import subprocess
+    import sys
+    import json
+
+    program = _program(rules=[{
+        "field": "question_text", "operator": operator,
+        "value": pattern, "verdict": "violated",
+    }])
+    code = (
+        "import json,sys; from detector.predicate_dsl import run_predicate_program; "
+        "request=json.load(sys.stdin); "
+        "print(json.dumps(run_predicate_program(*request)))"
+    )
+    started = time.monotonic()
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        input=json.dumps([program, {"question": text, "events": []}]),
+        capture_output=True, text=True, timeout=3,
+    )
+    assert result.returncode == 0, result.stderr
+    row = json.loads(result.stdout)
+    assert row["verdict"] == "not_applicable"
+    assert row["execution_status"] == "resource_exhausted"
+    assert time.monotonic() - started < 3
+
+
+@pytest.mark.parametrize("stop_kind", ["deadline", "cancel", "budget"])
+def test_regex_worker_is_reaped_on_every_stop_path(monkeypatch, stop_kind):
+    import subprocess
+    import threading
+    from detector import predicate_dsl as dsl
+    from detector.runtime import CaseDeadlineExceeded, RunControl, RunStopped, deadline_scope, run_scope
+
+    processes = []
+    popen = subprocess.Popen
+
+    def capture(*args, **kwargs):
+        process = popen(*args, **kwargs)
+        processes.append(process)
+        return process
+
+    monkeypatch.setattr(dsl.subprocess, "Popen", capture)
+    monkeypatch.setattr(dsl, "_REGEX_WORKER", "import time; time.sleep(10)")
+    monkeypatch.setattr(dsl, "MAX_REGEX_SECONDS", 0.1 if stop_kind == "budget" else 2.0)
+    control = RunControl()
+    timer = threading.Timer(0.1, lambda: control.stop({"message": "test cancellation"}))
+    program = _program(rules=[{
+        "field": "question_text", "operator": "not_matches", "value": "x", "verdict": "violated",
+    }])
+    try:
+        with run_scope(control), deadline_scope(0.1 if stop_kind == "deadline" else 3):
+            if stop_kind == "cancel":
+                timer.start()
+            if stop_kind == "budget":
+                result = run_predicate_program(program, _packet())
+                assert result["execution_status"] == "resource_exhausted"
+            else:
+                error = CaseDeadlineExceeded if stop_kind == "deadline" else RunStopped
+                with pytest.raises(error):
+                    run_predicate_program(program, _packet())
+    finally:
+        timer.cancel()
+        if timer.ident is not None:
+            timer.join()
+    assert len(processes) == 1
+    assert processes[0].poll() is not None
+
+
+def test_unmeasurable_regex_cannot_feed_facts_guards_or_recall(monkeypatch):
+    from detector import predicate_dsl as dsl
+
+    monkeypatch.setattr(dsl, "_REGEX_WORKER", "import time; time.sleep(10)")
+    monkeypatch.setattr(dsl, "MAX_REGEX_SECONDS", 0.05)
+    program = _program(
+        default_verdict="satisfied", conviction_verdicts=["not_applicable"],
+        rules=[{"field": "question_text", "operator": "not_matches", "value": "x",
+                "verdict": "not_applicable"}],
+    )
+    evidence = _entry("IV-E", "evidence")
+    evidence["body"]["predicate_definition"] = program
+    guard = _entry("IV-G", "guard")
+    guard["trigger"]["facts"][0] = "evo_missing_search=not_applicable"
+    plan = InterventionPlan.from_registry(build_intervention_registry([evidence, guard]))
+    rows = plan.evidence_for("judge.post", _packet(), {})
+    assert rows[0]["execution_status"] == "resource_exhausted"
+    assert plan.facts == {}
+    assert plan.guard_actions(_packet(), {"evo_missing_search": "not_applicable",
+                              "judge_positive": "false", "positive_source": "none"}) == []
+    trigger = _trigger_entry()
+    trigger["body"]["predicate_definition"] = program
+    trigger["body"]["trigger_verdicts"] = ["not_applicable"]
+    plan = InterventionPlan.from_registry(build_intervention_registry([trigger]))
+    assert plan.recall_triggered(_packet(), judge_positive=False, judge_parsed={}) is False
+
+
+def test_program_normalization_preserves_feature_and_fact_conditions():
+    program = _program(rules=[{
+        "field": "question_text", "operator": "contains", "value": "search",
+        "verdict": "violated", "when": {
+            "packet_features": ["has_tool_calls"], "facts": ["judge_positive=false"],
+        },
+    }])
+    normalized = validate_predicate_program(program)
+    assert validate_predicate_program(normalized) == normalized
+    no_tools = build_packet({"question": "Use search", "history": [{"role": "assistant", "content": "ok"}]})
+    for spec in (program, normalized):
+        assert run_predicate_program(spec, no_tools, {"judge_positive": False})["verdict"] == "not_applicable"
+        assert run_predicate_program(spec, _packet(), {"judge_positive": True})["verdict"] == "not_applicable"
+        assert run_predicate_program(spec, _packet(), {"judge_positive": False})["verdict"] == "violated"
+
+
+@pytest.mark.parametrize("fact", ["gold=secret", "judge_parsed=secret", "context_gold=secret"])
+def test_when_facts_cannot_read_fields_outside_the_typed_vocabulary(fact):
+    with pytest.raises(ValueError, match="typed field vocabulary"):
+        validate_predicate_program(_program(rules=[{
+            "field": "question_text", "operator": "contains", "value": "search",
+            "verdict": "violated", "when": {"facts": [fact]},
+        }]))
+
+
+def test_when_facts_are_subject_to_hook_input_permissions():
+    from detector.predicate_context import validate_program_hook
+
+    program = validate_predicate_program(_program(rules=[{
+        "field": "question_text", "operator": "contains", "value": "search",
+        "verdict": "violated", "when": {"facts": ["judge_positive=false"]},
+    }]))
+    with pytest.raises(ValueError, match="unavailable"):
+        validate_program_hook(program, "upgrade.pre")
+    entry = _entry("IV-WHEN", "evidence")
+    entry["hook"] = "upgrade.pre"
+    entry["body"]["predicate_definition"] = program
+    with pytest.raises(ValueError, match="unavailable"):
+        validate_intervention_batch([entry])
+
+
+@pytest.mark.parametrize("field,value", [
+    ("when_features", ["has_tool_calls"]), ("when_facts", [["gold", "secret"]]),
+    ("extra_condition", "uninterpreted constraint"),
+])
+def test_rule_rejects_uninterpreted_or_retired_constraint_fields(field, value):
+    program = _program(rules=[{
+        "field": "question_text", "operator": "contains", "value": "search",
+        "verdict": "violated", field: value,
+    }])
+    with pytest.raises(ValueError, match="unknown fields"):
+        validate_predicate_program(program)
+
+
+def test_regex_conditions_share_one_program_budget(monkeypatch):
+    from detector import predicate_dsl as dsl
+
+    monkeypatch.setattr(dsl, "MAX_PROGRAM_SECONDS", 0.7)
+    monkeypatch.setattr(dsl, "MAX_REGEX_SECONDS", 1.0)
+    monkeypatch.setattr(dsl, "_REGEX_WORKER", "import time; time.sleep(0.4); print('true')")
+    program = _program(rules=[{
+        "conditions": [
+            {"field": "question_text", "operator": "matches", "value": "x"},
+            {"field": "question_text", "operator": "matches", "value": "x"},
+        ], "verdict": "violated",
+    }])
+    result = run_predicate_program(program, _packet())
+    assert result["verdict"] == "not_applicable"
+    assert result["execution_status"] == "resource_exhausted"
 
 
 def _entry(entry_id: str, evidence_type: str):

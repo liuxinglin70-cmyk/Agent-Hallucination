@@ -189,9 +189,11 @@ def _frozen_recall(*, citations=(), positive=True):
     }
 
 
-def test_frozen_recall_preserves_snapshot_citations_through_hearing(monkeypatch):
+def test_frozen_recall_preserves_snapshot_citations_through_hearing(monkeypatch, replay_inputs_for):
+    from detector.evidence import validate_snapshot
     frozen = _frozen_recall(citations=["E1"])
     frozen["evidence_snapshot_digest"] = snapshot_digest(snapshot())
+    frozen["replay_inputs"] = replay_inputs_for(LISETTE_RECORD, CONFIG, validate_snapshot(snapshot()))
 
     def unexpected(**kwargs):
         raise AssertionError("frozen stage must be replayed")
@@ -225,7 +227,7 @@ def test_frozen_recall_preserves_snapshot_citations_through_hearing(monkeypatch)
 
 @pytest.mark.parametrize("positive", [False, True])
 def test_frozen_upgrade_discards_supplied_derived_candidates(positive):
-    from detector.api import _validate_frozen_stages
+    from detector.replay import validate_frozen_stages
     from detector.packet import build_packet
 
     frozen = _frozen_recall(positive=positive)
@@ -236,7 +238,7 @@ def test_frozen_upgrade_discards_supplied_derived_candidates(positive):
             {"candidate_id": "c1", "corrected_step": 2} if positive else None
         ),
     )
-    result = _validate_frozen_stages(frozen, build_packet(LISETTE_RECORD))
+    result = validate_frozen_stages(frozen, build_packet(LISETTE_RECORD))
     upgraded = result["upgrade_result"]
     assert [row["candidate_id"] for row in upgraded["upgraded_candidates"]] == (
         ["c1"] if positive else []
@@ -249,29 +251,30 @@ def test_frozen_upgrade_discards_supplied_derived_candidates(positive):
 
 @pytest.mark.parametrize("snap,citations", [(None, ["E1"]), (snapshot(), ["E9"])])
 def test_frozen_recall_rejects_unbound_snapshot_citations(snap, citations):
-    from detector.api import _validate_frozen_stages
+    from detector.replay import validate_frozen_stages
     from detector.packet import build_packet
 
     with pytest.raises(ValueError, match="contract error"):
-        _validate_frozen_stages(
+        validate_frozen_stages(
             _frozen_recall(citations=citations), build_packet(LISETTE_RECORD), snap,
         )
 
 
 def test_live_and_frozen_upgrade_assembly_share_order_and_owned_references():
-    from detector.api import _validate_frozen_stages
+    from detector.replay import validate_frozen_stages
     from detector.packet import build_packet
     from detector.recaller import assemble_upgraded_candidates
 
     frozen = _frozen_recall()
     earlier = {**CANDIDATE, "candidate_id": "earlier", "locus_event_id": "event_001",
-               "evidence_refs": ["event_001"], "evidence_citations": []}
+               "evidence_refs": ["event_001"], "evidence_citations": [],
+               "quote": "planning"}
     frozen["recall_result"]["candidates"].append(earlier)
     frozen["upgrade_result"]["upgrades"].append({
         "candidate_id": "earlier", "content_error": True, "causal": True,
         "corrected_step": 1, "reason": "first deviation",
     })
-    normalized = _validate_frozen_stages(frozen, build_packet(LISETTE_RECORD))
+    normalized = validate_frozen_stages(frozen, build_packet(LISETTE_RECORD))
     upgraded = normalized["upgrade_result"]
     candidates = normalized["recall_result"]["candidates"]
     assert upgraded["upgraded_candidates"] == assemble_upgraded_candidates(
@@ -287,7 +290,7 @@ def test_live_and_frozen_upgrade_assembly_share_order_and_owned_references():
 
 
 def test_failed_frozen_upgrade_cannot_supply_a_positive_hearing():
-    from detector.api import _validate_frozen_stages
+    from detector.replay import validate_frozen_stages
     from detector.packet import build_packet
 
     frozen = _frozen_recall()
@@ -296,14 +299,15 @@ def test_failed_frozen_upgrade_cannot_supply_a_positive_hearing():
         upgraded_candidate={"candidate_id": "forged"},
     )
     frozen["upgrade_status"] = {"state": "provider_error"}
-    result = _validate_frozen_stages(frozen, build_packet(LISETTE_RECORD))
+    result = validate_frozen_stages(frozen, build_packet(LISETTE_RECORD))
     assert result["upgrade_result"]["upgraded_candidates"] == []
     assert result["upgrade_result"]["upgraded_candidate"] is None
 
 
-def test_execution_identity_binds_the_replay_payload_actually_selected(monkeypatch):
+def test_execution_identity_binds_the_replay_payload_actually_selected(monkeypatch, replay_inputs_for):
     from detector.identity import digest
     primary = {"judge_result": _judge(), "judge_status": dict(JUDGE_STATUS)}
+    primary["replay_inputs"] = replay_inputs_for(LISETTE_RECORD, CONFIG)
     ignored = {"judge_result": _judge(), "upgrade_result": {"ignored": True}}
     _install(monkeypatch, _judge(),
              recall=({"ok": True, "candidates": []}, RECALL_WITH_CANDIDATE[1]),
@@ -500,11 +504,12 @@ def test_frozen_recall_replay_is_refused_with_an_active_snapshot():
         )
 
 
-def test_judge_only_freeze_is_compatible_with_a_snapshot(monkeypatch):
+def test_judge_only_freeze_is_compatible_with_a_snapshot(monkeypatch, replay_inputs_for):
     judge_result = _judge(positive=False)
     frozen = {
         "judge_result": {"ok": True, "parsed": judge_result["parsed"]},
         "judge_status": dict(JUDGE_STATUS),
+        "replay_inputs": replay_inputs_for(LISETTE_RECORD, CONFIG),
     }
     seen = _install(
         monkeypatch, judge_result,

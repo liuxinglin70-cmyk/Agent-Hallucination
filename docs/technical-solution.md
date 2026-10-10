@@ -1,6 +1,6 @@
 # 核心技术文档
 
-更新：2026-10-10。本文描述当前实现及约束；历史实验、旧方案和数值统一见 [实验日志](experiment-log.md)。
+更新：2026-10-11。本文描述当前实现及约束；历史实验、旧方案和数值统一见 [实验日志](experiment-log.md)。
 
 > **研究方向与验收目标**：详见 [疑惑度引导的双向因果轨迹审计技术设计](uncertainty-guided-causal-audit-design-20261008.md)，简明版见 [2026-10-08 组会汇报](group-meeting-uncertainty-causal-feedback-20261008.md)。
 
@@ -53,6 +53,22 @@ flowchart TD
 
 ### 执行与终态
 
+Judge 的阳性 root_cause.quote 和 Tracer 的 quote 必须是非空字符串；Scanner 的 quote 可省略，但提供时也须通过核验。`packet.packet_quote_error` 将引用文本逐通道匹配至对应步骤：事件引用覆盖该事件内容及工具交互，交互引用仅覆盖指定工具的名称、参数和观察，不能借用同事件中未引用的工具，也不能跨字段拼接。quote 采用去除首尾空白后的原文子串匹配，展示标签不是证据。live 与 frozen parser 消费同一规则；错误输出沿既有 repair/弃权流程处理，冻结合同错误拒绝回放。此核验只证明文本出处，不证明偏差或因果关系成立。
+
+`replay.validate_frozen_stages` 独立拥有输入信封的嵌套快照，集中调用各阶段解析器并从有效升级行重建派生候选；API只负责阶段编排。LiveDetectorBackend生成冻结信封时也复制完整嵌套结果，信封、规范化结果与原基线之间的修改不能相互传播。旧私有API验证入口已删除，调用方直接消费replay合同。
+
+听证队列是阶段结果的唯一来源。无论首听证来自Judge还是Recall，顶层proof、阶段状态与provider镜像均取首听证；实际责任步及决定性事实取被采纳的定罪听证，后续Recall不继承被推翻Judge的答案字段。决定性事实记录其candidate_id，Judge听证为None。首镜像与采纳步的分歧继续进入localization_sources/conflict，不改变检测裁决权威。无听证不调用Tracer/Defense，也不生成镜像。
+
+冻结阶段的ok必须为布尔值，并与state=ok一致。失败阶段的parsed必须为空或缺失，不能将成功裁决混入失败信封；合法失败状态及错误信息可以复用，避免通过重抽模型请求掩盖失败。此校验与所有成功阶段的原解析器一起执行。
+
+`replay.build_replay_inputs` 生成 `detector.replay_inputs.v1`，绑定每个模型阶段的源码、packet、有效路由、基础 prompt及共享hook政策指定的阶段干预条目；Scanner、Upgrade、Defense另绑定适用快照，Tracer绑定审计策略和声明的scorer工件，启用阴性复审时Judge也绑定复审策略。
+
+Detector在请求前取得此身份并写入provenance，backend将其复制进冻结信封。新运行拒绝缺身份、字段不闭合、摘要损坏或Judge输入漂移的信封；下游输入漂移清除对应冻结结果，Scanner或Upgrade漂移同时清除依赖它的Recall听证。Judge只读轨迹，单独冻结Judge可以配合新快照。
+
+当前活动干预的mask在移除输入失效结果前核验，防止失效选择清掉待拒绝的阶段；不影响模型输入的judge.post仍执行后处理。听证完整目标和实际因果上下文继续独立核验。纯规范化函数未传 `expected_inputs` 时只检查阶段合同，可用于只读诊断，不能授权新Detector运行复用。完整回放包与独立复审尚未验收，状态见实施台账。
+
+Judge保留每张无效票的结构化失败。全部无效票为同一失败类型时，阶段保留该类型（包括contract_error及provider的具体超时类型）；不足quorum或混合失败类型报告no_quorum。一次合同repair与有限vote_topup继续受原预算约束，fatal与取消继续传播。Defense的初次票与补票调用同一汇总规则，证词与权限不变。归档审计只读检查历史记录的原始步号、结构类别与计数，不将旧模型输出重新包装成当前合同的验证结果。
+
 `api.Detector` 编排阶段；`judge.py`、`recaller.py`、`step_tracer.py`、`defense.py` 各自校验模型输出。Judge 阳性和召回升级候选进入 hearing 队列；`adjudication.py` 校验证据引用、指控和确认步骤，计算终态。机械谓词的定罪能力受 `conviction_calibration.py` 和校准记录约束；证据型组件不能自行获得定罪权。
 
 `interventions.py` 负责统一 schema、内容哈希、hook 和执行计划；`predicate_dsl.py`、`predicate_context.py` 定义可执行谓词及可用上下文。冻结阶段回放必须匹配证据身份，并拒绝覆盖待测干预的目标阶段。配置文件与 `Detector(config=...)` 共用 `config.validate_config`，解析有效 route 并保留默认 off 的审计配置，未知字段、非法数值与缺失声明工件直接报错；`require_credentials=False` 不读取仓库 .env。审计默认关闭；shadow 与 tracer_context 执行分支已接通，完整模块验收状态见实施台账。
@@ -69,7 +85,7 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 
 `packet_reference_error` 统一 Judge、Recall、Tracer、Defense、引用谓词和 scoped semantic 的轨迹引用类型、存在性及范围验证；外部 snapshot citation 仍由 evidence.citation_error 验证。scoped semantic 的 supported/contradicted 必须带生产者提供的非空引用，abstained 可明确提供空列表，运行时不填造窗口引用。工具引用按实际所属 event 核验窗口范围。semantic executor 接收 packet/context 的独立副本，校验使用未被 executor 修改的投影；artifact/vocabulary 校验只有一个执行路径，证据仍不获得定罪权限。
 
-**尚未闭合的证据与权限边界**：M03 独立审查确认，DSL 的正则模式检查和 4096 字符输入上限不能约束标准库 `re` 的执行时间；可终止匹配方案尚未实施。多冲突说明仍以全局任一匹配接受，resolution 的来源尚未绑定对应实体/属性组；已交付 answer 工具后追加无内容 terminate 可能误报交付缺失。直接调用 `adjudicate` 并自定义权限表还可授权诊断内置或未知 deterministic 行；正常已验证 registry 未复现此绑定。这 5 个根因均未修复，不能据既有离线通过结果宣称 M03 已验收，证据与修复顺序见实施台账 B15–B19。
+**证据与权限边界**：DSL 正则在可终止子进程中执行，单次预算 0.5 秒、同一程序共享 1 秒，并受 case deadline 和 run cancellation 约束。资源耗尽输出 `not_applicable` 和 `execution_status=resource_exhausted`，不生成事实、不触发 Recall、不授权定罪；整例期限及取消继续传播。决定性引用逐一检查相关冲突说明，snapshot 的 resolution 来源绑定对应规范实体/属性组；packet 优先保留实质 answer 工具交付，closing status 保留为无实质交付时的锚点。deterministic 及无 runner 的公开裁决输入只可绑定内置定罪词汇并通过校准，typed DSL 保留显式程序权限。交付识别修改使旧校准源码指纹失效，历史记录保持原始字节，运行时拒绝复用其权限。DSL规范化保留 `when.packet_features`，`when.facts` 编译入现有 typed conditions；任意上下文字段扫描路径已删除，所有条件共享字段白名单、hook权限及合并条件数量上限；规则字段闭合，旧派生条件及未知字段明确拒绝，避免静默丢失约束。B15–B21 当前为工作区修复待审查；完整验收以实施台账为准。
 
 批次 `run_summary.v3` 分别记录 requested/returned/not_started/missing，completed 只统计实际返回的非 not_started 行。工作线程登记完成结果，调度器中断后仍保留已提交案例；没有返回行的已开始案例记为 missing，不写成阴性或未开始。重复及额外案例行拒绝进入汇总。
 

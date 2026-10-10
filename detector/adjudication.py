@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from detector.hearing import judge_target, recall_target
+from detector.hearing import hearing_target, judge_target, recall_target
 
 STATE_ERROR = "verified_error"
 STATE_CLEAN = "verified_clean"
@@ -43,25 +43,9 @@ LOCALIZATION_STEP_PRIORITY = (
     "> the allegation's own step"
 )
 
-# Two shapes of disagreement, kept apart because they mean opposite things.
-#
-# ``FIRST_HEARING_TRACER`` is a genuine contradiction: the envelope reports one
-# step in its ``proof.step_tracer`` slot (mirrored from the first hearing, the
-# judge's) and adopts a different one, so the row names two responsible steps.
-# This is the state the 2026-09-23 audit found reading as ``authoritative``
-# (BFCL/153, BFCL/008 x2). It degrades localization authority.
-#
-# ``TRACER_EARLIER_THAN_ATTESTED`` is not a contradiction, and is *recorded*
-# rather than charged. The defense contract pins ``confirmed_step`` to the
-# alleged step (``detector/defense.py``: "confirmed_step must equal the alleged
-# step"), and the measured archives bear that out -- every substantiated
-# hearing had ``confirmed_step == alleged step`` (284/284), and every tracer
-# that differed from it named an *earlier* step (25/25, never later). So a
-# tracer disagreeing with the confirmation is the tracer doing the one thing
-# ``LOCALIZATION_LAW`` asks of it ("find the EARLIEST step"), and the adopted
-# step then *is* the tracer's: the row reports one step and agrees with itself.
-# Degrading these would make the signal mean "the tracer worked". They are
-# recorded in ``localization_sources`` with the rule that resolved them.
+# A first-hearing mirror differing from the adopted locus degrades localization.
+# An earlier locus from the convicted tracer follows the localization rule;
+# its disagreement with the defense's restated allegation remains diagnostic.
 LOCALIZATION_CONFLICT_FIRST_HEARING_TRACER = "first_hearing_tracer_vs_adopted"
 LOCALIZATION_AGREEMENT_TRACER_EARLIER = "tracer_earlier_than_attested_step"
 LOCALIZATION_AGREEMENT_ALL_SOURCES = "all_sources_agree"
@@ -331,6 +315,7 @@ def adjudicate(
 
     valid_mechanical_evidence = any(
         str(item.get("action") or "") == "convict_mechanical_violation"
+        and item.get("execution_status") != "resource_exhausted"
         and bool(str(item.get("intervention_id") or ""))
         and bool(str(item.get("evidence_intervention_id") or ""))
         and bool(str(item.get("failure_family") or ""))
@@ -620,14 +605,13 @@ def adjudicate(
             "authority_failure_reasons": reasons,
         }
 
-    working_positive = dict(positive)
+    working_positive = hearing_target(convicted)
     convicted_parsed = (
         (convicted.get("defense_result") or {}).get("parsed") or {}
     )
     convicted_tracer = (
         (convicted.get("tracer_result") or {}).get("parsed") or {}
     )
-    working_positive["source"] = str(convicted.get("source") or positive["source"])
     if convicted.get("source") == "recall_upgrade":
         working_positive["step"] = _convicted_candidate_step(
             upgrade_result, convicted,
@@ -705,6 +689,7 @@ def adjudicate(
             "state": STATE_ERROR,
             "decisive_facts": {
                 "positive_source": working_positive["source"],
+                "candidate_id": working_positive.get("candidate_id"),
                 "judge_step": judge_positive.get("step") if judge_positive else None,
                 "traced_step": traced_step,
                 "defense": verdict,

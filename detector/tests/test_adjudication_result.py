@@ -380,7 +380,7 @@ def test_refuted_with_successful_recall_stays_authoritative(sample_packet):
     assert proof["decision_authority"] == AUTHORITY_AUTHORITATIVE
 
 
-def test_unhashable_basis_is_a_contract_failure_not_a_crash(sample_packet):
+def test_unhashable_basis_is_a_contract_failure_not_a_crash(wrong_answer_packet):
     """A non-string ``basis`` must abstain the ballot, not raise TypeError.
 
     ``basis not in JUDGE_BASIS_VALUES`` raised ``TypeError: unhashable type``
@@ -390,6 +390,6 @@ def test_unhashable_basis_is_a_contract_failure_not_a_crash(sample_packet):
 
     bad = dict(JUDGE_TRUE["parsed"])
     bad["basis"] = ["derivation"]
-    parsed, error = _parse_judge(bad, sample_packet)
+    parsed, error = _parse_judge(bad, wrong_answer_packet)
     assert parsed is None
     assert "must be a string" in error

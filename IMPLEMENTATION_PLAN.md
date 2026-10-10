@@ -4,13 +4,13 @@
 
 | 项目 | 当前值 |
 |---|---|
-| 当前任务 | 按2026-10-10用户要求完成本轮文档收尾并暂停后续重构；完整18包目标保留，不标记最终完成 |
+| 当前任务 | 根据本次用户请求恢复完整18包代码重构；按Pristine逐根因修复、离线验证并最终整理doc、README及实验日志 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | 2/18包已验收（M00/M02）。最近全量验证针对固定811662f：code_only1568、platform57通过，AST/三CLI/源码不变均通过，local_data未运行；后续提交仅有各自相关验证。M12局部claim绑定c6b6fd6相关173、固定独立46+相关138通过；M05/M06完整hearing目标811662f相关243、固定独立30+相关111通过。engine离线夹具7d04878正式72通过，固定独立完整模块72+probe4通过，29次默认工厂均为OfflineProposer。provider forwarding与完整snapshot tag的38b6f56相关158通过；固定审查产出54独立+141相关通过（2未选），报告因额度中断未完成，仍待复核，根代理已保全脚本/XML并安全清理checkout。M03固定811662f审查39通过/14失败，代表5个未修复根因：regex资源P1、逐冲突说明P2、resolution归属P2、answer后terminate交付识别P2、直接adjudicate自定义权限表P2；邻接235通过/1未选。全部为离线代码验证，无真实模型请求或新增测量收益。 |
-| 代码实施 | 2/18包已验收；后续重构按用户本轮结束请求暂停，各未验收包保留原状态 |
-| 下一工作包 | M03已确认的5个根因，先处理正则资源P1 |
+| 本轮已完成 | 此前M03/M05/M06修复证据保留。本轮M06 B27–B29修复Recall首听证镜像遗漏、决定性事实归属和冻结失败载荷/权限标记合同，15项反例先失败；新增23项、相关166及保留审查反例107通过（仅迁移旧私有导入，不是新独立复审）。最终bc0d5e0f code_only1714/platform57及AST/三CLI/源码不变通过。定位权限规则保留，生产注释中的历史读数/修复叙述清除。无真实请求、新测量或原始证据改写。[当前代码验证](artifacts/code_quality/bc0d5e0f1243d2bd6c802eab1648a6839f5cc5df967f5c982ff45537f321c9ef/57ae3a8095724256b1471d0ff8883544/summary.json)、[M06多听证核验](artifacts/code_quality/bc0d5e0f1243d2bd6c802eab1648a6839f5cc5df967f5c982ff45537f321c9ef/57ae3a8095724256b1471d0ff8883544/m06-hearing-verification.md)、[平台验证](artifacts/code_quality/bc0d5e0f1243d2bd6c802eab1648a6839f5cc5df967f5c982ff45537f321c9ef/29004567e89e4d2b88ef5af657ad0f4e/summary.json)。 |
+| 代码实施 | M00已验收；M02原验收证据保留，本轮B19交付锚点修订待复审；M03修复待审查，其余包保持原状态 |
+| 下一工作包 | 继续M06听证执行及冻结目标匹配职责提取，使API保留阶段顺序与业务分支；再接同claim因果证书与演化消费链。M02/M03/M05/M06本轮修改待独立复审 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
-| 更新时间 | 2026-10-10，Asia/Shanghai |
+| 更新时间 | 2026-10-11，Asia/Shanghai |
 
 本文件是本轮工作的唯一计划、任务状态和续接入口。每次实施结束就地更新表格、缺陷状态和四项检查点，提交历史由 Git 保留，不另建 progress、日报或计划副本。
 
@@ -99,11 +99,21 @@ Python 的真源标注使用合法的 `# SOURCE: <symbol>`，只指向符号，�
 | B12 | scoped semantic refs 未验证存在/范围，空 refs 自动填满窗口；executor 可修改待校验投影 | packet_reference_error 为轨迹引用验证真源；正向 verdict 必须有真实窗口引用，executor 输入独立副本，移除重复 identity/vocabulary 执行代码 | M03/M07 | 关闭；77a48c4，7 种非法引用及修改窗口反例先失败后通过；detector 430 项、跨包 80 项、AST 67 文件及独立 49 项通过，无阻断 |
 | B13 | `route_failures.py:325–327,405–427`：追加 resolution 后 reducer 跳过它，已解决路线仍 insufficient | 按顺序归约 observation/resolution，关闭当前观察 epoch，保留历史并允许后续重新开放 | M16 真源；M14 消费 | 关闭；9b3bac0，6 项反例修复前失败，相关 route/capability 62 项及独立 6 项/旧解决记录重放反例通过，无阻断；历史字节保留，独立 measurement identity 仍属 M16 未完成项 |
 | B14 | `route_failures.py:152–229`、`engine.py:2273–2275`：只读检测 delta，定位 joint_broken=1 被记为无改善无损伤 | outcome 明确 target_kind 与 delta basis；定位/联合损伤不能写为路线能力不足 | M15 真源；M14/M16 消费 | 关闭；d14e5f9，7 项反例先失败后通过，182 项扩展回归/AST 67 文件及独立 22 项通过，无新增阻断；普通/替换定位与联合机会迁移 ce6777d，136 项回归及独立 18 个正式单位入口用例通过 |
-| B15 | 固定811662f独立子进程确认两种合法DSL正则在匹配开始后超过1.5秒；输入长度和模式启发式不能约束re执行时间 | 在标准库运行时实现可终止的匹配资源边界，共享case deadline/取消；超时不得授权not_matches或定罪 | M03 | 已复现，未修复；两种反例见review-evidence-811662f/test_review_m03.py |
-| B16 | 两个未解决冲突只解释其中一个，citation_error/live Defense/frozen仍接受全部引用 | 对每个相关未解决冲突分别要求说明，保持单冲突业务合同 | M03 | 已复现，未修复；固定独立三入口反例 |
-| B17 | Alpha属性冲突的resolution可选择无关Gamma来源，三入口都接受 | resolved_by必须属于对应规范entity/attribute来源组 | M03 | 已复现，未修复；固定独立三入口反例 |
-| B18 | 直接adjudicate自定义权限表可授权诊断内置/未知deterministic行；正常validated registry未复现此绑定 | terminal消费者始终核验deterministic谓词词汇与校准权限，保留声明typed DSL权限合同 | M03/M07 | 条件反例已复现，未修复；不扩大为普通registry路径越权 |
-| B19 | submit_final_answer已交付，随后无内容terminate覆盖最后工具锚点，final_delivery_present误报missing | 交付身份保留实质answer工具通道，终止状态不能抹掉此前交付 | M03/M02 | 已复现，未修复；实际build_packet/run_predicate反例 |
+| B15 | 固定811662f独立子进程确认两种合法DSL正则在匹配开始后超过1.5秒；输入长度和模式启发式不能约束re执行时间 | 在标准库运行时实现可终止的匹配资源边界，共享case deadline/取消；超时不得授权not_matches或定罪 | M03 | 修复待审查；工作区采用单次0.5秒/程序共享1秒子进程预算，期限和取消传播；资源未知不写facts、不触发Recall、不定罪；4项超时反例修复、3停止路径及正式plan消费验证通过 |
+| B16 | 两个未解决冲突只解释其中一个，citation_error/live Defense/frozen仍接受全部引用 | 对每个相关未解决冲突分别要求说明，保持单冲突业务合同 | M03 | 修复待审查；citation_error逐冲突校验，live/frozen复用；三入口拒绝遗漏说明、接受完整说明 |
+| B17 | Alpha属性冲突的resolution可选择无关Gamma来源，三入口都接受 | resolved_by必须属于对应规范entity/attribute来源组 | M03 | 修复待审查；snapshot拒绝跨entity/attribute来源，直接conflict_report亦不认跨组resolution |
+| B18 | 直接adjudicate自定义权限表可授权诊断内置/未知deterministic行；正常validated registry未复现此绑定 | terminal消费者始终核验deterministic谓词词汇与校准权限，保留声明typed DSL权限合同 | M03/M07 | 修复待审查；无runner及deterministic权限取内置词汇交集并校准，8项公开入口反例通过；typed DSL原合同回归通过 |
+| B19 | submit_final_answer已交付，随后无内容terminate覆盖最后工具锚点，final_delivery_present误报missing | 交付身份保留实质answer工具通道，终止状态不能抹掉此前交付 | M03/M02 | 修复待审查；packet优先保留实质answer工具、无交付时保留状态锚点；final_delivery读统一通道规则。原校准源码指纹失效，保留原始字节并拒绝旧权限 |
+| B20 | DSL规范化返回when_features/when_facts，二次校验只读when，限制被静默丢弃 | 规范形式保留when.packet_features，事实条件编译入typed conditions，规范化幂等 | M03 | 修复待审查；工作区正式规范化/原始与规范输入同语义反例通过；规则字段闭合，拒绝旧派生条件及其他未解释字段，3项反例修复前失败后通过 |
+| B21 | when.facts接受任意上下文字段，gold条件能绕过typed字段及hook输入白名单 | 所有事实条件复用_validate_condition和阶段字段权限，删除任意context扫描执行路径 | M03/M07 | 修复待审查；gold/任意路径拒绝及upgrade.pre权限反例通过，新增5项最小回归修复前全部失败 |
+| B22 | Judge/Tracer/Scanner只检查quote非空或直接透传，实际合成packet可接受FABRICATED_QUOTE | quote归属核验由packet真源提供，迁移live/frozen阶段消费者并核查替身 | M05 | 工作区修复待审查；18项正式反例先失败，packet统一核验迁移三parser及frozen；新增35项合同用例、相关130通过；8d0bfde1 code_only1647通过，独立实施审查未完成 |
+| B23 | frozen验证浅复制，输入与规范化结果的refs/provider/status/hearing/metadata共享嵌套对象 | replay模块拥有独立信封快照，API仅编排；迁移全部正式消费者并删除旧私有入口 | M06 | 工作区修复待审查；验证侧12项双向修改及生成侧5项反例先失败；相关236通过，归档/定位模块只读17项通过；5b085a08 code_only1667/platform57通过，独立实施审查未完成 |
+| B24 | Judge无有效票和不足quorum均写provider_error，合同/超时类别丢失 | 投票保留结构化失败；同类全失败保留类型，不足或混合失效归no_quorum | M04/M05 | 工作区修复待审查；3项分类反例先失败，相关84通过，fatal传播保留；5b085a08 code_only1667/platform57通过，独立实施审查未完成 |
+| B25 | 冻结复用只核对packet/快照/听证目标及上下文，缺源码、阶段路由和基础prompt绑定；更换输入仍复用旧阶段结果 | replay生成闭合且自校验的逐阶段基础输入摘要，Detector强制验证，backend复制；下游漂移按依赖移除冻结结果 | M06 | 工作区修复待审查；7项反例先失败，新增14项及相关132通过，00288c0e code_only1681/platform57及AST/三CLI/源码不变通过；独立实施审查未完成 |
+| B26 | 冻结基线带阶段干预，移除后仍复用旧Judge/Scanner/Upgrade/Tracer/Defense结果；5项正式反例均先失败 | replay基础输入摘要依共享hook政策绑定各阶段条目；活动mask在输入失效选择前核验，API删除重复mask判断 | M06 | 工作区修复待审查；5项反例先失败，新增10项及相关142通过；843db6e6 code_only1691/platform57及AST/三CLI/源码不变通过，独立实施审查未完成 |
+| B27 | Judge阴性且Recall听证判阳时，首听证已有结果而顶层Tracer/Defense的proof/status/provider镜像为空 | 完整听证队列统一导出首听证镜像，删除Judge分支独占赋值及未使用中间值 | M06 | 工作区修复待审查；6项镜像反例先失败，相关166通过；bc0d5e0f code_only1714/platform57及AST/三CLI/源码不变通过，独立复审未完成 |
+| B28 | Judge翻案后后续Recall定罪，决定性事实仍采用先前positive的答案字段且缺选中candidate_id | 从实际定罪听证的统一目标投影生成最终事实，明确记录选中候选ID | M06 | 工作区修复待审查；2项归属反例先失败，live/frozen多听证及相关166通过；bc0d5e0f code_only1714/platform57及AST/三CLI/源码不变通过，独立复审未完成 |
+| B29 | frozen把ok作truthy读取，failed阶段可携带parsed成功裁决值并被后续消费 | 共享冻结阶段合同要求布尔ok、结果/状态一致，failed不得携带parsed裁决；保留无裁决的合法失败回放 | M06 | 工作区修复待审查；3项failed载荷及4项非法权限标记反例先失败，合法失败回放3项及相关166通过；bc0d5e0f code_only1714/platform57及AST/三CLI/源码不变通过，独立复审未完成 |
 
 B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fake 对象，无真实 provider、无历史测量写入。B12 修复保持 evidence-only 权限，反例证明引用和投影可信性缺陷，不声称直接越权定罪。
 
@@ -183,11 +193,11 @@ evolution/
 |---|---|---|---:|---|---|
 | M00 | 离线验证、合同基线、静态清理机制 | 本台账 | 1–2 | 已验收 | 4000669；4fcffecc/68845067：code_only 1020、AST/三 CLI 检查退出 0；平台 97f55299/8f21461a 52 通过；独立只读审查 review_4000669（12 项反例通过，无阻断） |
 | M01 | 配置与执行身份真源 | M00 | 2–3 | 实施中 | config.validate_config 为文件/直接配置唯一入口，causal 块保留且默认 off；数字范围/未知键/工件缺失验证；c58a147 配置独立 69 项通过；identity.py 已供 packet/api/runner 共用，B05 三项反例修复后 detector/repository/offline/backend/env 共 469 通过、5 未选，AST 67 文件通过；演化 backend baseline/cache 已绑定实际配置、record/packet、evidence、registry/replay 与完整源码；eb49756：2 项旧缓存反例先失败后通过，扩展 143 项及 backend 20 项、独立 34 项/3 个篡改缓存反例通过；harness.v2/checkpoint.v2/审计消费实际 backend runtime 身份，完成报告复用的 3 个漂移反例先失败后通过，64c1919：扩展 133 项及最终相关 55 项/AST 67 文件、独立 7 项通过，无新增阻断；preflight正式JSON保存规范完整source_identity和实际配置工件身份，缺声明配置阻断；2反例修复/相关43通过；旧file_digest删除。晋升13c91f4共享完整摘要/manifest.v2验证7反例修复与相关120通过；固定复核空工件路径P2已正式2反例修复，共享写者/读者路径约束，相关96通过，9efeb41固定回归132+独立11通过；当前811662f完整code_only1568/platform57通过，完整包验收未完成 |
-| M02 | Packet、投影、事件引用规范 | M00 | 2–3 | 已验收 | 565f191；detector 326、跨包 41、AST 66 文件通过；独立 review_offline_review 39 项通过，无阻断；window v2 技术合同已同步 |
-| M03 | 外部证据、谓词与引用权限 | M02 | 1–2 | 实施中 | 共享packet/citation合同及校准身份已落地；完整固定811662f审查39通过/14失败（5根因），邻接235通过/1未选；B15–B19均待源头修复，不能验收。报告：artifacts/code_quality/review-evidence-811662f/report.md |
+| M02 | Packet、投影、事件引用规范 | M00 | 2–3 | 待审查 | 本轮B19交付锚点变更待复审，原验收： 565f191；detector 326、跨包 41、AST 66 文件通过；独立 review_offline_review 39 项通过，无阻断；window v2 技术合同已同步 |
+| M03 | 外部证据、谓词与引用权限 | M02 | 1–2 | 待审查 | B15–B21工作区修复；25项反例修复前失败，相关197通过、保留审查反例107通过；32305600全量code_only1612/platform57、AST/三CLI/源码不变通过。原始校准只读1项通过，全量local_data未运行；[证据](artifacts/code_quality/3230560000323f618f1cb091b7828e7ee9865ade6d0995c050d4725e896c7de7/5a9d5885d7a644fea94144de396263cb/m03-review.md)，独立实施审查未完成 |
 | M04 | Provider、并发、预算、取消、请求记录 | M00 | 2–3 | 实施中 | B04/B06 已关闭；8082ee9 新增预算共享且跨重试不重领；全运行 RunStopped 与案例 CaseDeadlineExceeded 分型，取消不再被 provider/backend 转成案例失败；两个反例先失败后通过，相关 85 项、扩展 584 项、AST 71 文件通过；recaller/defense重复forwarding已删除，直接消费provider_call的统一cache_tag签名，snapshot完整摘要覆盖初次/repair，6反例修复后相关158通过；模块完整收尾/复核待完成 |
-| M05 | Judge/Recall/Tracer/Defense 阶段合同 | M03/M04 | 2–3 | 实施中 | hearing完整目标与Recall输入隔离已相关243及固定独立30+相关111通过；38b6f56删除重复forwarding并传递完整snapshot tag，相关158通过，固定审查54+141通过但报告额度中断未完成；阶段quote及完整包验收待继续 |
-| M06 | API、听证、冻结验证与回放 | M01/M02/M03/M05 | 3–4 | 实施中 | B01/B02 源头修复；evidence_flow/api/recaller/voting/upgrade/backend/localization 共 69 通过、17 未选；hearing目标已统一完整输入投影，contracts/confidence变化不再复用旧听证，2反例及相关243通过；完整阶段identity与编排验收待完成 |
+| M05 | Judge/Recall/Tracer/Defense 阶段合同 | M03/M04 | 2–3 | 实施中 | hearing完整目标与Recall输入隔离已相关243及固定独立30+相关111通过；38b6f56删除重复forwarding并传递完整snapshot tag，相关158通过，固定审查54+141通过但报告额度中断未完成；B22 quote归属工作区修复待审查，18项反例先失败、新增35项合同用例与相关130通过；8d0bfde1 code_only1647/platform57、AST/三CLI/源码不变通过，[核验](artifacts/code_quality/8d0bfde1423f93a3f055018bf4f9a3d17863e7f19c423b1b79cd6c2b5293850d/646fda2adeb74b3a9a4976106694e66a/m05-verification.md)；B24失败类型保留、Defense补票共用唯一汇总规则，3项反例先失败、相关84通过；5b085a08 code_only1667/platform57及AST/三CLI/源码不变通过，完整包验收待继续 |
+| M06 | API、听证、冻结验证与回放 | M01/M02/M03/M05 | 3–4 | 实施中 | B01/B02已关闭；完整hearing目标、独立信封快照及B25/B26阶段输入身份已接通。B27–B29首听证镜像/实际定罪事实/冻结失败合同修复，15项反例先失败、新增23项及相关166通过；保留审查反例107通过；最终bc0d5e0f code_only1714/platform57及AST/三CLI/源码不变通过；[本轮核验](artifacts/code_quality/bc0d5e0f1243d2bd6c802eab1648a6839f5cc5df967f5c982ff45537f321c9ef/57ae3a8095724256b1471d0ff8883544/m06-hearing-verification.md)。听证执行/冻结目标匹配仍嵌于API，职责提取及完整独立复审未完成 |
 | M07 | 干预执行器和 scope 合同 | M02/M03/M04 | 2–3 | 实施中 | B12：scope refs 非空/存在/范围验证、executor packet/context 独立副本、去除重复 semantic 执行校验；77a48c4：detector 430 项/跨包 80 项/AST 67 文件及独立 49 项通过，B12 已关闭；完整 executor 合同继续实施 |
 | M08 | 批处理、存储、恢复、成本和分母 | M01/M04/M06 | 2–3 | 实施中 | B05 已关闭（7f91c3e）；B07 已关闭（9c40b5c），相关 51 项、2 项 CLI 回环及独立覆盖分区通过；B06 已关闭（a2fed20），尝试 journal 与失败成本通过独立 51 项及多票反例；路径/存储一致性及 invocation/lifetime 成本继续实施 |
 | M09 | 风险画像与候选选择 | M01/M02/M03/M07 | 2–3 | 实施中 | 1a4d156/595b468：只读信号及有界候选接入 Detector，PPL unsupported；扩展 515 项、修复后相关 148 项、独立复核 17 项/7 反例通过；审计/定位消费者待接续 |
@@ -501,10 +511,10 @@ python -m experiments --help
 
 四项检查点（就地覆盖）：
 
-- **当前任务**：按用户要求完成当前阶段收尾并暂停；18包完整重构目标未完成。
-- **进度**：2/18包已验收（M00/M02）。最近全量验证针对固定811662f：code_only1568、platform57通过，AST/三CLI/源码不变均通过，local_data未运行；后续提交仅有各自相关验证。M12局部claim绑定c6b6fd6相关173、固定独立46+相关138通过；M05/M06完整hearing目标811662f相关243、固定独立30+相关111通过。engine离线夹具7d04878正式72通过，固定独立完整模块72+probe4通过，29次默认工厂均为OfflineProposer。provider forwarding与完整snapshot tag的38b6f56相关158通过；固定审查产出54独立+141相关通过（2未选），报告因额度中断未完成，仍待复核，根代理已保全脚本/XML并安全清理checkout。M03固定811662f审查39通过/14失败，代表5个未修复根因：regex资源P1、逐冲突说明P2、resolution归属P2、answer后terminate交付识别P2、直接adjudicate自定义权限表P2；邻接235通过/1未选。全部为离线代码验证，无真实模型请求或新增测量收益。
-- **下一步**：恢复后先修M03正则执行资源边界，随后逐项修复其余4根因并复核；补完38b6f56审查报告，再继续M05引用/quote和其余工作包验收。
-- **未定事项**：其余16包未验收，完整同claim因果引入与演化消费等合同仍未完成。正则子进程方案只完成设计讨论，未实施；真实实验不在本期范围。最终冗余脚本/文档清理、docs迁至doc及组会子目录归档尚未执行，依原要求在代码重构完成后处理。
+- **当前任务**：按本次用户请求继续完整18包重构，遵守Pristine；整体完成后核销冗余脚本/文档、整合doc并将组会材料置于子目录。
+- **进度**：M00已验收；M02/M03/M05/M06本轮修改待复审。M06 B27–B29工作区修复，15项反例先失败、新模块23项及相关166通过；最终bc0d5e0f code_only1714/platform57及AST/三CLI/源码不变通过，保留审查反例107通过不是新独立复审。全量local_data及真实实验未运行。证据见§0/§6。
+- **下一步**：从api._detect内run_hearing/frozen_hearing提取听证执行与目标匹配职责，保留现有多听证、预算、上下文及冻结合同；随后接续同claim证书和演化消费链。本轮修改待独立复审，整体验收后执行最终脚本/文档清理与doc组会归档。
+- **未定事项**：完整18包目标未完成，完整同claim因果证书及M14–M16消费链仍未闭合；历史校准因交付规则变化失效，原始字节保留且本期不重测；最终脚本/文档清理与doc归档未执行。
 
 ## 12. 本期最终完成与延期项
 

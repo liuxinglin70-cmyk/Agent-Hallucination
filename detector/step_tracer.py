@@ -8,7 +8,8 @@ from typing import Any, Mapping
 from detector.causal_audit import validate_hearing_context
 from detector.causal_contracts import numeric_literal
 from detector.interventions import InterventionPlan, empty_plan
-from detector.packet import (evidence_refs_support_step, packet_features,
+from detector.packet import (evidence_refs_support_step, event_id_for_step,
+                             packet_features, packet_quote_error,
                              packet_reference_error, render_judge_view)
 from detector.provider import ProviderError, provider_call, raise_if_terminal
 from detector.semantics import TRACER_CONTRACT_REPAIR, TRACER_SYSTEM
@@ -24,7 +25,7 @@ def _parse_tracer(parsed: Any, packet: Mapping[str, Any]):
     event_count = len(list(packet.get("events") or []))
     if step < 1 or step > event_count:
         return None, f"step {step} outside 1..{event_count}"
-    quote = str(parsed.get("quote") or "").strip()
+    quote = parsed.get("quote")
     referent = str(parsed.get("referent") or "").strip()
     reason = str(parsed.get("reason") or "").strip()
     if not quote or not referent or not reason:
@@ -35,9 +36,14 @@ def _parse_tracer(parsed: Any, packet: Mapping[str, Any]):
         return None, reference_error
     if not evidence_refs_support_step(packet, refs, step):
         return None, "evidence_refs do not support the traced step"
+    quote_error = packet_quote_error(
+        packet, quote, locus=event_id_for_step(packet, step), evidence_refs=refs,
+    )
+    if quote_error:
+        return None, quote_error
     return {
         "step": step,
-        "quote": quote,
+        "quote": quote.strip(),
         "referent": referent,
         "evidence_refs": refs,
         "reason": reason,

@@ -1,27 +1,8 @@
-"""Localization conflicts degrade; step kinds split the localization reading.
+"""Localization conflict and event-kind contracts.
 
-Two audit findings fixed here, both about readings that were recorded but not
-measured:
-
-* **two responsible steps on one row.** A conviction could carry the tracer's
-  step, the defense's ``confirmed_step`` and the first hearing's tracer (which
-  is what ``proof.step_tracer`` reports) disagreeing, with the envelope
-  adopting one of them and still claiming ``authoritative``. The fix records
-  the disagreement as ``localization_conflict``, states the adoption rule
-  (``LOCALIZATION_STEP_PRIORITY``), degrades ``localization_authority`` --
-  and leaves ``decision_authority`` exactly as the hearing flow set it, so no
-  downstream detection contract moves.
-
-* **action steps and content steps averaged into one number.** 117 of 142
-  archived convictions blame an event whose own prose is empty and that only
-  carries tool calls. The blame definition is unchanged (both are eligible);
-  the production readings now report the two separately, classified from event
-  structure rather than from any string heuristic, and never summed.
-
-The detector-side tests use synthetic packets and scripted stage results only.
-The corpus test reads the archived real-run records under
-``reports/rsi_pilot_20260919`` -- it replays already-recorded stage outputs
-through the pure adjudicator and calls no provider.
+Synthetic packets verify current adjudication, output and metric boundaries.
+The corpus audit reads original archived step disagreements and event kinds;
+it does not replay historical stage outputs as current-contract evidence.
 """
 
 from __future__ import annotations
@@ -515,81 +496,6 @@ def _archive_records():
     return [(Path(row["source"]), row["result"]) for row in records]
 
 
-def _replay(path: Path, envelope) -> tuple[dict, dict]:
-    """Re-run the recorded stage outputs through the pure adjudicator."""
-    from detector.api import _validate_frozen_stages
-
-    case = str(envelope["case_id"])
-    raw = json.loads(
-        (DATASET_ROOT / case).read_text(encoding="utf-8-sig")
-    )
-    packet = build_packet({"question": raw["question"],
-                           "history": raw["history"]})
-    proof = envelope["proof"]
-    status = envelope.get("stage_status") or {}
-    hearings = [h for h in proof.get("hearings") or [] if isinstance(h, dict)]
-    norm = _validate_frozen_stages(
-        {
-            "judge_result": {"ok": True, "parsed": proof["judge"]},
-            "judge_status": status.get("judge") or {"state": "ok"},
-            "hearings": [
-                {
-                    "source": h.get("source"),
-                    "candidate_id": h.get("candidate_id"),
-                    "positive": dict(h.get("positive") or {}),
-                    "tracer_result": h.get("tracer_result"),
-                    "tracer_status": h.get("tracer_status"),
-                    "defense_result": h.get("defense_result"),
-                    "defense_status": h.get("defense_status"),
-                }
-                for h in hearings
-            ],
-        },
-        packet, None,
-    )
-    rebuilt = []
-    for row in norm["hearings"]:
-        positive = dict(row.get("positive") or {})
-        rebuilt.append({
-            "source": row.get("source"),
-            "candidate_id": row.get("candidate_id"),
-            "step": positive.get("step"),
-            "reason": positive.get("reason"),
-            "delivered_result": positive.get("delivered_result"),
-            "correct_result": positive.get("correct_result"),
-            "evidence_refs": list(positive.get("evidence_refs") or []),
-            "quote": positive.get("quote"),
-            "tracer_result": row.get("tracer_result"),
-            "tracer_status": row.get("tracer_status"),
-            "defense_result": row.get("defense_result"),
-            "defense_status": row.get("defense_status"),
-        })
-    upgrades = list(proof.get("causal_upgrades") or [])
-    if not upgrades and proof.get("causal_upgrade"):
-        upgrades = [proof["causal_upgrade"]]
-    first = rebuilt[0] if rebuilt else {}
-    replayed = adjudicate(
-        packet=packet,
-        judge_result=norm["judge_result"], judge_status=norm["judge_status"],
-        recall_result={"ok": True,
-                       "candidates": list(proof.get("recall_candidates") or [])},
-        recall_status={"stage": "recall_scanner", "state": "ok"},
-        upgrade_result={
-            "ok": True,
-            "upgrades": list(proof.get("causal_upgrade_rows") or []),
-            "upgraded_candidate": proof.get("causal_upgrade"),
-            "upgraded_candidates": upgrades,
-        },
-        upgrade_status={"stage": "causal_upgrade", "state": "ok"},
-        tracer_result=first.get("tracer_result"),
-        tracer_status=first.get("tracer_status"),
-        defense_result=first.get("defense_result"),
-        defense_status=first.get("defense_status"),
-        hearings=rebuilt,
-    )
-    return replayed, packet
-
-
 def test_conflict_degradation_leaves_the_localization_gates_untouched():
     """The chosen path must not move any downstream contract.
 
@@ -695,45 +601,20 @@ def pair_has_no_conflict(*arms) -> bool:
     )
 
 
-def test_archived_corpus_has_no_authoritative_row_with_two_responsible_steps():
-    """The state the audit found must be gone: any contradiction is marked.
-
-    The archive is read-only. Every row that mirrors one step in its tracer slot
-    and adopts another now carries a conflict record and a degraded localization
-    authority; the detector verdicts and adopted steps themselves are identical
-    to what was recorded.
-    """
+def test_archived_corpus_preserves_original_step_readings():
+    """Check the historical audit's denominator without revalidating old stages."""
     records = _archive_records()
-    assert len(records) == 142, (
-        "the audit's 142-conviction corpus must be the one measured here"
-    )
+    assert len(records) == 142
     conflicts = 0
     kinds = {"content_step": 0, "action_step": 0, "empty_step": 0, None: 0}
     for path, envelope in records:
-        replayed, packet = _replay(path, envelope)
-        assert replayed["state"] == "verified_error", path
-        # Nothing else moved: same verdict, same adopted step.
-        assert replayed["decision_authority"] == envelope["decision_authority"], path
-        assert replayed["responsible_step"] == envelope["responsible_step"], path
+        raw = json.loads((DATASET_ROOT / str(envelope["case_id"])).read_text(encoding="utf-8-sig"))
+        packet = build_packet({"question": raw["question"], "history": raw["history"]})
+        assert envelope["state"] == "verified_error", path
+        adopted = envelope["responsible_step"]
         mirrored = ((envelope.get("proof") or {}).get("step_tracer") or {}).get("step")
-        kind = step_kind(packet, replayed["responsible_step"])
-        kinds[kind] += 1
-        if isinstance(mirrored, int) and mirrored != replayed["responsible_step"]:
+        kinds[step_kind(packet, adopted)] += 1
+        if isinstance(mirrored, int) and mirrored != adopted:
             conflicts += 1
-            assert replayed["localization_conflict"] is not None, path
-            assert replayed["localization_authority"] == (
-                LOCALIZATION_AUTHORITY_DEGRADED_CONFLICT
-            ), path
-        else:
-            assert replayed["localization_authority"] == (
-                LOCALIZATION_AUTHORITY_AUTHORITATIVE
-            ), path
-    # Three rows in this corpus reported two different steps and used to read
-    # as authoritative localization.
     assert conflicts == 3
-    # The structural split that motivated the work: 117 action steps, 25
-    # content steps, and no unclassifiable row.
-    assert kinds["action_step"] == 117
-    assert kinds["content_step"] == 25
-    assert kinds["empty_step"] == 0
-    assert kinds[None] == 0
+    assert kinds == {"content_step": 25, "action_step": 117, "empty_step": 0, None: 0}

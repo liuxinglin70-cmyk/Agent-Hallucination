@@ -252,28 +252,6 @@ def _vote_defense(
                   "error_type": "provider_error"}
     topups_used = 0
 
-    def cast_one() -> None:
-        nonlocal total_attempts, last_error, sample_meta
-        result, status = _call_defense(
-            packet=packet, route=route, system=system, user=user,
-            positive=positive, snapshot=snapshot,
-        )
-        total_attempts += int(status.get("attempts") or 0)
-        warnings.extend(status.get("warnings") or [])
-        if result.get("ok") and isinstance(result.get("parsed"), Mapping):
-            ballots.append(dict(result["parsed"]))
-            sample_meta = dict(result.get("provider") or {})
-            accumulate_usage(
-                ballots_usage, (sample_meta or {}).get("usage") or {},
-            )
-        else:
-            last_error = {
-                "error": str(result.get("error") or "defense vote failed"),
-                "error_type": str(
-                    result.get("error_type") or "provider_error"
-                ),
-            }
-
     def cast_at(_index: int) -> tuple[dict[str, Any], dict[str, Any]]:
         return _call_defense(
             packet=packet, route=route, system=system, user=user,
@@ -310,7 +288,7 @@ def _vote_defense(
     while len(ballots) < votes and topup_budget > 0:
         topup_budget -= 1
         topups_used += 1
-        cast_one()
+        absorb(cast_at(0))
     if not ballots:
         return {
             "ok": False, "parsed": None,

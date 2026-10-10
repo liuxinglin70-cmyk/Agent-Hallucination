@@ -39,7 +39,7 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable, Mapping
 
-from detector.packet import delivered_result as packet_delivered_result
+from detector.packet import answer_tool_is_delivery, delivered_result as packet_delivered_result
 from detector.packet import packet_reference_index, packet_reference_error
 
 PREDICATE_VERDICTS: dict[str, frozenset[str]] = {
@@ -625,29 +625,16 @@ def predicate_final_delivery_present(
 ) -> dict[str, Any]:
     """Detect a terminal success with no delivery anchor of any kind.
 
-    Three delivery channels count, not two. A trajectory may deliver its answer
-    as the last prose event, through an answer-like tool call, or **in a tool
-    observation** -- which is how this corpus's OpenManus-style runs deliver:
-    the answer sits in the observation of the final call and the run closes with
-    ``terminate(status=success)``. Reading only prose and answer-tool anchors
-    called three correct runs "no delivery", which is what a false positive
-    looks like when a predicate knows one framework's shape and not another's.
-
-    A content-bearing observation is one whose text, after the runtime envelope
-    ("Observed output of cmd `x` executed:") and the fixed completion banner are
-    removed, still carries at least ``_MIN_DELIVERY_CHARS`` characters. The
-    threshold is loose on purpose: this predicate is not judging whether the
-    answer is *correct*, only whether a channel exists. Its conviction authority
-    comes from the calibration record, which refuses it unless the loose rule
-    still produces zero clean-set false positives.
+    Prose, an answer delivery tool or a content-bearing tool observation counts
+    as a channel. Closing status tools do not erase an earlier answer delivery.
+    Observation payloads must retain at least ``_MIN_DELIVERY_CHARS`` after
+    removing runtime envelopes and completion banners. Channel presence does
+    not establish answer correctness; conviction authority needs calibration.
     """
     anchors = packet_delivered_result(packet)
     has_prose = bool(anchors.get("last_prose_event_id"))
     answer_tool = anchors.get("last_answer_tool_call") or {}
-    answer_tool_name = str(answer_tool.get("tool_name") or "").lower()
-    has_answer_tool = bool(answer_tool) and not any(
-        marker in answer_tool_name for marker in ("terminate", "finish", "success")
-    )
+    has_answer_tool = answer_tool_is_delivery(answer_tool)
     terminal_success = any(
         "success" in str(interaction.get("arguments") or "").lower()
         or "success" in str(interaction.get("observation") or "").lower()

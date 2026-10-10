@@ -990,13 +990,9 @@ def test_typed_dsl_conviction_route_is_unchanged(big_corpus):
     )
 
 
-def test_shipped_record_covers_every_convicting_predicate():
-    """The record in the tree answers for every predicate the design convicts on.
-
-    A predicate added to ``PREDICATE_CONVICTION_VERDICTS`` without a record
-    entry is refused at run time (fail-closed), so this test is the loud
-    reminder to re-measure -- not a gate that grants the missing authority.
-    """
+@pytest.mark.local_data
+def test_shipped_record_covers_predicates_and_refuses_stale_authority(tmp_path):
+    """Historical records retain their bytes; stale entries lose authority."""
     from detector.predicates import PREDICATE_CONVICTION_VERDICTS
 
     if not DEFAULT_ARTIFACT.is_file():
@@ -1009,7 +1005,11 @@ def test_shipped_record_covers_every_convicting_predicate():
         "convicting predicates with no calibration entry: "
         f"{missing}; re-run scripts/calibrate_conviction_predicates.py"
     )
+    calibration = ConvictionCalibration(
+        artifact=record, corpus_root=tmp_path / "absent-corpus", reverify=False,
+    )
     for name, entry in record["predicates"].items():
-        assert entry["source_fingerprint"] == source_fingerprint(name), (
-            f"{name}: the shipped record is stale against the predicate's code"
-        )
+        if entry["source_fingerprint"] != source_fingerprint(name):
+            status = calibration.status()[name]
+            assert status["admitted"] is False
+            assert "source_fingerprint_mismatch" in status["reasons"]

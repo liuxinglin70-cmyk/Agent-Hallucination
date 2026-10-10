@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from evolution.backends import DetectionBackend, LiveDetectorBackend
 from evolution.contracts import make_intervention, make_registry
-from detector.api import _validate_frozen_stages
+from detector.replay import validate_frozen_stages
 from detector.packet import build_packet
 
 
@@ -419,7 +419,7 @@ def test_frozen_stage_envelope_validates_with_canonical_status_names():
         },
     }
     frozen = LiveDetectorBackend._frozen_stages(baseline, {"judge.post"})
-    normalized = _validate_frozen_stages(frozen, packet)
+    normalized = validate_frozen_stages(frozen, packet)
     entry = normalized["hearings"][0]
     assert entry["tracer_status"]["state"] == "ok"
     assert entry["defense_status"]["state"] == "ok"

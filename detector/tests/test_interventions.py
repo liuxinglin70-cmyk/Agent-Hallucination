@@ -449,8 +449,9 @@ def test_detector_detect_writes_proof_deployment(sample_record, monkeypatch):
     assert deployment["evidence"][0]["intervention_id"] == "IV-E2"
 
 
-def test_frozen_judge_replay_skips_judge_provider(sample_record, monkeypatch):
+def test_frozen_judge_replay_skips_judge_provider(sample_record, monkeypatch, replay_inputs_for):
     frozen = {
+        "replay_inputs": replay_inputs_for(sample_record, CONFIG),
         "judge_result": {
             "ok": True,
             "parsed": {
@@ -497,8 +498,9 @@ def test_frozen_judge_replay_skips_judge_provider(sample_record, monkeypatch):
     assert result["provenance"]["frozen_judge_replay"] is True
 
 
-def test_frozen_judge_refuses_judge_hook_intervention(sample_record):
+def test_frozen_judge_refuses_judge_hook_intervention(sample_record, replay_inputs_for):
     frozen = {
+        "replay_inputs": replay_inputs_for(sample_record, CONFIG),
         "judge_result": {
             "ok": True,
             "parsed": {
@@ -523,15 +525,16 @@ def test_frozen_judge_refuses_judge_hook_intervention(sample_record):
         intervention_id="IV-J",
         hook="judge.system",
     )])
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="mask"):
         Detector(CONFIG, require_credentials=False).detect(
             sample_record, case_id="x", interventions=registry,
             frozen_judge=frozen,
         )
 
 
-def test_frozen_replay_refuses_masked_later_stage(sample_record):
+def test_frozen_replay_refuses_masked_later_stage(sample_record, replay_inputs_for):
     frozen = {
+        "replay_inputs": replay_inputs_for(sample_record, CONFIG),
         "judge_result": {
             "ok": True,
             "parsed": {
@@ -568,8 +571,9 @@ def test_frozen_replay_refuses_masked_later_stage(sample_record):
         )
 
 
-def test_frozen_judge_rejects_invalid_contract(sample_record):
+def test_frozen_judge_rejects_invalid_contract(sample_record, replay_inputs_for):
     frozen = {
+        "replay_inputs": replay_inputs_for(sample_record, CONFIG),
         "judge_result": {
             "ok": True,
             "parsed": {

@@ -29,7 +29,7 @@ JUDGE_TRUE = {
 }
 
 
-def test_run_judge_ok(sample_packet, monkeypatch):
+def test_run_judge_ok(wrong_answer_packet, monkeypatch):
     calls = []
 
     def fake_call(*, route, system, user, purpose):
@@ -37,7 +37,7 @@ def test_run_judge_ok(sample_packet, monkeypatch):
         return dict(JUDGE_TRUE), {"attempts": 1, "model": "m", "usage": {}}
 
     monkeypatch.setattr("detector.judge.provider_call", fake_call)
-    result, status = run_judge(packet=sample_packet, config=CONFIG)
+    result, status = run_judge(packet=wrong_answer_packet, config=CONFIG)
     assert result["ok"] is True
     assert result["parsed"]["is_hallucination"] is True
     assert status == {
@@ -46,7 +46,7 @@ def test_run_judge_ok(sample_packet, monkeypatch):
     }
 
 
-def test_run_judge_contract_repair(sample_packet, monkeypatch):
+def test_run_judge_contract_repair(wrong_answer_packet, monkeypatch):
     outputs = [
         {"is_hallucination": "yes"},
         JUDGE_TRUE,
@@ -56,29 +56,29 @@ def test_run_judge_contract_repair(sample_packet, monkeypatch):
         return outputs.pop(0), {"attempts": 1, "model": "m", "usage": {}}
 
     monkeypatch.setattr("detector.judge.provider_call", fake_call)
-    result, status = run_judge(packet=sample_packet, config=CONFIG)
+    result, status = run_judge(packet=wrong_answer_packet, config=CONFIG)
     assert result["ok"] is True
     assert status["warnings"][0]["error"].startswith("contract:")
 
 
-def test_run_judge_rejects_evidence_for_another_step(sample_packet, monkeypatch):
+def test_run_judge_rejects_evidence_for_another_step(wrong_answer_packet, monkeypatch):
     def fake_call(*, route, system, user, purpose):
         return {**JUDGE_TRUE, "evidence_refs": ["event_001"]}, {
             "attempts": 1, "model": "m", "usage": {},
         }
 
     monkeypatch.setattr("detector.judge.provider_call", fake_call)
-    result, status = run_judge(packet=sample_packet, config=CONFIG)
+    result, status = run_judge(packet=wrong_answer_packet, config=CONFIG)
     assert result["ok"] is False
-    assert status["state"] == "provider_error"
+    assert status["state"] == "contract_error"
 
 
-def test_run_judge_provider_error(sample_packet, monkeypatch):
+def test_run_judge_provider_error(wrong_answer_packet, monkeypatch):
     def fake_call(*, route, system, user, purpose):
         raise ProviderError("judge", "boom", attempts=1)
 
     monkeypatch.setattr("detector.judge.provider_call", fake_call)
-    result, status = run_judge(packet=sample_packet, config=CONFIG)
+    result, status = run_judge(packet=wrong_answer_packet, config=CONFIG)
     assert result["ok"] is False
     assert status["state"] == "provider_error"
 
@@ -93,15 +93,15 @@ POSITIVE = {
 }
 
 
-def test_run_defense_not_needed(sample_packet):
+def test_run_defense_not_needed(wrong_answer_packet):
     result, status = run_defense(
-        packet=sample_packet, positive={}, config=CONFIG,
+        packet=wrong_answer_packet, positive={}, config=CONFIG,
     )
     assert result["ok"] is True
     assert status["state"] == "not_needed"
 
 
-def test_run_defense_refuted(sample_packet, monkeypatch):
+def test_run_defense_refuted(wrong_answer_packet, monkeypatch):
     def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {
             "verdict": "refuted",
@@ -112,14 +112,14 @@ def test_run_defense_refuted(sample_packet, monkeypatch):
 
     monkeypatch.setattr("detector.defense.provider_call", fake_call)
     result, status = run_defense(
-        packet=sample_packet, positive=POSITIVE, config=CONFIG,
+        packet=wrong_answer_packet, positive=POSITIVE, config=CONFIG,
     )
     assert result["parsed"]["verdict"] == "refuted"
     assert status["state"] == "ok"
 
 
 def test_run_defense_rejects_refuted_without_resolved_evidence(
-    sample_packet, monkeypatch,
+    wrong_answer_packet, monkeypatch,
 ):
     def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {
@@ -131,14 +131,14 @@ def test_run_defense_rejects_refuted_without_resolved_evidence(
 
     monkeypatch.setattr("detector.defense.provider_call", fake_call)
     result, status = run_defense(
-        packet=sample_packet, positive=POSITIVE, config=CONFIG,
+        packet=wrong_answer_packet, positive=POSITIVE, config=CONFIG,
     )
     assert result["ok"] is False
     assert status["state"] == "contract_error"
 
 
 def test_run_defense_rejects_unknown_evidence_reference(
-    sample_packet, monkeypatch,
+    wrong_answer_packet, monkeypatch,
 ):
     def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {
@@ -150,14 +150,14 @@ def test_run_defense_rejects_unknown_evidence_reference(
 
     monkeypatch.setattr("detector.defense.provider_call", fake_call)
     result, status = run_defense(
-        packet=sample_packet, positive=POSITIVE, config=CONFIG,
+        packet=wrong_answer_packet, positive=POSITIVE, config=CONFIG,
     )
     assert result["ok"] is False
     assert status["state"] == "contract_error"
 
 
 def test_run_defense_rejects_confirmation_for_another_step(
-    sample_packet, monkeypatch,
+    wrong_answer_packet, monkeypatch,
 ):
     def fake_call(*, route, system, user, purpose, cache_tag=""):
         return {
@@ -169,21 +169,21 @@ def test_run_defense_rejects_confirmation_for_another_step(
 
     monkeypatch.setattr("detector.defense.provider_call", fake_call)
     result, status = run_defense(
-        packet=sample_packet, positive=POSITIVE, config=CONFIG,
+        packet=wrong_answer_packet, positive=POSITIVE, config=CONFIG,
     )
     assert result["ok"] is False
     assert status["state"] == "contract_error"
 
 
 def test_run_defense_inconclusive_keeps_judge_on_failure(
-    sample_packet, monkeypatch,
+    wrong_answer_packet, monkeypatch,
 ):
     def fake_call(*, route, system, user, purpose, cache_tag=""):
         raise ProviderError("defense", "boom", attempts=1)
 
     monkeypatch.setattr("detector.defense.provider_call", fake_call)
     result, status = run_defense(
-        packet=sample_packet, positive=POSITIVE, config=CONFIG,
+        packet=wrong_answer_packet, positive=POSITIVE, config=CONFIG,
     )
     assert result["ok"] is False
     assert status["state"] == "provider_error"

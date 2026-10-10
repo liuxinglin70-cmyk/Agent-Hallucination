@@ -15,7 +15,7 @@ from detector.causal_audit import (
 from detector.causal_contracts import seal
 from detector.identity import build_execution_identity, digest, source_identity
 from detector.hearing import hearing_target, judge_target, recall_target
-from detector.defense import _parse_defense, _validate_defense_evidence, run_defense
+from detector.defense import run_defense
 from detector.evidence import (
     snapshot_digest,
     touches_packet,
@@ -27,7 +27,7 @@ from detector.interventions import (
     compile_runtime_plan,
     load_intervention_registry,
 )
-from detector.judge import _parse_judge, run_judge
+from detector.judge import run_judge
 from detector.packet import build_packet, event_id_for_step, validate_record
 from detector.predicate_context import judge_predicate_context
 from detector.provider import ProviderError, case_deadline_ctx
@@ -37,15 +37,12 @@ from detector.runtime import (
 )
 import time
 from detector.recaller import (
-    _parse_candidates,
-    _parse_upgrades,
-    assemble_upgraded_candidates,
     run_causal_upgrade,
     run_recall_scan,
 )
-from detector.replay import frozen_masked_stages
+from detector.replay import build_replay_inputs, validate_frozen_stages
 from detector.result import build_detection_output
-from detector.step_tracer import _parse_tracer, run_step_tracer
+from detector.step_tracer import run_step_tracer
 
 
 @dataclass(frozen=True)
@@ -75,132 +72,6 @@ def _judge_negative_needs_recall(
     cast = int(vote.get("cast") or 0)
     positives = int(vote.get("positives") or 0)
     return cast < requested or positives > 0 or bool(vote.get("tie"))
-
-
-def _frozen_stage(
-    frozen: Mapping[str, Any], name: str,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    result = frozen.get(f"{name}_result")
-    status = frozen.get(f"{name}_status")
-    if not isinstance(result, Mapping) or not isinstance(status, Mapping):
-        raise ValueError(f"frozen {name} replay requires result and status objects")
-    result_copy = dict(result)
-    status_copy = dict(status)
-    if bool(result_copy.get("ok")) != (status_copy.get("state") == "ok"):
-        raise ValueError(f"frozen {name} result/status authority mismatch")
-    return result_copy, status_copy
-
-
-def _validate_frozen_stages(
-    frozen: Mapping[str, Any], packet: Mapping[str, Any],
-    snapshot: Mapping[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Normalize replay payloads through the same contracts as live stages."""
-    if not isinstance(frozen, Mapping):
-        raise ValueError("frozen stage replay payload must be an object")
-    normalized = dict(frozen)
-    if frozen.get("packet_hash") and frozen["packet_hash"] != digest(packet):
-        raise ValueError("frozen stages belong to a different packet")
-    judge_result, judge_status = _frozen_stage(frozen, "judge")
-    if judge_result.get("ok"):
-        parsed, error = _parse_judge(judge_result.get("parsed"), packet)
-        if parsed is None:
-            raise ValueError(f"frozen judge_result contract error: {error}")
-        judge_result["parsed"] = parsed
-    normalized["judge_result"] = judge_result
-    normalized["judge_status"] = judge_status
-
-    if "recall_result" in frozen:
-        recall_result, recall_status = _frozen_stage(frozen, "recall")
-        if recall_result.get("ok"):
-            candidates, error = _parse_candidates(
-                {"candidates": recall_result.get("candidates") or []}, packet, snapshot,
-            )
-            if candidates is None:
-                raise ValueError(f"frozen recall_result contract error: {error}")
-            recall_result["candidates"] = candidates
-        normalized["recall_result"] = recall_result
-        normalized["recall_status"] = recall_status
-
-    if "upgrade_result" in frozen:
-        upgrade_result, upgrade_status = _frozen_stage(frozen, "upgrade")
-        recall_candidates = (
-            normalized.get("recall_result") or {}
-        ).get("candidates") or []
-        if upgrade_result.get("ok"):
-            upgrades, missing, error = _parse_upgrades(
-                {
-                    "upgrades": upgrade_result.get("upgrades") or [],
-                },
-                recall_candidates,
-                packet, snapshot,
-            )
-            if upgrades is None or missing:
-                raise ValueError(
-                    f"frozen upgrade_result contract error: {error or missing}"
-                )
-            upgraded_candidates = assemble_upgraded_candidates(
-                recall_candidates, upgrades,
-            )
-            upgrade_result["upgraded_candidates"] = upgraded_candidates
-            upgrade_result["upgraded_candidate"] = (
-                upgraded_candidates[0] if upgraded_candidates else None
-            )
-            upgrade_result["upgrades"] = upgrades
-        else:
-            upgrade_result["upgraded_candidates"] = []
-            upgrade_result["upgraded_candidate"] = None
-        normalized["upgrade_result"] = upgrade_result
-        normalized["upgrade_status"] = upgrade_status
-
-    if "hearings" in frozen:
-        entries = frozen.get("hearings")
-        if not isinstance(entries, list):
-            raise ValueError("frozen hearings must be a list")
-        normalized_hearings: list[dict[str, Any]] = []
-        for entry in entries:
-            if not isinstance(entry, Mapping):
-                raise ValueError("frozen hearing entry must be an object")
-            clean = {
-                "source": str(entry.get("source") or ""),
-                "candidate_id": entry.get("candidate_id"),
-                "positive": dict(entry.get("positive") or {}),
-            }
-            if "tracer_result" in entry or "tracer_status" in entry:
-                tracer_result, tracer_status = _frozen_stage(entry, "tracer")
-                if tracer_result.get("ok"):
-                    parsed, error = _parse_tracer(
-                        tracer_result.get("parsed"), packet,
-                    )
-                    if parsed is None:
-                        raise ValueError(
-                            f"frozen tracer_result contract error: {error}"
-                        )
-                    tracer_result["parsed"] = parsed
-                clean["tracer_result"] = tracer_result
-                clean["tracer_status"] = tracer_status
-            if "defense_result" in entry or "defense_status" in entry:
-                defense_result, defense_status = _frozen_stage(entry, "defense")
-                if defense_result.get("ok"):
-                    parsed, error = _parse_defense(defense_result.get("parsed"))
-                    if parsed is None:
-                        raise ValueError(
-                            f"frozen defense_result contract error: {error}"
-                        )
-                    positive = {"step": clean["positive"].get("step")}
-                    parsed, error = _validate_defense_evidence(
-                        parsed, packet, positive, snapshot,
-                    )
-                    if parsed is None:
-                        raise ValueError(
-                            f"frozen defense_result evidence error: {error}"
-                        )
-                    defense_result["parsed"] = parsed
-                clean["defense_result"] = defense_result
-                clean["defense_status"] = defense_status
-            normalized_hearings.append(clean)
-        normalized["hearings"] = normalized_hearings
-    return normalized
 
 
 class Detector:
@@ -385,6 +256,14 @@ class Detector:
         )
         replay_payload = frozen_judge if frozen_judge is not None else frozen_stages
         frozen = replay_payload
+        current_source = source_identity("detector")
+        identity_config = {**self.config, **(
+            {"offline_feedback_policy": self.offline_feedback_policy.policy_id}
+            if self.offline_feedback_policy is not None else {})}
+        replay_inputs = build_replay_inputs(
+            packet=packet, config=identity_config, source=current_source, snapshot=snapshot,
+            entries=plan.entries,
+        )
         review_input_digest = digest({"case_id": case_id, "packet": packet, "config": self.config,
                                      "registry": effective_interventions, "evidence": attached_snapshot})
         if frozen is not None and "judge_result" not in frozen:
@@ -417,16 +296,11 @@ class Detector:
                     f"{recorded} but this run carries "
                     f"{active_digest[:16] if active_digest else 'none'}"
                 )
-            frozen = _validate_frozen_stages(frozen, packet, snapshot)
+            frozen = validate_frozen_stages(
+                frozen, packet, snapshot, expected_inputs=replay_inputs, active_entries=plan.entries,
+            )
             judge_result = frozen["judge_result"]
             judge_status = frozen["judge_status"]
-            masked = frozen_masked_stages(frozen, plan.entries)
-            if masked:
-                raise ValueError(
-                    "frozen stage replay is refused: active interventions "
-                    f"target the frozen stage(s) {masked} (it would mask "
-                    "the intervention under test)"
-                )
         else:
             judge_result, judge_status = run_judge(
                 packet=packet, config=self.config, plan=plan,
@@ -620,13 +494,11 @@ class Detector:
 
         judge_overturned = False
         if hearings:
-            tracer_result, tracer_status, defense_result, defense_status = (
-                run_hearing(hearings[0])
-            )
-            hearings[0]["tracer_result"] = tracer_result
-            hearings[0]["tracer_status"] = tracer_status
-            hearings[0]["defense_result"] = defense_result
-            hearings[0]["defense_status"] = defense_status
+            (
+                hearings[0]["tracer_result"], hearings[0]["tracer_status"],
+                hearings[0]["defense_result"], hearings[0]["defense_status"],
+            ) = run_hearing(hearings[0])
+            defense_result = hearings[0]["defense_result"]
             defense_parsed = (
                 defense_result.get("parsed")
                 if isinstance(defense_result.get("parsed"), Mapping) else {}
@@ -648,9 +520,10 @@ class Detector:
                 ) = run_hearing(hearing)
                 hearings.append(hearing)
 
-        defense_parsed = (
-            (defense_result or {}).get("parsed") or {}
-        ) if isinstance((defense_result or {}).get("parsed"), Mapping) else {}
+        if hearings:
+            first = hearings[0]
+            tracer_result, tracer_status = first["tracer_result"], first["tracer_status"]
+            defense_result, defense_status = first["defense_result"], first["defense_status"]
         hearing_facts = [
             {
                 "candidate_id": h.get("candidate_id"),
@@ -731,10 +604,9 @@ class Detector:
         )
         provenance: dict[str, Any] = {
             "packet_hash": digest(packet),
+            "replay_inputs": replay_inputs,
             "execution_identity": build_execution_identity(
-                source=source_identity("detector"), config={**self.config, **(
-                    {"offline_feedback_policy": self.offline_feedback_policy.policy_id}
-                    if self.offline_feedback_policy is not None else {})},
+                source=current_source, config=identity_config,
                 record=record, packet=packet, evidence=attached_snapshot,
                 registry=effective_interventions,
                 authority=authority_identity(effective_interventions, calibration=plan.conviction_calibration),
