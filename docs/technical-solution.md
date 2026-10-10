@@ -89,7 +89,7 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 
 `causal_contracts.py`、`step_uncertainty.py` 和 `causal_graph.py` 生成只读风险画像、确定性候选和实际依赖投影；未知语义关系保留未知，teacher-forced PPL 返回 unsupported。`causal_audit.py` 可验证局部字面算术偏差；模型解释只记 hypothesis，局部错误不证明材料性、最早责任步或最终交付违约。
 
-`shadow` 在基础裁决后使用剩余新增预算生成诊断。`tracer_context` 在听证前准备诊断，`context_for_hearing` 只投影当前听证所引用事件的核验记录，并绑定完整目标摘要；事件重叠仍不证明 claim 等价。Tracer 可以拒绝不相关上下文，原引用解析和 Adjudication 权限保持有效。上下文的实际证据摘要不含审计耗时，冻结 Tracer 仅在上下文身份相同后复用；配置变化或此前无上下文时重新执行。
+`shadow` 在基础裁决后使用剩余新增预算生成诊断。`tracer_context` 在听证前准备诊断。context.v2只接收可唯一绑定的局部算术结果：packet引用限定实际交互，quote与delivered_result必须是相同有界数值，correct_result与重算表达式一致，且观察确有偏差；多工具事件必须有明确交互引用。缺值、自然语言值、歧义或已一致的结果回退基础Tracer；Recall hearing不借用Judge的correct_result。局部claim证书绑定packet和完整目标摘要，候选仅保留匹配交互的证书。Tracer在provider前从packet重算证书并核验实际结果输入，重新封装的错证书/角色/权限被拒绝。same_local_result只证明此被引用算术结果，材料性、语义传播和首次因果引入仍未知，局部证书无定罪或定位权限。上下文的实际证据摘要不含审计耗时，冻结 Tracer 仅在上下文身份相同后复用；配置变化或此前无上下文时重新执行。
 
 新增上下文按 UTF-8 内容字节保守计入输入预算；repair 单独准入，耗尽时回到基础 Tracer。新增阴性复审的 Scanner、Upgrade 多票、Tracer、Defense 及 repair 都由 provider 的 `added_request_scope` 共享同一案例请求、输入、输出和 deadline 预算，transport 不重新领预算。预算持有者记录复审启动，整例重试不能再次启动可选阴性复审；后续新案例独立获得预算。内部 continuation 绑定 case、packet、配置、registry 和证据，复用同次已执行的 Judge；不借用外部冻结回放入口。高置信阴性的审计在基础证明形成后执行。预算耗尽保留已形成的基础证明与实际请求成本；策略资格回调结束立即核验预算与整例期限/取消，允许和拒绝分支共用；整个可选诊断和反馈阶段共享异常证明保留边界，fatal、整例超时和取消都保留基础证明。
 

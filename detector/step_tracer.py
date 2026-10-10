@@ -5,9 +5,8 @@ from __future__ import annotations
 import json
 from typing import Any, Mapping
 
-from detector.causal_audit import CONTEXT_SCHEMA
-from detector.causal_contracts import validate_seal
-from detector.identity import digest
+from detector.causal_audit import validate_hearing_context
+from detector.causal_contracts import numeric_literal
 from detector.interventions import InterventionPlan, empty_plan
 from detector.packet import (evidence_refs_support_step, packet_features,
                              packet_reference_error, render_judge_view)
@@ -76,18 +75,16 @@ def run_step_tracer(
         )
     context_block = ""
     if causal_context is not None:
-        validate_seal(causal_context, schema=CONTEXT_SCHEMA)
-        if causal_context["packet_digest"] != digest(packet):
-            raise ValueError("causal context packet identity differs")
-        if positive is None or causal_context["target_digest"] != digest(positive):
-            raise ValueError("causal context hearing identity differs")
-        if causal_context["policy_digest"] != digest(config["causal_audit"]):
-            raise ValueError("causal context policy identity differs")
+        validate_hearing_context(causal_context, packet=packet, positive=positive,
+                                 policy=config["causal_audit"])
+        if (numeric_literal(delivered_result) != numeric_literal(positive["delivered_result"])
+                or numeric_literal(correct_result) != numeric_literal(positive["correct_result"])):
+            raise ValueError("causal context actual result inputs differ")
         context_block = (
             "\n\nCAUSAL CONTEXT: " + json.dumps(causal_context, ensure_ascii=False)
-            + "\nThese local checks have no decision or localization authority. Reject any check "
-            "that does not explain this hearing's same claim; an event overlap does not establish "
-            "claim equivalence. Corrected errors and unrelated errors cannot replace the target."
+            + "\nThe certificate binds only this referenced literal arithmetic result. It has no "
+            "decision or localization authority and does not prove semantic propagation, materiality "
+            "or the first causal introduction. Corrected and unrelated errors cannot replace the target."
         )
     warnings: list[dict[str, str]] = []
     used_context_digest = None

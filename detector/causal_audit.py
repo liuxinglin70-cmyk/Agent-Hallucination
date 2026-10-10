@@ -9,19 +9,20 @@ import time
 from typing import Any, Callable, Mapping, Sequence
 
 from detector.causal_contracts import (
-    CAUSAL_PROJECTION_SCHEMA, RISK_PROFILE_SCHEMA, arithmetic_check, seal, validate_seal,
+    CAUSAL_PROJECTION_SCHEMA, RISK_PROFILE_SCHEMA, arithmetic_check, bind_arithmetic_claim,
+    seal, validate_seal,
 )
 from detector.causal_graph import build_observed_dependencies, project_dependency_closure
 from detector.identity import digest
 from detector.measurement import request_execution
-from detector.packet import event_id_for_step, packet_reference_error, packet_reference_index, validate_packet
+from detector.packet import packet_reference_error, validate_packet
 from detector.provider import ProviderError, provider_call, raise_if_terminal
 from detector.predicates import run_predicate
 from detector.runtime import AddedBudget, AddedBudgetExceeded, added_request_scope, usage_scope, utc_now
 from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates
 
 AUDIT_SCHEMA = "detector.causal_audit.v1"
-CONTEXT_SCHEMA = "detector.causal_context.v1"
+CONTEXT_SCHEMA = "detector.causal_context.v2"
 CAUSAL_ROLES = frozenset({"introduction", "propagation", "delivery", "corrected", "unknown"})
 CLAIM_STATUSES = frozenset({"supported", "refuted", "inconclusive"})
 _SYSTEM = (
@@ -108,6 +109,28 @@ def _model_hypotheses(parsed: Any, packet, selected, visible) -> list[dict[str, 
     return hypotheses
 
 
+def _local_candidate(eid: str, checks: list[dict[str, Any]], *, unchecked: bool = False) -> dict[str, Any]:
+    deviations = [check for check in checks if check["status"] == "deviation"]
+    return {
+        "event_id": eid, "role": "unknown",
+        "claim": "observed calculator result deviates from its literal expression"
+        if checks else "candidate has a material causal deviation",
+        "claim_status": "supported" if deviations else "refuted" if checks and not unchecked else "inconclusive",
+        "scope": "local_arithmetic_result" if checks else "unverified_causal_claim",
+        "materiality": "unknown", "evidence_refs": list(dict.fromkeys(
+            ref for check in checks for ref in check["evidence_refs"])),
+        "verification_status": "verified" if checks else "unknown", "certificates": checks,
+        "decision_authority": "none",
+        "counterfactual": {
+            "kind": "local_arithmetic_correction" if deviations else "none",
+            "status": "verified_local" if deviations else "not_run",
+            "assumptions": ["same literal expression"] if deviations else [],
+            "verifier_refs": [check["verifier"] for check in deviations],
+            "state_changes_verified": False,
+        },
+    }
+
+
 def run_causal_audit(
     *, packet: Mapping[str, Any], profile: Mapping[str, Any], projection: Mapping[str, Any],
     target: Mapping[str, Any] | None = None, snapshot: Mapping[str, Any] | None = None,
@@ -165,25 +188,7 @@ def run_causal_audit(
                             checks.append(check)
                         elif str(interaction.get("tool_name") or "").lower() == "calculator":
                             unchecked = True
-                deviations = [check for check in checks if check["status"] == "deviation"]
-                candidates.append({
-                    "event_id": eid, "role": "unknown",
-                    "claim": "observed calculator result deviates from its literal expression"
-                    if checks else "candidate has a material causal deviation",
-                    "claim_status": "supported" if deviations else "refuted" if checks and not unchecked else "inconclusive",
-                    "scope": "local_arithmetic_result" if checks else "unverified_causal_claim",
-                    "materiality": "unknown", "evidence_refs": list(dict.fromkeys(
-                        ref for check in checks for ref in check["evidence_refs"])),
-                    "verification_status": "verified" if checks else "unknown", "certificates": checks,
-                    "decision_authority": "none",
-                    "counterfactual": {
-                        "kind": "local_arithmetic_correction" if deviations else "none",
-                        "status": "verified_local" if deviations else "not_run",
-                        "assumptions": ["same literal expression"] if deviations else [],
-                        "verifier_refs": [check["verifier"] for check in deviations],
-                        "state_changes_verified": False,
-                    },
-                })
+                candidates.append(_local_candidate(eid, checks, unchecked=unchecked))
             budget.check()
             hypotheses = []
             if visible.intersection(selected) and policy["counterfactual_mode"] == "model_hypothesis":
@@ -237,25 +242,53 @@ def context_for_hearing(
     error = packet_reference_error(packet, refs)
     if error:
         raise ValueError(error)
-    owners = packet_reference_index(packet)
-    anchors = {owners[ref] for ref in refs}
-    eid = event_id_for_step(packet, positive.get("step"))
-    if eid is not None:
-        anchors.add(eid)
-    # A shared event is a relevance bound, not proof that two claims are equivalent.
-    candidates = [row for row in audit["candidates"] if row["event_id"] in anchors
-                  and row["verification_status"] == "verified"]
-    if not candidates:
+    bound = bind_arithmetic_claim(packet, positive)
+    if bound is None:
         return None
+    binding, check = bound
+    if not any(row["event_id"] == binding["event_id"] and check in row["certificates"]
+               and row["verification_status"] == "verified" for row in audit["candidates"]):
+        return None
+    candidates = [_local_candidate(binding["event_id"], [check])]
     return seal({
         "schema_version": CONTEXT_SCHEMA, "packet_digest": audit["packet_digest"],
         "policy_digest": audit["policy_digest"],
         "audit_evidence_digest": digest({key: value for key, value in audit.items()
                                         if key not in {"digest", "cost", "budget", "hypotheses"}}),
         "target_digest": digest(positive), "candidates": candidates,
-        "scope": "hearing_referenced_local_checks", "claim_equivalence": "unverified",
+        "scope": "hearing_referenced_local_checks", "claim_equivalence": "same_local_result",
+        "claim_binding": binding,
         "closure_state": audit["closure_state"], "decision_authority": "none",
     })
+
+
+def validate_hearing_context(
+    context: Mapping[str, Any], *, packet: Mapping[str, Any],
+    positive: Mapping[str, Any] | None, policy: Mapping[str, Any],
+) -> None:
+    validate_seal(context, schema=CONTEXT_SCHEMA)
+    if context["packet_digest"] != digest(packet):
+        raise ValueError("causal context packet identity differs")
+    if positive is None or context["target_digest"] != digest(positive):
+        raise ValueError("causal context hearing identity differs")
+    if context["policy_digest"] != digest(policy):
+        raise ValueError("causal context policy identity differs")
+    error = packet_reference_error(packet, positive.get("evidence_refs") or ())
+    if error:
+        raise ValueError(error)
+    candidates = context.get("candidates")
+    if not isinstance(candidates, list) or len(candidates) != 1 or not isinstance(candidates[0], Mapping):
+        raise ValueError("causal context requires one bound local claim")
+    bound = bind_arithmetic_claim(packet, positive)
+    if bound is None:
+        raise ValueError("causal context local claim is not bound")
+    binding, check = bound
+    if (context.get("claim_binding") != binding
+            or candidates != [_local_candidate(binding["event_id"], [check])]
+            or context.get("claim_equivalence") != "same_local_result"
+            or context.get("decision_authority") != "none"
+            or context.get("scope") != "hearing_referenced_local_checks"):
+        raise ValueError("causal context local claim certificate differs")
 
 
 def build_causal_diagnostics(

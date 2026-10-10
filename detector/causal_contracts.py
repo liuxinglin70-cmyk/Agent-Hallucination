@@ -73,6 +73,19 @@ def field_binding(field: Mapping[str, Any]) -> tuple[Any, ...]:
     return tuple(field[key] for key in ("entity", "attribute", "unit", "time"))
 
 
+def numeric_literal(value: Any) -> Decimal | None:
+    if type(value) not in {str, int, float}:
+        return None
+    if ((isinstance(value, str) and len(value) > 256)
+            or (type(value) is int and value.bit_length() > 512)):
+        return None
+    try:
+        number = Decimal(str(value))
+        return number if number.is_finite() and abs(number.adjusted()) <= 128 else None
+    except InvalidOperation:
+        return None
+
+
 def arithmetic_check(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
     """Check a calculator's literal arithmetic result, without executing tool code."""
     if str(interaction.get("tool_name") or "").lower() != "calculator":
@@ -119,14 +132,8 @@ def arithmetic_check(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
                 denominator //= factor
         if denominator != 1:
             return None
-        observation = interaction.get("observation")
-        if type(observation) not in {str, int, float}:
-            return None
-        if ((isinstance(observation, str) and len(observation) > 256)
-                or (type(observation) is int and observation.bit_length() > 512)):
-            return None
-        observed = Decimal(str(observation))
-        if not observed.is_finite() or abs(observed.adjusted()) > 128:
+        observed = numeric_literal(interaction.get("observation"))
+        if observed is None:
             return None
     except (SyntaxError, ValueError, InvalidOperation, ArithmeticError):
         return None
@@ -136,3 +143,45 @@ def arithmetic_check(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
         "status": "consistent" if expected == Fraction(observed) else "deviation",
         "scope": "local_result", "evidence_refs": [interaction["interaction_id"]],
     }
+
+
+def bind_arithmetic_claim(
+    packet: Mapping[str, Any], positive: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    """Bind a referenced literal result, without inferring semantic propagation."""
+    delivered = numeric_literal(positive.get("delivered_result"))
+    corrected = numeric_literal(positive.get("correct_result"))
+    quoted = numeric_literal(positive.get("quote"))
+    if (positive.get("source") != "judge" or delivered is None or corrected is None
+            or quoted != delivered or corrected == delivered):
+        return None
+    refs = set(positive.get("evidence_refs") or ())
+    matches = []
+    for event in packet["events"]:
+        eid = event["event_id"]
+        interactions = event.get("tool_interactions") or ()
+        direct_refs = {item["interaction_id"] for item in interactions}.intersection(refs)
+        if not direct_refs and (eid not in refs or len(interactions) != 1):
+            continue
+        if len(direct_refs) > 32:
+            return None
+        for interaction in interactions:
+            iid = interaction["interaction_id"]
+            if direct_refs and iid not in direct_refs:
+                continue
+            check = arithmetic_check(interaction)
+            if (check is not None and check["status"] == "deviation"
+                    and numeric_literal(check["observed"]) == delivered
+                    and Fraction(check["expected"]) == Fraction(corrected)):
+                matches.append((eid, iid, check))
+    if len(matches) != 1:
+        return None
+    eid, iid, check = matches[0]
+    return seal({
+        "schema_version": "detector.local_claim_binding.v1",
+        "packet_digest": digest(packet), "target_digest": digest(positive),
+        "event_id": eid, "interaction_id": iid, "expression": check["expression"],
+        "observed": check["observed"], "expected": check["expected"],
+        "status": "verified_local_result", "scope": "literal_arithmetic_result",
+        "decision_authority": "none", "localization_authority": "none",
+    }), check
