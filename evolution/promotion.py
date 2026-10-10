@@ -35,7 +35,7 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from detector.interventions import (
     validate_intervention,
@@ -768,7 +768,13 @@ def _verify_frozen_policy(
         )
 
 
+def _validate_artifact_labels(labels: Iterable[Any]) -> None:
+    if any(not isinstance(label, str) or not label for label in labels):
+        raise PromotionProtocolError("invalid artifact manifest path labels")
+
+
 def _artifact_manifest(*paths: str | Path) -> dict[str, Any]:
+    _validate_artifact_labels(str(path) for path in paths)
     payload = {"schema_version": ARTIFACT_MANIFEST_SCHEMA,
                "artifacts": {str(path): artifact_digest(path) for path in paths}}
     return {**payload, "digest": digest(payload)}
@@ -786,11 +792,13 @@ def _verify_artifact_manifest(protocol: Mapping[str, Any]) -> None:
             or manifest["schema_version"] != ARTIFACT_MANIFEST_SCHEMA):
         raise PromotionProtocolError("unsupported artifact manifest schema or fields")
     declared = manifest["artifacts"]
-    if not isinstance(declared, Mapping) or any(
-        not isinstance(path, str) or not path
-        or not isinstance(expected, str) or len(expected) != 64
+    if not isinstance(declared, Mapping):
+        raise PromotionProtocolError("invalid artifact manifest entries")
+    _validate_artifact_labels(declared)
+    if any(
+        not isinstance(expected, str) or len(expected) != 64
         or any(char not in "0123456789abcdef" for char in expected)
-        for path, expected in declared.items()
+        for expected in declared.values()
     ):
         raise PromotionProtocolError("invalid artifact manifest entries")
     payload = {"schema_version": ARTIFACT_MANIFEST_SCHEMA, "artifacts": dict(declared)}

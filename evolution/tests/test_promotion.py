@@ -965,6 +965,27 @@ def test_promotion_freeze_uses_shared_complete_content_identities(tmp_path):
     assert manifest["digest"] == digest({key: value for key, value in manifest.items() if key != "digest"})
 
 
+@pytest.mark.parametrize("include_valid", [False, True])
+def test_promotion_freeze_refuses_empty_artifact_path_before_writing(
+    tmp_path, monkeypatch, include_valid,
+):
+    roles, gold, batch, detector_config = _artifact_fixture(tmp_path)
+    weights = tmp_path / "weights.bin"
+    weights.write_bytes(b"model-v1")
+    monkeypatch.chdir(tmp_path)
+    protocol_path = tmp_path / "protocol.json"
+    paths = [weights, ""] if include_valid else [""]
+    monkeypatch.setattr("evolution.promotion.artifact_digest",
+                        lambda path: pytest.fail("invalid labels must be refused before artifact IO"))
+    with pytest.raises(PromotionProtocolError, match="artifact manifest"):
+        freeze_protocol(
+            protocol_path, batch_path=batch, roles=roles, gold=gold,
+            detector_config=detector_config, workers=2, artifact_paths=paths,
+            framework_config={"registry_dir": str(tmp_path / "registry")},
+        )
+    assert not protocol_path.exists()
+
+
 @pytest.mark.parametrize("schema", ["evolution.promotion_protocol.v1", "evolution.promotion_protocol.v2"])
 def test_old_promotion_identity_contracts_are_not_reused_or_rewritten(tmp_path, schema):
     from evolution.promotion import protocol_self_hash
