@@ -24,11 +24,11 @@
 
 ## 2026-10-09 至 10-11：代码重构离线验证
 
-按用户请求继续完整18包重构。B31及测量来源基础已分别提交65dde2c、6e50319，范围见 [实施台账](../IMPLEMENTATION_PLAN.md)。本轮B32三个正式反例先失败后修复：门控丢弃原始result前生成route_measurement，普通/伙伴成员报告传递来源信封，记录和能力规划匹配当前实际运行身份；候选/伙伴、注册表、配对案例、配置、原始尝试叶身份及冻结范围闭合。重复或部分重复来源、解决后重放、缺/错身份和配置漂移不累积独立负反馈。数字revisions只作诊断，不单独判定能力不足。缺来源的旧记录不补造身份、不改原字节。
+按用户请求继续完整18包重构，范围和证据见 [实施台账](../IMPLEMENTATION_PLAN.md)。B31开发适配与B32来源消费已由Git提交保留；B32实际门控、报告、记录和能力规划按当前运行身份核验原始测量叶来源，重复、部分重复、解决后重放和缺/错身份只作诊断。Mock显式标注synthetic，缓存保留原来源；bb62955c完整code_only1859/platform57、AST80/三个CLI/源码不变通过，首轮Mock缺来源的失败报告保留。
 
-新增29项、相关143项/60项及末次42项通过。51d7ecf7首轮全量1855通过/1失败、平台57通过；失败定位为实际Mock没有测量来源。Mock现从实际调用生成显式synthetic来源，缓存保留原来源，无有效packet不生成来源证书；原完整周期正向断言保留并通过，bb62955c完整code_only1859/platform57、AST80/三个CLI/源码不变通过，范围见 [来源消费核验](../artifacts/code_quality/bb62955c9975b2d276619d14a6863f1825ff2c56262a91a7ee9f885eb7a9be47/2ce1ae1a9bb7420aa8ff53e802459a1c/route-observation-verification.md)。首轮失败报告保留。实际Engine单位报告、路线存储、当前能力规划及同周期多测量重放边界已验证。R13注册表受控故障注入确认B33：baseline写成功后，_save_state抛OSError，active和内存已改变，原磁盘state不变，重新打开因active/state mismatch被拒。该探针只在临时目录执行，正式回归与修复待实施；不是新实验或准入结果。
+B33七条正式故障反例先失败后通过：写入、恢复、清空、退役、回滚和两种贡献记录均以active.json唯一提交发布registry与state，快照由提交索引引用。新增17项及相关50项通过；提交前失败保持原磁盘/内存并清理未引用快照，实际替换后中断读取新提交且传播原异常，陈旧实例拒绝写入。Detector与预检共享严格加载器；旧分离格式不迁移、不改字节。[提交核验](../artifacts/code_quality/3331d727e592712ce25d53cba38c2aa9fc98ad0b6e2c0d414fa2f1ac24aeef1b/60a4b5270156423faa9786ea2b812bac/registry-commit-verification.md)、[纯代码](../artifacts/code_quality/3331d727e592712ce25d53cba38c2aa9fc98ad0b6e2c0d414fa2f1ac24aeef1b/60a4b5270156423faa9786ea2b812bac/summary.json)、[平台](../artifacts/code_quality/3331d727e592712ce25d53cba38c2aa9fc98ad0b6e2c0d414fa2f1ac24aeef1b/bc2a7886a7b349f885dace446f24db98/summary.json)。3331d727完整纯代码1876项、平台57项、AST80/三CLI/源码不变检查通过。
 
-registry/晋升/记忆完整生命周期及整包独立复审尚未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。最终脚本/文档清理与doc组会归档仍未完成。
+B34在正式PromotionRun、四门与ScriptedBackend临时目录复现：version.json注入OSError后，活动条目已有1项，version.json及promotion.json不存在，candidate_promoted/promotion_attempt事件为空。正式故障回归与修复待实施。注册表/晋升/记忆完整生命周期、独立复审及18包验收尚未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。最终脚本/文档清理与doc组会归档仍未完成。
 
 ## 2026-09-24 至 09-27：三轮自进化与 G0 检测器基线
 

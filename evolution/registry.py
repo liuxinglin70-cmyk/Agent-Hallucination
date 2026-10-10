@@ -1,35 +1,29 @@
-"""Pre-commit active registry with library limits and snapshots.
-
-The registry file is the only object detector consumes at runtime. Writes
-happen only after STRUCTURAL-BEHAVIOR-M all pass, and every write is snapshotted so the
-mechanical drift rollback in the design has a concrete implementation.
-"""
-
+"""Atomic registry and governance commits with immutable deployment snapshots."""
 from __future__ import annotations
 
-import json
+from contextlib import contextmanager
 from copy import deepcopy
-import os
-import tempfile
+import json
+from pathlib import Path
 import threading
 import time
-from uuid import uuid4
-from pathlib import Path
 from typing import Any, Mapping, Sequence
+from uuid import uuid4
 
-from detector.interventions import (
-    validate_registry,
-)
-
+from detector.interventions import build_registry_commit, validate_registry_commit, validate_registry
+from detector.runtime import atomic_json, contained_path, exclusive_writer
 from evolution.config import resolve_path
 from evolution.contracts import empty_registry, make_registry
 
 ACTIVE_FILENAME = "active.json"
-STATE_FILENAME = "state.json"
 SNAPSHOTS_DIR = "snapshots"
 
 
 class LibraryLimitError(ValueError):
+    pass
+
+
+class RegistryConflictError(RuntimeError):
     pass
 
 
@@ -39,67 +33,87 @@ class ActiveRegistry:
         self.dir.mkdir(parents=True, exist_ok=True)
         (self.dir / SNAPSHOTS_DIR).mkdir(parents=True, exist_ok=True)
         self.active_path = self.dir / ACTIVE_FILENAME
-        self.state_path = self.dir / STATE_FILENAME
-        self._entries = self._load_entries()
-        self._state = self._load_state()
         self._lock = threading.RLock()
-        expected_hash = str(self._state.get("active_hash") or "")
-        if expected_hash and expected_hash != self.registry_hash:
-            raise RuntimeError(
-                "registry active/state mismatch: "
-                f"active={self.registry_hash}, state={expected_hash}"
-            )
-        if not self.active_path.exists():
-            self._atomic_write(self.active_path, empty_registry())
+        self._commit: dict[str, Any] | None = None
+        with self._lock, exclusive_writer(self.dir):
+            if self.active_path.exists():
+                self._commit = self._read_commit()
+            else:
+                if (self.dir / "state.json").exists():
+                    raise ValueError("separate registry state is historical; use a new registry directory")
+                self._publish(empty_registry(), self._empty_state())
 
     @staticmethod
-    def _atomic_write(path: Path, payload: Any) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, temporary = tempfile.mkstemp(
-            prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent),
-        )
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-                json.dump(payload, handle, ensure_ascii=False, indent=2)
-                handle.write("\n")
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary, path)
-        finally:
-            if os.path.exists(temporary):
-                os.unlink(temporary)
+    def _empty_state() -> dict[str, Any]:
+        return {"cycle": 0, "net_contribution_history": [], "interventions": {}, "snapshots": []}
+
+    def _read_commit(self) -> dict[str, Any]:
+        payload = json.loads(self.active_path.read_text(encoding="utf-8-sig"))
+        validate_registry_commit(payload)
+        return payload
+
+    def _known_commit(self) -> dict[str, Any]:
+        if self._commit is None:
+            self._commit = self._read_commit()
+        return self._commit
 
     @property
     def entries(self) -> list[dict[str, Any]]:
-        return deepcopy(self._entries)
+        return self.registry["interventions"]
 
     @property
     def registry(self) -> dict[str, Any]:
-        return make_registry(deepcopy(self._entries))
+        with self._lock:
+            return deepcopy(self._known_commit()["registry"])
 
     @property
     def registry_hash(self) -> str:
-        return str(self.registry.get("content_hash") or "")
+        return str(self.registry["content_hash"])
 
     @property
     def state(self) -> dict[str, Any]:
-        return deepcopy(self._state)
+        with self._lock:
+            return deepcopy(self._known_commit()["state"])
 
-    def _load_entries(self) -> list[dict[str, Any]]:
-        if not self.active_path.exists():
-            return []
-        payload = json.loads(self.active_path.read_text(encoding="utf-8-sig"))
-        return validate_registry(payload, require_executable_bounds=True)
+    @contextmanager
+    def _mutation(self):
+        with self._lock, exclusive_writer(self.dir):
+            current = self._read_commit()
+            if self._commit is None or self._commit["commit_id"] != current["commit_id"]:
+                raise RegistryConflictError("registry commit changed; reopen before mutation")
+            self._commit = current
+            yield deepcopy(self._commit["registry"]), deepcopy(self._commit["state"])
 
-    def _load_state(self) -> dict[str, Any]:
-        if not self.state_path.exists():
-            return {
-                "cycle": 0,
-                "net_contribution_history": [],
-                "interventions": {},
-                "snapshots": [],
-            }
-        return json.loads(self.state_path.read_text(encoding="utf-8-sig"))
+    def _publish(self, registry: Mapping[str, Any], state: Mapping[str, Any], artifacts=()) -> dict[str, Any]:
+        state = deepcopy(state)
+        state["active_hash"] = registry["content_hash"]
+        commit = build_registry_commit(registry, state, commit_id=uuid4().hex)
+        created = []
+        try:
+            for name, payload in artifacts:
+                path = contained_path(self.dir, SNAPSHOTS_DIR, name)
+                if path.exists():
+                    raise FileExistsError(f"snapshot already exists: {path}")
+                created.append(path)
+                atomic_json(path, payload)
+            atomic_json(self.active_path, commit)
+        except BaseException as failure:
+            # A signal may arrive after replace; reconcile against the sole commit point.
+            try:
+                self._commit = self._read_commit()
+            except Exception:
+                self._commit = None
+            if self._commit is not None:
+                referenced = {item.get("file") for item in self._commit["state"]["snapshots"]}
+                try:
+                    for path in created:
+                        if path.name not in referenced:
+                            path.unlink(missing_ok=True)
+                finally:
+                    raise failure
+            raise
+        self._commit = commit
+        return deepcopy(commit["registry"])
 
     def check_limits(
         self,
@@ -134,292 +148,138 @@ class ActiveRegistry:
             )
         return problems
 
-    def write(
-        self,
-        entries: Sequence[Mapping[str, Any]],
-        *,
-        cycle: int,
-        reason: str,
-        library_cfg: Mapping[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        with self._lock:
-            problems = self.check_limits(entries, library_cfg=library_cfg)
-            if problems:
-                raise LibraryLimitError("; ".join(problems))
-            payload = make_registry(entries)
-            previous_hash = self.registry_hash
-            if not self._state.get("snapshots"):
-                baseline_name = (
-                    f"cycle{max(0, int(cycle) - 1):03d}_baseline.json"
-                )
-                baseline_payload = make_registry(self._entries)
-                self._atomic_write(
-                    self.dir / SNAPSHOTS_DIR / baseline_name,
-                    baseline_payload,
-                )
-                self._state.setdefault("snapshots", []).append({
-                    "cycle": max(0, int(cycle) - 1),
-                    "file": baseline_name,
-                    "hash": str(baseline_payload.get("content_hash") or ""),
-                    "previous_hash": "",
-                    "reason": "pre-admission baseline",
-                    "entries": [
-                        str(e.get("intervention_id") or "")
-                        for e in self._entries
-                    ],
-                })
-            snapshot_name = f"cycle{int(cycle):03d}_{time.strftime('%Y%m%d_%H%M%S')}_{uuid4().hex}.json"
-            snapshot_path = self.dir / SNAPSHOTS_DIR / snapshot_name
-            self._atomic_write(snapshot_path, payload)
-            self._atomic_write(self.active_path, payload)
-            self._entries = deepcopy(list(entries))
-            self._state["cycle"] = int(cycle)
-            self._state["active_hash"] = str(payload.get("content_hash") or "")
-            self._state.setdefault("snapshots", []).append({
-                "cycle": int(cycle),
-                "file": snapshot_name,
-                "hash": str(payload.get("content_hash") or ""),
-                "previous_hash": previous_hash,
-                "reason": str(reason),
-                "entries": [str(e.get("intervention_id") or "") for e in entries],
+    def _prepare_write(self, entries, *, current, state, cycle, reason, library_cfg=None):
+        problems = self.check_limits(entries, library_cfg=library_cfg)
+        if problems:
+            raise LibraryLimitError("; ".join(problems))
+        payload = make_registry(deepcopy(entries))
+        artifacts = []
+        if not state["snapshots"]:
+            baseline_cycle = max(0, int(cycle) - 1)
+            name = f"cycle{baseline_cycle:03d}_baseline_{uuid4().hex}.json"
+            artifacts.append((name, current))
+            state["snapshots"].append({
+                "cycle": baseline_cycle, "file": name, "hash": current["content_hash"],
+                "previous_hash": "", "reason": "pre-admission baseline",
+                "entries": [entry["intervention_id"] for entry in current["interventions"]],
             })
-            self._save_state()
-            return payload
+        name = f"cycle{int(cycle):03d}_{time.strftime('%Y%m%d_%H%M%S')}_{uuid4().hex}.json"
+        artifacts.append((name, payload))
+        state["cycle"] = int(cycle)
+        state["snapshots"].append({
+            "cycle": int(cycle), "file": name, "hash": payload["content_hash"],
+            "previous_hash": current["content_hash"], "reason": str(reason),
+            "entries": [entry["intervention_id"] for entry in payload["interventions"]],
+        })
+        return payload, artifacts
 
-    def record_marginal(
-        self,
-        intervention_id: str,
-        marginal: int,
-        *,
-        cycle: int,
-        fired_rate: float,
-    ) -> None:
-        info = self._state.setdefault("interventions", {}).setdefault(
-            intervention_id, {}
-        )
-        history = info.setdefault("marginal_history", [])
-        current = next(
-            (item for item in history if int(item.get("cycle") or 0) == int(cycle)),
-            None,
-        )
-        payload = {
-            "cycle": int(cycle),
-            "marginal_cases": int(marginal),
-            "fired_rate": float(fired_rate),
-        }
-        if current is None:
-            history.append(payload)
-        else:
-            current.update(payload)
-        info["admitted_cycle"] = info.get("admitted_cycle", int(cycle))
-        self._save_state()
+    def write(self, entries: Sequence[Mapping[str, Any]], *, cycle: int, reason: str,
+              library_cfg: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        with self._mutation() as (current, state):
+            payload, artifacts = self._prepare_write(entries, current=current, state=state,
+                                                     cycle=cycle, reason=reason, library_cfg=library_cfg)
+            return self._publish(payload, state, artifacts)
+
+    def record_marginal(self, intervention_id: str, marginal: int, *, cycle: int, fired_rate: float) -> None:
+        with self._mutation() as (current, state):
+            info = state["interventions"].setdefault(intervention_id, {})
+            history = info.setdefault("marginal_history", [])
+            existing = next((item for item in history if item["cycle"] == int(cycle)), None)
+            value = {"cycle": int(cycle), "marginal_cases": int(marginal), "fired_rate": float(fired_rate)}
+            if existing is None:
+                history.append(value)
+            else:
+                existing.update(value)
+            info.setdefault("admitted_cycle", int(cycle))
+            self._publish(current, state)
 
     def record_net_contribution(self, net_correct: int, *, cycle: int) -> None:
-        history = self._state.setdefault("net_contribution_history", [])
-        for entry in history:
-            if int(entry.get("cycle") or 0) == int(cycle):
-                # A retried cycle overwrites its own record instead of
-                # appending; the rollback threshold reads cycle-disjoint
-                # entries, not rerun artifacts.
-                entry["net_correct_cases"] = int(net_correct)
-                self._save_state()
-                return
-        history.append({"cycle": int(cycle), "net_correct_cases": int(net_correct)})
-        self._save_state()
+        with self._mutation() as (current, state):
+            history = state["net_contribution_history"]
+            existing = next((item for item in history if item["cycle"] == int(cycle)), None)
+            value = {"cycle": int(cycle), "net_correct_cases": int(net_correct)}
+            if existing is None:
+                history.append(value)
+            else:
+                existing.update(value)
+            self._publish(current, state)
 
-    def check_retire_dependencies(
-        self,
-        retiring_ids: Sequence[str],
-    ) -> list[str]:
-        """Check if retiring any of these IDs would orphan a remaining guard."""
-        to_retire = set(retiring_ids)
-        remaining = [
-            e for e in self._entries
-            if str(e.get("intervention_id") or "") not in to_retire
-        ]
-        retired_predicates = {
-            str((e.get("body") or {}).get("predicate") or "")
-            for e in self._entries
-            if str(e.get("intervention_id") or "") in to_retire
-            and e.get("type") == "evidence_check"
-        }
-        orphans = []
-        for e in remaining:
-            if e.get("type") == "decision_guard":
-                consumed = {
-                    str(fact).split("=", 1)[0]
-                    for fact in (e.get("trigger") or {}).get("facts") or ()
-                    if "=" in str(fact)
-                }
-                if consumed & retired_predicates:
-                    orphans.append(str(e.get("intervention_id")))
-        return sorted(orphans)
+    @staticmethod
+    def _retire_dependencies(entries, retiring_ids):
+        retiring = set(retiring_ids)
+        predicates = {str(entry["body"].get("predicate") or "") for entry in entries
+                      if entry["intervention_id"] in retiring and entry["type"] == "evidence_check"}
+        return sorted(entry["intervention_id"] for entry in entries
+                      if entry["intervention_id"] not in retiring and entry["type"] == "decision_guard"
+                      and predicates & {str(fact).split("=", 1)[0] for fact in entry["trigger"].get("facts", ()) if "=" in str(fact)})
 
-    def retire(
-        self,
-        intervention_ids: Sequence[str],
-        *,
-        cycle: int,
-        library_cfg: Mapping[str, Any] | None = None,
-    ) -> list[str]:
-        with self._lock:
+    def check_retire_dependencies(self, retiring_ids: Sequence[str]) -> list[str]:
+        return self._retire_dependencies(self.entries, retiring_ids)
+
+    def retire(self, intervention_ids: Sequence[str], *, cycle: int,
+               library_cfg: Mapping[str, Any] | None = None) -> list[str]:
+        with self._mutation() as (current, state):
             ids = set(intervention_ids)
-            orphans = self.check_retire_dependencies(intervention_ids)
+            orphans = self._retire_dependencies(current["interventions"], ids)
             if orphans:
-                raise ValueError(
-                    f"Cannot retire {sorted(ids)}: remaining guard(s) {orphans} "
-                    "depend on evidence being retired. Retire the full unit closure instead."
-                )
-            retired = [
-                entry for entry in self._entries
-                if str(entry.get("intervention_id") or "") in ids
-            ]
-            remaining = [
-                entry for entry in self._entries
-                if str(entry.get("intervention_id") or "") not in ids
-            ]
+                raise ValueError(f"Cannot retire {sorted(ids)}: remaining guard(s) {orphans} depend on evidence being retired. Retire the full unit closure instead.")
+            retired = [entry["intervention_id"] for entry in current["interventions"] if entry["intervention_id"] in ids]
+            payload, artifacts = current, []
             if retired:
-                self.write(
-                    remaining,
-                    cycle=cycle,
-                    reason="outcome-driven retirement",
-                    library_cfg=library_cfg,
-                )
-            for intervention_id in ids:
-                info = self._state.get("interventions", {}).get(intervention_id)
-                if info is not None:
-                    info["retired_cycle"] = int(cycle)
-            self._save_state()
-            return [
-                str(entry.get("intervention_id") or "") for entry in retired
-            ]
+                payload, artifacts = self._prepare_write(
+                    [entry for entry in current["interventions"] if entry["intervention_id"] not in ids],
+                    current=current, state=state, cycle=cycle, reason="outcome-driven retirement", library_cfg=library_cfg)
+            for identifier in ids:
+                if identifier in state["interventions"]:
+                    state["interventions"][identifier]["retired_cycle"] = int(cycle)
+            self._publish(payload, state, artifacts)
+            return retired
 
-
-    def restore(
-        self,
-        payload: Mapping[str, Any],
-        *,
-        reason: str,
-    ) -> dict[str, Any]:
-        """Reinstate a previously recorded registry payload.
-
-        Used when resuming a cycle whose own admission was already committed:
-        the resumed run must be evaluated against the state the cycle started
-        from, or its gates would treat the candidate as already deployed. The
-        snapshot history is retained, so the admission committed by the
-        interrupted run stays recoverable rather than being discarded.
-        """
-        # ``validate_registry`` returns the entry list; rebuild the envelope so
-        # the content hash is recomputed rather than trusted from the file.
-        entries = validate_registry(dict(payload), require_executable_bounds=True)
-        validated = make_registry(entries)
-        restored_hash = str(validated.get("content_hash") or "")
-        previous_hash = self.registry_hash
-        with self._lock:
-            self._atomic_write(self.active_path, validated)
-            self._entries = deepcopy(list(validated.get("interventions") or ()))
-            self._state["active_hash"] = restored_hash
-            if previous_hash != restored_hash:
-                self._state.setdefault("snapshots", []).append({
-                    "cycle": int(self._state.get("cycle") or 0),
-                    "file": "",
-                    "hash": restored_hash,
-                    "previous_hash": previous_hash,
-                    "reason": str(reason),
-                    "entries": [
-                        str(entry.get("intervention_id") or "")
-                        for entry in self._entries
-                    ],
+    def restore(self, payload: Mapping[str, Any], *, reason: str) -> dict[str, Any]:
+        validated = make_registry(validate_registry(payload, require_executable_bounds=True))
+        with self._mutation() as (current, state):
+            if current["content_hash"] != validated["content_hash"]:
+                state["snapshots"].append({
+                    "cycle": state["cycle"], "file": "", "hash": validated["content_hash"],
+                    "previous_hash": current["content_hash"], "reason": str(reason),
+                    "entries": [entry["intervention_id"] for entry in validated["interventions"]],
                 })
-            self._save_state()
-        return validated
+            return self._publish(validated, state)
 
     def rollback_to_snapshot(self, cycle: int) -> dict[str, Any] | None:
-        snapshots = list(self._state.get("snapshots") or [])
-        if not snapshots:
-            return None
-        target = max(
-            (item for item in reversed(snapshots)
-             if int(item.get("cycle") or 0) <= int(cycle)
-             and item.get("file")
-             and (self.dir / SNAPSHOTS_DIR / str(item["file"])).is_file()),
-            key=lambda item: int(item.get("cycle") or 0),
-            default=None,
-        )
-        if target is None:
-            return None
-        # A snapshot recorded without a file (the resume path records the
-        # state it restored) has nothing to restore from. An empty name must
-        # not resolve to the snapshots directory itself: `exists()` is true
-        # for a directory and reading it raises instead of reporting "no
-        # snapshot".
-        name = str(target.get("file") or "")
-        if not name:
-            return None
-        path = self.dir / SNAPSHOTS_DIR / name
-        if not path.is_file():
-            return None
-        payload = json.loads(path.read_text(encoding="utf-8-sig"))
-        validate_registry(payload, require_executable_bounds=True)
-        self._atomic_write(self.active_path, payload)
-        self._entries = validate_registry(
-            payload, require_executable_bounds=True,
-        )
-        target_cycle = int(target.get("cycle") or 0)
-        target_ids = {
-            str(entry.get("intervention_id") or "") for entry in self._entries
-        }
-        interventions = self._state.setdefault("interventions", {})
-        for intervention_id in list(interventions):
-            info = interventions[intervention_id]
-            if intervention_id not in target_ids:
-                # Preserve audit history, but prevent retired/removed entries
-                # from influencing future governance after rollback.
-                info["rolled_back_out"] = True
-                continue
-            info["marginal_history"] = [
-                item for item in info.get("marginal_history") or []
-                if int(item.get("cycle") or 0) <= target_cycle
-            ]
-            info.pop("retired_cycle", None)
-            info.pop("rolled_back_out", None)
-        self._state["net_contribution_history"] = [
-            item for item in self._state.get("net_contribution_history") or []
-            if int(item.get("cycle") or 0) <= target_cycle
-        ]
-        self._state["cycle"] = target_cycle
-        self._state["rolled_back_to"] = {
-            "cycle": int(cycle),
-            "snapshot": str(target.get("file") or ""),
-            "hash": str(payload.get("content_hash") or ""),
-        }
-        self._state["active_hash"] = str(payload.get("content_hash") or "")
-        self._save_state()
-        return payload
-
-    def _save_state(self) -> None:
-        self._atomic_write(self.state_path, self._state)
+        with self._mutation() as (current, state):
+            eligible = [item for item in reversed(state["snapshots"])
+                        if int(item["cycle"]) <= int(cycle) and item.get("file")
+                        and contained_path(self.dir, SNAPSHOTS_DIR, item["file"]).is_file()]
+            target = max(eligible, key=lambda item: item["cycle"], default=None)
+            if target is None:
+                return None
+            path = contained_path(self.dir, SNAPSHOTS_DIR, target["file"])
+            raw = json.loads(path.read_text(encoding="utf-8-sig"))
+            payload = make_registry(validate_registry(raw, require_executable_bounds=True))
+            if payload["content_hash"] != target["hash"]:
+                raise ValueError("rollback snapshot hash does not match committed index")
+            target_cycle = int(target["cycle"])
+            target_ids = {entry["intervention_id"] for entry in payload["interventions"]}
+            for identifier, info in state["interventions"].items():
+                if identifier not in target_ids:
+                    info["rolled_back_out"] = True
+                    continue
+                info["marginal_history"] = [item for item in info.get("marginal_history", ()) if item["cycle"] <= target_cycle]
+                info.pop("retired_cycle", None)
+                info.pop("rolled_back_out", None)
+            state["net_contribution_history"] = [item for item in state["net_contribution_history"] if item["cycle"] <= target_cycle]
+            state["cycle"] = target_cycle
+            state["rolled_back_to"] = {"cycle": int(cycle), "snapshot": target["file"], "hash": payload["content_hash"]}
+            return self._publish(payload, state)
 
     def clear(self) -> None:
-        payload = empty_registry()
-        self._atomic_write(self.active_path, payload)
-        self._entries = []
-        self._state = {
-            "cycle": 0,
-            "active_hash": str(payload.get("content_hash") or ""),
-            "net_contribution_history": [],
-            "interventions": {},
-            "snapshots": [],
-        }
-        self._save_state()
+        with self._mutation():
+            self._publish(empty_registry(), self._empty_state())
 
 
 def load_active_registry(config: Mapping[str, Any]) -> ActiveRegistry:
     return ActiveRegistry(resolve_path(config["registry_dir"]))
 
 
-__all__ = [
-    "ActiveRegistry",
-    "LibraryLimitError",
-    "load_active_registry",
-]
+__all__ = ["ActiveRegistry", "LibraryLimitError", "RegistryConflictError", "load_active_registry"]

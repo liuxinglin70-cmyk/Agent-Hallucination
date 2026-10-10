@@ -547,8 +547,9 @@ def check_work_root(report: Report, cfg: dict, phase: str) -> None:
         return
     registry = Path(cfg["registry_dir"]) / "active.json"
     if registry.is_file():
-        entries = (json.loads(registry.read_text(encoding="utf-8-sig"))
-                   .get("interventions") or [])
+        from detector.interventions import load_intervention_registry
+
+        entries = load_intervention_registry(registry, require_executable_bounds=True)["interventions"]
         if entries:
             _warn(report, "work_root",
                   f"the active registry already holds {len(entries)} "

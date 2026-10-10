@@ -20,7 +20,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from copy import deepcopy
+from detector.identity import digest
+from detector.runtime import validate_path_id
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -40,6 +43,7 @@ from detector.predicates import (
 )
 
 INTERVENTION_REGISTRY_SCHEMA = "detector.intervention_registry.v1"
+REGISTRY_COMMIT_SCHEMA = "detector.registry_commit.v1"
 INTERVENTION_SCHEMA = "detector.intervention.v1"
 SCOPED_SEMANTIC_EVIDENCE_SCHEMA = "detector.scoped_semantic_evidence.v1"
 
@@ -1429,6 +1433,9 @@ def load_intervention_registry(
     :func:`validate_registry`.
     """
     payload = json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    if isinstance(payload, Mapping) and payload.get("schema_version") == REGISTRY_COMMIT_SCHEMA:
+        registry, _state = validate_registry_commit(payload)
+        return registry
     persisted = (
         str(payload.get("content_hash") or "")
         if isinstance(payload, Mapping) else ""
@@ -1457,6 +1464,89 @@ def build_intervention_registry(
     validate_registry(payload, require_executable_bounds=True)
     payload["content_hash"] = intervention_content_hash(payload)
     return payload
+
+
+def build_registry_commit(registry: Mapping[str, Any], state: Mapping[str, Any], *, commit_id: str) -> dict[str, Any]:
+    payload = {"schema_version": REGISTRY_COMMIT_SCHEMA, "commit_id": commit_id,
+               "registry": deepcopy(registry), "state": deepcopy(state)}
+    payload["digest"] = digest(payload)
+    validate_registry_commit(payload)
+    return payload
+
+
+def validate_registry_commit(payload: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    if not isinstance(payload, Mapping) or payload.get("schema_version") != REGISTRY_COMMIT_SCHEMA:
+        raise ValueError("unknown registry commit schema")
+    if set(payload) != {"schema_version", "commit_id", "registry", "state", "digest"}:
+        raise ValueError("registry commit fields do not match contract")
+    identifier = payload["commit_id"]
+    if not isinstance(identifier, str) or len(identifier) != 32 or any(char not in "0123456789abcdef" for char in identifier):
+        raise ValueError("registry commit identity is invalid")
+    if payload["digest"] != digest({key: value for key, value in payload.items() if key != "digest"}):
+        raise ValueError("registry commit digest does not match")
+    registry, state = payload["registry"], payload["state"]
+    if not isinstance(registry, Mapping) or set(registry) != {"schema_version", "interventions", "content_hash"}:
+        raise ValueError("committed registry fields do not match contract")
+    validate_registry(registry, require_executable_bounds=True)
+    if not registry.get("content_hash"):
+        raise ValueError("committed registry has no content_hash")
+    if not isinstance(state, Mapping) or state.get("active_hash") != registry["content_hash"]:
+        raise ValueError("registry active/state mismatch")
+    required = {"cycle", "active_hash", "net_contribution_history", "interventions", "snapshots"}
+    if not required <= set(state) or set(state) - required - {"rolled_back_to"}:
+        raise ValueError("registry state fields do not match contract")
+    if type(state["cycle"]) is not int or state["cycle"] < 0:
+        raise ValueError("registry state cycle is invalid")
+    if not isinstance(state["interventions"], Mapping) or not isinstance(state["snapshots"], list) or not isinstance(state["net_contribution_history"], list):
+        raise ValueError("registry state collections are invalid")
+    for snapshot in state["snapshots"]:
+        if not isinstance(snapshot, Mapping) or set(snapshot) != {"cycle", "file", "hash", "previous_hash", "reason", "entries"}:
+            raise ValueError("registry snapshot fields are invalid")
+        if type(snapshot["cycle"]) is not int or snapshot["cycle"] < 0 or not isinstance(snapshot["file"], str):
+            raise ValueError("registry snapshot identity is invalid")
+        if snapshot["file"]:
+            validate_path_id(snapshot["file"], nested=False)
+        if not isinstance(snapshot["reason"], str) or not isinstance(snapshot["entries"], list) or not all(
+            isinstance(item, str) and item for item in snapshot["entries"]
+        ):
+            raise ValueError("registry snapshot metadata is invalid")
+        for key in ("hash", "previous_hash"):
+            value = snapshot[key]
+            if key == "previous_hash" and value == "":
+                continue
+            if not isinstance(value, str) or len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
+                raise ValueError("registry snapshot hash is invalid")
+    for item in state["net_contribution_history"]:
+        if not isinstance(item, Mapping) or set(item) != {"cycle", "net_correct_cases"} or any(type(item[key]) is not int for key in item) or item["cycle"] < 0:
+            raise ValueError("registry contribution history is invalid")
+    for identifier, info in state["interventions"].items():
+        if not isinstance(identifier, str) or not identifier or not isinstance(info, Mapping):
+            raise ValueError("registry intervention governance is invalid")
+        if set(info) - {"admitted_cycle", "retired_cycle", "marginal_history", "rolled_back_out"}:
+            raise ValueError("registry intervention governance fields are invalid")
+        for key in ("admitted_cycle", "retired_cycle"):
+            if key in info and (type(info[key]) is not int or info[key] < 0):
+                raise ValueError("registry intervention cycle is invalid")
+        if "rolled_back_out" in info and type(info["rolled_back_out"]) is not bool:
+            raise ValueError("registry rollback flag is invalid")
+        history = info.get("marginal_history", [])
+        if not isinstance(history, list):
+            raise ValueError("registry marginal history is invalid")
+        for item in history:
+            if not isinstance(item, Mapping) or set(item) != {"cycle", "marginal_cases", "fired_rate"}:
+                raise ValueError("registry marginal fields are invalid")
+            if type(item["cycle"]) is not int or item["cycle"] < 0 or type(item["marginal_cases"]) is not int:
+                raise ValueError("registry marginal reading is invalid")
+            if type(item["fired_rate"]) not in (int, float) or not math.isfinite(item["fired_rate"]) or item["fired_rate"] < 0:
+                raise ValueError("registry fired rate is invalid")
+    if "rolled_back_to" in state:
+        target = state["rolled_back_to"]
+        if not isinstance(target, Mapping) or set(target) != {"cycle", "snapshot", "hash"} or type(target["cycle"]) is not int or target["cycle"] < 0:
+            raise ValueError("registry rollback target is invalid")
+        validate_path_id(target["snapshot"], nested=False)
+        if not isinstance(target["hash"], str) or len(target["hash"]) != 64 or any(char not in "0123456789abcdef" for char in target["hash"]):
+            raise ValueError("registry rollback hash is invalid")
+    return deepcopy(dict(registry)), deepcopy(dict(state))
 
 
 def authority_identity(
@@ -2207,6 +2297,9 @@ __all__ = [
     "GUARD_HOOK",
     "HOOKS",
     "INTERVENTION_REGISTRY_SCHEMA",
+    "REGISTRY_COMMIT_SCHEMA",
+    "build_registry_commit",
+    "validate_registry_commit",
     "INTERVENTION_SCHEMA",
     "INTERVENTION_TYPES",
     "InterventionPlan",
