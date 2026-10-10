@@ -57,7 +57,8 @@ def run_hearing(
     entry = match_frozen_hearing(frozen, hearing_target(positive))
     causal_context = None
     if diagnostics is not None and diagnostics.get("audit") is not None:
-        causal_context = context_for_hearing(diagnostics["audit"], positive=positive, packet=packet)
+        causal_context = context_for_hearing(diagnostics["audit"], positive=positive, packet=packet,
+                                            policy=config["causal_audit"])
     context_digest = causal_context["digest"] if causal_context is not None else None
     if (entry is not None and "tracer_result" in entry
             and entry["tracer_result"].get("causal_context_digest") == context_digest):

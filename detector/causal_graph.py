@@ -11,7 +11,7 @@ from detector.causal_contracts import (
     bound_fields, field_binding, numeric_literal, seal, validate_seal,
 )
 from detector.identity import digest
-from detector.packet import delivered_result, validate_packet
+from detector.packet import answer_tool_is_delivery, delivered_result, validate_packet
 
 
 def build_observed_dependencies(packet: Mapping[str, Any], *, policy: Mapping[str, Any]) -> dict[str, Any]:
@@ -45,13 +45,15 @@ def build_observed_dependencies(packet: Mapping[str, Any], *, policy: Mapping[st
             unresolved.append({"node_id": node_id, "reason": "dependency_source_unspecified"})
         return node
 
-    def add_edge(source, target, relation, status, refs):
+    def add_edge(source, target, relation, status, refs, *, field=None):
         edge = {"source": source["node_id"], "target": target["node_id"],
                 "relation": relation, "verification_status": status,
                 "producer": {"call_result": "packet_structure.v1",
                              "declared_literal_consumption": "literal_arithmetic.v1"}.get(
                                  relation, "explicit_field.v1"),
                 "evidence_refs": list(dict.fromkeys(refs))}
+        if field is not None:
+            edge["field"] = field
         (edges if len(edges) < policy["max_graph_edges"] else omitted_edges).append(edge)
 
     for event in packet["events"]:
@@ -85,30 +87,138 @@ def build_observed_dependencies(packet: Mapping[str, Any], *, policy: Mapping[st
                     unresolved.append({"node_id": target["node_id"], "reason": "field_source_missing"})
                 continue
             sources = fields_by_ref.get(source_ref, ()) if isinstance(source_ref, str) else ()
-            matches = [(node, "declared_field_consumption") for node, source in sources
+            matches = [(node, "declared_field_consumption", source) for node, source in sources
                        if field_binding(source) == field_binding(field)
                        and source["value"] == field["value"]]
             literal = literal_sources.get(source_ref) if isinstance(source_ref, str) else None
             # A scalar has no unit or time binding; a declaration cannot supply either as evidence.
             if (literal is not None and field["unit"] is None and field["time"] is None
                     and numeric_literal(field["value"]) == literal[1]):
-                matches.append((literal[0], "declared_literal_consumption"))
-            preceding = [(node, relation) for node, relation in matches
+                matches.append((literal[0], "declared_literal_consumption", None))
+            preceding = [(node, relation, source_field) for node, relation, source_field in matches
                          if (node["position"], node["phase"]) < (target["position"], target["phase"])]
             if len(preceding) != 1:
                 reason = "source_ambiguous" if len(preceding) > 1 else (
                     "source_not_preceding" if matches else "source_missing_or_binding_mismatch")
                 unresolved.append({"node_id": target["node_id"], "reason": reason})
                 continue
-            source, relation = preceding[0]
+            source, relation, source_field = preceding[0]
             # A matching declaration verifies copied fields, not the source's truth or materiality.
-            add_edge(source, target, relation, "verified", [source_ref, ref])
+            add_edge(source, target, relation, "verified", [source_ref, ref], field={
+                "binding": list(field_binding(field)), "value": field["value"],
+                "source_path": source_field["path"] if source_field is not None else None,
+                "target_path": field["path"],
+            })
     return seal({
         "schema_version": DEPENDENCY_GRAPH_SCHEMA, "packet_digest": digest(packet),
         "policy_digest": digest(policy), "nodes": nodes, "edges": edges,
         "unresolved_dependencies": unresolved, "omitted_node_ids": omitted_nodes,
         "omitted_edges": omitted_edges,
         "complete": not (unresolved or omitted_nodes or omitted_edges),
+    })
+
+
+def build_observed_claim_lineage(
+    packet: Mapping[str, Any], *, binding: Mapping[str, Any], policy: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Follow declared field copies of one bound result, without inferring task effects."""
+    validate_seal(binding, schema="detector.local_claim_binding.v1")
+    if binding["packet_digest"] != digest(packet):
+        raise ValueError("observed claim lineage packet identity differs")
+    graph = build_observed_dependencies(packet, policy=policy)
+    nodes = {node["node_id"]: node for node in graph["nodes"]}
+    events = {event["event_id"]: event for event in packet["events"]}
+    source_id = binding["interaction_id"] + ":observation"
+    source_event = events.get(binding["event_id"])
+    if source_event is None:
+        raise ValueError("observed claim lineage source event is missing")
+    interaction = next((item for item in source_event.get("tool_interactions") or ()
+                        if item["interaction_id"] == binding["interaction_id"]), None)
+    check = arithmetic_check(interaction) if interaction is not None else None
+    if (check is None or check["status"] != "deviation"
+            or any(check[key] != binding[key] for key in ("expression", "observed", "expected"))):
+        raise ValueError("observed claim lineage arithmetic input differs")
+    edges = []
+    reasons = []
+    if graph["omitted_node_ids"] or graph["omitted_edges"]:
+        reasons.append("graph_budget")
+    if graph["unresolved_dependencies"]:
+        reasons.append("unresolved_dependencies")
+    if source_id not in nodes:
+        reasons.append("source_node_omitted")
+    frontier = {(source_id, None, None)} if source_id in nodes else set()
+    visited = set(frontier)
+    reachable = set()
+
+    def successor(edge, state):
+        if edge["source"] != state[0] or edge["verification_status"] != "verified":
+            return None
+        field = edge.get("field")
+        if field is None or numeric_literal(field["value"]) != numeric_literal(binding["observed"]):
+            return None
+        if state[1] is None:
+            if edge["relation"] != "declared_literal_consumption":
+                return None
+        elif (edge["relation"] != "declared_field_consumption"
+              or tuple(field["source_path"]) != state[1]
+              or digest(field["binding"]) != state[2]):
+            return None
+        return (edge["target"], tuple(field["target_path"]), digest(field["binding"]))
+
+    for _ in range(policy["max_dependency_depth"]):
+        following = set()
+        for edge in graph["edges"]:
+            for state in sorted(frontier):
+                target = successor(edge, state)
+                if target is not None:
+                    edges.append(edge)
+                    reachable.add(target[0])
+                    if target not in visited:
+                        following.add(target)
+                        visited.add(target)
+        frontier = following
+        if not frontier:
+            break
+    if any(successor(edge, state) is not None and successor(edge, state) not in visited
+           for edge in graph["edges"] for state in frontier):
+        reasons.append("lineage_depth_budget")
+    ordered = sorted({nodes[node_id]["event_id"] for node_id in reachable},
+                     key=lambda eid: events[eid]["position"])
+    assistant_events = [eid for eid in ordered if events[eid].get("role") == "assistant"
+                        and any(node_id in reachable and nodes[node_id]["event_id"] == eid
+                                and nodes[node_id]["kind"] != "observation" for node_id in reachable)]
+    anchors = delivered_result(packet)
+    answer = anchors["last_answer_tool_call"] or {}
+    delivery_nodes = {anchors["last_prose_event_id"]}
+    if answer_tool_is_delivery(answer) and answer.get("interaction_id") is not None:
+        delivery_nodes.add(answer["interaction_id"] + ":arguments")
+    delivery_ids = [eid for eid in assistant_events
+                    if any(node_id in delivery_nodes and nodes[node_id]["event_id"] == eid
+                           for node_id in reachable)]
+    consistent_refs = []
+    for node in graph["nodes"]:
+        if (node["kind"] != "observation" or node["position"] <= source_event["position"]
+                or ":observation" not in node["node_id"]):
+            continue
+        iid = node["node_id"].removesuffix(":observation")
+        item = next(item for item in events[node["event_id"]]["tool_interactions"]
+                    if item["interaction_id"] == iid)
+        correction = arithmetic_check(item)
+        if (correction is not None and correction["status"] == "consistent"
+                and correction["expression"] == binding["expression"]):
+            consistent_refs.append(iid)
+    return seal({
+        "schema_version": "detector.observed_claim_lineage.v1",
+        "packet_digest": graph["packet_digest"], "policy_digest": graph["policy_digest"],
+        "target_digest": binding["target_digest"], "claim_binding_digest": binding["digest"],
+        "graph_digest": graph["digest"], "source_interaction_id": binding["interaction_id"],
+        "scope": "declared_literal_field_copies", "edges": edges,
+        "observed_event_ids": ordered,
+        "first_observed_assistant_event_id": next(iter(assistant_events), None),
+        "delivery_event_ids": delivery_ids, "consistent_observation_refs": consistent_refs,
+        "closure_state": "unknown" if reasons else "complete", "reasons": reasons,
+        "materiality": "unknown", "first_causal_introduction": "unknown", "correction_effect": "unknown",
+        "decision_authority": "none", "localization_authority": "none",
     })
 
 

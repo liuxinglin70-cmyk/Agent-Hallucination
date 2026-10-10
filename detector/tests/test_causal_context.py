@@ -33,7 +33,7 @@ def test_local_claim_certificate_binds_the_actual_interaction():
     from detector.causal_audit import context_for_hearing
     packet = build_packet(record())
     target = positive(evidence_refs=["event_001_tool_01"])
-    context = context_for_hearing(diagnostics(packet, config())["audit"], positive=target, packet=packet)
+    context = context_for_hearing(diagnostics(packet, config())["audit"], positive=target, packet=packet, policy=config()["causal_audit"])
     binding = context["claim_binding"]
     assert binding["status"] == "verified_local_result"
     assert binding["target_digest"] == digest(target)
@@ -57,7 +57,7 @@ def test_local_context_falls_back_when_the_hearing_claim_is_not_bound(changes):
     from detector.causal_audit import context_for_hearing
     packet = build_packet(record())
     assert context_for_hearing(diagnostics(packet, config())["audit"],
-                               positive=positive(**changes), packet=packet) is None
+                               positive=positive(**changes), packet=packet, policy=config()["causal_audit"]) is None
 
 
 def test_event_overlap_does_not_select_between_two_identical_numeric_errors():
@@ -68,9 +68,9 @@ def test_event_overlap_does_not_select_between_two_identical_numeric_errors():
     data["history"][0]["tool_responses"].append("5")
     packet = build_packet(data)
     audit = diagnostics(packet, config())["audit"]
-    assert context_for_hearing(audit, positive=positive(), packet=packet) is None
+    assert context_for_hearing(audit, positive=positive(), packet=packet, policy=config()["causal_audit"]) is None
     target = positive(evidence_refs=["event_001_tool_02"])
-    context = context_for_hearing(audit, positive=target, packet=packet)
+    context = context_for_hearing(audit, positive=target, packet=packet, policy=config()["causal_audit"])
     assert context["claim_binding"]["expression"] == "8/2"
     assert context["candidates"][0]["evidence_refs"] == ["event_001_tool_02"]
     assert len(context["candidates"][0]["certificates"]) == 1
@@ -93,13 +93,13 @@ def test_corrected_first_error_cannot_replace_a_second_hearing_claim():
                                     context=None, snapshot=None)["audit"]
     target = positive(step=3, quote="7", delivered_result="7", correct_result="6",
                       evidence_refs=["event_003_tool_01"])
-    context = context_for_hearing(audit, positive=target, packet=packet)
+    context = context_for_hearing(audit, positive=target, packet=packet, policy=cfg["causal_audit"])
     assert [row["event_id"] for row in context["candidates"]] == ["event_003"]
     assert context["claim_binding"]["interaction_id"] == "event_003_tool_01"
     assert context_for_hearing(audit, positive=positive(step=2, quote="4", delivered_result="4",
-                                                     evidence_refs=["event_002_tool_01"]), packet=packet) is None
+                                                     evidence_refs=["event_002_tool_01"]), packet=packet, policy=cfg["causal_audit"]) is None
     assert context_for_hearing(audit, positive={**target, "evidence_refs": ["event_001_tool_01"]},
-                               packet=packet) is None
+                               packet=packet, policy=cfg["causal_audit"]) is None
 
 
 @pytest.mark.parametrize("part", ["binding", "certificate", "role", "authority", "equivalence"])
@@ -108,7 +108,7 @@ def test_tracer_recomputes_resealed_local_context_before_provider(monkeypatch, p
     from detector.causal_contracts import seal
     packet = build_packet(record())
     cfg = config()
-    context = context_for_hearing(diagnostics(packet, cfg)["audit"], positive=positive(), packet=packet)
+    context = context_for_hearing(diagnostics(packet, cfg)["audit"], positive=positive(), packet=packet, policy=cfg["causal_audit"])
     if part == "binding":
         context["claim_binding"]["expected"] = "6"
         context["claim_binding"] = seal({key: value for key, value in context["claim_binding"].items()
@@ -156,7 +156,7 @@ def test_tracer_refuses_a_local_certificate_for_different_actual_result_inputs(m
     from detector.causal_audit import context_for_hearing
     packet = build_packet(record())
     cfg = config()
-    context = context_for_hearing(diagnostics(packet, cfg)["audit"], positive=positive(), packet=packet)
+    context = context_for_hearing(diagnostics(packet, cfg)["audit"], positive=positive(), packet=packet, policy=cfg["causal_audit"])
     monkeypatch.setattr("detector.step_tracer.provider_call",
                         lambda **kwargs: pytest.fail("different result inputs reached provider"))
     with added_budget_scope(cfg["causal_audit"]), pytest.raises(ValueError, match="actual result inputs"):
@@ -168,13 +168,13 @@ def test_context_is_bound_to_hearing_and_excludes_unrelated_candidates():
     from detector.causal_audit import context_for_hearing
     packet = build_packet(record())
     data = diagnostics(packet, config())
-    context = context_for_hearing(data["audit"], positive=positive(), packet=packet)
+    context = context_for_hearing(data["audit"], positive=positive(), packet=packet, policy=config()["causal_audit"])
     assert context["target_digest"] == digest(positive())
     assert [row["event_id"] for row in context["candidates"]] == ["event_001"]
     assert context["decision_authority"] == "none"
     context["candidates"].clear()
     assert data["audit"]["candidates"]
-    assert context_for_hearing(data["audit"], positive=positive(step=2, evidence_refs=["event_002"]), packet=packet) is None
+    assert context_for_hearing(data["audit"], positive=positive(step=2, evidence_refs=["event_002"]), packet=packet, policy=config()["causal_audit"]) is None
 
 
 def test_context_rejects_changed_packet_and_tampered_audit():
@@ -182,10 +182,10 @@ def test_context_rejects_changed_packet_and_tampered_audit():
     packet = build_packet(record())
     audit = diagnostics(packet, config())["audit"]
     with pytest.raises(ValueError, match="packet identity"):
-        context_for_hearing(audit, positive=positive(), packet=build_packet(record("6")))
+        context_for_hearing(audit, positive=positive(), packet=build_packet(record("6")), policy=config()["causal_audit"])
     audit["candidates"][0]["claim_status"] = "refuted"
     with pytest.raises(ValueError, match="identity"):
-        context_for_hearing(audit, positive=positive(), packet=packet)
+        context_for_hearing(audit, positive=positive(), packet=packet, policy=config()["causal_audit"])
 
 
 def tracer_reply():
@@ -197,7 +197,7 @@ def test_tracer_rejects_context_for_another_claim_before_provider(monkeypatch):
     from detector.causal_audit import context_for_hearing
     cfg = config()
     packet = build_packet(record())
-    context = context_for_hearing(diagnostics(packet, cfg)["audit"], positive=positive(), packet=packet)
+    context = context_for_hearing(diagnostics(packet, cfg)["audit"], positive=positive(), packet=packet, policy=cfg["causal_audit"])
     def unexpected(**kwargs):
         raise AssertionError("wrong hearing must be rejected before provider")
     monkeypatch.setattr("detector.step_tracer.provider_call", unexpected)
@@ -265,7 +265,7 @@ def test_repair_admits_context_again_without_resetting_budget(monkeypatch):
     from detector.causal_audit import context_for_hearing
     packet = build_packet(record())
     cfg = config()
-    context = context_for_hearing(diagnostics(packet, cfg)["audit"], positive=positive(), packet=packet)
+    context = context_for_hearing(diagnostics(packet, cfg)["audit"], positive=positive(), packet=packet, policy=cfg["causal_audit"])
     seen = []
     def provider(**kwargs):
         seen.append(kwargs["user"])
@@ -284,7 +284,7 @@ def test_context_budget_failure_keeps_base_tracer_and_records_fallback(monkeypat
     from detector.causal_audit import context_for_hearing
     packet = build_packet(record())
     cfg = config()
-    context = context_for_hearing(diagnostics(packet, cfg)["audit"], positive=positive(), packet=packet)
+    context = context_for_hearing(diagnostics(packet, cfg)["audit"], positive=positive(), packet=packet, policy=cfg["causal_audit"])
     seen = []
     def tracer(**kwargs):
         seen.append(kwargs["user"])

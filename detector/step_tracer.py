@@ -88,9 +88,11 @@ def run_step_tracer(
             raise ValueError("causal context actual result inputs differ")
         context_block = (
             "\n\nCAUSAL CONTEXT: " + json.dumps(causal_context, ensure_ascii=False)
-            + "\nThe certificate binds only this referenced literal arithmetic result. It has no "
-            "decision or localization authority and does not prove semantic propagation, materiality "
-            "or the first causal introduction. Corrected and unrelated errors cannot replace the target."
+            + "\nThe certificate binds this referenced literal arithmetic result and its observed "
+            "declared field copies. An observed consistent result does not prove that stale copies "
+            "were corrected. The certificate has no decision or localization authority and does not "
+            "prove task materiality, semantic propagation or the first causal introduction. "
+            "Corrected and unrelated errors cannot replace the target."
         )
     warnings: list[dict[str, str]] = []
     used_context_digest = None

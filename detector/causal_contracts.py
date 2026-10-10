@@ -11,7 +11,7 @@ from typing import Any, Mapping
 from detector.identity import digest
 
 RISK_PROFILE_SCHEMA = "detector.step_risk_profile.v1"
-DEPENDENCY_GRAPH_SCHEMA = "detector.dependency_graph.v1"
+DEPENDENCY_GRAPH_SCHEMA = "detector.dependency_graph.v2"
 CAUSAL_PROJECTION_SCHEMA = "detector.causal_projection.v1"
 SCORE_STATUSES = frozenset({"scored", "unknown", "unsupported", "truncated"})
 SIGNAL_PRIORITY = {
@@ -58,7 +58,7 @@ def bound_fields(value: Any, *, limit: int = 64) -> tuple[list[dict[str, Any]], 
                     "value": item["value"], "unit": item.get("unit"), "time": item.get("time"),
                     "source_ref": item.get("source_ref"),
                 })
-            for key, nested in item.items():
+            for key, nested in sorted(item.items(), key=lambda pair: str(pair[0])):
                 if isinstance(nested, (Mapping, list)):
                     visit(nested, [*path, str(key)], depth + 1)
         elif isinstance(item, list):
