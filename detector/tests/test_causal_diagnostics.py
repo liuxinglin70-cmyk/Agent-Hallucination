@@ -144,6 +144,102 @@ def test_matching_words_and_separate_tool_role_do_not_create_consumption():
     assert projection["closure_state"] == "unknown"
 
 
+def test_literal_arithmetic_result_has_an_explicit_consumption_chain():
+    p = packet(
+        {"role": "assistant", "tool_calls": [{"name": "calculator", "arguments": {"expr": "2+2"}}],
+         "tool_responses": ["5"]},
+        {"role": "assistant", "content": field(value=5, unit=None, time=None,
+                                               source_ref="event_001_tool_01")},
+        {"role": "assistant", "content": field(value=5, unit=None, time=None,
+                                               source_ref="event_002")},
+    )
+    graph, projection = project(p, policy(top_k=1), ["event_003"])
+    copied = [edge for edge in graph["edges"] if edge["relation"] == "declared_literal_consumption"]
+    assert len(copied) == 1
+    assert copied[0]["source"] == "event_001_tool_01:observation"
+    assert copied[0]["target"] == "event_002"
+    assert copied[0]["producer"] == "literal_arithmetic.v1"
+    assert graph["complete"]
+    assert projection["ancestor_event_ids"] == ["event_002"]
+    assert "event_001" in projection["selected_event_ids"]
+    assert projection["closure_state"] == "complete"
+
+
+@pytest.mark.parametrize("change", [
+    {"source_ref": "event_001"}, {"source_ref": "event_002"},
+    {"value": 4}, {"unit": "USD"}, {"time": "today"},
+])
+def test_literal_copy_requires_the_exact_source_value_and_dimensionless_binding(change):
+    p = packet(
+        {"role": "assistant", "tool_calls": [{"name": "calculator", "arguments": {"expr": "2+2"}}],
+         "tool_responses": ["5"]},
+        {"role": "assistant", "content": field(**{
+            "value": 5, "unit": None, "time": None, "source_ref": "event_001_tool_01", **change})},
+    )
+    graph, projection = project(p, policy(), ["event_002"])
+    assert not any(edge["relation"] == "declared_literal_consumption" for edge in graph["edges"])
+    assert not graph["complete"]
+    assert projection["closure_state"] == "unknown"
+
+
+def test_literal_copy_cannot_consume_the_same_calls_later_observation():
+    p = packet({"role": "assistant", "tool_calls": [{"name": "calculator", "arguments": {
+        "expr": "2+2", "inputs": field(value=5, unit=None, time=None,
+                                        source_ref="event_001_tool_01")}}], "tool_responses": ["5"]})
+    graph = build_observed_dependencies(p, policy=policy())
+    assert not any(edge["relation"] == "declared_literal_consumption" for edge in graph["edges"])
+    assert "source_not_preceding" in {row["reason"] for row in graph["unresolved_dependencies"]}
+
+
+@pytest.mark.parametrize("tool,expression,observation", [
+    ("read", "2+2", "5"), ("calculator", "unknown()", "5"),
+    ("calculator", "2+2", None), ("calculator", "2+2", "the result is 5"),
+])
+def test_unverified_scalar_observation_is_not_a_literal_dependency(tool, expression, observation):
+    p = packet(
+        {"role": "assistant", "tool_calls": [{"name": tool, "arguments": {"expr": expression}}],
+         "tool_responses": [observation]},
+        {"role": "assistant", "content": field(value=5, unit=None, time=None,
+                                               source_ref="event_001_tool_01")},
+    )
+    graph = build_observed_dependencies(p, policy=policy())
+    assert not any(edge["relation"] == "declared_literal_consumption" for edge in graph["edges"])
+    assert not graph["complete"]
+
+
+def test_corrected_observation_does_not_replace_a_consumers_declared_old_source():
+    p = packet(
+        {"role": "assistant", "tool_calls": [{"name": "calculator", "arguments": {"expr": "2+2"}}],
+         "tool_responses": ["5"]},
+        {"role": "assistant", "tool_calls": [{"name": "calculator", "arguments": {"expr": "2+2"}}],
+         "tool_responses": ["4"]},
+        {"role": "assistant", "content": field(value=5, unit=None, time=None,
+                                               source_ref="event_001_tool_01")},
+    )
+    graph = build_observed_dependencies(p, policy=policy())
+    copied = [edge for edge in graph["edges"] if edge["relation"] == "declared_literal_consumption"]
+    assert [edge["source"] for edge in copied] == ["event_001_tool_01:observation"]
+    assert all(edge["target"] == "event_003" for edge in copied)
+
+
+def test_detector_shadow_exposes_literal_consumption_without_changing_the_base_decision(monkeypatch):
+    from detector.api import Detector
+    from detector.tests.test_causal_audit import detector_config, install_base_judge
+
+    install_base_judge(monkeypatch)
+    data = {"question": "Calculate 2+2", "history": [
+        {"role": "assistant", "tool_calls": [{"name": "calculator", "arguments": {"expr": "2+2"}}],
+         "tool_responses": ["5"]},
+        {"role": "assistant", "content": field(value=5, unit=None, time=None,
+                                               source_ref="event_001_tool_01")},
+    ]}
+    result = Detector(detector_config(), require_credentials=False).detect(data)
+    assert result["state"] == "verified_clean"
+    assert result["responsible_step"] is None
+    graph = result["proof"]["causal_diagnostics"]["graph"]
+    assert any(edge["relation"] == "declared_literal_consumption" for edge in graph["edges"])
+
+
 @pytest.mark.parametrize("source_ref, changes", [
     ("not_real", {}), ("event_001", {"value": 9}), ("event_001", {"unit": "EUR"}),
     ("event_001", {"time": "tomorrow"}), ("event_002", {}),

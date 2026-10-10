@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 from detector.causal_contracts import (
     CAUSAL_PROJECTION_SCHEMA, DEPENDENCY_GRAPH_SCHEMA, arithmetic_check,
-    bound_fields, field_binding, seal, validate_seal,
+    bound_fields, field_binding, numeric_literal, seal, validate_seal,
 )
 from detector.identity import digest
 from detector.packet import delivered_result, validate_packet
@@ -22,6 +22,7 @@ def build_observed_dependencies(packet: Mapping[str, Any], *, policy: Mapping[st
     omitted_nodes: list[str] = []
     omitted_edges: list[dict[str, Any]] = []
     fields_by_ref: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+    literal_sources: dict[str, tuple[dict[str, Any], Any]] = {}
     node_limit = policy["max_projection_events"] * policy["max_dependency_depth"] * 3
     char_limit = policy["max_added_prompt_tokens_per_case"]
 
@@ -47,7 +48,9 @@ def build_observed_dependencies(packet: Mapping[str, Any], *, policy: Mapping[st
     def add_edge(source, target, relation, status, refs):
         edge = {"source": source["node_id"], "target": target["node_id"],
                 "relation": relation, "verification_status": status,
-                "producer": "packet_structure.v1" if relation == "call_result" else "explicit_field.v1",
+                "producer": {"call_result": "packet_structure.v1",
+                             "declared_literal_consumption": "literal_arithmetic.v1"}.get(
+                                 relation, "explicit_field.v1"),
                 "evidence_refs": list(dict.fromkeys(refs))}
         (edges if len(edges) < policy["max_graph_edges"] else omitted_edges).append(edge)
 
@@ -69,6 +72,7 @@ def build_observed_dependencies(packet: Mapping[str, Any], *, policy: Mapping[st
             if arguments and observation:
                 add_edge(arguments, observation, "call_result", "verified", [iid])
                 if arithmetic_check(interaction):
+                    literal_sources[iid] = (observation, numeric_literal(interaction["observation"]))
                     unresolved[:] = [row for row in unresolved if not (
                         row["node_id"] == arguments["node_id"]
                         and row["reason"] == "dependency_source_unspecified")]
@@ -81,19 +85,24 @@ def build_observed_dependencies(packet: Mapping[str, Any], *, policy: Mapping[st
                     unresolved.append({"node_id": target["node_id"], "reason": "field_source_missing"})
                 continue
             sources = fields_by_ref.get(source_ref, ()) if isinstance(source_ref, str) else ()
-            matches = [(node, source) for node, source in sources
+            matches = [(node, "declared_field_consumption") for node, source in sources
                        if field_binding(source) == field_binding(field)
                        and source["value"] == field["value"]]
-            preceding = [(node, source) for node, source in matches
+            literal = literal_sources.get(source_ref) if isinstance(source_ref, str) else None
+            # A scalar has no unit or time binding; a declaration cannot supply either as evidence.
+            if (literal is not None and field["unit"] is None and field["time"] is None
+                    and numeric_literal(field["value"]) == literal[1]):
+                matches.append((literal[0], "declared_literal_consumption"))
+            preceding = [(node, relation) for node, relation in matches
                          if (node["position"], node["phase"]) < (target["position"], target["phase"])]
             if len(preceding) != 1:
                 reason = "source_ambiguous" if len(preceding) > 1 else (
                     "source_not_preceding" if matches else "source_missing_or_binding_mismatch")
                 unresolved.append({"node_id": target["node_id"], "reason": reason})
                 continue
-            source, _ = preceding[0]
+            source, relation = preceding[0]
             # A matching declaration verifies copied fields, not the source's truth or materiality.
-            add_edge(source, target, "declared_field_consumption", "verified", [source_ref, ref])
+            add_edge(source, target, relation, "verified", [source_ref, ref])
     return seal({
         "schema_version": DEPENDENCY_GRAPH_SCHEMA, "packet_digest": digest(packet),
         "policy_digest": digest(policy), "nodes": nodes, "edges": edges,

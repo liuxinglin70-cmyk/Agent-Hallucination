@@ -6,9 +6,9 @@
 |---|---|
 | 当前任务 | 根据本次用户请求恢复完整18包代码重构；按Pristine逐根因修复、离线验证并最终整理doc、README及实验日志 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | 94ee8a2保存M03/M05/M06的B15–B29合同修复；本轮将单次听证执行与冻结目标匹配提取至hearing/replay，迁移所有测试替身，API保留诊断准备及业务流。相关121项通过；当前e90296ed完整code_only1714/platform57、AST75文件/三CLI/源码不变均通过。无新独立复审、真实请求或原始证据改写。[提取核验](artifacts/code_quality/e90296ed5de101dc6a04b8fdb3d5e271e71e4a3688ccdd9efc96dcb005e8cfcf/1ec58f90c2104a5682e16c06d130a4d5/m06-extraction-verification.md)、[纯代码](artifacts/code_quality/e90296ed5de101dc6a04b8fdb3d5e271e71e4a3688ccdd9efc96dcb005e8cfcf/1ec58f90c2104a5682e16c06d130a4d5/summary.json)、[平台](artifacts/code_quality/e90296ed5de101dc6a04b8fdb3d5e271e71e4a3688ccdd9efc96dcb005e8cfcf/7df492c6cea34b258a73f6604cbd0983/summary.json)。 |
+| 本轮已完成 | M10补齐算术标量观察到显式字段声明的实际消费边，复用字段传播、预算和闭包规则；缺边反例先失败，新增13项及相关177项通过，受控预算/来源歧义2项通过。babab472完整code_only1727、AST75文件/三CLI/源码不变通过。本轮未重跑platform/local_data；平台57项的最近证据属于21236a2听证提取源码。无新独立复审、真实请求或原始证据改写。[消费链核验](artifacts/code_quality/babab4721003eb81ac54213fbdea0ae24aae965a182ad3e1003059813d90a92d/13f9060034fc419f84dc88b5c2b3d594/literal-consumption-verification.md)、[纯代码](artifacts/code_quality/babab4721003eb81ac54213fbdea0ae24aae965a182ad3e1003059813d90a92d/13f9060034fc419f84dc88b5c2b3d594/summary.json)。 |
 | 代码实施 | M00已验收；M02原验收证据保留，本轮B19交付锚点修订待复审；M03修复待审查，其余包保持原状态 |
-| 下一工作包 | 接续M12完整同claim因果证书及M14–M16演化消费链，核对M06剩余纯组装与裁决边界；M02/M03/M05/M06本轮修改待独立复审。 |
+| 下一工作包 | 将M10实际算术结果消费链绑定到M12当前听证证书，区分观察传播与未知材料性/首次因果引入；再接M14–M16演化消费链。M02/M03/M05/M06本轮修改待独立复审。 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
 | 更新时间 | 2026-10-11，Asia/Shanghai |
 
@@ -201,7 +201,7 @@ evolution/
 | M07 | 干预执行器和 scope 合同 | M02/M03/M04 | 2–3 | 实施中 | B12：scope refs 非空/存在/范围验证、executor packet/context 独立副本、去除重复 semantic 执行校验；77a48c4：detector 430 项/跨包 80 项/AST 67 文件及独立 49 项通过，B12 已关闭；完整 executor 合同继续实施 |
 | M08 | 批处理、存储、恢复、成本和分母 | M01/M04/M06 | 2–3 | 实施中 | B05 已关闭（7f91c3e）；B07 已关闭（9c40b5c），相关 51 项、2 项 CLI 回环及独立覆盖分区通过；B06 已关闭（a2fed20），尝试 journal 与失败成本通过独立 51 项及多票反例；路径/存储一致性及 invocation/lifetime 成本继续实施 |
 | M09 | 风险画像与候选选择 | M01/M02/M03/M07 | 2–3 | 实施中 | 1a4d156/595b468：只读信号及有界候选接入 Detector，PPL unsupported；扩展 515 项、修复后相关 148 项、独立复核 17 项/7 反例通过；审计/定位消费者待接续 |
-| M10 | 实际依赖图与闭包 | M02/M03/M09 | 2–3 | 实施中 | 1a4d156：call/result 及声明字段消费、远距离祖先/后缀/交付投影接通，未核验自然语言保持未知；有限审查除 M09 数值阻断外无新增问题，该阻断 595b468 关闭；完整审计/定位集成待接续 |
+| M10 | 实际依赖图与闭包 | M02/M03/M09 | 2–3 | 实施中 | 1a4d156：call/result 及声明字段消费、远距离祖先/后缀/交付投影接通，未核验自然语言保持未知；有限审查除 M09 数值阻断外无新增问题，该阻断 595b468 关闭；本轮补齐declared_literal_consumption：可重算算术观察与显式dimensionless字段声明共用依赖匹配/预算/闭包规则，来源唯一且前置，后续复用字段传播；缺边反例先失败，新增13项及相关177项通过，受控预算/歧义2项通过。babab472完整code_only1727/AST75文件/三CLI/源码不变通过；[核验](artifacts/code_quality/babab4721003eb81ac54213fbdea0ae24aae965a182ad3e1003059813d90a92d/13f9060034fc419f84dc88b5c2b3d594/literal-consumption-verification.md)。同claim上下文绑定及独立审查未完成 |
 | M11 | 有界因果审计与 shadow | M04/M06/M09/M10 | 2–3 | 待审查 | 8082ee9 已接通 shadow、局部证书/可选假说及共享预算；有限审查发现真实 provider wrapper 吞 RunStopped，已从异常类型与转换规则修复；相关 85 项/扩展 584 项通过，固定修复提交独立复核尚未完成：审查代理因账户额度终止 |
 | M12 | 定位上下文及受控阴性反馈 | M05/M06/M11 | 3–4 | 实施中 | 664ca93：正式 Tracer 接收同 hearing 目标摘要与局部核验证据；冻结 Tracer 按实际上下文摘要复用，耗时不参与身份；上下文/repair 与新增复审链共享案例预算；生产无校准保持不激活，显式 OfflineFeedbackPolicy 仅无凭据 API 可注入；初始 11 项反例先失败，修复后相关 115 项、平台 6 项、AST 71 文件通过，报告 `artifacts/code_quality/009d6ad5403f675d65f76e6316448e799f6d052064188686f0763324dfe1dad4/ffbc0284e6a64faaa29743c3f53a2d12/summary.json`；当前固定811662f完整code_only1568/platform57通过；局部claim绑定context.v2已接通，12项新合同用例及2项实际输入漂移反例先失败后通过，相关173通过；只核验被引用算术结果，不证明语义传播或首次因果引入，局部证书c6b6fd6固定独立46+相关138通过，无局部范围阻断；完整同claim证书及包审查待完成 |
 | M13 | Backend、缓存、harness与回放合同 | M01/M06/M12 | 2–3 | 实施中 | fresh快照caea1a8独立39通过；共享replay固定复核101通过/1失败，外部API full-view P1完整/仅hearings共4正式反例修复，相关155通过，7e45ecb固定复核独立38+相关120通过。周期已消费校准身份统一绑定/恢复验证，相关50/f2a1933全量1521通过，a85edf6校准加载/绑定/落盘核验固定独立14+相关42通过。preflight e1632be相关43、晋升13c91f4身份/manifest相关120通过，晋升固定复核发现空路径P2、正式2反例修复及相关96通过，9efeb41修复固定回归132+独立11通过，原P2核销；完整包验收未完成 |
@@ -512,8 +512,8 @@ python -m experiments --help
 四项检查点（就地覆盖）：
 
 - **当前任务**：按本次用户请求继续完整18包重构，遵守Pristine；整体完成后核销冗余脚本/文档、整合doc并将组会材料置于子目录。
-- **进度**：M00已验收；M02/M03/M05/M06本轮修改待独立复审。94ee8a2保存B15–B29修复；M06听证执行及冻结目标匹配已提取，121项入口回归通过；e90296ed完整code_only1714/platform57及AST75文件/三CLI/源码不变通过，证据见§0/§6。全量local_data与真实实验未运行。
-- **下一步**：读取M12任务卡与causal_contracts.bind_arithmetic_claim，补齐同claim核验证书的材料性、观察传播、纠正和首次引入边界；随后接M14–M16实际演化消费链。核对M06剩余纯组装及裁决边界，完成本轮独立复审；整体完成后执行冗余清理与doc组会归档。
+- **进度**：M00已验收；M02/M03/M05/M06本轮修复待独立复审。21236a2听证提取完成，当前M10算术观察实际消费边修复，新增13项/相关177项及受控2项通过；babab472完整code_only1727/AST75文件/三CLI/源码不变通过。platform57项最近证据属于21236a2，本轮platform/local_data未运行。证据见§0/§6。
+- **下一步**：将causal_graph中的可核验消费路径绑定到context_for_hearing的完整听证目标，保留材料性/语义首次引入/反事实效应的独立未知状态，并核验纠正、旧值复用及第二错误；再接M14–M16演化消费链。M06剩余纯组装与裁决边界、本轮独立复审和最终doc清理尚待完成。
 - **未定事项**：完整18包目标未完成，完整同claim因果证书及M14–M16消费链仍未闭合；历史校准因交付规则变化失效，原始字节保留且本期不重测；最终脚本/文档清理与doc归档未执行。
 
 ## 12. 本期最终完成与延期项
