@@ -71,14 +71,15 @@ class CycleJournal:
         return state
 
     @staticmethod
-    def _verify_authority(state: dict) -> None:
+    def _verify_authority(state: dict, *, calibration=None) -> None:
         if "authority" not in state:
             raise RuntimeError("checkpoint lacks its authority snapshot")
         previous = state["authority"]
         if previous is None:
             return
         from detector.conviction_calibration import default_calibration
-        current = default_calibration().identity(list(previous["status"]))
+        view = calibration if calibration is not None else default_calibration()
+        current = view.identity(list(previous["status"]))
         if current != previous:
             raise RuntimeError("checkpoint authority input changed; refusing a new observation")
 
@@ -93,13 +94,15 @@ class CycleJournal:
 
     def _bind_authority(self, authority):
         with self.lock:
-            self._verify_authority(self.state)
+            view = None
+            if authority is not None or self.state.get("authority") is not None:
+                from detector.conviction_calibration import default_calibration
+                view = default_calibration()
+            self._verify_authority(self.state, calibration=view)
             if authority is None:
                 return
             previous = self.state["authority"]
             names = sorted(set(authority["status"]) | set((previous or {}).get("status", {})))
-            from detector.conviction_calibration import default_calibration
-            view = default_calibration()
             if view.identity(list(authority["status"])) != authority:
                 raise RuntimeError("checkpoint authority input changed; refusing a new observation")
             combined = view.identity(names)
@@ -126,6 +129,7 @@ class CycleJournal:
             if len(result) != 1 or result[0]["case"] != case:
                 raise RuntimeError("backend returned an incomplete case observation")
             row = result[0]
+            self._bind_authority(authority)
             save_json(path, {"arm": arm, "authority": authority, "row": row, "row_hash": digest(row)})
             self.save()
             return row

@@ -62,6 +62,7 @@ import hashlib
 import inspect
 import json
 import re
+import threading
 import types
 from copy import deepcopy
 from pathlib import Path
@@ -508,6 +509,7 @@ class ConvictionCalibration:
         self._warnings: list[str] = []
         self._artifact_error = ""
         self._inputs: dict[str, Any] = {}
+        self._lock = threading.Lock()
 
     # -- record loading ----------------------------------------------------
     def _load_artifact(self) -> Mapping[str, Any] | None:
@@ -532,9 +534,10 @@ class ConvictionCalibration:
 
     # -- status ------------------------------------------------------------
     def status(self) -> dict[str, dict[str, Any]]:
-        if self._status is None:
-            self._status = self._resolve()
-        return deepcopy(self._status)
+        with self._lock:
+            if self._status is None:
+                self._status = self._resolve()
+            return deepcopy(self._status)
 
     def identity(self, predicates: Sequence[str]) -> dict[str, Any]:
         status = self.status()
@@ -693,14 +696,16 @@ def _decision(
 
 
 _CACHE: dict[tuple[str, str, bool], ConvictionCalibration] = {}
+_CACHE_LOCK = threading.Lock()
 
 
 def default_calibration() -> ConvictionCalibration:
     """The process-wide calibration view used by the conviction guard."""
     key = (str(DEFAULT_ARTIFACT), str(DEFAULT_CORPUS_ROOT), True)
-    if key not in _CACHE:
-        _CACHE[key] = ConvictionCalibration()
-    return _CACHE[key]
+    with _CACHE_LOCK:
+        if key not in _CACHE:
+            _CACHE[key] = ConvictionCalibration()
+        return _CACHE[key]
 
 
 

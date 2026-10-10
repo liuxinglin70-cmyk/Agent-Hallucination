@@ -58,6 +58,148 @@ from detector.interventions import (
 from detector.packet import build_packet
 
 
+def test_cold_default_view_cannot_change_identity_after_journal_binding(tmp_path, monkeypatch):
+    from copy import deepcopy
+    from threading import Event, Thread
+    import detector.conviction_calibration as calibration
+    from evolution.checkpoint import CycleJournal
+
+    artifact = tmp_path / "calibration.json"
+    artifact.write_text(json.dumps({"synthetic": "A"}), encoding="utf-8")
+    monkeypatch.setattr(calibration, "DEFAULT_ARTIFACT", artifact)
+    monkeypatch.setattr(calibration, "DEFAULT_CORPUS_ROOT", tmp_path / "empty-corpus")
+    monkeypatch.setattr(calibration, "_CACHE", {})
+    read_a, release_a, finished_a, backend_entered = (Event() for _ in range(4))
+    reads, errors = [], []
+    load = calibration.ConvictionCalibration._load_artifact
+
+    def paused_load(self):
+        payload = load(self)
+        reads.append(payload["synthetic"])
+        if payload["synthetic"] == "A":
+            read_a.set()
+            assert release_a.wait(5)
+        return payload
+
+    monkeypatch.setattr(calibration.ConvictionCalibration, "_load_artifact", paused_load)
+    names = ["final_delivery_present"]
+
+    def preload():
+        try:
+            calibration.default_calibration().identity(names)
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            finished_a.set()
+
+    def release_load():
+        # Release independently of backend progress so serialized loading can finish.
+        backend_entered.wait(1)
+        release_a.set()
+
+    journal = CycleJournal(tmp_path / "journal", {}, resume=False)
+    preloader = Thread(target=preload)
+    preloader.start()
+    assert read_a.wait(3)
+    artifact.write_text(json.dumps({"synthetic": "B"}), encoding="utf-8")
+    releaser = Thread(target=release_load)
+    releaser.start()
+    observations = []
+
+    def backend(cases, **kwargs):
+        bound = deepcopy(journal.state["authority"])
+        backend_entered.set()
+        assert finished_a.wait(3)
+        used = calibration.default_calibration().identity(names)
+        observations.append((bound, used))
+        return [{"case": cases[0], "used_identity": used}]
+
+    try:
+        rows = journal.evaluate(["case"], registry=_mechanical_registry(), fresh=False,
+                                evaluate=backend, kwargs={"workers": 1})
+    finally:
+        release_a.set()
+        preloader.join(3)
+        releaser.join(3)
+    assert not preloader.is_alive() and not releaser.is_alive()
+    assert errors == []
+    assert observations[0][0] == rows[0]["used_identity"]
+    assert reads == ["A"]
+
+
+def test_concurrent_default_requests_share_one_calibration_view(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier, Event
+    import detector.conviction_calibration as calibration
+
+    monkeypatch.setattr(calibration, "DEFAULT_ARTIFACT", tmp_path / "unused.json")
+    monkeypatch.setattr(calibration, "DEFAULT_CORPUS_ROOT", tmp_path / "unused-corpus")
+    monkeypatch.setattr(calibration, "_CACHE", {})
+    constructor = calibration.ConvictionCalibration
+    barrier = Barrier(8)
+    created = []
+
+    def paused_constructor():
+        Event().wait(0.1)
+        view = constructor()
+        created.append(view)
+        return view
+
+    def request(index):
+        barrier.wait(3)
+        return calibration.default_calibration()
+
+    monkeypatch.setattr(calibration, "ConvictionCalibration", paused_constructor)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        views = list(pool.map(request, range(8)))
+    assert len(created) == 1
+    assert all(view is views[0] for view in views)
+
+
+def test_journal_binding_uses_one_view_for_previous_and_requested_authority(tmp_path, monkeypatch):
+    import detector.conviction_calibration as calibration
+    from evolution.checkpoint import CycleJournal
+
+    a = ConvictionCalibration(artifact={"synthetic": "A"}, corpus_root=tmp_path / "empty")
+    b = ConvictionCalibration(artifact={"synthetic": "B"}, corpus_root=tmp_path / "empty")
+    monkeypatch.setattr(calibration, "default_calibration", lambda: a)
+    journal = CycleJournal(tmp_path / "journal", {}, resume=False)
+    registry = _mechanical_registry()
+    journal.evaluate(["case"], registry=registry, fresh=False,
+                     evaluate=lambda cases, **kwargs: [{"case": cases[0]}], kwargs={"workers": 1})
+    before = {path: path.read_bytes() for path in journal.directory.rglob("*.json")}
+    choices = iter([b, a, b])
+    monkeypatch.setattr(calibration, "default_calibration", lambda: next(choices, b))
+    with pytest.raises(RuntimeError, match="authority input changed"):
+        journal.evaluate(["case"], registry=registry, fresh=True,
+                         evaluate=lambda *args, **kwargs: pytest.fail("changed view cannot be measured"),
+                         kwargs={"workers": 1})
+    assert {path: path.read_bytes() for path in journal.directory.rglob("*.json")} == before
+
+
+def test_journal_rechecks_authority_before_committing_observation(tmp_path, monkeypatch):
+    import detector.conviction_calibration as calibration
+    from evolution.checkpoint import CycleJournal
+
+    a = ConvictionCalibration(artifact={"synthetic": "A"}, corpus_root=tmp_path / "empty")
+    b = ConvictionCalibration(artifact={"synthetic": "B"}, corpus_root=tmp_path / "empty")
+    current = [a]
+    monkeypatch.setattr(calibration, "default_calibration", lambda: current[0])
+    journal = CycleJournal(tmp_path / "journal", {}, resume=False)
+    checkpoint = []
+
+    def backend(cases, **kwargs):
+        checkpoint.append(journal.path.read_bytes())
+        current[0] = b
+        return [{"case": cases[0], "used_identity": b.identity(["final_delivery_present"])}]
+
+    with pytest.raises(RuntimeError, match="authority input changed"):
+        journal.evaluate(["case"], registry=_mechanical_registry(), fresh=False,
+                         evaluate=backend, kwargs={"workers": 1})
+    assert not list((journal.directory / "arms").rglob("*.json"))
+    assert journal.path.read_bytes() == checkpoint[0]
+
+
 PREDICATE = "final_delivery_present"
 
 
