@@ -23,6 +23,7 @@ from __future__ import annotations
 from detector.replay import requires_fresh_evaluation
 
 import json
+from copy import deepcopy
 from contextvars import Context
 from functools import wraps
 from threading import RLock
@@ -630,7 +631,7 @@ class EvolutionEngine:
                 case: load_gold_step(self.config["dataset_root"], case)
                 for case in self.split.pool
             }
-            self.cycle_reports: list[dict[str, Any]] = []
+            self._cycle_reports: list[dict[str, Any]] = []
             # H_t = (G, C, T, M, R) base. These describe and remember the
             # generation that ran; they are read for reporting and for what the
             # next round starts from, and they never score a candidate.
@@ -725,6 +726,11 @@ class EvolutionEngine:
         except BaseException:
             self.close()
             raise
+
+    @property
+    def cycle_reports(self) -> list[dict[str, Any]]:
+        with self._operation_lock:
+            return deepcopy(self._cycle_reports)
 
     # ------------------------------------------------------------------
     def _load_mechanism_binding(self) -> None:
@@ -4459,34 +4465,29 @@ class EvolutionEngine:
     # ------------------------------------------------------------------
     @_engine_operation
     def run_experiment(self, cycles: int | None = None, *, resume: bool = False) -> dict[str, Any]:
-        import time as _time
-
         requested = int(self.config.get("cycles", 3) if cycles is None else cycles)
-        cycles = requested
-        if cycles < 0:
+        if requested < 0:
             raise ValueError("cycles must be non-negative")
-        for cycle in range(1, cycles + 1):
+        cycle_reports = []
+        for cycle in range(1, requested + 1):
             started = any(r["event"] == "cycle_started" and r["payload"].get("cycle") == cycle for r in self.ledger.read())
             result = self.run_cycle(cycle, resume=resume and started)
+            cycle_reports.append(result)
             if result.get("state") != "completed":
                 break
         completed = [
-            item for item in self.cycle_reports
+            item for item in cycle_reports
             if item.get("state") == "completed"
         ]
-        # A run that stopped early must say so. Otherwise a six-cycle request
-        # that ended after one blocked preflight is indistinguishable from a
-        # six-cycle run by anyone reading the report -- the cycles list is the
-        # only trace, and counting it is not a contract.
         stopped_early = len(completed) < requested
         report = {
-            "cycles": self.cycle_reports,
+            "cycles": cycle_reports,
             "cycles_requested": requested,
             "cycles_completed": len(completed),
             "stopped_early": stopped_early,
             "stop_reason": (
-                str(self.cycle_reports[-1].get("state") or "") if stopped_early
-                and self.cycle_reports else ""
+                str(cycle_reports[-1].get("state") or "") if stopped_early
+                and cycle_reports else ""
             ),
             "active": [
                 str(c.get("intervention_id") or "") for c in self.registry.entries
@@ -4495,7 +4496,7 @@ class EvolutionEngine:
             "registry_state": self.registry.state,
         }
         if self.mini and self.split.validation:
-            if all(item.get("state") == "completed" for item in self.cycle_reports):
+            if cycle_reports and not stopped_early:
                 report["mini_effect"] = self._evaluate_mini_effect()
             else:
                 # "Not measured" must be stated, not implied by a missing key:
@@ -4504,9 +4505,10 @@ class EvolutionEngine:
                 report["mini_effect"] = {
                     "status": "not_run",
                     "reason": (
+                        "no cycle requested" if not cycle_reports else
                         "the out-of-sample effect is only computed when every "
-                        "cycle completed; stopped with "
-                        f"{completed and len(completed) or 0} completed cycle(s)"
+                        "requested cycle completed; stopped with "
+                        f"{len(completed)} completed cycle(s)"
                     ),
                     "passed": None,
                 }
@@ -5035,9 +5037,9 @@ class EvolutionEngine:
             raise RuntimeError("cycle already recorded complete, but deployment changed before publication recovery")
         self._save_cycle_report(cycle, report)
         self._ledger("cycle_completed", completion["event"], idempotency_key=key)
-        if not any(row.get("cycle") == cycle for row in self.cycle_reports):
-            self.cycle_reports.append(json.loads(json.dumps(report, ensure_ascii=False, allow_nan=False)))
-        return json.loads(json.dumps(report, ensure_ascii=False, allow_nan=False))
+        if not any(row.get("cycle") == cycle for row in self._cycle_reports):
+            self._cycle_reports.append(deepcopy(report))
+        return deepcopy(report)
 
     def _save_cycle_report(self, cycle: int, report: Mapping[str, Any]) -> None:
         path = self.paths["cycles"] / f"cycle{int(cycle):03d}.json"

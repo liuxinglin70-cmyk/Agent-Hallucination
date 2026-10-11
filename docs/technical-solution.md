@@ -189,6 +189,8 @@ L1 开发回放要求两臂恰好覆盖预定 target∪neighbor，每例各一�
 
 CycleJournal的save与权威绑定共用独立JSON发布：原子替换成功后才更新内存；写入异常后核对实际落盘是否为旧提交或本次提交，无法确认则拒绝状态读取、保存和新观察，要求重新打开。state返回独立快照，合同、起始注册表和更新输入不保留外部可变引用；非有限JSON拒绝。Engine.run_cycle将恢复准备和执行纳入同一清理作用域；原始取消、fatal或业务异常保持对象身份传播，checkpoint与ledger中断记录分别尝试，记录故障以cycle_recording_errors中的(stage, exception)元组附在原异常对象上，兼容Python 3.10。周期完成由统一入口将evolution.cycle_completion.v1记录与status=completed一起原子写入checkpoint，记录绑定合同摘要、部署摘要、完整报告/摘要、cycle_completed事件及记录摘要；正常、预检阻断、审计冻结共用。提交完成后checkpoint不可改写或新增观察，恢复不更新时间/重提案/重测/重部署，仅校验并补齐report文件和带幂等键的完成事件。报告或事件的完整内容/JSON类型冲突、重复完成事件、记录摘要/语义或合同漂移拒绝且不覆盖。未提交完成而既有终态输出也拒绝；待补输出时部署必须仍对应提交，输出完整的历史周期可复用历史报告。full_self_evolution通过同一run_cycle恢复完成周期，不直接信任散落报告或跳过检查点核验。该完成记录不证明此前部署、全部记忆与其他周期事件已经形成一个原子提交。
 
+EvolutionEngine周期历史由私有_cycle_reports拥有，公开cycle_reports在操作锁内返回独立深副本，没有替换入口；run_cycle返回、内部历史和checkpoint记录互不共享可变内容。run_experiment只聚合本次请求中实际读取的提交报告，完成计数、提前停止、停止原因和验证集评估都使用同一范围；其他周期不混入零/前缀请求，也不压制本次范围的验证。零周期返回空聚合且验证集status=not_run。公开快照的嵌套修改、追加或清空不能污染内部历史及恢复结果。
+
 ### 核心不变量
 
 1. STRUCTURAL 验证候选合同、执行边界、失败族和目标类型；结构失败不消耗真实候选测量。
