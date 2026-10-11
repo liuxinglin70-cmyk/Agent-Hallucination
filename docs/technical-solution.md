@@ -107,7 +107,7 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 
 ### 因果诊断与定位上下文
 
-`causal_contracts.py`、`step_uncertainty.py` 和 `causal_graph.py` 生成只读风险画像、确定性候选和实际依赖投影；未知语义关系保留未知，teacher-forced PPL 返回 unsupported。`causal_audit.py` 可验证局部字面算术偏差；模型解释只记 hypothesis，局部错误不证明材料性、最早责任步或最终交付违约。
+`causal_contracts.py`、`step_uncertainty.py` 和 `causal_graph.py` 生成只读风险画像、确定性候选和实际依赖投影；未知语义关系保留未知，teacher-forced PPL 返回 unsupported。`causal_audit.py` 可验证局部字面算术偏差；模型解释只记 hypothesis，局部错误不证明材料性、最早责任步或最终交付违约。后向依赖闭包为候选生成有界输入，前向observed claim lineage追踪一个实际结果的声明字段复制；方向、状态及权限不同，分别保留。
 
 依赖图的 `declared_literal_consumption` 边表示结构化字段通过明确的工具交互 `source_ref` 声明采用了可重算算术观察的数值。观察和字段必须数值相同，字段不能额外声明单位或时间；来源必须唯一且在消费之前。后续字段传播复用 `declared_field_consumption`，继续核对实体、属性、单位、时间和数值。`dependency_graph.v2` 的复制边另记录实体/属性/单位/时间绑定、值与精确来源/目标字段路径，同事件的不同字段不能通过节点相交拼成一条消费链。新边与原边共用节点/边预算、遗漏及闭包规则；引用错误、来源歧义、后见观察或未核验标量保持未知。正确的新观察不会替换后续声明仍引用的旧来源。该图证据从Detector诊断入口可达，并已接入当前听证的声明消费路径证书；它不证明任务材料性、语义首次引入或反事实效应，也不授予定罪/定位权限。
 
@@ -234,7 +234,7 @@ engine、backends、promotion、interventions 仍承担较多职责，后续物�
 
 `causal_contracts.py`、`step_uncertainty.py`、`causal_graph.py` 和 `causal_audit.py` 实现只读诊断及 shadow 审计。Detector 在非 off 模式于基础终态生成后输出 `proof.causal_diagnostics`：StepRiskProfile、Top-K 与 mandatory 候选、DependencyGraph、CausalProjection 和 CausalAudit。默认 off 不计算诊断；默认 deterministic_only 不增加 provider 调用。
 
-风险排序优先采用 calculator 字面算术的局部偏差、相同 entity/attribute/unit/time 的显式字段冲突候选，以及未核验内容。机械缺失动作保留轨迹级 null locus。字段冲突是 hypothesis，工具观察不自动归责；缺失/未知 role 不记为零风险，teacher-forced PPL 明确 unsupported。算术核验仅支持可精确表示的字面四则运算；数值转换前限制十进制数量级，运算中限制分子/分母位长，超限保持未知。不执行工具代码，不把局部结果当作任务级违规证明。
+风险排序优先采用 calculator 字面算术的局部偏差、相同 entity/attribute/unit/time 的显式字段冲突候选，以及未核验内容。同优先级按已核验信号数量降序，再按原事件位置稳定排序。画像绑定packet、策略、context、snapshot及实际scorer工件内容，候选选择拒绝不匹配策略和摘要不匹配的画像；Top-K、mandatory和预算遗漏分别记录，容量不足明确未知。机械缺失动作保留轨迹级 null locus。字段冲突是 hypothesis，工具观察不自动归责；缺失/未知 role 不记为零风险，teacher-forced PPL 明确 unsupported。算术核验仅支持可精确表示的字面四则运算；数值转换前限制十进制数量级，运算中限制分子/分母位长，超限保持未知。不执行工具代码，不把局部结果当作任务级违规证明。
 
 依赖图确认 packet 内同一交互的 call/result 结构，以及显式 source_ref、绑定字段和值匹配且来源在前的声明消费。该验证证明记录声明的字段复制关系，不证明来源事实或材料性。没有来源的自然语言、仅文字相似、未解析/歧义引用和同次参数引用后续观察均不能取得因果验证。投影纳入远距离祖先、真实后缀和交付锚点；节点/边/深度/字符预算或依赖缺失使 closure_state 保持 unknown，记录遗漏并返回独立内容副本。
 
