@@ -1077,3 +1077,26 @@ def test_joint_candidate_revision_keeps_both_entries(tmp_path):
     assert all(
         len(call["registry"]["interventions"]) == 2 for call in backend.calls
     )
+
+
+@pytest.mark.parametrize('consumer', ['baseline', 'screening'])
+def test_research_rejects_source_label_drift_before_persisting(tmp_path, monkeypatch, consumer):
+    dataset_root = _write_dataset(tmp_path)
+    manifest = _write_manifest(tmp_path, dataset_root, budget={'baseline_case_evaluations': 4, 'screening_case_evaluations': 16, 'proposer_calls_per_route': 3, 'max_versions': 4, 'workers': 1})
+    backend = FakeBackend()
+    run = ResearchRun(manifest, tmp_path / 'run', backend, FakeProposer([]))
+    run.frozen_manifest = run.freeze_manifest()
+    evaluate = backend.evaluate_fresh
+
+    def observe(cases, **kwargs):
+        rows = evaluate(cases, **kwargs)
+        run.gold_map[cases[0]] = not run.gold_map[cases[0]]
+        return rows
+    monkeypatch.setattr(backend, 'evaluate_fresh', observe)
+    with pytest.raises(RuntimeError, match='inputs changed'):
+        if consumer == 'baseline':
+            run.resolve_baseline()
+        else:
+            run._evaluate_version('B', 'v001', _valid_candidate())
+    assert not list((tmp_path / 'run').glob('baseline/*.json'))
+    assert not list((tmp_path / 'run').rglob('results/*.json'))

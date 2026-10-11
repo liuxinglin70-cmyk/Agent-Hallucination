@@ -299,7 +299,7 @@ class ResearchRun:
                     [case_id],
                     dataset_root=self.dataset_root,
                     registry=registry,
-                    gold_map=dict(self.gold_map),
+                    gold_map=self.gold_map,
                     workers=1,
                 )
                 self.budget.used_baseline_evaluations += 1
@@ -590,7 +590,7 @@ class ResearchRun:
                 missing,
                 dataset_root=self.dataset_root,
                 registry=registry,
-                gold_map=dict(self.gold_map),
+                gold_map=self.gold_map,
                 workers=self.budget.workers,
             )
             self.budget.used_screening_evaluations += len(missing)
