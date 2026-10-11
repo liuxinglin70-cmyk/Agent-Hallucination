@@ -758,7 +758,9 @@ class EvolutionEngine:
         raw = (self.config.get("budget") or {}).get("cycle_timeout_seconds")
         return float(raw) if raw else None
 
-    def _ledger(self, event: str, payload: Mapping[str, Any]) -> dict[str, Any]:
+    def _ledger(self, event: str, payload: Mapping[str, Any], *, idempotency_key: str | None = None) -> dict[str, Any]:
+        if idempotency_key is not None:
+            return self.ledger.append(event, payload, idempotency_key=idempotency_key)
         if getattr(self, "_resuming", False):
             for record in self.ledger.read():
                 if record["event"] == event and record["payload"] == payload:
@@ -1198,10 +1200,7 @@ class EvolutionEngine:
             "active_after_cycle": [entry["intervention_id"] for entry in self.registry.entries],
         }
         self._ledger("evaluation_preflight_blocked", {"cycle": cycle, **dict(preflight)})
-        self._ledger("cycle_completed", {"cycle": cycle, "state": report["state"]})
         report["ledger_integrity"] = self.ledger.verify()
-        self._save_cycle_report(cycle, report)
-        self.cycle_reports.append(report)
         return report
 
     def _mechanism_opportunity(
@@ -3193,14 +3192,6 @@ class EvolutionEngine:
                     "runtime_identity": backend_runtime_identity(self.backend, cases=self.split.pool),
                     "split": split_manifest_report(self.split),
                     "data": {case: artifact_digest(Path(self.config["dataset_root"]) / case) for case in self.split.pool}}
-        if resume and report_path.exists():
-            report = json.loads(report_path.read_text(encoding="utf-8"))
-            if any(r["event"] == "cycle_completed" and r["payload"].get("cycle") == cycle for r in self.ledger.read()):
-                CycleJournal.load_state(
-                    self.paths["root"] / "checkpoints" / f"cycle{cycle:03d}" / "checkpoint.json", contract,
-                )
-                self.cycle_reports.append(report)
-                return report
         # The contract deliberately excludes the registry hash: a cycle that
         # committed its own admission and then died must still be resumable.
         # The registry it started from is recorded separately and re-applied
@@ -3213,6 +3204,11 @@ class EvolutionEngine:
         )
         try:
             self._resuming = resume
+            if "completion" in self._journal.state:
+                return self._project_cycle_completion(cycle, self._journal.state["completion"])
+            if report_path.exists() or any(row["event"] == "cycle_completed" and row["payload"].get("cycle") == cycle
+                                          for row in self.ledger.read()):
+                raise RuntimeError("cycle already recorded complete without a committed completion record")
             if resume:
                 self._restore_resume_registry(cycle)
             backend = self.backend
@@ -3231,16 +3227,19 @@ class EvolutionEngine:
                     raise RuntimeError("resume may not replace persisted proposals")
                 proposal_batch = saved
             report = self._run_cycle(cycle, proposal_batch=proposal_batch)
-            self._journal.save(status="completed")
-            return report
+            return self._publish_cycle_completion(cycle, report)
         except BaseException as exc:
             recording_errors = []
+            committed = False
             try:
-                self._journal.save(status="interrupted", error_type=type(exc).__name__)
+                committed = "completion" in self._journal.state
+                if not committed:
+                    self._journal.save(status="interrupted", error_type=type(exc).__name__)
             except BaseException as failure:
                 recording_errors.append(("checkpoint", failure))
             try:
-                self._ledger("cycle_interrupted", {"cycle": cycle, "error_type": type(exc).__name__})
+                if not committed:
+                    self._ledger("cycle_interrupted", {"cycle": cycle, "error_type": type(exc).__name__})
             except BaseException as failure:
                 recording_errors.append(("ledger", failure))
             if recording_errors:
@@ -3266,18 +3265,6 @@ class EvolutionEngine:
         expected = str(recorded.get("content_hash") or "")
         current = self.registry.registry_hash
         if expected and expected != current:
-            completed = any(
-                record.get("event") == "cycle_completed"
-                and int((record.get("payload") or {}).get("cycle") or -1)
-                == int(cycle)
-                for record in self.ledger.read()
-            )
-            if completed:
-                raise RuntimeError(
-                    f"cycle {cycle} is already recorded complete, but the live "
-                    "registry does not match the checkpoint; refusing to resume "
-                    "on inconsistent state"
-                )
             self.registry.restore(
                 recorded,
                 reason=(
@@ -3369,17 +3356,11 @@ class EvolutionEngine:
                 break
             self._journal.save(audit=audit)
         if audit.get("frozen"):
-            self._ledger("cycle_completed", {
-                "cycle": cycle,
-                "state": "frozen_after_defect_injection_audit",
-            })
             report = {
                 "cycle": cycle,
                 "state": "frozen_after_defect_injection_audit",
                 "audit": audit,
             }
-            self._save_cycle_report(cycle, report)
-            self.cycle_reports.append(report)
             return report
 
         patrol = prepare_patrol(
@@ -3528,7 +3509,6 @@ class EvolutionEngine:
                 diagnosed_families=diagnosed_families,
                 gate_reports=(),
             )
-            self._save_cycle_report(cycle, report)
             return report
         if diagnosed_families and not proposal_families and proposal_batch is None:
             reason = "no diagnosed failure direction has repair opportunities in gain"
@@ -3567,11 +3547,6 @@ class EvolutionEngine:
                 diagnosed_families=diagnosed_families,
                 gate_reports=(),
             )
-            # The report was saved and appended to ``cycle_reports`` by
-            # ``_stop_preflight`` before the backlog existed; re-saving writes
-            # the same dict the caller receives, so the file, the in-memory
-            # record and the return value cannot disagree.
-            self._save_cycle_report(cycle, report)
             return report
 
         development_block: dict[str, Any] | None = None
@@ -4188,10 +4163,6 @@ class EvolutionEngine:
             selected=selected,
         )
         report["harness"] = self.record_harness(cycle)
-        self._save_cycle_report(cycle, report)
-        self._ledger("cycle_completed", {"cycle": cycle, "state": "completed",
-                                        "active_registry_hash": self.registry.registry_hash})
-        self.cycle_reports.append(report)
         return report
 
     def _check_combination(
@@ -5032,9 +5003,46 @@ class EvolutionEngine:
         })
         return report
 
+    def _publish_cycle_completion(self, cycle: int, report: Mapping[str, Any]) -> dict[str, Any]:
+        if self._journal is None:
+            raise RuntimeError("cycle completion requires its journal")
+        report = json.loads(json.dumps(dict(report), ensure_ascii=False, allow_nan=False))
+        completion = {
+            "schema_version": "evolution.cycle_completion.v1",
+            "contract_digest": digest(self._journal.state["contract"]),
+            "registry_hash": self.registry.registry_hash,
+            "report": report,
+            "report_hash": digest(report),
+            "event": {"cycle": cycle, "state": report["state"],
+                      "active_registry_hash": self.registry.registry_hash},
+        }
+        completion["digest"] = digest(completion)
+        self._journal.save(status="completed", completion=completion)
+        return self._project_cycle_completion(cycle, completion)
+
+    def _project_cycle_completion(self, cycle: int, completion: Mapping[str, Any]) -> dict[str, Any]:
+        report = completion["report"]
+        path = self.paths["cycles"] / f"cycle{cycle:03d}.json"
+        key = digest({"completion_contract": completion["contract_digest"], "event": "cycle_completed"})
+        events = [row for row in self.ledger.read()
+                  if row["event"] == "cycle_completed" and row["payload"].get("cycle") == cycle]
+        if len(events) > 1 or any(row.get("idempotency_key") != key or digest(row["payload"]) != digest(completion["event"])
+                                 for row in events):
+            raise RuntimeError("cycle already recorded complete with conflicting publication")
+        if path.exists() and digest(json.loads(path.read_text(encoding="utf-8"))) != completion["report_hash"]:
+            raise RuntimeError("cycle report conflicts with committed completion")
+        if (not events or not path.exists()) and self.registry.registry_hash != completion["registry_hash"]:
+            raise RuntimeError("cycle already recorded complete, but deployment changed before publication recovery")
+        self._save_cycle_report(cycle, report)
+        self._ledger("cycle_completed", completion["event"], idempotency_key=key)
+        if not any(row.get("cycle") == cycle for row in self.cycle_reports):
+            self.cycle_reports.append(json.loads(json.dumps(report, ensure_ascii=False, allow_nan=False)))
+        return json.loads(json.dumps(report, ensure_ascii=False, allow_nan=False))
+
     def _save_cycle_report(self, cycle: int, report: Mapping[str, Any]) -> None:
         path = self.paths["cycles"] / f"cycle{int(cycle):03d}.json"
-        save_json(path, dict(report))
+        if not path.exists():
+            save_json(path, dict(report))
 
 
 def _time_monotonic() -> float:
@@ -5282,13 +5290,9 @@ def run_full_self_evolution(
                 "runtime_identity": backend_runtime_identity(engine.backend),
             })
         cycle_reports = []
-        for path in sorted(engine.paths["cycles"].glob("cycle*.json")):
-            cycle_reports.append(json.loads(path.read_text(encoding="utf-8-sig")))
         target_cycles = int(cfg.get("cycles", 3))
         for cycle in range(1, target_cycles + 1):
-            if cycle in completed:
-                continue
-            report = engine.run_cycle(cycle, resume=cycle in resumable)
+            report = engine.run_cycle(cycle, resume=cycle in resumable or cycle in completed)
             cycle_reports.append(report)
             if report.get("state") != "completed":
                 raise RuntimeError(

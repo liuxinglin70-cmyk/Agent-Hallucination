@@ -48,7 +48,8 @@ class CycleJournal:
             # committed its own admission.
             self._state["registry_before"] = registry_before
         self.previous_seconds = float(self._state.get("used_seconds", 0))
-        self.save()
+        if "completion" not in self._state:
+            self.save()
 
     @staticmethod
     def load_state(path: Path, contract: dict) -> dict:
@@ -57,9 +58,10 @@ class CycleJournal:
         state = json.loads(path.read_text(encoding="utf-8"))
         if state.get("schema_version") != "evolution.cycle_checkpoint.v3":
             raise RuntimeError("unsupported cycle checkpoint schema")
-        if state["contract"] != contract:
+        if digest(state["contract"]) != digest(contract):
             raise RuntimeError("resume fingerprint mismatch (code/config/data/split/registry changed)")
         CycleJournal._verify_authority(state)
+        CycleJournal._verify_completion(state)
         if state.get("proposing") and "proposal" not in state:
             raise RuntimeError(
                 "proposal call interrupted before persistence; refusing a "
@@ -69,6 +71,35 @@ class CycleJournal:
                 "work_root/registry_dir/ledger_path for a fresh cycle."
             )
         return state
+
+    @staticmethod
+    def _verify_completion(state: dict) -> None:
+        if "completion" not in state:
+            if state.get("status") == "completed":
+                raise RuntimeError("completed checkpoint lacks its completion record")
+            return
+        completion = state["completion"]
+        fields = {"schema_version", "contract_digest", "registry_hash", "report", "report_hash", "event", "digest"}
+        if (not isinstance(completion, dict) or set(completion) != fields
+                or completion["schema_version"] != "evolution.cycle_completion.v1"
+                or state.get("status") != "completed"):
+            raise RuntimeError("invalid checkpoint completion record")
+        payload = {key: value for key, value in completion.items() if key != "digest"}
+        report = completion["report"]
+        registry_hash = completion["registry_hash"]
+        if (completion["digest"] != digest(payload)
+                or completion["contract_digest"] != digest(state["contract"])
+                or not isinstance(report, dict)
+                or completion["report_hash"] != digest(report)
+                or type(report.get("cycle")) is not int
+                or type(state["contract"].get("cycle")) is not int
+                or report["cycle"] != state["contract"]["cycle"]
+                or not isinstance(report.get("state"), str) or not report["state"]
+                or not isinstance(registry_hash, str) or len(registry_hash) != 64
+                or any(char not in "0123456789abcdef" for char in registry_hash)
+                or digest(completion["event"]) != digest({"cycle": report["cycle"], "state": report["state"],
+                                                         "active_registry_hash": registry_hash})):
+            raise RuntimeError("checkpoint completion integrity failure")
 
     @staticmethod
     def _verify_authority(state: dict, *, calibration=None) -> None:
@@ -112,12 +143,22 @@ class CycleJournal:
 
     def save(self, **updates):
         with self.lock:
+            if self._state is None:
+                raise RuntimeError("checkpoint commit is unknown; reopen before reuse")
+            if "completion" in self._state:
+                if updates:
+                    raise RuntimeError("completed checkpoint is immutable")
+                return
+            if "completion" in updates:
+                self._verify_completion({**self._state, **updates})
             self._persist_state(**updates)
 
     def _bind_authority(self, authority):
         with self.lock:
             if self._state is None:
                 raise RuntimeError("checkpoint commit is unknown; reopen before reuse")
+            if "completion" in self._state:
+                raise RuntimeError("completed checkpoint cannot observe a new arm")
             view = None
             if authority is not None or self._state.get("authority") is not None:
                 from detector.conviction_calibration import default_calibration

@@ -202,7 +202,7 @@ def _resume_config(tmp, monkeypatch):
     return cases, config, split, base, overrides
 
 
-def test_resume_after_committed_admission_reverts_its_own_write(tmp_path):
+def test_resume_after_committed_admission_reverts_its_own_write(tmp_path, monkeypatch):
     """A cycle that admitted and then died must be resumable, not wedged.
 
     This is the gap the real interrupted run hit: the admission changed the
@@ -218,14 +218,21 @@ def test_resume_after_committed_admission_reverts_its_own_write(tmp_path):
     proposer = _scripted_proposer(_scanner_candidate())
     backend = MockDetectorBackend(base_predictions=base, overrides=overrides)
     engine = _resume_engine(tmp_path, config, split, backend, proposer)
-    engine._save_cycle_report = lambda *a, **k: (_ for _ in ()).throw(
-        RuntimeError("interrupted after registry write")
-    )
+    import evolution.checkpoint as checkpoint_module
+    real_save = checkpoint_module.save_json
+
+    def fail_before_completion(path, payload):
+        if "completion" in payload:
+            raise RuntimeError("interrupted after registry write")
+        return real_save(path, payload)
+
+    monkeypatch.setattr(checkpoint_module, "save_json", fail_before_completion)
     with pytest.raises(RuntimeError, match="interrupted after registry write"):
         engine.run_cycle(1)
     # The interrupted run really did commit its admission.
     assert [e["intervention_id"] for e in engine.registry.entries] == ["IV-1-001"]
     engine.close()
+    monkeypatch.setattr(checkpoint_module, "save_json", real_save)
 
     resumed = _resume_engine(
         tmp_path, config, split,
