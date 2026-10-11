@@ -28,11 +28,13 @@ score, admit, or reject anything.
 
 from __future__ import annotations
 
-import hashlib
 import json
+import threading
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from detector.identity import digest
+from detector.runtime import contained_path, exclusive_writer, validate_path_id
 from evolution.contracts import append_jsonl, read_jsonl, save_json
 
 EPISODIC_SCHEMA = "evolution.experience.episodic.v1"
@@ -47,6 +49,7 @@ CORRECTION_NAME = "episode_corrections.jsonl"
 CORRECTION_SCHEMA = "evolution.experience.correction.v1"
 
 DEFAULT_RECALL_LIMIT = 3
+_MEMORY_LOCK = threading.RLock()
 
 
 # ----------------------------------------------------------------------
@@ -74,20 +77,29 @@ def _logical_key(record: Mapping[str, Any], fields: Sequence[str]) -> tuple[Any,
     return tuple(record.get(field) for field in fields)
 
 
-def _already_present(
-    path: str | Path,
-    key: tuple[Any, ...],
-    fields: Sequence[str],
-) -> bool:
-    """Whether an equivalent record already exists.
-
-    A resumed cycle replays its writes. Without this check a resume would
-    inflate occurrence counts and make the stores describe a run that never
-    happened.
-    """
-    return any(
-        _logical_key(record, fields) == key for record in read_jsonl(path)
-    )
+def _append_record(path: Path, record: Mapping[str, Any], fields: Sequence[str]) -> dict[str, Any]:
+    owned = json.loads(json.dumps(record, ensure_ascii=False, allow_nan=False))
+    key, content = _logical_key(owned, fields), digest(owned)
+    with _MEMORY_LOCK, exclusive_writer(path.parent):
+        existing = None
+        keys = set()
+        for row in read_jsonl(path):
+            if row.get("schema_version") != owned["schema_version"] or any(
+                field not in row or type(row[field]) is not type(owned[field]) for field in fields
+            ):
+                raise ValueError("memory store contains an unsupported record")
+            identifier = digest(_logical_key(row, fields))
+            if identifier in keys:
+                raise ValueError("memory store contains duplicate logical keys")
+            keys.add(identifier)
+            if _logical_key(row, fields) == key:
+                if digest(row) != content:
+                    raise ValueError("memory replay conflicts with persisted content")
+                existing = row
+        if existing is not None:
+            return existing
+        append_jsonl(path, owned)
+        return owned
 
 
 # ----------------------------------------------------------------------
@@ -135,15 +147,11 @@ def record_episode(
         "treatment_routes": sorted({str(item) for item in treatment_routes}),
         "unevaluable": bool(unevaluable),
     }
-    if _already_present(paths["episodic"], _logical_key(record, _EPISODE_KEY_FIELDS), _EPISODE_KEY_FIELDS):
-        return record
-    append_jsonl(paths["episodic"], record)
-    return record
+    return _append_record(paths["episodic"], record, _EPISODE_KEY_FIELDS)
 
 
 def episode_digest(record: Mapping[str, Any]) -> str:
-    return hashlib.sha256(json.dumps(dict(record), sort_keys=True, ensure_ascii=False,
-                                    separators=(",", ":")).encode("utf-8")).hexdigest()
+    return digest(dict(record))
 
 
 def record_episode_correction(
@@ -155,17 +163,16 @@ def record_episode_correction(
     Hash binding prevents reuse across another run with the same cycle/id.
     Original observations, admission decisions and ledger entries are untouched.
     """
-    paths = _ensure(root)
     target = episode_digest(original)
-    if not any(episode_digest(row) == target for row in read_jsonl(paths["episodic"])):
-        raise ValueError("correction target is not an original episode in this store")
     if not reason.strip() or not evidence.strip():
         raise ValueError("episode correction requires a reason and evidence")
     correction = {"schema_version": CORRECTION_SCHEMA, "target_digest": target,
                   "unevaluable": bool(unevaluable), "reason": reason, "evidence": evidence}
-    if correction not in read_jsonl(paths["corrections"]):
-        append_jsonl(paths["corrections"], correction)
-    return correction
+    paths = _ensure(root)
+    with _MEMORY_LOCK, exclusive_writer(paths["root"]):
+        if not any(episode_digest(row) == target for row in read_jsonl(paths["episodic"])):
+            raise ValueError("correction target is not an original episode in this store")
+        return _append_record(paths["corrections"], correction, tuple(correction))
 
 
 def load_episodes(root: str | Path) -> list[dict[str, Any]]:
@@ -249,10 +256,7 @@ def record_procedure(
         "failure_boundary": str(failure_boundary or ""),
         "evidence": dict(evidence or {}),
     }
-    if _already_present(paths["procedural"], _logical_key(record, ("cycle", "intervention_id")), ("cycle", "intervention_id")):
-        return record
-    append_jsonl(paths["procedural"], record)
-    return record
+    return _append_record(paths["procedural"], record, ("cycle", "intervention_id"))
 
 
 def load_procedures(root: str | Path) -> list[dict[str, Any]]:
@@ -296,12 +300,7 @@ def record_improvement(
         "note": str(note or ""),
         "evidence": dict(evidence or {}),
     }
-    key = (record["cycle"], record["bottleneck"], record["patch_kind"], record["outcome"])
-    fields = ("cycle", "bottleneck", "patch_kind", "outcome")
-    if _already_present(paths["improvement"], key, fields):
-        return record
-    append_jsonl(paths["improvement"], record)
-    return record
+    return _append_record(paths["improvement"], record, ("cycle", "bottleneck", "patch_kind", "outcome"))
 
 
 def load_improvements(root: str | Path) -> list[dict[str, Any]]:
@@ -397,9 +396,15 @@ def write_recall(
     *,
     name: str = RECALL_NAME,
 ) -> dict[str, Any]:
+    validate_path_id(name, nested=False)
+    if Path(name).suffix.lower() != ".json":
+        raise ValueError("recall output must be a JSON snapshot, not an append-only store")
     paths = _ensure(root)
-    save_json(paths["root"] / name, dict(payload))
-    return dict(payload)
+    target = contained_path(paths["root"], name)
+    owned = json.loads(json.dumps(dict(payload), ensure_ascii=False, allow_nan=False))
+    with _MEMORY_LOCK, exclusive_writer(paths["root"]):
+        save_json(target, owned)
+    return owned
 
 
 def memory_summary(root: str | Path) -> dict[str, Any]:

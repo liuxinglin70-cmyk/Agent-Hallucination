@@ -24,11 +24,11 @@
 
 ## 2026-10-09 至 10-11：代码重构离线验证
 
-按用户请求继续完整18包重构，范围和证据见 [实施台账](../IMPLEMENTATION_PLAN.md)。B32实际测量来源消费已提交7f87ac6，bb62955c完整code_only1859/platform57、AST80/三个CLI/源码不变通过，首轮Mock缺来源的失败报告保留。B33注册表唯一提交已提交73a3371，新17项/相关50项及3331d727完整1876/57、AST80/三CLI/源码不变通过，旧分离格式不迁移、历史字节不改。
+按用户请求继续完整18包重构，范围和证据见 [实施台账](../IMPLEMENTATION_PLAN.md)。B33唯一注册表提交已提交73a3371，3331d727完整1876/57通过；B34晋升publication提交/恢复与公共终态已提交2601610，eae68b5b完整1904/57、AST80/三CLI/源码不变通过。首次508b3bca1901/57通过后仍发现公共candidate_status未落盘，两条正式反例补修后重新验证；首轮报告保留。
 
-B34四条正式故障反例先失败后通过：version.json、promotion.json或晋升两个事件持久化失败后，原实现已部署却无完整终态。两种协议现在共用publication提交，将版本、终态和事件与部署绑定；外部文件和账本通过严格身份恢复及幂等追加补齐。新28项/相关134项及末次28项通过。提交前失败不部署，实际替换或事件追加后的OSError/KeyboardInterrupt传播且可恢复；同身份已提交恢复不重测、不重复部署，候选/协议/配置/源码/门集合漂移、既有输出和重封不一致记录拒绝。清空部署保留历史提交记录。临时目录的实际version/promotion写入后KeyboardInterrupt探针也成功恢复，原文件字节保留且两事件各一次。508b3bca第一轮1901/57全量通过；随后两条公共返回/落盘candidate_status不一致反例先失败后补修，公共入口现在直接返回终态生成处已决定状态的报告。最终eae68b5b完整1904/57、AST80/三CLI/源码不变检查通过；[晋升核验](../artifacts/code_quality/eae68b5b3cb516d7f59fbb28e60ed0c4cc3c9a236024a0101df10d7a226c4ef0/ca0828c4d48c48b6a9167d75f3eaa4c1/promotion-commit-verification.md)、[纯代码](../artifacts/code_quality/eae68b5b3cb516d7f59fbb28e60ed0c4cc3c9a236024a0101df10d7a226c4ef0/ca0828c4d48c48b6a9167d75f3eaa4c1/summary.json)、[平台](../artifacts/code_quality/eae68b5b3cb516d7f59fbb28e60ed0c4cc3c9a236024a0101df10d7a226c4ef0/2be24ae26b7f4ac6abd919ef2fb81ae7/summary.json)。
+B35六条重放/并发和五条recall输出边界正式反例先失败后通过。三个实际记忆入口共用_append_record，在线程锁及现有进程租约内校验逻辑键、完整JSON内容与历史结构，检查和追加作为一个操作；同键内容变化拒绝，同键同内容返回实际持久化独立副本。旧_already_present和重复SHA实现删除，episode摘要复用共享digest。纠正记录验证原episode摘要后独立追加，新证据可再分类，原始episode字节不变。recall只写目录内JSON快照，不覆盖JSONL或越界。新44项、相关130项及末次58项/6项通过，覆盖实际Engine、线程竞争/委托上下文、独立进程租约、写入前后OSError/KeyboardInterrupt、JSON类型/非有限值/所有权、未知/重复历史及纠正。ef2ed2ca完整1947/58、AST80/三CLI/源码不变检查通过；[记忆核验](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/430f54e639134c6f8bfffa6d85982d43/memory-commit-verification.md)、[纯代码](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/430f54e639134c6f8bfffa6d85982d43/summary.json)、[平台](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/cbdff2c773744c61b7adc1fcf6a7468f/summary.json)。
 
-B35三种记忆写入入口在临时目录复现：同一逻辑键第二次内容变化时，episodic/procedural/improvement都只有原1条，却返回未落盘的新记录；episode返回unevaluable=False而磁盘仍True。受控两线程在检查后会合、物理追加串行后，三类相同输入均落盘2条，确认检查/追加不是原子操作。正式反例与修复待实施。注册表/晋升/记忆完整生命周期、独立复审及18包验收尚未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。最终脚本/文档清理与doc组会归档仍未完成。
+B36受控临时目录已复现：正式CycleJournal.save在持久化失败时，磁盘仍旧而内存status已completed；实际Mock Engine.run_cycle产生KeyboardInterrupt后，保存interrupted状态抛OSError，调用方观察到OSError而不是原取消对象。正式反例与修复待实施。checkpoint/周期完整生命周期、独立复审及18包验收尚未完成。未运行全量local_data、真实模型、基准或真实演化，不报告准确率或进化收益；历史原始测量和旧校准记录不回写。最终脚本/文档清理与doc组会归档仍未完成。
 
 ## 2026-09-24 至 09-27：三轮自进化与 G0 检测器基线
 
