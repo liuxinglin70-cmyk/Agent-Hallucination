@@ -6,9 +6,9 @@
 |---|---|
 | 当前任务 | 根据本次用户请求恢复完整18包代码重构；按Pristine逐根因修复、离线验证并最终整理doc、README及实验日志 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | M09–M12共24项条件核验及生产入口核查，相关276项通过；M09排序/身份和M10投影/M11输出合同probe通过。M01–M12累计74项条件已绑定当前AST和实际JUnit。源码仍为4512647c，沿用同源完整2076/58及AST80/三CLI证据，本轮没有重跑完整组或修改生产源码。四包待审查，完整18包未验收。[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m09_m12_6d818e7df9164049a69fe23de32c6bb9/task-card-review.json)、[本轮回归](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m09_m12_6d818e7df9164049a69fe23de32c6bb9/summary.json)、[实际入口](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m09_m12_6d818e7df9164049a69fe23de32c6bb9/production-entry-check.json)。 |
-| 代码实施 | M00已验收；M01–M12已逐项核对当前条件，M09–M12进入待审查；固定源码独立审查及最终清理未闭合，M13–M17继续核验 |
-| 下一工作包 | M13–M17：核对backend/cache/harness、开发门、完整生命周期及CLI/打包条件；随后完成5条公开合同、全局冗余清理与固定源码独立复审。 |
+| 本轮已完成 | M13–M17新增33项当前功能条件绑定实际定义及已通过JUnit；累计107项限定自检，另列M17最终验收门未完成。实际M13缓存/scorer/未决probe通过，preview/cycle/开发服务及仓库外wheel功能证据已核对。源码仍4512647c，沿用同源2076/58、AST80/三CLI报告，本轮未改生产源码或重跑完整组。隐式工件周期冻结声明待核销，18包未验收。[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/task-card-review.json)、[范围记录](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/summary.json)、[未证合同](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/remaining-contracts.json)。 |
+| 代码实施 | M00已验收；M01–M17当前功能条件已有映射，M14–M16待审查；M13隐式工件周期声明、M17最终清理/独立审查/完整验收仍未闭合 |
+| 下一工作包 | 先追踪M13整周期隐式工件冻结声明的真实消费者，再核销5条公开合同与全局冗余/技术文档；完成固定源码独立复审和完整18包验收。 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
 | 更新时间 | 2026-10-11，Asia/Shanghai |
 
@@ -219,11 +219,11 @@ evolution/
 | M10 | 实际依赖图与闭包 | M02/M03/M09 | 2–3 | 待审查 | 六项条件核对：实际来源/时序、词面不产生消费、字段/路径绑定、分支及旧值复用、图/投影预算未知、身份和独立投影。前向同claim声明路径与后向候选闭包职责不同，保留各自字段状态和权限。 相关276通过，源码不变；当前完整2076/58证据仍有效，独立审查和最终清理未完成；[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m09_m12_6d818e7df9164049a69fe23de32c6bb9/task-card-review.json) |
 | M11 | 有界因果审计与 shadow | M04/M06/M09/M10 | 2–3 | 待审查 | 六项条件核对：局部证书无裁决权、模型hypothesis与闭合schema、共享准入预算、shadow基础证据、终止合同及输入/成本身份；另8个schema/范围/限额probe拒绝非法模型输出。 相关276通过，源码不变；当前完整2076/58证据仍有效，独立审查和最终清理未完成；[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m09_m12_6d818e7df9164049a69fe23de32c6bb9/task-card-review.json) |
 | M12 | 定位上下文及受控阴性反馈 | M05/M06/M11 | 3–4 | 待审查 | 六项条件核对：同claim重算、hearing/Tracer正式入口、上下文回放/repair预算、无校准生产不触发、显式离线策略单次全链、预算及fatal/cancel保留基础证据。 相关276通过，源码不变；当前完整2076/58证据仍有效，独立审查和最终清理未完成；[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m09_m12_6d818e7df9164049a69fe23de32c6bb9/task-card-review.json) |
-| M13 | Backend、缓存、harness与回放合同 | M01/M06/M12 | 2–3 | 实施中 | fresh快照caea1a8独立39通过；共享replay固定复核101通过/1失败，外部API full-view P1完整/仅hearings共4正式反例修复，相关155通过，7e45ecb固定复核独立38+相关120通过。周期已消费校准身份统一绑定/恢复验证，相关50/f2a1933全量1521通过，a85edf6校准加载/绑定/落盘核验固定独立14+相关42通过。preflight e1632be相关43、晋升13c91f4身份/manifest相关120通过，晋升固定复核发现空路径P2、正式2反例修复及相关96通过，9efeb41修复固定回归132+独立11通过，原P2核销；完整包验收未完成 |
-| M14 | 因果失败族、机制、能力和提案 | M11/M12/M13 | 3–4 | 实施中 | 同claim/共用准备/开发适配已接通；B31固定提交65dde2c，B32实际门控/报告/当前范围能力规划来源校验已修复，缺/错/复用/冻结/配置漂移只作诊断，Mock显式synthetic隔离。新29项，bb62955c完整1859/57/AST80/CLI/源码不变通过；[来源消费核验](artifacts/code_quality/bb62955c9975b2d276619d14a6863f1825ff2c56262a91a7ee9f885eb7a9be47/2ce1ae1a9bb7420aa8ff53e802459a1c/route-observation-verification.md)、[纯代码](artifacts/code_quality/bb62955c9975b2d276619d14a6863f1825ff2c56262a91a7ee9f885eb7a9be47/2ce1ae1a9bb7420aa8ff53e802459a1c/summary.json)、[平台](artifacts/code_quality/bb62955c9975b2d276619d14a6863f1825ff2c56262a91a7ee9f885eb7a9be47/be78baf9601c44cb852d32096c49dceb/summary.json)。B31/B32独立复审及完整包核验待完成 |
-| M15 | 开发、指标、覆盖、四门和晋升 | M00；集成依赖 M13/M14 | 3–4 | 实施中 | B09 已关闭；B10/B11 已实现：confusion_rows 拥有 expected coverage，check_l1 将缺覆盖/非法读值/不健康判为未测，定位回退要求基线原本命中；9dbf358 相关 87 项、独立 17 项通过，B10/B11 关闭；B14 指标 outcome 已接入周期收益集合及路线反馈，d14e5f9：182 项扩展回归/AST 67 文件及独立 22 项通过，B14 关闭；普通定位/联合单位提前机会检查已迁移 target_opportunity；ce6777d：18 个普通/替换/定位/联合入口用例及相关 136 项回归、独立 18 项通过，无阻断；B34晋升publication提交与公共终态真源修复待审查，新28项及相关134项/末次28项通过，eae68b5b完整1904/57、AST80/CLI/源码不变通过；[晋升核验](artifacts/code_quality/eae68b5b3cb516d7f59fbb28e60ed0c4cc3c9a236024a0101df10d7a226c4ef0/ca0828c4d48c48b6a9167d75f3eaa4c1/promotion-commit-verification.md)、[纯代码](artifacts/code_quality/eae68b5b3cb516d7f59fbb28e60ed0c4cc3c9a236024a0101df10d7a226c4ef0/ca0828c4d48c48b6a9167d75f3eaa4c1/summary.json)、[平台](artifacts/code_quality/eae68b5b3cb516d7f59fbb28e60ed0c4cc3c9a236024a0101df10d7a226c4ef0/2be24ae26b7f4ac6abd919ef2fb81ae7/summary.json)；完整门集成待完成 |
-| M16 | 周期编排、状态、registry 与记忆 | M13/M14/M15 | 3–5 | 实施中 | B33注册表提交73a3371、B34晋升提交2601610、B35记忆提交8fe5145、B36 checkpoint提交52b8f92、B37完成发布提交52d7d56。B38私有周期历史、公开独立快照与按请求聚合/验证集消费者实现，新15项/扩大相关182项，5cc27418完整2014/58、AST80/三CLI/源码不变通过；完整生命周期及独立包审查未完成；[聚合快照核验](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/43877f48f3ee44b6865706ee9a5f86f9/experiment-snapshot-verification.md)、[纯代码](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/43877f48f3ee44b6865706ee9a5f86f9/summary.json)、[平台](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/a1f30cad16cf4c0f992896904c8a3f53/summary.json) |
-| M17 | CLI/打包/脚本、全局清理与交付审查 | M00–M16 | 2–3 | 实施中 | CLI/measurement/snapshot/实际身份已实现；023c516完整1457通过。效果/健康独立9场景/63项核销；六脚本cfb461c独立25、相关64通过。前缀导出与加载共用验证，父/当前/选择身份独立、排除角色保留、实际标签计数，5反例修复及独立16通过/1失败；悬空链接源头修复相关43通过；全量1506通过/2旧测试失败，测试已迁移正式合同相关27通过；f5163e0固定复核17+2/相关26通过；f2a1933全量1521通过；剩余清理和最终归档待完成 |
+| M13 | Backend、缓存、harness与回放合同 | M01/M06/M12 | 2–3 | 实施中 | 6项当前身份/回放/缓存/harness/checkpoint条件已核对，实际scorer变更使两层缓存失效、未决磁盘缓存不保存probe通过；周期隐式工件冻结声明仍待追踪消费者核销。 同源完整2076/58及AST80/三CLI证据仍有效；最终消费者/清理和独立复审未完成；[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/task-card-review.json) |
+| M14 | 因果失败族、机制、能力和提案 | M11/M12/M13 | 3–4 | 待审查 | 6项条件核对同claim viability、机制身份、共用准备、真实proposer投影、独立修订及适用能力/观察；部署/提案无目标答案的实际断言通过。 同源完整2076/58及AST80/三CLI证据仍有效；最终消费者/清理和独立复审未完成；[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/task-card-review.json) |
+| M15 | 开发、指标、覆盖、四门和晋升 | M00；集成依赖 M13/M14 | 3–4 | 待审查 | 7项条件核对两臂expected覆盖、定位回退、L0/L1触发/保护/预算、共用目标读数、冻结身份、四门及publication公共终态；正式合成准入/拒绝/不可测回归已执行。 同源完整2076/58及AST80/三CLI证据仍有效；最终消费者/清理和独立复审未完成；[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/task-card-review.json) |
+| M16 | 周期编排、状态、registry 与记忆 | M13/M14/M15 | 3–5 | 待审查 | 8项条件核对共同准备/开发服务、registry CAS、ledger/记忆幂等、checkpoint原子性、completion恢复、独立测量epoch、请求聚合和writer/闭环生命周期；真实Fake入口断言已执行。 同源完整2076/58及AST80/三CLI证据仍有效；最终消费者/清理和独立复审未完成；[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/task-card-review.json) |
+| M17 | CLI/打包/脚本、全局清理与交付审查 | M00–M16 | 2–3 | 实施中 | 6项功能条件核对arm/policy、measurement/prefix、仓库外wheel正式CLI、共同snapshot、统计口径和离线/AST边界；最终清理、固定源码独立审查及18包验收门仍未完成。 同源完整2076/58及AST80/三CLI证据仍有效；最终消费者/清理和独立复审未完成；[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/task-card-review.json) |
 
 估计为熟悉仓库的工程实现与离线审查，不含任何模型实验。简单累计约 39–58 人日；经边界明确的并行实现可缩短日历时间，但共享 API/合同/identity/engine 文件须串行合入。发现新根因时在对应任务改范围和估计，禁止为守日期跳过验收。
 
@@ -516,29 +516,29 @@ python -m experiments --help
 
 ### 10.3 当前固定源码验收映射
 
-源码`4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4`，生产代码提交`3f92899`；完整纯代码2076项、平台58项、AST80/三CLI/源码不变通过。本轮生产源码未改，相关276项再核查M09–M12并完成直接合同probe；M01–M12的74个条件绑定当前定义和实际JUnit。完整组沿用同源报告，不重复测试；子集重叠不可相加，自检不替代独立审查及最终清理。
-机器索引：[当前18包执行子集](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m09_m12_6d818e7df9164049a69fe23de32c6bb9/acceptance-inventory.json)；[M01–M12的74个条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m09_m12_6d818e7df9164049a69fe23de32c6bb9/task-card-review.json)；[四包实际入口](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m09_m12_6d818e7df9164049a69fe23de32c6bb9/production-entry-check.json)；[M09排序及身份](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m09_m12_6d818e7df9164049a69fe23de32c6bb9/m09-ordering-identity-probe.json)；[M10/M11合同](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m09_m12_6d818e7df9164049a69fe23de32c6bb9/m10-m11-contract-probe.json)。M07重构及B41等原验证证据保留在原报告和Git；任务卡未全部验收。
+源码`4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4`，生产代码提交`3f92899`；完整2076项纯代码、58项平台及AST80/三CLI/源码不变通过。本轮未改生产源码，继续复用同源实际JUnit并完成M13缓存probe。M01–M17共108个条件已映射，其中107个为当前功能限定自检，M17最终清理/独立审查/18包验收门未完成；M13整周期隐式工件声明另行核销。子集重叠不可相加，限定自检不等同每包完整验收。
+机器索引：[当前18包执行子集](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/acceptance-inventory.json)；[107项功能自检及未完成最终门](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/task-card-review.json)；[服务消费者与缓存边界](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/production-entry-check.json)；[M13实际缓存probe](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/m13-cache-input-probe.json)；[未证周期合同](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/acceptance_m13_m17_ac4b1de387ac460e8e8c2731881f5c94/remaining-contracts.json)。此前M07及M09–M12等原证据保留原报告和Git。
 
 | 包 | 当前真源 | 已执行子集（纯代码/平台） | 剩余验收 |
 |---|---|---:|---|
 | M00 | [verify.py](scripts/verify.py)、[source_audit.py](scripts/source_audit.py)、[conftest.py](conftest.py) | 34/2 | 已验收基线；最终全局扫描和审查仍覆盖 |
-| M01 | [config.py](detector/config.py)、[identity.py](detector/identity.py) | 107/0 | 任务卡已逐条自检；当前固定源码独立审查及最终消费者核销 |
-| M02 | [packet.py](detector/packet.py) | 52/1 | 任务卡已逐条自检；当前固定源码独立审查及最终消费者核销 |
-| M03 | [evidence.py](detector/evidence.py)、[predicate_context.py](detector/predicate_context.py)、[predicate_dsl.py](detector/predicate_dsl.py)、[conviction_calibration.py](detector/conviction_calibration.py) | 129/0 | B39–B41规则修复待审查；最终清理/消费者及独立复审 |
-| M04 | [provider.py](detector/provider.py)、[provider_worker.py](detector/provider_worker.py)、[runtime.py](detector/runtime.py) | 58/2 | 6项条件已映射；最终消费者/清理及独立审查未完成 |
-| M05 | [judge.py](detector/judge.py)、[recaller.py](detector/recaller.py)、[step_tracer.py](detector/step_tracer.py)、[defense.py](detector/defense.py) | 79/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M06 | [api.py](detector/api.py)、[hearing.py](detector/hearing.py)、[replay.py](detector/replay.py)、[adjudication.py](detector/adjudication.py) | 88/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M07 | [interventions.py](detector/interventions.py)、[sandbox.py](evolution/sandbox.py) | 113/42 | 条件已映射；M07绑定重复已核销，其他清理及独立复审未完成 |
-| M08 | [runner.py](detector/runner.py)、[measurement.py](detector/measurement.py)、[evaluation.py](detector/evaluation.py) | 61/0 | 条件已映射；M07绑定重复已核销，其他清理及独立复审未完成 |
-| M09 | [step_uncertainty.py](detector/step_uncertainty.py)、[causal_contracts.py](detector/causal_contracts.py) | 53/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M10 | [causal_graph.py](detector/causal_graph.py) | 75/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M11 | [causal_audit.py](detector/causal_audit.py) | 97/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M12 | [causal_task.py](detector/causal_task.py)、[hearing.py](detector/hearing.py)、[api.py](detector/api.py) | 101/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M13 | [backends.py](evolution/backends.py)、[harness.py](evolution/harness.py)、[checkpoint.py](evolution/checkpoint.py) | 62/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M14 | [causal_failures.py](evolution/causal_failures.py)、[cycle_preparation.py](evolution/cycle_preparation.py)、[development_adapter.py](evolution/development_adapter.py)、[capability_planning.py](evolution/capability_planning.py)、[proposer.py](evolution/proposer.py) | 88/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M15 | [development.py](evolution/development.py)、[metrics.py](evolution/metrics.py)、[gates.py](evolution/gates.py)、[promotion.py](evolution/promotion.py)、[candidate_versions.py](evolution/candidate_versions.py) | 169/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M16 | [engine.py](evolution/engine.py)、[registry.py](evolution/registry.py)、[ledger.py](evolution/ledger.py)、[memory.py](evolution/memory.py)、[route_failures.py](evolution/route_failures.py) | 259/1 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M17 | [__main__.py](experiments/__main__.py)、[runner.py](experiments/runner.py)、[reading.py](experiments/reading.py)、[pyproject.toml](pyproject.toml)、[freeze_measured_prefix.py](scripts/freeze_measured_prefix.py) | 69/6 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M01 | [config.py](detector/config.py)、[identity.py](detector/identity.py) | 107/0 | 6项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M02 | [packet.py](detector/packet.py) | 52/1 | 6项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M03 | [evidence.py](detector/evidence.py)、[predicate_context.py](detector/predicate_context.py)、[predicate_dsl.py](detector/predicate_dsl.py)、[conviction_calibration.py](detector/conviction_calibration.py) | 129/0 | 7项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M04 | [provider.py](detector/provider.py)、[provider_worker.py](detector/provider_worker.py)、[runtime.py](detector/runtime.py) | 58/2 | 6项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M05 | [judge.py](detector/judge.py)、[recaller.py](detector/recaller.py)、[step_tracer.py](detector/step_tracer.py)、[defense.py](detector/defense.py) | 79/0 | 6项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M06 | [api.py](detector/api.py)、[hearing.py](detector/hearing.py)、[replay.py](detector/replay.py)、[adjudication.py](detector/adjudication.py) | 88/0 | 7项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M07 | [interventions.py](detector/interventions.py)、[sandbox.py](evolution/sandbox.py) | 113/42 | 6项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M08 | [runner.py](detector/runner.py)、[measurement.py](detector/measurement.py)、[evaluation.py](detector/evaluation.py) | 61/0 | 6项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M09 | [step_uncertainty.py](detector/step_uncertainty.py)、[causal_contracts.py](detector/causal_contracts.py) | 53/0 | 6项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M10 | [causal_graph.py](detector/causal_graph.py) | 75/0 | 6项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M11 | [causal_audit.py](detector/causal_audit.py) | 97/0 | 6项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M12 | [causal_task.py](detector/causal_task.py)、[hearing.py](detector/hearing.py)、[api.py](detector/api.py) | 101/0 | 6项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M13 | [backends.py](evolution/backends.py)、[harness.py](evolution/harness.py)、[checkpoint.py](evolution/checkpoint.py) | 62/0 | 6项当前功能条件已映射；隐式工件周期声明、最终消费者/清理及固定源码独立审查未完成 |
+| M14 | [causal_failures.py](evolution/causal_failures.py)、[cycle_preparation.py](evolution/cycle_preparation.py)、[development_adapter.py](evolution/development_adapter.py)、[capability_planning.py](evolution/capability_planning.py)、[proposer.py](evolution/proposer.py) | 88/0 | 6项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M15 | [development.py](evolution/development.py)、[metrics.py](evolution/metrics.py)、[gates.py](evolution/gates.py)、[promotion.py](evolution/promotion.py)、[candidate_versions.py](evolution/candidate_versions.py) | 169/0 | 7项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M16 | [engine.py](evolution/engine.py)、[registry.py](evolution/registry.py)、[ledger.py](evolution/ledger.py)、[memory.py](evolution/memory.py)、[route_failures.py](evolution/route_failures.py) | 259/1 | 8项当前功能条件已映射；最终消费者/清理及固定源码独立审查未完成 |
+| M17 | [__main__.py](experiments/__main__.py)、[runner.py](experiments/runner.py)、[reading.py](experiments/reading.py)、[pyproject.toml](pyproject.toml)、[freeze_measured_prefix.py](scripts/freeze_measured_prefix.py) | 69/6 | 6项当前功能条件已映射；最终验收门、最终消费者/清理及固定源码独立审查未完成 |
 
 测试类和全部逐例结果见机器索引及原summary.json/pytest.xml；local_data和真实实验未运行，未记为通过。
 
@@ -559,9 +559,9 @@ python -m experiments --help
 四项检查点（就地覆盖）：
 
 - **当前任务**：按本次用户请求继续完整18包重构，遵守Pristine；整体完成后核销冗余脚本/文档、整合doc并将组会材料置于子目录。
-- **进度**：M09–M12的24项条件/入口已核对，相关276项及排序/身份/投影/schema直接probe通过；M01–M12累计74项条件映射。生产源码仍为3f92899/4512647c，沿用同源2076/58、AST80/三CLI验证；独立审查及最终包验收未完成。
-- **下一步**：M13–M17逐项核对真实缓存/恢复身份、门及完整生命周期/CLI；随后核销5条公开合同与全局冗余，固定源码独立复审。
-- **未定事项**：18包未完成；当前固定源码独立复审、B32–B41及M07最终审查未闭合，只读子代理授权未收到。M13–M17、5条公开合同和最终清理继续核销。只读条件核验不证明真实检测或进化收益，历史数据/校准/报告/正文保留。
+- **进度**：M13–M17新增33项当前功能条件核对，累计107项限定自检及1项未完成最终门；实际M13缓存/scorer/未决probe通过，服务/周期闭环及仓库外wheel证据已核对。源码仍3f92899/4512647c，沿用同源2076/58、AST80/三CLI报告；未改生产源码或重复全套测试。
+- **下一步**：核销M13整个周期隐式能力工件冻结声明，逐一追踪当前消费者；随后核销5条公开合同、全局冗余/技术文档，再完成固定源码独立复审。
+- **未定事项**：18包未完整验收；M13周期合同声明尚未证实已完成或过时，5条公开合同、全局清理及固定源码独立审查未闭合，只读子代理授权未收到。限定自检不证明真实收益；原数据/校准/报告/实验正文保留，不做真实模型或重测。
 
 ## 12. 本期最终完成与延期项
 
