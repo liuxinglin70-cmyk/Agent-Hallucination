@@ -210,7 +210,7 @@ def test_shipped_recall_budget_cannot_truncate_on_glm():
 
 
 def test_shipped_case_budget_fits_a_measured_long_trajectory():
-    # Measured on 2026-09-18 (scripts/diagnostic_019_timing.py): the
+    # Measured on 2026-09-18 (historical timing script at Git a6318f4): the
     # SmolAgents/019 trajectory needs 1480 seconds end to end with generous
     # per-call budgets. At the old 900-second case deadline its judge votes
     # consumed the budget, the tracer and defense never started, and the row

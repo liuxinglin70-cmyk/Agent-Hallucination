@@ -6,15 +6,15 @@
 |---|---|
 | 当前任务 | 根据本次用户请求恢复完整18包代码重构；按Pristine逐根因修复、离线验证并最终整理doc、README及实验日志 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | B37周期完成提交52d7d56，159e505a完整1999/58通过。B38九条快照/范围正式反例及一条零周期验证集反例先失败后修复；周期历史私有，公开历史为独立快照，无整体替换入口，聚合结果取本次请求实际完成记录；零/前缀请求及验证集消费者同步。旧共享可变历史、全历史统计、重复JSON复制、未用局部导入和冗余别名已删除。新15项及首轮相关34项通过；扩大相关182项及5cc27418完整2014/58、AST80/三CLI/源码不变通过。独立复审与18包验收未完成。；[聚合快照核验](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/43877f48f3ee44b6865706ee9a5f86f9/experiment-snapshot-verification.md)、[纯代码](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/43877f48f3ee44b6865706ee9a5f86f9/summary.json)、[平台](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/a1f30cad16cf4c0f992896904c8a3f53/summary.json) |
+| 本轮已完成 | M00–M17生产真源与已执行测试子集已映射；M01/M02的12个任务卡条件已逐条核对实现与实际通过断言，仍待独立审查及最终消费者核销。九个接口签名按现实现就地更新。固定Pristine扫描223条已分类，5条活跃读值/提案合同待审查。删除被execution记录取代的单案例计时脚本；两份组会材料移到doc/group-meetings并修复链接，旧组会工作区字节和历史实验正文保留。清理后f6da71cd完整2014/58、AST80/三CLI/源码不变通过。完整18包尚未验收；[逐条核验](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/task-card-review.json)、[纯代码](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/summary.json)、[平台](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/94d007059f4e4343b5b14e43ec474f30/summary.json)、[清理核销](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/pristine_7364d0706e934ed3921bac5b35f9fb46/cleanup-inventory.json) |
 | 代码实施 | M00已验收；M14/M16实际因果消费及共用准备职责实施中；M02/M03及本轮修改待独立复审；其余包按§6状态 |
-| 下一工作包 | 逐项映射M00–M17验收要求、实际入口、测试和审查证据，再核销清理及doc组会归档。 |
+| 下一工作包 | 从M03任务卡继续逐条验收；核对M01摘要职责及扫描中5条活跃合同，授权到达后执行固定源码独立审查。 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
 | 更新时间 | 2026-10-11，Asia/Shanghai |
 
 本文件是本轮工作的唯一计划、任务状态和续接入口。每次实施结束就地更新表格、缺陷状态和四项检查点，提交历史由 Git 保留，不另建 progress、日报或计划副本。
 
-源材料：[研究设计](docs/uncertainty-guided-causal-audit-design-20261008.md)、[组会说明](docs/group-meeting-uncertainty-causal-feedback-20261008.md)、[当前实现合同](docs/technical-solution.md)。研究设计描述目标，当前实现合同描述已落地行为，本台账描述实施工作。实现完成后同步更新当前实现合同，避免把拟议接口写成已上线功能。
+源材料：[研究设计](docs/uncertainty-guided-causal-audit-design-20261008.md)、[组会说明](doc/group-meetings/group-meeting-uncertainty-causal-feedback-20261008.md)、[当前实现合同](docs/technical-solution.md)。研究设计描述目标，当前实现合同描述已落地行为，本台账描述实施工作。实现完成后同步更新当前实现合同，避免把拟议接口写成已上线功能。
 
 ## 1. 范围、完成定义与默认决策
 
@@ -201,8 +201,8 @@ evolution/
 | ID | 工作包 | 前置 | 预计人日 | 状态 | 最新证据/提交/审查 |
 |---|---|---|---:|---|---|
 | M00 | 离线验证、合同基线、静态清理机制 | 本台账 | 1–2 | 已验收 | 4000669；4fcffecc/68845067：code_only 1020、AST/三 CLI 检查退出 0；平台 97f55299/8f21461a 52 通过；独立只读审查 review_4000669（12 项反例通过，无阻断） |
-| M01 | 配置与执行身份真源 | M00 | 2–3 | 实施中 | config.validate_config 为文件/直接配置唯一入口，causal 块保留且默认 off；数字范围/未知键/工件缺失验证；c58a147 配置独立 69 项通过；identity.py 已供 packet/api/runner 共用，B05 三项反例修复后 detector/repository/offline/backend/env 共 469 通过、5 未选，AST 67 文件通过；演化 backend baseline/cache 已绑定实际配置、record/packet、evidence、registry/replay 与完整源码；eb49756：2 项旧缓存反例先失败后通过，扩展 143 项及 backend 20 项、独立 34 项/3 个篡改缓存反例通过；harness.v2/checkpoint.v2/审计消费实际 backend runtime 身份，完成报告复用的 3 个漂移反例先失败后通过，64c1919：扩展 133 项及最终相关 55 项/AST 67 文件、独立 7 项通过，无新增阻断；preflight正式JSON保存规范完整source_identity和实际配置工件身份，缺声明配置阻断；2反例修复/相关43通过；旧file_digest删除。晋升13c91f4共享完整摘要/manifest.v2验证7反例修复与相关120通过；固定复核空工件路径P2已正式2反例修复，共享写者/读者路径约束，相关96通过，9efeb41固定回归132+独立11通过；当前811662f完整code_only1568/platform57通过，完整包验收未完成 |
-| M02 | Packet、投影、事件引用规范 | M00 | 2–3 | 待审查 | 本轮B19交付锚点变更待复审，原验收： 565f191；detector 326、跨包 41、AST 66 文件通过；独立 review_offline_review 39 项通过，无阻断；window v2 技术合同已同步 |
+| M01 | 配置与执行身份真源 | M00 | 2–3 | 实施中 | validate_config与execution_identity.v2为当前真源，case/baseline/cache/run resume及harness/checkpoint实际消费；6个任务卡条件按实现和通过断言核对，见[逐条核验](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/task-card-review.json)。f6da71cd完整2014/58及AST80/三CLI/源码不变通过；域摘要职责与历史/公开合同清理、当前固定源码独立审查仍待核销 |
+| M02 | Packet、投影、事件引用规范 | M00 | 2–3 | 待审查 | packet为position/source_step_id、引用归属及window.v2投影真源；B03已关闭，B19交付锚点修复已提交94ee8a2。6个任务卡条件逐条核对前后target、内容摘要/独立投影、截断、混合角色和label防火墙，见[逐条核验](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/task-card-review.json)。f6da71cd完整2014/58通过；当前固定源码独立复审及最终消费者核销未完成 |
 | M03 | 外部证据、谓词与引用权限 | M02 | 1–2 | 待审查 | B15–B21工作区修复；25项反例修复前失败，相关197通过、保留审查反例107通过；32305600全量code_only1612/platform57、AST/三CLI/源码不变通过。原始校准只读1项通过，全量local_data未运行；[证据](artifacts/code_quality/3230560000323f618f1cb091b7828e7ee9865ade6d0995c050d4725e896c7de7/5a9d5885d7a644fea94144de396263cb/m03-review.md)，独立实施审查未完成 |
 | M04 | Provider、并发、预算、取消、请求记录 | M00 | 2–3 | 实施中 | B04/B06 已关闭；8082ee9 新增预算共享且跨重试不重领；全运行 RunStopped 与案例 CaseDeadlineExceeded 分型，取消不再被 provider/backend 转成案例失败；两个反例先失败后通过，相关 85 项、扩展 584 项、AST 71 文件通过；recaller/defense重复forwarding已删除，直接消费provider_call的统一cache_tag签名，snapshot完整摘要覆盖初次/repair，6反例修复后相关158通过；模块完整收尾/复核待完成 |
 | M05 | Judge/Recall/Tracer/Defense 阶段合同 | M03/M04 | 2–3 | 实施中 | hearing完整目标与Recall输入隔离已相关243及固定独立30+相关111通过；38b6f56删除重复forwarding并传递完整snapshot tag，相关158通过，固定审查54+141通过但报告额度中断未完成；B22 quote归属工作区修复待审查，18项反例先失败、新增35项合同用例与相关130通过；8d0bfde1 code_only1647/platform57、AST/三CLI/源码不变通过，[核验](artifacts/code_quality/8d0bfde1423f93a3f055018bf4f9a3d17863e7f19c423b1b79cd6c2b5293850d/646fda2adeb74b3a9a4976106694e66a/m05-verification.md)；B24失败类型保留、Defense补票共用唯一汇总规则，3项反例先失败、相关84通过；5b085a08 code_only1667/platform57及AST/三CLI/源码不变通过，完整包验收待继续 |
@@ -374,19 +374,21 @@ B13 的 reducer 真源由 M16 在 `route_failures.py` 维护；B14 的目标 out
 
 ### 8.1 最小接口
 
-下列为待实现签名。实现时采用现有 Mapping/dict 或必要的 dataclass，不为形式引入大型 schema 框架。
+以下为当前生产接口，已核对真实定义与调用；版本化字段由§8.2及生产验证器负责。完整验收状态见§10.3，不把函数存在当作整包验收。
 
 ```python
 validate_causal_config(raw, *, base_dir) -> dict
-build_execution_identity(inputs) -> dict
+build_execution_identity(*, source, config, record, packet, evidence=None,
+                         registry=None, replay=None, authority=None) -> dict
 build_step_risk_profile(packet, *, policy, context=None, snapshot=None) -> dict
 select_causal_candidates(profile, *, mandatory_event_ids, policy) -> dict
 build_observed_dependencies(packet, *, policy) -> dict
 project_dependency_closure(packet, *, candidates, graph, policy) -> dict
 run_causal_audit(*, packet, profile, projection, target=None,
-                 snapshot=None, config, budget) -> tuple[dict, dict]
+                 snapshot=None, context=None, config, budget) -> tuple[dict, dict]
 context_for_hearing(audit, *, positive, packet, policy) -> dict | None
-causal_recall_decision(audit, *, judge_result, policy, budget) -> dict
+causal_recall_decision(audit, *, judge_result, policy, budget,
+                      offline_policy=None) -> dict
 ```
 
 公用输入引用/摘要使用既有 packet/evidence 规则。`supported` 候选的验证器、作用范围和证据必须可重放；图的确定性结构可 verified，未核验语义边只 hypothesis。模型预测的后续行为不标为执行验证。
@@ -506,6 +508,36 @@ python -m experiments --help
 4. 独立审查已处理，证据包含实际测试范围、命令、结果、源码/提交与剩余限制。
 5. 本台账与技术合同只报告实际完成；没有实验也不要求实验收益作为代码门。
 
+### 10.3 当前固定源码验收映射
+
+源码`f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66`；相对提交`a6318f4`的代码清理仅删除失效计时脚本并更新测试中的历史来源说明。已核对定义/消费点，并按当前JUnit逐例记录核对下列测试子集；完整纯代码2014项、平台58项通过。子集互相重叠，不可相加；入口存在/测试通过不等于任务卡全部条件已核销，§10.2五项门及独立审查仍逐包执行。
+机器索引：[验收映射](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/acceptance-inventory.json)；[M01/M02逐条核验](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/task-card-review.json)。
+
+| 包 | 当前真源 | 已执行子集（纯代码/平台） | 剩余验收 |
+|---|---|---:|---|
+| M00 | [verify.py](scripts/verify.py)、[source_audit.py](scripts/source_audit.py)、[conftest.py](conftest.py) | 34/2 | 已验收基线；最终全局扫描和审查仍覆盖 |
+| M01 | [config.py](detector/config.py)、[identity.py](detector/identity.py) | 107/0 | 任务卡已逐条自检；当前固定源码独立审查及最终消费者核销 |
+| M02 | [packet.py](detector/packet.py) | 52/1 | 任务卡已逐条自检；当前固定源码独立审查及最终消费者核销 |
+| M03 | [evidence.py](detector/evidence.py)、[predicate_context.py](detector/predicate_context.py)、[predicate_dsl.py](detector/predicate_dsl.py)、[conviction_calibration.py](detector/conviction_calibration.py) | 67/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M04 | [provider.py](detector/provider.py)、[provider_worker.py](detector/provider_worker.py)、[runtime.py](detector/runtime.py) | 58/2 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M05 | [judge.py](detector/judge.py)、[recaller.py](detector/recaller.py)、[step_tracer.py](detector/step_tracer.py)、[defense.py](detector/defense.py) | 79/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M06 | [api.py](detector/api.py)、[hearing.py](detector/hearing.py)、[replay.py](detector/replay.py)、[adjudication.py](detector/adjudication.py) | 88/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M07 | [interventions.py](detector/interventions.py)、[sandbox.py](evolution/sandbox.py) | 53/42 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M08 | [runner.py](detector/runner.py)、[measurement.py](detector/measurement.py)、[evaluation.py](detector/evaluation.py) | 61/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M09 | [step_uncertainty.py](detector/step_uncertainty.py)、[causal_contracts.py](detector/causal_contracts.py) | 53/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M10 | [causal_graph.py](detector/causal_graph.py) | 75/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M11 | [causal_audit.py](detector/causal_audit.py) | 97/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M12 | [causal_task.py](detector/causal_task.py)、[hearing.py](detector/hearing.py)、[api.py](detector/api.py) | 101/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M13 | [backends.py](evolution/backends.py)、[harness.py](evolution/harness.py)、[checkpoint.py](evolution/checkpoint.py) | 62/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M14 | [causal_failures.py](evolution/causal_failures.py)、[cycle_preparation.py](evolution/cycle_preparation.py)、[development_adapter.py](evolution/development_adapter.py)、[capability_planning.py](evolution/capability_planning.py)、[proposer.py](evolution/proposer.py) | 88/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M15 | [development.py](evolution/development.py)、[metrics.py](evolution/metrics.py)、[gates.py](evolution/gates.py)、[promotion.py](evolution/promotion.py)、[candidate_versions.py](evolution/candidate_versions.py) | 169/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M16 | [engine.py](evolution/engine.py)、[registry.py](evolution/registry.py)、[ledger.py](evolution/ledger.py)、[memory.py](evolution/memory.py)、[route_failures.py](evolution/route_failures.py) | 259/1 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M17 | [__main__.py](experiments/__main__.py)、[runner.py](experiments/runner.py)、[reading.py](experiments/reading.py)、[pyproject.toml](pyproject.toml)、[freeze_measured_prefix.py](scripts/freeze_measured_prefix.py) | 69/6 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+
+测试类和全部逐例结果见机器索引及原summary.json/pytest.xml；local_data和真实实验未运行，未记为通过。
+
+清理证据：[删除/移动核销](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/pristine_7364d0706e934ed3921bac5b35f9fb46/cleanup-inventory.json)、[链接与历史字节检查](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/document-cleanup-check.json)。固定扫描[selftest/报告](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/pristine_d48b9190a7214e3bbde794a37951531c/summary.json)的223条命中中，95条测试/夹具、77条保护门/配置、46条业务合同或关键词误报；5条活跃读值/提案合同仍按[实际符号索引](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/pristine_d48b9190a7214e3bbde794a37951531c/contract-review.json)复审，不按关键词删除。
+
 ## 11. 进度更新及续接规则
 
 每次实施就地更新 §0、§4、§6 和本节检查点；任务卡只在范围/合同真正变化时修改。验收报告在 artifacts，长期进度在本文件，代码在 Git，不复制整份历史日志。
@@ -521,9 +553,9 @@ python -m experiments --help
 四项检查点（就地覆盖）：
 
 - **当前任务**：按本次用户请求继续完整18包重构，遵守Pristine；整体完成后核销冗余脚本/文档、整合doc并将组会材料置于子目录。
-- **进度**：M00已验收；B37提交52d7d56、完整1999/58通过。B38十条正式反例先失败后修复，私有历史/公开独立快照、按请求聚合和验证集范围贯通；新15项/首轮相关34项通过，扩大相关182项及5cc27418完整2014/58、AST80/三CLI/源码不变通过。独立复审与整包验收未完成。
-- **下一步**：逐项映射M00–M17验收证据。
-- **未定事项**：完整18包目标未完成；B32–B38独立复审、完整M15/M16生命周期与整包审查未闭合。受限因果证书不证明通用语义或工具状态变化；历史校准失效且原始字节保留、本期不重测。最终脚本/文档清理与doc组会归档未执行；local_data/真实实验未运行。
+- **进度**：M00–M17生产真源与已执行测试子集已映射；M01/M02的12个任务卡条件已逐条核对实现与实际通过断言，仍待独立审查及最终消费者核销。九个接口签名按现实现就地更新。固定Pristine扫描223条已分类，5条活跃读值/提案合同待审查。删除被execution记录取代的单案例计时脚本；两份组会材料移到doc/group-meetings并修复链接，旧组会工作区字节和历史实验正文保留。清理后f6da71cd完整2014/58、AST80/三CLI/源码不变通过。完整18包尚未验收；[逐条核验](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/task-card-review.json)、[纯代码](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/summary.json)、[平台](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/94d007059f4e4343b5b14e43ec474f30/summary.json)、[清理核销](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/pristine_7364d0706e934ed3921bac5b35f9fb46/cleanup-inventory.json)
+- **下一步**：读取M03任务卡并建立具体实现/断言的条件映射；继续核销M01摘要职责与5条扫描活跃合同。
+- **未定事项**：完整18包目标未完成；B32–B38和当前源码独立复审尚未闭合，只读子代理审查授权未收到。M03–M17逐条任务卡验收、M15/M16完整生命周期及全局冗余核销待继续。组会归档和已证明冗余脚本删除完成；其余历史读者/公开CLI不能仅凭无静态调用删除。受限证书不证明通用语义或工具状态变化；历史校准与原始证据保留，本期不重测；local_data及真实实验未运行。
 
 ## 12. 本期最终完成与延期项
 
@@ -537,4 +569,4 @@ python -m experiments --help
 | 外部新轨迹、人工因果标注和独立泛化评估 | 保留研究设计引用，不启动采集或标注 |
 | 新行为生产激活与真实多轮准入 | 配置默认关闭；本期只以 Fake 验证完整接口和门 |
 
-当前验证证据见 §6 和四项检查点；固定 Pristine 扫描器已验证与上游固定提交文本相同，selftest 通过，4fcffecc/pristine_00bf223e 报告记录 209 个文本命中。关键词命中不是删除依据；历史读者、保护门键和约束参数保留，各模块中的失效说明及无调用定义继续核销。没有真实模型请求，没有改写历史原始证据。
+当前验证证据见§6、§10.3和四项检查点；固定Pristine扫描器与固定提交归档的字节一致，selftest通过，当前f6da71cd报告223条命中已分类，5条活跃合同仍需最终审查。历史读者、保护门键、约束参数及原始证据保留；最终验收未完成，没有真实模型请求。

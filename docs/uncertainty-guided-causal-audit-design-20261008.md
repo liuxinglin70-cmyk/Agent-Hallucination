@@ -160,4 +160,4 @@
 2. 优先在 P2 做 **定位主终点**，还是提前引入 P3 阴性 Recall 反馈？建议先定位以免混淆效应。
 3. 是否批准额外的人工双标注/歧义审查和新的独立轨迹采样？这是论文因果归因可信度的关键。
 
-组会一页版见：[疑惑度反哺检测方案组会汇报](group-meeting-uncertainty-causal-feedback-20261008.md)。
+组会一页版见：[疑惑度反哺检测方案组会汇报](../doc/group-meetings/group-meeting-uncertainty-causal-feedback-20261008.md)。

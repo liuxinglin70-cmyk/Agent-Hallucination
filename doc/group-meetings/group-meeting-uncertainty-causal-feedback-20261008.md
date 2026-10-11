@@ -1,7 +1,7 @@
 # 组会汇报｜让“疑惑度定位”反哺幻觉检测与自进化
 
 > **2026-10-08｜方案讨论稿（未实现、未验证新模型收益）**  
-> 详见：[技术优化设计](uncertainty-guided-causal-audit-design-20261008.md)｜[基线报告](detector-vs-agenthallu-baseline-20260927.md)｜[自进化失败分析](self_evolution_failure_analysis.md)
+> 详见：[技术优化设计](../../docs/uncertainty-guided-causal-audit-design-20261008.md)｜[基线报告](../../docs/detector-vs-agenthallu-baseline-20260927.md)｜[自进化失败分析](../../docs/self_evolution_failure_analysis.md)
 
 ## 1. 我们当前做到了什么，问题在哪里？
 

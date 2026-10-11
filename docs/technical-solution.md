@@ -2,7 +2,7 @@
 
 更新：2026-10-11。本文描述当前实现及约束；历史实验、旧方案和数值统一见 [实验日志](experiment-log.md)。
 
-> **研究方向与验收目标**：详见 [疑惑度引导的双向因果轨迹审计技术设计](uncertainty-guided-causal-audit-design-20261008.md)，简明版见 [2026-10-08 组会汇报](group-meeting-uncertainty-causal-feedback-20261008.md)。
+> **研究方向与验收目标**：详见 [疑惑度引导的双向因果轨迹审计技术设计](uncertainty-guided-causal-audit-design-20261008.md)，简明版见 [2026-10-08 组会汇报](../doc/group-meetings/group-meeting-uncertainty-causal-feedback-20261008.md)。
 
 代码重构、缺陷修复及新功能的当前实施状态统一见根目录 [实施台账](../IMPLEMENTATION_PLAN.md)。本期采用离线代码验收，不开展真实模型实验；本文件仍只描述已实现合同。
 
@@ -130,6 +130,8 @@ Tracer在provider前从当前packet和策略重算任务证书与完整路径，
 `measurement.cost_summary` 是运行/报告成本汇总真源。批次 measurement 的 `invocation_cost` 只统计本次实际执行（含中断请求），缓存命中不收取历史请求；`case_attempt_cost` 汇总选中案例最近一次完成测量，`run_lifetime_cost` 从持久化整例尝试 journal 累计所有实际请求，失败与重测保留且不重复。顶层 usage/elapsed 和实验报告 cost 使用 invocation 口径，独立列出历史成本；请求数未知不写零。provider 并发峰值在运行控制退出前后由同一实例显式交付。
 
 完成案例的 `result.json` 携带 `case_commit.v1`：输入快照/摘要、run/case/attempt ID、耗时、结果摘要和完整提交摘要一次原子写入。immutable attempt 先提交，canonical 同内容替换；替换中断时旧结果与旧耗时共同保留，已完成 attempt 不能覆盖。新运行缓存要求合法提交、执行身份及实际输入摘要；当前报告和评估必须验证提交，删除提交不能降级成历史格式。整例 attempt journal 独立封存内容摘要，累计成本前验证；未知计数字段不默认补零。分离的 input.json/elapsed_seconds.json 不再生产或用于计时；计时和 usage 脚本分别共用 case_elapsed/result_usage。
+
+单案例计时使用 `python -m detector detect --record RECORD --case-id CASE --config CONFIG --output-dir UNIQUE_OUTPUT` 的 `prediction.json`：`execution` 保存每次请求耗时、排队时间、用量、失败状态及案例总耗时。运行使用配置中的实际预算；不会为诊断隐式扩大预算。固定 SmolAgents/019 计时脚本已删除：它在阶段导入后替换 provider，无法采集既有调用绑定。2026-09-18 的测量数值和相关预算依据保留，旧脚本可从 Git `a6318f4` 读取。
 
 路径 ID 统一拒绝 Windows 设备名，包括扩展名前空格与 COM/LPT 上标¹²³别名；不通过设备 I/O 验证非法名字。run writer lease 通过 ContextVar 在同一执行上下文中传递，bounded_map 显式复制上下文给批次 worker；独立线程/进程没有该租约。公开 record_case 取得 run 和 case 租约，独立 evaluate_run 和 baseline 报告取得 run 租约；批次到报告的同次调用保持租约，防止中间恢复运行替换结果。实验阶段在同一 run 租约内执行、读取和评估，报告从固定副本构造，缓存行本次耗时为零。evaluate_run 将当前投影任务与 case_commit.input_digest 对照，拒绝用改变后的任务给旧结果评分；gold仍由评估侧读取，不进入该任务摘要。baseline CLI 直接输出完整报告，stop 非空时退出码为2；源码与安装 wheel 的回环认证失败、缺measurement提示已验证。experiments.snapshot.run_snapshot在读取前按路径顺序取得所有选中既有run租约，采样、实际身份对照和评分共用；缺失root捕获为缺失，不创建新run。paired、status与scripts/paired_endpoint共用，旧_load_rows/_shared_registry与独立manifest读树路径已删除。snapshot只接受run_manifest.v3完整逐例execution_identity与case_commit绑定，缺身份历史输出不进入当前测量复用；实际source/record/packet不一致拒绝配对，配置/registry/evidence/replay/authority/artifacts决定是否同配置噪声。 paired --baseline-roll 指定独立同输入的基线复测；相同目录拒绝作为独立roll。snapshot将已校验result与评分行按case合并，保留阶段健康证据；experiments.reading为两入口效果读数真源，先排除prediction/state/健康状态改变的不稳定样本；缺复测或没有稳定样本结论未知。默认要求稳定样本决定性修正多于回退且单侧精确McNemar p<0.05，全量读数独立保留；演化终止报告共用metrics.mcnemar_improvement_p。
 
