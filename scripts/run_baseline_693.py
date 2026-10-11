@@ -62,7 +62,7 @@ if str(ROOT) not in sys.path:
 from detector.config import load_config
 from detector.dataset import load_case
 from detector.evaluation import binary_metrics, evaluate_run
-from detector.measurement import result_usage
+from detector.measurement import merge_usage_sources, result_usage
 from detector.provider import accumulate_usage
 from detector.packet import build_packet, validate_record
 from detector.runner import run_batch, safe_case_id
@@ -228,17 +228,20 @@ def _usage_report(rows: Sequence[Mapping[str, Any]], cases: Sequence[str]) -> di
         usage = reading["usage"]
         if usage is None:
             continue
-        per_case.append({"case": case, "usage": usage})
+        per_case.append({"case": case, "usage": usage, "usage_source": reading["source"]})
         accumulate_usage(total, usage)
     values = [
         float(entry["usage"]["total_tokens"])
         for entry in per_case
         if isinstance(entry["usage"].get("total_tokens"), (int, float))
     ]
+    usage_source = merge_usage_sources([entry["usage_source"] for entry in per_case])
+    lower_bound = bool(missing_attempts or unknown_cases or usage_source == "legacy_stage_metadata_lower_bound")
     return {
         "measured_cases": len(per_case),
         "unmeasured_cases": len(cases) - len(per_case),
         "total": total or None,
+        "usage_source": usage_source,
         "total_tokens": int(sum(values)) if values else None,
         "mean_tokens_per_case": (
             round(sum(values) / len(values), 1) if values else None
@@ -256,14 +259,16 @@ def _usage_report(rows: Sequence[Mapping[str, Any]], cases: Sequence[str]) -> di
         "attempts_without_usage": missing_attempts,
         "cases_with_missing_usage": len(cases_with_missing),
         "usage_unknown_cases": unknown_cases,
-        "total_is_lower_bound": bool(missing_attempts or unknown_cases),
+        "total_is_lower_bound": None if usage_source == "unknown" else lower_bound,
         "scope": (
+            "Reported numeric counters have an unidentified source; neither an exact total nor a lower bound is established."
+            if usage_source == "unknown" else
             f"Sum of provider counters actually returned. {missing_attempts} "
             "provider attempt(s) across "
             f"{len(cases_with_missing)} case(s) returned no usage metadata "
             f"and {unknown_cases} case(s) have unknown attempt coverage, so "
-            "the true spend is at or above this total."
-            if missing_attempts or unknown_cases
+            f"the source is {usage_source}, and the true spend is at or above this total."
+            if lower_bound
             else "Sum of provider counters actually returned; every attempt "
                  "reported usage metadata."
         ),

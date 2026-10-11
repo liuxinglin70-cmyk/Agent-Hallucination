@@ -747,10 +747,8 @@ class CandidateDeveloper:
                 drafted.candidates
                 if hasattr(drafted, "candidates") else (drafted or ())
             )
-            # Charge actual provider requests, including internal repair
-            # requests.  A refusal before calling the provider must not appear
-            # as a successful network call in the development ledger.  Legacy
-            # proposers without notes retain the one-call accounting.
+            # Without request metadata, a proposal call consumes one unit of
+            # the development budget.
             notes = getattr(drafted, "notes", None)
             calls = (
                 sum(

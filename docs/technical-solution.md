@@ -87,7 +87,7 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 
 `packet_reference_error` 统一 Judge、Recall、Tracer、Defense、引用谓词和 scoped semantic 的轨迹引用类型、存在性及范围验证；外部 snapshot citation 仍由 evidence.citation_error 验证。scoped semantic 的 supported/contradicted 必须带生产者提供的非空引用，abstained 可明确提供空列表，运行时不填造窗口引用。工具引用按实际所属 event 核验窗口范围。semantic executor 接收 packet/context 的独立副本，校验使用未被 executor 修改的投影；scoped/unscoped semantic 共用其返回及引用校验路径。语义和组件runner的实际artifact id/digest由 `_validate_executor_binding` 在调用judge前统一核验，精确比较声明和实际identity，保留各runner的缺失executor/字段及摘要不匹配错误；注册时的声明合法性仍由 `_validate_artifact_binding` 单独核验。证据型 runner 不获得定罪权限。
 
-**证据与权限边界**：DSL 正则在可终止子进程中执行，单次预算 0.5 秒、同一程序共享 1 秒，并受 case deadline 和 run cancellation 约束。资源耗尽输出 `not_applicable` 和 `execution_status=resource_exhausted`，不生成事实、不触发 Recall、不授权定罪；整例期限及取消继续传播。决定性引用逐一检查相关冲突说明，snapshot 的 resolution 来源绑定对应规范实体/属性组；packet 优先保留实质 answer 工具交付，closing status 保留为无实质交付时的锚点。deterministic 及无 runner 的公开裁决输入只可绑定内置定罪词汇并通过校准，typed DSL 保留显式程序权限。交付识别修改使旧校准源码指纹失效，历史记录保持原始字节，运行时拒绝复用其权限。DSL规范化保留 `when.packet_features`，`when.facts` 编译入现有 typed conditions；任意上下文字段扫描路径已删除，所有条件共享字段白名单、hook权限及合并条件数量上限；规则字段闭合，旧派生条件及未知字段明确拒绝，避免静默丢失约束。B15–B21 当前为工作区修复待审查；完整验收以实施台账为准。
+**证据与权限边界**：DSL 正则在可终止子进程中执行，单次预算 0.5 秒、同一程序共享 1 秒，并受 case deadline 和 run cancellation 约束。资源耗尽输出 `not_applicable` 和 `execution_status=resource_exhausted`，不生成事实、不触发 Recall、不授权定罪；整例期限及取消继续传播。决定性引用逐一检查相关冲突说明，snapshot 的 resolution 来源绑定对应规范实体/属性组；packet 优先保留实质 answer 工具交付，closing status 保留为无实质交付时的锚点。deterministic 及无 runner 的公开裁决输入只可绑定内置定罪词汇并通过校准，typed DSL 保留显式程序权限。交付识别修改使旧校准源码指纹失效，历史记录保持原始字节，运行时拒绝复用其权限。DSL规范化保留 `when.packet_features`，`when.facts` 编译入现有 typed conditions；任意上下文字段扫描路径已删除，所有条件共享字段白名单、hook权限及合并条件数量上限；规则字段闭合，旧派生条件及未知字段明确拒绝，避免静默丢失约束。完整验收状态以实施台账为准。
 
 批次 `run_summary.v3` 分别记录 requested/returned/not_started/missing，completed 只统计实际返回的非 not_started 行。工作线程登记完成结果，调度器中断后仍保留已提交案例；没有返回行的已开始案例记为 missing，不写成阴性或未开始。重复及额外案例行拒绝进入汇总。
 
@@ -129,7 +129,9 @@ Tracer在provider前从当前packet和策略重算任务证书与完整路径，
 
 `runner.py` 统一结果落盘、尝试记录、断点复用和调度；`runtime.py` 提供运行控制、deadline、原子写入和单写者保护。整例重试共享案例 deadline。`measurement.request_execution` 汇总单次 Detector 的真实请求，`case_execution` 生成 execution.v2，保留每次整例尝试的结果、错误和请求成本；嵌套 usage scope 向父层归并一次。批次每次尝试结束即原子保存 attempt.json，程序错误和中断仍传播，汇总保留已发生的成本而不补造结果行。未知请求统计用 usage_unknown_cases 表示，旧 providers/hearings 统计仅为下界。
 
-`measurement.cost_summary` 是运行/报告成本汇总真源。批次 measurement 的 `invocation_cost` 只统计本次实际执行（含中断请求），缓存命中不收取历史请求；`case_attempt_cost` 汇总选中案例最近一次完成测量，`run_lifetime_cost` 从持久化整例尝试 journal 累计所有实际请求，失败与重测保留且不重复。顶层 usage/elapsed 和实验报告 cost 使用 invocation 口径，独立列出历史成本；请求数未知不写零。provider 并发峰值在运行控制退出前后由同一实例显式交付。
+`measurement.cost_summary` 是运行/报告成本汇总真源，`merge_usage_sources` 合并成本来源。request_observations 表示实际请求观察；legacy_stage_metadata_lower_bound 表示阶段元数据的读数下界，混合请求观察仍保留这个下界来源；缺失或不支持的显式来源、异常嵌套结构返回 unknown。来源不等于统计完整性，usage_missing_attempts/usage_unknown_cases 单独描述缺测；未知计数不补零。result_usage 只读解析嵌套来源，不改历史结果。Judge/Defense 的 provider 保留最后有效票元数据，usage_total 汇总成功票的 usage，可能遗漏失败或repair请求；全部请求成本以 execution 中实际观察为准。成本报告和逐例/脚本导出保留 usage_source，未知来源不宣称精确总量或已证下界。
+
+批次 measurement 的 `invocation_cost` 只统计本次实际执行（含中断请求），缓存命中不收取历史请求；`case_attempt_cost` 汇总选中案例最近一次完成测量，`run_lifetime_cost` 从持久化整例尝试 journal 累计所有实际请求，失败与重测保留且不重复。顶层 usage/elapsed 和实验报告 cost 使用 invocation 口径，独立列出历史成本；报告保留该口径自己的来源，缺来源不借用历史案例来源推断。provider 并发峰值在运行控制退出前后由同一实例显式交付。
 
 完成案例的 `result.json` 携带 `case_commit.v1`：输入快照/摘要、run/case/attempt ID、耗时、结果摘要和完整提交摘要一次原子写入。immutable attempt 先提交，canonical 同内容替换；替换中断时旧结果与旧耗时共同保留，已完成 attempt 不能覆盖。新运行缓存要求合法提交、执行身份及实际输入摘要；当前报告和评估必须验证提交，删除提交不能降级成历史格式。整例 attempt journal 独立封存内容摘要，累计成本前验证；未知计数字段不默认补零。分离的 input.json/elapsed_seconds.json 不再生产或用于计时；计时和 usage 脚本分别共用 case_elapsed/result_usage。
 
@@ -278,6 +280,8 @@ python scripts/cost_model_693.py --json artifacts/cost_model_693.json
 
 verify.py 默认执行 code_only（合成输入与临时夹具），可显式选择 platform（回环 HTTP、worker、锁、沙箱）、local_data（本地数据和证据完整性）或 all。所有测试禁公网，Python 子进程继承同一回环边界；code_only 拒绝访问原始数据及历史 artifacts。验证报告按源码摘要及独立运行 ID 写入 artifacts/code_quality，不覆盖历史报告；源码 AST 检查覆盖重复定义、包依赖边界和循环依赖。成本工具从实验日志的命名 JSON 块读取冻结样本并保留 original_source；旧样本有选择偏差，不代表完整语料的最新成本。
 
-engine smoke 的共享合成配置明确选择 `proposer.mode=offline`，模块级 autouse fixture 禁止构造 LLMProposer；显式 Scripted/Recording 注入对象继续由 Engine 使用，生产默认配置保持原语义。固定 7d04878 独立复核完整模块 72 项及 4 项注入/配置隔离检查通过，29 次默认工厂调用全部返回 OfflineProposer。最近全量验证对应固定 811662f；其后实现提交使用各自相关回归，当前文档收尾没有重新运行全套，也没有新增实验结果。
+engine smoke 的共享合成配置明确选择 `proposer.mode=offline`，模块级 autouse fixture 禁止构造 LLMProposer；显式 Scripted/Recording 注入对象继续由 Engine 使用，生产默认配置保持原语义。源码、平台、CLI、安装、权限与引用边界的实际验证结果及剩余验收见[实施台账](../IMPLEMENTATION_PLAN.md)及其报告；离线测试不证明真实模型收益。
+
+历史架构方案归入 [设计归档](design-archive/architecture-review-20260924.md)，其中的提案和交付记录描述当时状态；当前接口以本文为准，任务状态仅由根目录实施台账维护。归档只修正搬迁后的实验日志链接，不更新历史数值或设计声明。
 
 新增实验先冻结输入、源码/配置身份、角色、预算和判据；结束后将日期、分母、结果、失败、中断、更正和成本追加到唯一实验日志。运行缓存不作为永久文档提交。算法文件按职责命名，日期放运行 ID；夹具只服务具体测试断言，不存放任意实验备份。

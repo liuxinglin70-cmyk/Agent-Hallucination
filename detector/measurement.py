@@ -124,6 +124,7 @@ def request_execution(
         "finished_at": finished_at, "elapsed_seconds": elapsed_seconds,
         "requests": list(requests), "provider_attempts": len(requests),
         "usage": usage or None,
+        "usage_source": "request_observations",
         "usage_missing_attempts": sum(request.get("usage") is None for request in requests),
     }
 
@@ -164,6 +165,25 @@ def measurement_sources(execution: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(values)
 
 
+def merge_usage_sources(sources: Sequence[Any]) -> str:
+    if all(source == "request_observations" for source in sources):
+        return "request_observations"
+    if all(source in ("request_observations", "legacy_stage_metadata_lower_bound") for source in sources):
+        return "legacy_stage_metadata_lower_bound"
+    return "unknown"
+
+
+def _execution_usage_source(execution: Mapping[str, Any]) -> str:
+    sources = [execution.get("usage_source", "request_observations")]
+    attempts = execution.get("case_attempts", [])
+    if not isinstance(attempts, list):
+        return "unknown"
+    for attempt in attempts:
+        child = attempt.get("execution") if isinstance(attempt, Mapping) else None
+        sources.append(_execution_usage_source(child) if isinstance(child, Mapping) else "unknown")
+    return merge_usage_sources(sources)
+
+
 def case_execution(
     attempts: Sequence[Mapping[str, Any]], *, started_at: str, finished_at: str,
     elapsed_seconds: float,
@@ -190,6 +210,7 @@ def case_execution(
         "case_attempts": list(attempts), "requests": requests,
         "provider_attempts": sum(counts) if all(type(value) is int for value in counts) else None,
         "usage": usage or None,
+        "usage_source": merge_usage_sources([_execution_usage_source(attempt["execution"]) for attempt in attempts]),
         "usage_missing_attempts": sum(missing) if all(type(value) is int for value in missing) else None,
     }
 
@@ -197,7 +218,7 @@ def case_execution(
 def result_usage(result: Mapping[str, Any]) -> dict[str, Any]:
     execution = result.get("execution")
     if isinstance(execution, Mapping):
-        return {"usage": execution.get("usage"), "source": "request_observations",
+        return {"usage": execution.get("usage"), "source": _execution_usage_source(execution),
                 "missing_attempts": execution.get("usage_missing_attempts"),
                 "attempts": execution.get("provider_attempts")}
     providers = result.get("providers") or {}
@@ -228,6 +249,7 @@ def cost_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     usage: dict[str, Any] = {}
     attempts: list[int | None] = []
     missing: list[int | None] = []
+    sources: list[str] = []
     elapsed = 0.0
     for row in rows:
         reading = result_usage(row["result"])
@@ -235,8 +257,10 @@ def cost_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             accumulate_usage(usage, reading["usage"])
         attempts.append(reading["attempts"])
         missing.append(reading["missing_attempts"])
+        sources.append(reading["source"])
         elapsed += float(row.get("elapsed_seconds") or 0)
     return {"elapsed_seconds": round(elapsed, 1), "usage": usage or None,
+            "usage_source": merge_usage_sources(sources),
             "provider_attempts": sum(attempts) if all(type(n) is int for n in attempts) else None,
             "usage_missing_attempts": sum(n for n in missing if type(n) is int),
             "usage_unknown_cases": sum(n is None for n in missing)}

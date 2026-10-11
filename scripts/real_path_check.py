@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from detector.config import load_config
-from detector.measurement import result_usage
+from detector.measurement import merge_usage_sources, result_usage
 from detector.runner import case_elapsed
 from detector.runtime import contained_path
 from experiments.snapshot import run_snapshot
@@ -66,12 +66,14 @@ def _case_metrics(case_id: str, result: dict | None) -> dict:
         "responsible_step": None,
         "elapsed_seconds": None,
         "tokens": None,
+        "usage_source": "unknown",
         "stages": {},
         "model": None,
     }
     if result is None:
         return row
-    usage = result_usage(result)["usage"]
+    reading = result_usage(result)
+    usage = reading["usage"]
     tokens = usage.get("total_tokens") if isinstance(usage, dict) else None
     provider_models = set()
     for provider in (result.get("providers") or {}).values():
@@ -86,6 +88,7 @@ def _case_metrics(case_id: str, result: dict | None) -> dict:
         "runtime_valid": result.get("runtime_valid"),
         "elapsed_seconds": case_elapsed(result),
         "tokens": tokens,
+        "usage_source": reading["source"],
         "stages": {
             key: value.get("state")
             for key, value in (result.get("stage_status") or {}).items()
@@ -366,6 +369,9 @@ def main() -> int:
             "mean": round(sum(elapsed) / len(elapsed), 1) if elapsed else None,
         },
         "tokens": {
+            "usage_source": merge_usage_sources([
+                row["usage_source"] for row in all_rows if isinstance(row["tokens"], int)
+            ]),
             "total": sum(token_rows) if token_rows else None,
             "mean_per_case": (
                 round(sum(token_rows) / len(token_rows), 1) if token_rows else None

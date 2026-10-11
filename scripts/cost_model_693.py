@@ -342,12 +342,10 @@ def sensitivity(*, machine_only: Sequence[float]) -> dict[str, Any]:
 
 
 def token_model(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """Token burn per case, from envelopes that recorded usage.
+    """Token readings per case from the preserved numeric sample.
 
-    ``usage_total`` folds every ballot of a voting stage, so it is the stage's
-    real burn; summing the stages gives the case's. A row without usage is left
-    out rather than read as zero, because zero would pull the mean down as if
-    the case had been free.
+    Stage metadata is a lower bound when request observations are absent.
+    Missing usage is excluded rather than treated as a free case.
     """
     per_case: list[dict[str, Any]] = []
     for row in rows:

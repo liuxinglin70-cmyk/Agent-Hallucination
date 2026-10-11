@@ -164,9 +164,9 @@ def detect_with_transport_retry(
                     elapsed_seconds=time.perf_counter() - attempt_started,
                 )
                 if not requests and failure is None:
-                    legacy = result_usage(result)
-                    execution.update(usage=legacy["usage"], provider_attempts=legacy["attempts"],
-                                     usage_missing_attempts=legacy["missing_attempts"], usage_source=legacy["source"])
+                    reading = result_usage(result)
+                    execution.update(usage=reading["usage"], provider_attempts=reading["attempts"],
+                                     usage_missing_attempts=reading["missing_attempts"], usage_source=reading["source"])
             attempt = copy.deepcopy({
                 "attempt": number, "execution": execution,
                 "result": {key: value for key, value in result.items() if key != "execution"},

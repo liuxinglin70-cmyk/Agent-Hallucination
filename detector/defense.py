@@ -372,8 +372,6 @@ def _vote_defense(
         "topups": topups_used, "quorum": quorum, "quorum_met": True,
     }
     if ballots_usage:
-        # Last ballot's own usage stays under ``usage``; the vote total rides
-        # beside it so a stage's real burn is readable (see ``accumulate_usage``).
         sample_meta["usage_total"] = ballots_usage
     return {"ok": True, "parsed": parsed, "raw": ballots,
             "provider": sample_meta}, {

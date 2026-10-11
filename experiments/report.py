@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 
-from detector.measurement import cost_summary, measurement_status
+from detector.measurement import cost_summary, measurement_status, merge_usage_sources
 
 REPORT_SCHEMA = "experiments.stage_report.v1"
 
@@ -144,6 +144,7 @@ class StageReport:
             "case_hours": round(elapsed / 3600, 3),
             "provider_attempts": cost["provider_attempts"],
             "usage": cost["usage"],
+            "usage_source": cost["usage_source"],
             "usage_missing_attempts": cost["usage_missing_attempts"],
             "usage_unknown_cases": cost["usage_unknown_cases"],
             "slowest_cases": per_case[:5],
@@ -219,6 +220,7 @@ def summarize_stage(
             run_lifetime_cost=batch_measurement.get("run_lifetime_cost"),
             case_seconds=elapsed, case_hours=round(elapsed / 3600, 3),
             provider_attempts=invocation["provider_attempts"], usage=invocation["usage"],
+            usage_source=merge_usage_sources([invocation.get("usage_source", "unknown")]),
             usage_missing_attempts=invocation["usage_missing_attempts"],
             usage_unknown_cases=invocation["usage_unknown_cases"],
             mean_case_seconds=round(elapsed / len(rows), 1) if rows else None,
