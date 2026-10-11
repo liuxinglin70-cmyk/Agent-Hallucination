@@ -3181,6 +3181,30 @@ class EvolutionEngine:
         )
         return report
 
+    def _cycle_contract(self, cycle: int, *, cases: Sequence[str] | None = None) -> dict[str, Any]:
+        selected = self.split.pool if cases is None else cases
+        return {
+            "schema_version": "evolution.cycle_contract.v2", "cycle": cycle,
+            "config": digest(self.config), "source": source_identity("detector", "evolution"),
+            "runtime_identity": backend_runtime_identity(self.backend, cases=selected),
+            "split": split_manifest_report(self.split),
+            "data": {case: artifact_digest(Path(self.config["dataset_root"]) / case) for case in selected},
+        }
+
+    def _verify_cycle_inputs(self, contract: Mapping[str, Any], case: str | None) -> None:
+        expected = deepcopy(contract)
+        cases = None
+        if case is not None:
+            if case not in expected["data"]:
+                raise RuntimeError("cycle execution inputs changed; case is outside the pinned pool")
+            cases = [case]
+            expected["data"] = {case: expected["data"][case]}
+            runtime = expected["runtime_identity"]
+            runtime["evidence"] = {case: runtime["evidence"][case]} if case in runtime["evidence"] else {}
+            runtime["digest"] = digest({key: value for key, value in runtime.items() if key != "digest"})
+        if digest(self._cycle_contract(contract["cycle"], cases=cases)) != digest(expected):
+            raise RuntimeError("cycle execution inputs changed; refusing observation or completion")
+
     # ------------------------------------------------------------------
     @_engine_operation
     def run_cycle(
@@ -3194,10 +3218,8 @@ class EvolutionEngine:
         if started and not resume:
             raise RuntimeError(f"cycle {cycle} has already started; use --resume, not a new search")
         report_path = self.paths["cycles"] / f"cycle{cycle:03d}.json"
-        contract = {"schema_version": "evolution.cycle_contract.v2", "cycle": cycle, "config": digest(self.config), "source": source_identity("detector", "evolution"),
-                    "runtime_identity": backend_runtime_identity(self.backend, cases=self.split.pool),
-                    "split": split_manifest_report(self.split),
-                    "data": {case: artifact_digest(Path(self.config["dataset_root"]) / case) for case in self.split.pool}}
+        contract = self._cycle_contract(cycle)
+        pinned_contract = deepcopy(contract)
         # The contract deliberately excludes the registry hash: a cycle that
         # committed its own admission and then died must still be resumable.
         # The registry it started from is recorded separately and re-applied
@@ -3207,6 +3229,7 @@ class EvolutionEngine:
             contract,
             resume=resume,
             registry_before=self.registry.registry,
+            input_verifier=lambda case: self._verify_cycle_inputs(pinned_contract, case),
         )
         try:
             self._resuming = resume
@@ -3978,6 +4001,9 @@ class EvolutionEngine:
                 self.rejection_feedback.append(payload)
             selected = []
         if selected:
+            if self._journal is None:
+                raise RuntimeError("cycle admission requires its journal")
+            self._journal.verify_inputs()
             previous_ids = [
                 str(c.get("intervention_id") or "")
                 for c in self.registry.entries
@@ -5008,6 +5034,7 @@ class EvolutionEngine:
     def _publish_cycle_completion(self, cycle: int, report: Mapping[str, Any]) -> dict[str, Any]:
         if self._journal is None:
             raise RuntimeError("cycle completion requires its journal")
+        self._journal.verify_inputs()
         report = json.loads(json.dumps(dict(report), ensure_ascii=False, allow_nan=False))
         completion = {
             "schema_version": "evolution.cycle_completion.v1",

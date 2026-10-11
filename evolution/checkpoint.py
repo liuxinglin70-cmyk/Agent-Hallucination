@@ -11,6 +11,7 @@ from pathlib import Path
 import json
 import threading
 import time
+from typing import Callable
 
 from detector.identity import digest
 from detector.interventions import authority_identity
@@ -25,10 +26,12 @@ class CycleJournal:
         *,
         resume: bool,
         registry_before: dict | None = None,
+        input_verifier: Callable[[str | None], None] | None = None,
     ):
         self.directory = directory
         self.path = directory / "checkpoint.json"
         self.lock = threading.Lock()
+        self._input_verifier = input_verifier
         self.started = time.monotonic()
         if self.path.exists():
             if not resume:
@@ -174,12 +177,23 @@ class CycleJournal:
             if combined != previous:
                 self._persist_state(authority=combined)
 
+    def verify_inputs(self, case: str | None = None) -> None:
+        if self._state is None:
+            raise RuntimeError("checkpoint commit is unknown; reopen before reuse")
+        if self._input_verifier is None:
+            if "runtime_identity" in self._state["contract"]:
+                raise RuntimeError("cycle execution contract requires its input verifier")
+            return
+        self._input_verifier(case)
+
     def evaluate(self, cases, *, registry, fresh, evaluate, kwargs):
+        self.verify_inputs()
         arm = digest({"registry": registry, "fresh": fresh})
         authority = authority_identity(registry)
         self._bind_authority(authority)
 
         def one(case):
+            self.verify_inputs(case)
             path = self.directory / "arms" / arm[:20] / (digest(case)[:20] + ".json")
             if path.exists():
                 envelope = json.loads(path.read_text(encoding="utf-8"))
@@ -188,15 +202,19 @@ class CycleJournal:
                 if (envelope["arm"] != arm or envelope["row"]["case"] != case
                         or digest(envelope["row"]) != envelope["row_hash"]):
                     raise RuntimeError("checkpoint observation integrity failure")
+                self.verify_inputs(case)
                 return envelope["row"]
             result = evaluate([case], **{**kwargs, "workers": 1})
             if len(result) != 1 or result[0]["case"] != case:
                 raise RuntimeError("backend returned an incomplete case observation")
             row = result[0]
+            self.verify_inputs(case)
             self._bind_authority(authority)
             save_json(path, {"arm": arm, "authority": authority, "row": row, "row_hash": digest(row)})
             self.save()
             return row
 
         with ThreadPoolExecutor(max_workers=max(1, int(kwargs.get("workers", 1)))) as pool:
-            return list(pool.map(one, cases))
+            rows = list(pool.map(one, cases))
+        self.verify_inputs()
+        return rows
