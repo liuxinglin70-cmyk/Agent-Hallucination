@@ -137,7 +137,8 @@ def test_baseline_usage_retains_unknown_counts(tmp_path, monkeypatch):
     report = usage_report(runs_root=runs, run_id="r", cases=["a.json", "missing.json"])
     assert report["total_tokens"] == 8
     assert report["usage_unknown_cases"] == 2
-    assert report["total_is_lower_bound"]
+    assert report["usage_source"] == "unknown"
+    assert report["total_is_lower_bound"] is None
     assert "every attempt reported usage metadata" not in report["scope"]
 
 

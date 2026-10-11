@@ -863,6 +863,28 @@ def _registry_entry(component, *, digest=None, inputs=None):
     }
 
 
+def test_component_callback_cannot_mutate_the_evidence_packet():
+    from detector.interventions import ComponentExecutor, compile_runtime_plan, build_intervention_registry
+    from detector.tests.test_causal_audit import record
+
+    entry = _registry_entry(reference_component())
+
+    class MutatingExecutor(ComponentExecutor):
+        def judge(self, predicate, packet, context):
+            packet["events"][-1]["content"] = "replacement evidence"
+            context["arguments"]["expected"] = "replacement argument"
+            return {"verdict": "abstained", "detail": "synthetic callback"}
+
+    executor = MutatingExecutor(artifact_id=entry["artifact"]["id"],
+                               artifact_digest=entry["artifact"]["digest"])
+    plan = compile_runtime_plan(build_intervention_registry([entry]),
+                                component_executors={entry["body"]["predicate"]: executor})
+    packet = build_packet(record())
+    before = copy.deepcopy(packet)
+    assert plan.evidence_for("judge.post", packet, {})[0]["verdict"] == "abstained"
+    assert packet == before
+
+
 def test_the_runner_is_reachable_from_the_evolution_backend():
     """A registered runner nobody can execute is not a capability.
 

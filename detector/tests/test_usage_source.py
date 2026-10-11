@@ -9,6 +9,34 @@ from detector.tests.test_runner import _FakeDetector, _envelope
 from experiments.report import StageReport, summarize_stage
 
 
+@pytest.mark.parametrize("execution", [
+    {"usage": {"total_tokens": 10}},
+    {"usage": {"total_tokens": 10}, "requests": []},
+    {"usage": {"total_tokens": 10}, "requests": [None]},
+])
+def test_missing_source_requires_request_observation_evidence(execution):
+    from scripts.run_baseline_693 import _usage_report
+
+    result = _envelope("synthetic")
+    result["execution"] = deepcopy(execution)
+    before = deepcopy(result)
+    assert result_usage(result)["source"] == "unknown"
+    report = _usage_report([{"case": "synthetic", "result": result}], ["synthetic"])
+    assert report["usage_source"] == "unknown"
+    assert report["total_tokens"] == 10
+    assert report["total_is_lower_bound"] is None
+    assert result == before
+
+
+def test_missing_source_with_original_request_observations_remains_identified():
+    from detector.measurement import request_execution
+
+    execution = request_execution([{"usage": {"total_tokens": 10}}],
+                                  started_at="same", finished_at="same", elapsed_seconds=0)
+    del execution["usage_source"]
+    assert result_usage({"execution": execution})["source"] == "request_observations"
+
+
 @pytest.mark.parametrize("mode", ["stage", "mixed", "request"])
 @pytest.mark.parametrize("nested", [False, True])
 def test_actual_retry_preserves_cost_source_through_aggregates(mode, nested):

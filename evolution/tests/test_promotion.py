@@ -770,6 +770,7 @@ def test_changed_case_set_invalidates_a_stored_arm(tmp_path, monkeypatch):
     with pytest.raises(OSError, match="interrupt after measuring arms"):
         run.run()
     assert run.registry.writes == []
+    arms = {path: path.read_bytes() for path in (tmp_path / "out/arms").glob("*.json")}
 
     class _Counting(_ScriptedBackend):
         def __init__(self, **kwargs):
@@ -795,8 +796,12 @@ def test_changed_case_set_invalidates_a_stored_arm(tmp_path, monkeypatch):
         ledger=_FakeLedger(),
         stages=("structural", "harmlessness", "behavior", "m"),
     )
-    resumed.run()
-    assert backend.calls > 0, "changed gold steps must force a fresh measurement"
+    report = resumed.run()
+    assert backend.calls == 0, "changed frozen inputs must not redraw completed arms"
+    assert report.get("admitted") is not True
+    assert "identity changed" in report["terminal_reason"]
+    assert resumed.registry.writes == []
+    assert {path: path.read_bytes() for path in (tmp_path / "out/arms").glob("*.json")} == arms
 
 
 def test_target_kind_defaults_to_detection_on_old_entries():

@@ -47,7 +47,7 @@ from detector.interventions import (
 from evolution import promotion_alignment as alignment
 from evolution.candidate_versions import canonical_hash
 from detector.identity import artifact_digest, digest, source_identity
-from evolution.backends import make_backend
+from evolution.backends import make_backend, evaluate_owned_inputs, backend_runtime_identity
 from evolution.config import resolve_path
 from evolution.contracts import (
     candidate_contains_case_id,
@@ -1075,9 +1075,9 @@ class PromotionRun:
         ledger: Any | None = None,
         stages: Sequence[str] = ("structural", "harmlessness", "behavior", "m"),
     ) -> None:
-        self.candidate = dict(candidate)
-        self.protocol = dict(protocol)
-        self.config = dict(config)
+        self.candidate = deepcopy(dict(candidate))
+        self.protocol = deepcopy(dict(protocol))
+        self.config = deepcopy(dict(config))
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.dataset_root = config["dataset_root"]
@@ -1106,6 +1106,7 @@ class PromotionRun:
         )
         self.deadline: float | None = None
         self._provided_rows: dict[str, list[dict[str, Any]]] = {}
+        self._measured_arms: dict[str, tuple[Any, Any, bool, dict[str, Any]]] = {}
         self.resumed_arms: list[str] = []
         # The gate verdicts of the most recent evaluation, kept so the
         # admission reason can name the gates that actually ran instead of a
@@ -1167,9 +1168,16 @@ class PromotionRun:
 
         Resume must never re-draw a completed arm, and must never reuse rows
         measured under a different registry, case set, evidence condition or
-        frozen protocol. The identity records exactly those inputs.
+        frozen protocol. Missing dataset files remain explicit for synthetic
+        backends that provide their own observations.
         """
         return {
+            "candidate": digest(self.candidate),
+            "protocol": digest(self.protocol),
+            "config": digest(self.config),
+            "runtime": backend_runtime_identity(self.backend, cases=cases),
+            "data": {case: artifact_digest(Path(self.dataset_root) / case)
+                     if (Path(self.dataset_root) / case).is_file() else None for case in cases},
             "candidate_content_hash": self.candidate.get("content_hash"),
             "registry_hash": str(
                 self._registry_for(entries).get("content_hash") or ""
@@ -1210,22 +1218,26 @@ class PromotionRun:
         arms are run concurrently rather than the cases within an arm twice
         over. A completed arm is reused from disk under an identical identity:
         an interrupted run resumes without re-spending provider budget on work
-        that was already measured, and a changed input forces a fresh arm
-        instead of silently pairing two different measurements.
+        that was already measured. Changed inputs reject the stored arm and
+        preserve its bytes, so recovery cannot pair different measurements.
         """
         provided = self._provided_rows.get(label)
         if provided is not None:
-            return provided
+            return deepcopy(provided)
         path = self.output_dir / "arms" / f"{label}.json"
         identity = self._arm_identity(entries, cases, fresh=fresh)
         if path.is_file():
             try:
                 stored = json.loads(path.read_text(encoding="utf-8-sig"))
-            except (OSError, ValueError):
-                stored = None
-            if isinstance(stored, Mapping) and stored.get("identity") == identity:
-                self.resumed_arms.append(label)
-                return [dict(row) for row in stored.get("rows") or ()]
+            except (OSError, ValueError) as error:
+                raise ValueError("stored promotion arm is unreadable") from error
+            if not isinstance(stored, Mapping) or stored.get("identity") != identity:
+                raise ValueError("promotion arm input identity changed; refusing stored measurement")
+            if stored.get("rows_hash") != digest(stored.get("rows")):
+                raise ValueError("stored promotion arm observation integrity failure")
+            self.resumed_arms.append(label)
+            self._measured_arms[label] = (deepcopy(entries), list(cases), fresh, identity)
+            return deepcopy(stored["rows"])
         kwargs = dict(
             dataset_root=self.dataset_root,
             registry=self._registry_for(entries),
@@ -1242,7 +1254,10 @@ class PromotionRun:
             deadline=self.deadline,
         )
         evaluate = self.backend.evaluate_fresh if fresh else self.backend.evaluate
-        rows = evaluate(list(cases), **kwargs)
+        rows = evaluate_owned_inputs(evaluate, cases, **kwargs)
+        if self._arm_identity(entries, cases, fresh=fresh) != identity:
+            raise RuntimeError("promotion arm inputs changed; refusing the observation")
+        self._measured_arms[label] = (deepcopy(entries), list(cases), fresh, identity)
         # An arm with an infrastructure failure is NOT a completed measurement
         # and is deliberately not persisted: storing it would let a later run
         # resume an arm that never produced a comparable pair, and an outage
@@ -1251,12 +1266,12 @@ class PromotionRun:
         unhealthy = arm_has_infrastructure_failure(rows)
         self.arm_health[label] = unhealthy
         if not unhealthy:
-            save_json(path, {"label": label, "identity": identity, "rows": rows})
+            save_json(path, {"label": label, "identity": identity, "rows": rows, "rows_hash": digest(rows)})
         return rows
 
     def install_rows(self, label: str, rows: Sequence[Mapping[str, Any]]) -> None:
         """Inject precomputed rows (offline harness and resume reuse)."""
-        self._provided_rows[label] = [dict(row) for row in rows]
+        self._provided_rows[label] = deepcopy(list(rows))
 
     # -- stages -----------------------------------------------------------
     def _structural(self) -> dict[str, Any]:
@@ -2155,6 +2170,7 @@ class PromotionRun:
         }
 
     def _publish(self, report: Mapping[str, Any]) -> dict[str, Any]:
+        self._verify_measured_arms()
         if any((self.output_dir / name).exists() for name in ("version.json", "promotion.json")):
             raise ValueError("promotion output already exists without its committed publication")
         artifacts = deepcopy(self.candidate.get("artifacts") or [])
@@ -2230,7 +2246,13 @@ class PromotionRun:
                                idempotency_key=f"{self._publication_id()}:{event['event']}")
         return report
 
+    def _verify_measured_arms(self) -> None:
+        for entries, cases, fresh, identity in self._measured_arms.values():
+            if self._arm_identity(entries, cases, fresh=fresh) != identity:
+                raise RuntimeError("promotion arm inputs changed before publication")
+
     def _write(self, report: Mapping[str, Any]) -> None:
+        self._verify_measured_arms()
         self._normalize_report(report)
         save_json(self.output_dir / "promotion.json", report)
         self.ledger.append("promotion_attempt", self._attempt_event(report))

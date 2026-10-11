@@ -7,6 +7,7 @@ every outcome, including failures, for the current paired comparison.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from pathlib import Path
 import json
 import threading
@@ -16,6 +17,7 @@ from typing import Callable
 from detector.identity import digest
 from detector.interventions import authority_identity
 from evolution.contracts import save_json
+from evolution.backends import evaluate_owned_inputs
 
 
 class CycleJournal:
@@ -188,6 +190,11 @@ class CycleJournal:
 
     def evaluate(self, cases, *, registry, fresh, evaluate, kwargs):
         self.verify_inputs()
+        registry = deepcopy(registry)
+        kwargs = deepcopy(kwargs)
+        if "registry" in kwargs and digest(kwargs["registry"]) != digest(registry):
+            raise RuntimeError("checkpoint registry inputs disagree")
+        kwargs["registry"] = registry
         arm = digest({"registry": registry, "fresh": fresh})
         authority = authority_identity(registry)
         self._bind_authority(authority)
@@ -204,7 +211,7 @@ class CycleJournal:
                     raise RuntimeError("checkpoint observation integrity failure")
                 self.verify_inputs(case)
                 return envelope["row"]
-            result = evaluate([case], **{**kwargs, "workers": 1})
+            result = evaluate_owned_inputs(evaluate, [case], **{**kwargs, "workers": 1})
             if len(result) != 1 or result[0]["case"] != case:
                 raise RuntimeError("backend returned an incomplete case observation")
             row = result[0]

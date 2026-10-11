@@ -136,6 +136,20 @@ def backend_runtime_identity(backend: Any, *, cases: Sequence[str] = ()) -> dict
     return {**payload, "digest": digest(payload)}
 
 
+def evaluate_owned_inputs(evaluate: Any, cases: Sequence[str], **kwargs: Any) -> list[dict[str, Any]]:
+    selected = list(cases)
+    inputs = copy.deepcopy(kwargs)
+    def identity() -> str:
+        return digest({"cases": selected, **{
+            key: inputs.get(key) for key in ("registry", "gold_map", "gold_step_map")
+        }})
+    expected = identity()
+    rows = evaluate(selected, **inputs)
+    if identity() != expected:
+        raise RuntimeError("evaluation inputs changed; refusing the observation")
+    return copy.deepcopy(rows)
+
+
 def backend_execution_identity(
     backend: Any, record: Mapping[str, Any], *, case_id: str,
     registry: Mapping[str, Any] | None = None, replay: Mapping[str, Any] | None = None,

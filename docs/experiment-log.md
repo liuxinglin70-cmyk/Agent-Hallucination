@@ -28,7 +28,7 @@
 
 B35六条重放/并发和五条recall输出边界正式反例先失败后通过。三个实际记忆入口共用_append_record，在线程锁及现有进程租约内校验逻辑键、完整JSON内容与历史结构，检查和追加作为一个操作；同键内容变化拒绝，同键同内容返回实际持久化独立副本。旧_already_present和重复SHA实现删除，episode摘要复用共享digest。纠正记录验证原episode摘要后独立追加，新证据可再分类，原始episode字节不变。recall只写目录内JSON快照，不覆盖JSONL或越界。新44项、相关130项及末次58项/6项通过，覆盖实际Engine、线程竞争/委托上下文、独立进程租约、写入前后OSError/KeyboardInterrupt、JSON类型/非有限值/所有权、未知/重复历史及纠正。ef2ed2ca完整1947/58、AST80/三CLI/源码不变检查通过；[记忆核验](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/430f54e639134c6f8bfffa6d85982d43/memory-commit-verification.md)、[纯代码](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/430f54e639134c6f8bfffa6d85982d43/summary.json)、[平台](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/cbdff2c773744c61b7adc1fcf6a7468f/summary.json)。
 
-B43成本来源丢失已修复待独立复审：固定Git基线20项反例失败；完整2113项纯代码、58项平台及AST80/三CLI/源码不变通过。共享来源规则贯通runner、成本汇总、实验报告和脚本导出，未知来源不宣称精确值或已证明下界；数字读数及未知请求数保留。220条扫描命中逐行核销，5条公开合同保留必要行为并清除失效注释/命名。旧架构方案已移入docs/design-archive，仅修正搬迁后的日志链接，历史内容保留。最终清理、独立审查及18包验收未完成。 [纯代码](../artifacts/code_quality/35706f9fe1f8df50b069722445de2450ced671ab739d76ae9a76509758966c52/5263de900c824f55980d4880e570bd0f/summary.json)、[平台](../artifacts/code_quality/35706f9fe1f8df50b069722445de2450ced671ab739d76ae9a76509758966c52/cf3533c6a15047909636604234cf0497/summary.json)、[公开合同](../artifacts/code_quality/35706f9fe1f8df50b069722445de2450ced671ab739d76ae9a76509758966c52/public-contract-review.json)。本轮仅验证代码，不运行真实模型或生成新实验结果。
+固定代码8faf8b0的三个只读独立复审已完成，确认B44–B49六项代码问题和两项文档漂移；主代理已逐根因补反例并修改源规则，当前重新验证及独立复核尚未完成。此前2113/58全量仅属于修复前源码，离线回归不代表真实模型效果。原始数据、校准、归档和本文历史正文保持原字节；当前状态见[实施台账](../IMPLEMENTATION_PLAN.md)。
 
 ## 2026-09-24 至 09-27：三轮自进化与 G0 检测器基线
 

@@ -1964,7 +1964,7 @@ class InterventionPlan:
             arguments[str(name)] = _resolve_component_input(
                 str(field), packet, context,
             )
-        result = executor.judge(predicate, packet, {"arguments": arguments})
+        result = executor.judge(predicate, deepcopy(packet), {"arguments": deepcopy(arguments)})
         if not isinstance(result, Mapping):
             raise ValueError(
                 f"{intervention_id}: the component executor must return a mapping"

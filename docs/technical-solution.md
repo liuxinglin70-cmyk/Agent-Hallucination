@@ -121,7 +121,7 @@ Tracer在provider前从当前packet和策略重算任务证书与完整路径，
 
 新增上下文按 UTF-8 内容字节保守计入输入预算；repair 单独准入，耗尽时回到基础 Tracer。新增阴性复审的 Scanner、Upgrade 多票、Tracer、Defense 及 repair 都由 provider 的 `added_request_scope` 共享同一案例请求、输入、输出和 deadline 预算，transport 不重新领预算。预算持有者记录复审启动，整例重试不能再次启动可选阴性复审；后续新案例独立获得预算。内部 continuation 绑定 case、packet、配置、registry 和证据，复用同次已执行的 Judge；不借用外部冻结回放入口。高置信阴性的审计在基础证明形成后执行。预算耗尽保留已形成的基础证明与实际请求成本；策略资格回调结束立即核验预算与整例期限/取消，允许和拒绝分支共用；整个可选诊断和反馈阶段共享异常证明保留边界，fatal、整例超时和取消都保留基础证明。
 
-阴性反馈独立开关默认为 false，仅在 tracer_context 模式、基础 clean 且原召回未运行时检查已核验异常。生产配置缺少真实校准时记录 calibration_unavailable，不启动扩展。`OfflineFeedbackPolicy` 是无凭据 API 的显式离线策略注入点，不能从 JSON 校准证书装载；它允许复审后仍必须经过完整召回、升级、独立听证和裁决。Scanner 只接收有界异常与来源，不接收 Judge 的 correct_result；仅凭高风险或模型意见不会重开。当前离线闭环不证明真实收益，完整同 claim 首次引入证书及演化消费仍在实施。
+阴性反馈独立开关默认为 false，仅在 tracer_context 模式、基础 clean 且原召回未运行时检查已核验异常。生产配置缺少真实校准时记录 calibration_unavailable，不启动扩展。`OfflineFeedbackPolicy` 是无凭据 API 的显式离线策略注入点，不能从 JSON 校准证书装载；它允许复审后仍必须经过完整召回、升级、独立听证和裁决。Scanner 只接收有界异常与来源，不接收 Judge 的 correct_result；仅凭高风险或模型意见不会重开。当前已实现有限字面算术任务的同 claim 首次声明及符号修复证书，并由演化侧核验后消费；它不证明通用语义因果关系或真实检测收益，整包验收状态见实施台账。
 
 ### 测量、故障与成本
 
@@ -129,7 +129,7 @@ Tracer在provider前从当前packet和策略重算任务证书与完整路径，
 
 `runner.py` 统一结果落盘、尝试记录、断点复用和调度；`runtime.py` 提供运行控制、deadline、原子写入和单写者保护。整例重试共享案例 deadline。`measurement.request_execution` 汇总单次 Detector 的真实请求，`case_execution` 生成 execution.v2，保留每次整例尝试的结果、错误和请求成本；嵌套 usage scope 向父层归并一次。批次每次尝试结束即原子保存 attempt.json，程序错误和中断仍传播，汇总保留已发生的成本而不补造结果行。未知请求统计用 usage_unknown_cases 表示，旧 providers/hearings 统计仅为下界。
 
-`measurement.cost_summary` 是运行/报告成本汇总真源，`merge_usage_sources` 合并成本来源。request_observations 表示实际请求观察；legacy_stage_metadata_lower_bound 表示阶段元数据的读数下界，混合请求观察仍保留这个下界来源；缺失或不支持的显式来源、异常嵌套结构返回 unknown。来源不等于统计完整性，usage_missing_attempts/usage_unknown_cases 单独描述缺测；未知计数不补零。result_usage 只读解析嵌套来源，不改历史结果。Judge/Defense 的 provider 保留最后有效票元数据，usage_total 汇总成功票的 usage，可能遗漏失败或repair请求；全部请求成本以 execution 中实际观察为准。成本报告和逐例/脚本导出保留 usage_source，未知来源不宣称精确总量或已证下界。
+`measurement.cost_summary` 是运行/报告成本汇总真源，`merge_usage_sources` 合并成本来源。request_observations 表示实际请求观察；legacy_stage_metadata_lower_bound 表示阶段元数据的读数下界，混合请求观察仍保留这个下界来源；缺失来源仅在原请求列表、计数及累计usage一致，或嵌套attempt拥有来源时识别；没有观测依据、不支持的显式来源和异常嵌套结构返回 unknown。来源不等于统计完整性，usage_missing_attempts/usage_unknown_cases 单独描述缺测；未知计数不补零。result_usage 只读解析嵌套来源，不改历史结果。Judge/Defense 的 provider 保留最后有效票元数据，usage_total 汇总成功票的 usage，可能遗漏失败或repair请求；全部请求成本以 execution 中实际观察为准。成本报告和逐例/脚本导出保留 usage_source，未知来源不宣称精确总量或已证下界。
 
 批次 measurement 的 `invocation_cost` 只统计本次实际执行（含中断请求），缓存命中不收取历史请求；`case_attempt_cost` 汇总选中案例最近一次完成测量，`run_lifetime_cost` 从持久化整例尝试 journal 累计所有实际请求，失败与重测保留且不重复。顶层 usage/elapsed 和实验报告 cost 使用 invocation 口径，独立列出历史成本；报告保留该口径自己的来源，缺来源不借用历史案例来源推断。provider 并发峰值在运行控制退出前后由同一实例显式交付。
 
@@ -195,6 +195,8 @@ L1 开发回放要求两臂恰好覆盖预定 target∪neighbor，每例各一�
 
 CycleJournal的save与权威绑定共用独立JSON发布：原子替换成功后才更新内存；写入异常后核对实际落盘是否为旧提交或本次提交，无法确认则拒绝状态读取、保存和新观察，要求重新打开。state返回独立快照，合同、起始注册表和更新输入不保留外部可变引用；非有限JSON拒绝。Engine.run_cycle将恢复准备和执行纳入同一清理作用域；原始取消、fatal或业务异常保持对象身份传播，checkpoint与ledger中断记录分别尝试，记录故障以cycle_recording_errors中的(stage, exception)元组附在原异常对象上，兼容Python 3.10。周期完成由统一入口将evolution.cycle_completion.v1记录与status=completed一起原子写入checkpoint，记录绑定合同摘要、部署摘要、完整报告/摘要、cycle_completed事件及记录摘要；正常、预检阻断、审计冻结共用。提交完成后checkpoint不可改写或新增观察，恢复不更新时间/重提案/重测/重部署，仅校验并补齐report文件和带幂等键的完成事件。报告或事件的完整内容/JSON类型冲突、重复完成事件、记录摘要/语义或合同漂移拒绝且不覆盖。未提交完成而既有终态输出也拒绝；待补输出时部署必须仍对应提交，输出完整的历史周期可复用历史报告。full_self_evolution通过同一run_cycle恢复完成周期，不直接信任散落报告或跳过检查点核验。该完成记录不证明此前部署、全部记忆与其他周期事件已经形成一个原子提交。
 
+周期合同同时绑定实际gold_map/gold_step_map的evaluator摘要；它们用于评分，不进入部署registry或提案。evaluate_owned_inputs为Engine、CycleJournal和PromotionRun的测量回调提供独立案例、registry、标签与返回rows快照，回调改变测量输入时拒绝观测。Journal的arm身份与实际传入registry共用绑定。PromotionRun拥有candidate/protocol/config及预供rows副本；arm身份含完整候选、协议、配置、backend runtime和案例文件内容，显式合成backend没有案例文件时记录缺失。测量后和终态发布前均重核验；已存arm的身份或内容摘要不符时拒绝并保留原字节，不能在恢复中重抽已完成臂。install_rows是显式离线预供观察入口，不代表经过正式backend测量或带来源的恢复证据。
+
 EvolutionEngine周期历史由私有_cycle_reports拥有，公开cycle_reports在操作锁内返回独立深副本，没有替换入口；run_cycle返回、内部历史和checkpoint记录互不共享可变内容。run_experiment只聚合本次请求中实际读取的提交报告，完成计数、提前停止、停止原因和验证集评估都使用同一范围；其他周期不混入零/前缀请求，也不压制本次范围的验证。零周期返回空聚合且验证集status=not_run。公开快照的嵌套修改、追加或清空不能污染内部历史及恢复结果。
 
 ### 核心不变量
@@ -224,7 +226,7 @@ EvolutionEngine周期历史由私有_cycle_reports拥有，公开cycle_reports�
 | 工具/测试依赖历史产物目录 | 清理文档破坏执行 | 驱动迁 scripts，划分迁 protocols，回放迁 fixtures |
 | 旧文档与代码不同步 | 定位冲突口径、现状与计划混淆 | 当前合同集中本文，旧内容标为历史 |
 
-静态结构检查覆盖 66 个顶层 Python 模块（detector 28、evolution 33、experiments 5），没有 detector 反向依赖 evolution 的导入。engine（5353 行）、promotion（2325 行）和 interventions（2247 行）仍是主要维护热点。
+静态结构检查覆盖 80 个顶层 Python 模块（detector 36、evolution 37、experiments 7），没有 detector 反向依赖 evolution 的导入。engine、promotion 和 interventions 仍是主要维护热点；当前检查结果以固定源码审计报告为准。
 
 一次冗余梳理移除了没有生产调用方的代码：RepairUnit 声明与编译器、统计评估器、注册表单笔事务、注册表自愈、单元漂移记录、`event_source_mapping` 与 `resolution_opportunity`。它们此前只被各自的测试引用，`promotion.py` 中通向其中的分支在任何候选上都无法到达。保留的 `retire()` 反向依赖检查是实时的：它仍会拒绝单独退役被现役 Guard 消费的证据项。
 
@@ -246,7 +248,7 @@ engine、backends、promotion、interventions 仍承担较多职责，后续物�
 
 可恢复 provider/合同失败或预算不足只改变诊断 health，保留基础终态和必需阶段健康。致命 provider 失败继续返回原有 invalid/unresolved 信封并附 `base_detection_result` 和停止原因；KeyboardInterrupt/RunStopped 等传播原异常，整例 attempt 记录保留已生成的基础证明和实际成本。RunStopped 属于运行控制中止，继承 BaseException，provider 不转换为普通 provider 错误，backend 的案例失败处理也不能吞掉它。等待 provider 容量时耗尽单例 deadline 则抛 CaseDeadlineExceeded，由 provider 转为不可同轮重试的 case_deadline_exceeded，保留单例失败与全运行取消的区别。
 
-**定位与复审合同**：tracer_context 已向当前听证的 Tracer 传入有界局部核验证据，并校验上下文身份；完整同 claim 证书仍在实施。阴性复审的当前权限与生产校准限制见本文因果诊断合同，不把拟议能力写成已实现行为。
+**定位与复审合同**：tracer_context 已向当前听证的 Tracer 传入有界局部核验证据，并校验上下文身份；有限字面算术任务的同 claim 首次声明及符号修复证书已实现，开发侧仅在目标、上下文和独立证据一致时消费。阴性复审的当前权限与生产校准限制见本文因果诊断合同，不把拟议能力写成已实现行为。
 
 **开发侧因果失败记录**：Tracer结果保存独立复制的完整causal_context及摘要。`evolution/causal_failures.py` 从当前无标签轨迹和实际backend策略重算听证证书，核对目标、上下文摘要、有效Tracer/Defense、终局定位权限和Tracer步与结果步的一致性。漏检、误报、运行不可测、证据缺失、多指控歧义分别记录；只有单个成立听证中的材料性、首个规范结果声明及符号修复均核验通过，才能分类同claim的early/late/aligned。责任步与首次位置比较使用packet.position，source_step_id只作为原始来源标识保留。
 

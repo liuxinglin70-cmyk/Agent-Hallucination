@@ -174,10 +174,25 @@ def merge_usage_sources(sources: Sequence[Any]) -> str:
 
 
 def _execution_usage_source(execution: Mapping[str, Any]) -> str:
-    sources = [execution.get("usage_source", "request_observations")]
     attempts = execution.get("case_attempts", [])
     if not isinstance(attempts, list):
         return "unknown"
+    sources = []
+    if "usage_source" in execution:
+        sources.append(execution["usage_source"])
+    elif not attempts:
+        requests = execution.get("requests")
+        if not isinstance(requests, list) or not all(isinstance(request, Mapping) for request in requests):
+            return "unknown"
+        usage: dict[str, Any] = {}
+        for request in requests:
+            if isinstance(request.get("usage"), Mapping):
+                accumulate_usage(usage, request["usage"])
+        if (execution.get("provider_attempts") != len(requests)
+                or execution.get("usage_missing_attempts") != sum(request.get("usage") is None for request in requests)
+                or (execution.get("usage") or {}) != usage):
+            return "unknown"
+        sources.append("request_observations")
     for attempt in attempts:
         child = attempt.get("execution") if isinstance(attempt, Mapping) else None
         sources.append(_execution_usage_source(child) if isinstance(child, Mapping) else "unknown")

@@ -36,6 +36,7 @@ from evolution.backends import (
     DetectionBackend,
     LiveDetectorBackend,
     backend_runtime_identity,
+    evaluate_owned_inputs,
     make_backend,
 )
 from evolution.config import ensure_dirs, load_config, resolve_path
@@ -527,7 +528,7 @@ class _ArmRunner:
         )
         journal = getattr(self.engine, "_journal", None)
         if journal is None:
-            return evaluate(list(cases), **kwargs)
+            return evaluate_owned_inputs(evaluate, cases, **kwargs)
         rows = journal.evaluate(list(cases), registry=registry, fresh=fresh,
                                 evaluate=evaluate, kwargs=kwargs)
         # Restored baseline observations must seed the replay backend, even
@@ -3188,6 +3189,7 @@ class EvolutionEngine:
             "config": digest(self.config), "source": source_identity("detector", "evolution"),
             "runtime_identity": backend_runtime_identity(self.backend, cases=selected),
             "split": split_manifest_report(self.split),
+            "evaluator": {"gold": digest(self.gold_map), "gold_steps": digest(self.gold_step_map)},
             "data": {case: artifact_digest(Path(self.config["dataset_root"]) / case) for case in selected},
         }
 
@@ -4392,8 +4394,8 @@ class EvolutionEngine:
             if requires_fresh_evaluation(entries)
             else self.backend.evaluate
         )
-        return evaluate(
-            list(cases),
+        return evaluate_owned_inputs(
+            evaluate, cases,
             dataset_root=self.config["dataset_root"],
             registry=registry,
             gold_map=self.gold_map,
@@ -4640,8 +4642,8 @@ class EvolutionEngine:
         evaluate = (
             self.backend.evaluate_fresh if fresh else self.backend.evaluate
         )
-        return evaluate(
-            list(cases),
+        return evaluate_owned_inputs(
+            evaluate, cases,
             dataset_root=self.config["dataset_root"],
             registry=registry,
             gold_map=self.gold_map,
