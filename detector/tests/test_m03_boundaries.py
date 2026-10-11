@@ -156,3 +156,122 @@ def test_nested_status_data_is_not_a_success_report():
          "tool_responses": ['[' * depth + '"success"' + ']' * depth]},
     ]})
     assert run_predicate("final_delivery_present", packet)["verdict"] == "not_applicable"
+
+
+@pytest.mark.parametrize("requirement", [
+    "Start the engine.", "Please go to the nearest tire shop.",
+])
+def test_model_contract_cannot_add_an_action_obligation(requirement):
+    packet = build_packet({
+        "question": "Ask whether I want the engine activated. Do not activate it.",
+        "history": [{"role": "assistant", "content": "Would you like me to start the engine?"}],
+    })
+    context = {"contracts": [{"kind": "required_action", "requirement": requirement}]}
+    assert run_predicate("required_action_present", packet)["verdict"] == "not_applicable"
+    assert run_predicate("required_action_present", packet, context)["verdict"] == "not_applicable"
+
+
+def test_evidence_plan_does_not_turn_a_model_contract_into_an_obligation():
+    from detector.interventions import InterventionPlan, build_intervention_registry
+    from detector.predicate_context import judge_predicate_context
+    from detector.tests.test_interventions import _candidate
+
+    packet = build_packet({
+        "question": "Ask whether I want the engine activated. Do not activate it.",
+        "history": [
+            {"role": "assistant", "tool_calls": [{"name": "inspect_vehicle", "arguments": {}}],
+             "tool_responses": ["parked"]},
+            {"role": "assistant", "content": "Would you like me to start the engine?"},
+        ],
+    })
+    entry = _candidate(type="evidence_check", hook="judge.post", body={
+        "predicate": "required_action_present", "runner": "deterministic",
+        "output_verdicts": ["satisfied", "violated", "not_applicable"],
+    })
+    plan = InterventionPlan.from_registry(build_intervention_registry([entry]))
+    context = judge_predicate_context({
+        "is_hallucination": False,
+        "contracts": [{"kind": "required_action", "requirement": "Start the engine."}],
+    })
+    rows = plan.evidence_for("judge.post", packet, context)
+    assert len(rows) == 1
+    assert rows[0]["verdict"] == "not_applicable"
+    assert plan.facts["required_action_present"] == "not_applicable"
+
+
+def test_causal_audit_does_not_certify_a_model_supplied_action():
+    from detector.causal_audit import run_causal_audit
+    from detector.causal_graph import build_observed_dependencies, project_dependency_closure
+    from detector.runtime import AddedBudget
+    from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates
+    from detector.tests.test_causal_audit import policy
+
+    packet = build_packet({
+        "question": "Ask whether I want the engine activated. Do not activate it.",
+        "history": [{"role": "assistant", "content": "Would you like me to start the engine?"}],
+    })
+    context = {"contracts": [{"kind": "required_action", "requirement": "Start the engine."}]}
+    cfg = policy()
+    profile = build_step_risk_profile(packet, policy=cfg, context=context)
+    candidates = select_causal_candidates(profile, mandatory_event_ids=[], policy=cfg)
+    graph = build_observed_dependencies(packet, policy=cfg)
+    projection = project_dependency_closure(packet, candidates=candidates, graph=graph, policy=cfg)
+    audit, _ = run_causal_audit(packet=packet, profile=profile, projection=projection,
+                              context=context, config={"causal_audit": cfg}, budget=AddedBudget(cfg))
+    assert profile["task_signals"] == []
+    assert audit["task_checks"] == []
+
+
+@pytest.mark.parametrize("question", [
+    "Start the engine.", "Please go to the nearest tire shop.",
+    "You must use the search tool before answering.",
+])
+def test_real_action_obligations_survive_an_unrelated_model_contract(question):
+    packet = build_packet({"question": question, "history": [
+        {"role": "assistant", "content": "Would you like me to start the engine?"},
+    ]})
+    context = {"contracts": [{"kind": "required_action", "requirement": "Check the weather."}]}
+    assert run_predicate("required_action_present", packet)["verdict"] == "violated"
+    assert run_predicate("required_action_present", packet, context)["verdict"] == "violated"
+
+
+def test_detector_records_no_mechanical_violation_from_a_model_contract(monkeypatch):
+    from detector.api import Detector
+    from detector.interventions import build_intervention_registry
+    from detector.tests.test_interventions import CONFIG, _candidate
+
+    record = {
+        "question": "Ask whether I want the engine activated. Do not activate it.",
+        "history": [
+            {"role": "assistant", "tool_calls": [{"name": "inspect_vehicle", "arguments": {}}],
+             "tool_responses": ["parked"]},
+            {"role": "assistant", "content": "Would you like me to start the engine?"},
+        ],
+    }
+    monkeypatch.setattr("detector.api.run_judge", lambda **kwargs: (
+        {"ok": True, "parsed": {
+            "is_hallucination": False, "confidence": "high", "evidence_refs": [],
+            "contracts": [{"kind": "required_action", "requirement": "Start the engine."}],
+        }, "provider": {}},
+        {"stage": "judge", "state": "ok", "attempts": 0, "view": "complete", "warnings": []},
+    ))
+    monkeypatch.setattr("detector.api.run_recall_scan", lambda **kwargs: (
+        {"ok": True, "candidates": []},
+        {"stage": "recall_scanner", "state": "ok", "attempts": 0, "view": "complete", "warnings": []},
+    ))
+    monkeypatch.setattr("detector.api.run_causal_upgrade", lambda **kwargs: (
+        {"ok": True, "upgrades": [], "upgraded_candidate": None},
+        {"stage": "causal_upgrade", "state": "not_needed", "attempts": 0,
+         "view": "not_rendered", "warnings": []},
+    ))
+    registry = build_intervention_registry([_candidate(
+        type="evidence_check", hook="judge.post", body={
+            "predicate": "required_action_present", "runner": "deterministic",
+            "output_verdicts": ["satisfied", "violated", "not_applicable"],
+        },
+    )])
+    result = Detector(CONFIG, require_credentials=False).detect(record, interventions=registry)
+    evidence = result["proof"]["deployment"]["evidence"]
+    assert len(evidence) == 1
+    assert evidence[0]["verdict"] == "not_applicable"
+    assert result["state"] == "verified_clean"

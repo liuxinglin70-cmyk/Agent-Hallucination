@@ -422,17 +422,8 @@ def predicate_required_action_present(
         if not any(action in name for name in names)
     )
 
-    # Conservative completion signals from explicit task contracts. These are
-    # deliberately narrow: only movement actions and a pending-permission
-    # engine-start are considered mechanically checkable.
-    contracts = [
-        str(item.get("requirement") or "")
-        for item in context.get("contracts") or ()
-        if isinstance(item, Mapping)
-        and str(item.get("kind") or "") == "required_action"
-    ]
-    contract_texts = [question, *contracts]
-    movements = _movement_requirements(contract_texts)
+    # Model contracts describe the task but cannot add mechanical obligations.
+    movements = _movement_requirements([question])
     movement_violated = []
     for target in movements:
         tokens = {
@@ -451,11 +442,10 @@ def predicate_required_action_present(
             movement_violated.append(target)
 
     start_pending = False
-    engine_requested = any(
-        "start" in text.lower() and (
-            "engine" in text.lower() or "ignition" in text.lower()
+    engine_requested = (
+        "start" in question.lower() and (
+            "engine" in question.lower() or "ignition" in question.lower()
         )
-        for text in contract_texts
     )
     if engine_requested and _permission_pending(packet):
         start_pending = True
@@ -478,17 +468,11 @@ def predicate_required_action_present(
             "verdict": "violated",
             "detail": f"required actions missing from tool calls: {missing}",
         }
-    if not required and contracts:
+    if not required:
         return {
             "predicate": "required_action_present",
             "verdict": "not_applicable",
-            "detail": "required_action contract is not covered by a mechanical parser",
-        }
-    if not required and not contracts:
-        return {
-            "predicate": "required_action_present",
-            "verdict": "not_applicable",
-            "detail": "no explicit required_action found in question or contracts",
+            "detail": "no explicit required_action found in question",
         }
     return {
         "predicate": "required_action_present",
