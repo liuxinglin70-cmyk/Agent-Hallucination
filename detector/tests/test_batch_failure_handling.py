@@ -155,11 +155,7 @@ def test_a_degraded_verdict_is_a_reading_not_an_outage():
 
 
 def test_usage_comes_from_the_per_attempt_record_not_one_ballot():
-    """``usage`` alone undercounts a vote by its ballot multiplicity.
-
-    Measured on a real archived row: the judge stage reported 4948 tokens as
-    its sample while the vote had actually spent 17359.
-    """
+    """An aggregate numeric reading does not establish its provenance."""
     result = _envelope("g.json", execution={
         "usage": {"total_tokens": 17359},
         "provider_attempts": 3,
@@ -167,7 +163,7 @@ def test_usage_comes_from_the_per_attempt_record_not_one_ballot():
     })
     reading = result_usage(result)
     assert reading["usage"]["total_tokens"] == 17359
-    assert reading["source"] == "request_observations"
+    assert reading["source"] == "unknown"
 
 
 def test_legacy_rows_report_a_lower_bound_and_say_so():

@@ -63,7 +63,7 @@ def test_actual_cycle_refuses_changed_inputs_before_observation_commit(tmp_path,
             return {"cycle": cycle, "state": "completed"}
 
         monkeypatch.setattr(engine, "_run_cycle", run)
-        with pytest.raises(RuntimeError, match="cycle execution inputs changed"):
+        with pytest.raises(RuntimeError, match="(cycle execution|evaluation) inputs changed"):
             engine.run_cycle(1)
         assert calls == ([] if when == "before" else [cases[0]])
         checkpoint = tmp_path / "work/checkpoints/cycle001"

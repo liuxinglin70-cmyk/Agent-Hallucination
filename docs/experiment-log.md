@@ -28,7 +28,7 @@
 
 B35六条重放/并发和五条recall输出边界正式反例先失败后通过。三个实际记忆入口共用_append_record，在线程锁及现有进程租约内校验逻辑键、完整JSON内容与历史结构，检查和追加作为一个操作；同键内容变化拒绝，同键同内容返回实际持久化独立副本。旧_already_present和重复SHA实现删除，episode摘要复用共享digest。纠正记录验证原episode摘要后独立追加，新证据可再分类，原始episode字节不变。recall只写目录内JSON快照，不覆盖JSONL或越界。新44项、相关130项及末次58项/6项通过，覆盖实际Engine、线程竞争/委托上下文、独立进程租约、写入前后OSError/KeyboardInterrupt、JSON类型/非有限值/所有权、未知/重复历史及纠正。ef2ed2ca完整1947/58、AST80/三CLI/源码不变检查通过；[记忆核验](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/430f54e639134c6f8bfffa6d85982d43/memory-commit-verification.md)、[纯代码](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/430f54e639134c6f8bfffa6d85982d43/summary.json)、[平台](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/cbdff2c773744c61b7adc1fcf6a7468f/summary.json)。
 
-固定代码8faf8b0的三个只读独立复审已完成，确认B44–B49六项代码问题和两项文档漂移；主代理已逐根因补反例并修改源规则，当前重新验证及独立复核尚未完成。此前2113/58全量仅属于修复前源码，离线回归不代表真实模型效果。原始数据、校准、归档和本文历史正文保持原字节；当前状态见[实施台账](../IMPLEMENTATION_PLAN.md)。
+两轮三个只读独立复审已完成，发现的嵌套用量、评估输入所有权与恢复身份边界已修共同源规则，当前固定源码全量及独立复核尚未完成。此前2113/58仅属于修复前源码，离线回归不代表真实模型效果。原始数据、校准、归档和本文历史正文保持原字节；当前状态见[实施台账](../IMPLEMENTATION_PLAN.md)。
 
 ## 2026-09-24 至 09-27：三轮自进化与 G0 检测器基线
 

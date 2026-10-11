@@ -33,6 +33,8 @@ Protocol invariants enforced here:
 
 from __future__ import annotations
 
+from evolution.backends import evaluate_owned_inputs
+
 import hashlib
 import json
 import subprocess
@@ -293,7 +295,7 @@ class ResearchRun:
                         "baseline case-evaluation budget is exhausted",
                     )
                 registry = build_intervention_registry([])
-                results = self.backend.evaluate_fresh(
+                results = evaluate_owned_inputs(self.backend.evaluate_fresh,
                     [case_id],
                     dataset_root=self.dataset_root,
                     registry=registry,
@@ -584,7 +586,7 @@ class ResearchRun:
                     f"missing cases ({len(missing)} missing, "
                     f"{self.budget.screening_left()} left)",
                 )
-            rows = self.backend.evaluate_fresh(
+            rows = evaluate_owned_inputs(self.backend.evaluate_fresh,
                 missing,
                 dataset_root=self.dataset_root,
                 registry=registry,
@@ -1158,7 +1160,7 @@ def run_frozen_repeats(
                         f"({used} used, {len(missing)} missing)"
                     )
                     break
-                rows = backend.evaluate_fresh(
+                rows = evaluate_owned_inputs(backend.evaluate_fresh,
                     missing,
                     dataset_root=manifest["input_manifest"]["dataset_root"],
                     registry=registry,

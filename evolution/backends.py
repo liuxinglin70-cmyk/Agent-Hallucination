@@ -139,13 +139,16 @@ def backend_runtime_identity(backend: Any, *, cases: Sequence[str] = ()) -> dict
 def evaluate_owned_inputs(evaluate: Any, cases: Sequence[str], **kwargs: Any) -> list[dict[str, Any]]:
     selected = list(cases)
     inputs = copy.deepcopy(kwargs)
-    def identity() -> str:
-        return digest({"cases": selected, **{
-            key: inputs.get(key) for key in ("registry", "gold_map", "gold_step_map")
+    def identity(values: Mapping[str, Any], identifiers: Sequence[str]) -> str:
+        root = values.get("dataset_root")
+        data = {case: artifact_digest(Path(root) / case)
+                if (Path(root) / case).is_file() else None for case in identifiers} if root is not None else {}
+        return digest({"cases": list(identifiers), "data": data, "dataset_root": str(root), **{
+            key: values.get(key) for key in ("registry", "gold_map", "gold_step_map")
         }})
-    expected = identity()
+    expected = identity(inputs, selected)
     rows = evaluate(selected, **inputs)
-    if identity() != expected:
+    if identity(inputs, selected) != expected or identity(kwargs, cases) != expected:
         raise RuntimeError("evaluation inputs changed; refusing the observation")
     return copy.deepcopy(rows)
 

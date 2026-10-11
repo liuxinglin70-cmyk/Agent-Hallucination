@@ -173,10 +173,33 @@ def merge_usage_sources(sources: Sequence[Any]) -> str:
     return "unknown"
 
 
+def _execution_totals(executions: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    usage: dict[str, Any] = {}
+    for execution in executions:
+        if isinstance(execution.get("usage"), Mapping):
+            accumulate_usage(usage, execution["usage"])
+    totals: dict[str, Any] = {"usage": usage or None}
+    for key in ("provider_attempts", "usage_missing_attempts"):
+        values = [execution.get(key) for execution in executions]
+        totals[key] = sum(values) if all(type(value) is int for value in values) else None
+    return totals
+
+
 def _execution_usage_source(execution: Mapping[str, Any]) -> str:
     attempts = execution.get("case_attempts", [])
     if not isinstance(attempts, list):
         return "unknown"
+    children = [attempt.get("execution") if isinstance(attempt, Mapping) else None for attempt in attempts]
+    if not all(isinstance(child, Mapping) for child in children):
+        return "unknown"
+    if children:
+        totals = _execution_totals(children)
+        if (execution.get("usage") or None) != totals["usage"]:
+            return "unknown"
+        for key in ("provider_attempts", "usage_missing_attempts"):
+            if (execution.get(key) != totals[key]
+                    or (totals[key] is not None and type(execution.get(key)) is not int)):
+                return "unknown"
     sources = []
     if "usage_source" in execution:
         sources.append(execution["usage_source"])
@@ -193,9 +216,7 @@ def _execution_usage_source(execution: Mapping[str, Any]) -> str:
                 or (execution.get("usage") or {}) != usage):
             return "unknown"
         sources.append("request_observations")
-    for attempt in attempts:
-        child = attempt.get("execution") if isinstance(attempt, Mapping) else None
-        sources.append(_execution_usage_source(child) if isinstance(child, Mapping) else "unknown")
+    sources.extend(_execution_usage_source(child) for child in children)
     return merge_usage_sources(sources)
 
 
@@ -203,18 +224,12 @@ def case_execution(
     attempts: Sequence[Mapping[str, Any]], *, started_at: str, finished_at: str,
     elapsed_seconds: float,
 ) -> dict[str, Any]:
-    usage: dict[str, Any] = {}
+    executions = [attempt["execution"] for attempt in attempts]
     requests: list[dict[str, Any]] = []
-    counts: list[int | None] = []
-    missing: list[int | None] = []
     measurement_ids: list[Any] = []
     for number, attempt in enumerate(attempts, start=1):
         execution = attempt["execution"]
         measurement_ids.append(execution.get("measurement_id"))
-        if isinstance(execution.get("usage"), Mapping):
-            accumulate_usage(usage, execution["usage"])
-        counts.append(execution.get("provider_attempts"))
-        missing.append(execution.get("usage_missing_attempts"))
         requests.extend({**request, "case_attempt": number}
                         for request in execution.get("requests") or ())
     return {
@@ -223,10 +238,8 @@ def case_execution(
         "measurement_id": _measurement_sequence_id(measurement_ids),
         "finished_at": finished_at, "elapsed_seconds": elapsed_seconds,
         "case_attempts": list(attempts), "requests": requests,
-        "provider_attempts": sum(counts) if all(type(value) is int for value in counts) else None,
-        "usage": usage or None,
-        "usage_source": merge_usage_sources([_execution_usage_source(attempt["execution"]) for attempt in attempts]),
-        "usage_missing_attempts": sum(missing) if all(type(value) is int for value in missing) else None,
+        **_execution_totals(executions),
+        "usage_source": merge_usage_sources([_execution_usage_source(execution) for execution in executions]),
     }
 
 

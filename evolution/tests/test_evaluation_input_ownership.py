@@ -167,3 +167,39 @@ def test_aligned_promotion_rejects_owned_input_changes_after_measurement(tmp_pat
     assert observed
     assert run.registry.active_path.read_bytes() == original_active
     assert not any(row['event'] == 'candidate_promoted' for row in run.ledger.read())
+
+
+def test_public_experiment_validation_callback_keeps_owned_labels(tmp_path, monkeypatch):
+    cases = _make_dataset(tmp_path / 'data', n=22)
+    config = _config(tmp_path)
+    config['proposer']['mode'] = 'offline'
+    config['audit']['enabled'] = False
+    split = EvolutionSplit(name='synthetic', pool=cases[:20], sentinel=cases[:4], gain=cases[4:12], patrol_pool=cases[12:20], validation=cases[20:], mini=True)
+    backend = MockDetectorBackend()
+    with EvolutionEngine(config, backend=backend, split=split, mini=True) as engine:
+        evaluate = backend.evaluate
+        calls = []
+
+        def observe(ids, **kwargs):
+            if set(ids) == set(cases[20:]) and (not calls):
+                calls.append(True)
+                kwargs['gold_map'][cases[20]] = not kwargs['gold_map'][cases[20]]
+            return evaluate(ids, **kwargs)
+        monkeypatch.setattr(backend, 'evaluate', observe)
+        with pytest.raises(RuntimeError, match='inputs changed'):
+            engine.run_experiment(1)
+        assert calls
+
+def test_validation_does_not_prevent_completed_cycle_resume(tmp_path):
+    cases = _make_dataset(tmp_path / 'data', n=22)
+    config = _config(tmp_path)
+    config['proposer']['mode'] = 'offline'
+    config['audit']['enabled'] = False
+    split = EvolutionSplit(name='synthetic', pool=cases[:20], sentinel=cases[:4], gain=cases[4:12], patrol_pool=cases[12:20], validation=cases[20:], mini=True)
+    with EvolutionEngine(config, backend=MockDetectorBackend(), split=split, mini=True) as engine:
+        first = engine.run_experiment(1)
+        assert first['cycles_completed'] == 1
+        checkpoint = (engine.paths['root'] / 'checkpoints/cycle001/checkpoint.json').read_bytes()
+        second = engine.run_cycle(1, resume=True)
+        assert second == first['cycles'][0]
+        assert (engine.paths['root'] / 'checkpoints/cycle001/checkpoint.json').read_bytes() == checkpoint

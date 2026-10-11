@@ -3189,7 +3189,10 @@ class EvolutionEngine:
             "config": digest(self.config), "source": source_identity("detector", "evolution"),
             "runtime_identity": backend_runtime_identity(self.backend, cases=selected),
             "split": split_manifest_report(self.split),
-            "evaluator": {"gold": digest(self.gold_map), "gold_steps": digest(self.gold_step_map)},
+            "evaluator": {
+                "gold": digest({case: self.gold_map.get(case) for case in self.split.pool}),
+                "gold_steps": digest({case: self.gold_step_map.get(case) for case in self.split.pool}),
+            },
             "data": {case: artifact_digest(Path(self.config["dataset_root"]) / case) for case in selected},
         }
 
@@ -4571,7 +4574,7 @@ class EvolutionEngine:
                 "mini effect requires boolean gold for every validation case; "
                 f"missing: {missing_gold[:5]}"
             )
-        empty_rows = self.backend.evaluate(
+        empty_rows = evaluate_owned_inputs(self.backend.evaluate,
             self.split.validation,
             dataset_root=self.config["dataset_root"],
             registry=empty_registry(),
@@ -4906,7 +4909,7 @@ class EvolutionEngine:
         # provider-stage registry instead runs both arms fresh.
         active_fresh = requires_fresh_evaluation(self.registry.entries)
         if not self.registry.entries:
-            empty_rows = self.backend.evaluate(
+            empty_rows = evaluate_owned_inputs(self.backend.evaluate,
                 case_ids,
                 dataset_root=self.config["dataset_root"],
                 registry=empty,
@@ -4918,14 +4921,14 @@ class EvolutionEngine:
             # Provider-stage interventions cannot use frozen replay. Both arms
             # must be fresh in the final contrast; otherwise provider variance
             # is attributed to the registry.
-            empty_rows = self.backend.evaluate_fresh(
+            empty_rows = evaluate_owned_inputs(self.backend.evaluate_fresh,
                 case_ids,
                 dataset_root=self.config["dataset_root"],
                 registry=empty,
                 gold_map=final_gold,
                 workers=workers,
             )
-            active_rows = self.backend.evaluate_fresh(
+            active_rows = evaluate_owned_inputs(self.backend.evaluate_fresh,
                 case_ids,
                 dataset_root=self.config["dataset_root"],
                 registry=active,
@@ -4933,14 +4936,14 @@ class EvolutionEngine:
                 workers=workers,
             )
         else:
-            empty_rows = self.backend.evaluate(
+            empty_rows = evaluate_owned_inputs(self.backend.evaluate,
                 case_ids,
                 dataset_root=self.config["dataset_root"],
                 registry=empty,
                 gold_map=final_gold,
                 workers=workers,
             )
-            active_rows = self.backend.evaluate(
+            active_rows = evaluate_owned_inputs(self.backend.evaluate,
                 case_ids,
                 dataset_root=self.config["dataset_root"],
                 registry=active,

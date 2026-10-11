@@ -37,6 +37,34 @@ def test_missing_source_with_original_request_observations_remains_identified():
     assert result_usage({"execution": execution})["source"] == "request_observations"
 
 
+@pytest.mark.parametrize("field,value", [
+    ("usage", {"total_tokens": 999}),
+    ("provider_attempts", 999),
+    ("usage_missing_attempts", 999),
+])
+@pytest.mark.parametrize("explicit", [False, True])
+def test_nested_cost_source_cannot_certify_inconsistent_parent_readings(field, value, explicit):
+    from detector.measurement import request_execution
+    from scripts.run_baseline_693 import _usage_report
+
+    child = request_execution([{"usage": {"total_tokens": 10}}],
+                              started_at="same", finished_at="same", elapsed_seconds=0)
+    parent = case_execution([{"execution": child}],
+                            started_at="same", finished_at="same", elapsed_seconds=0)
+    if not explicit:
+        del parent["usage_source"]
+    parent[field] = value
+    result = _envelope("synthetic")
+    result["execution"] = parent
+    before = deepcopy(result)
+    assert result_usage(result)["source"] == "unknown"
+    report = _usage_report([{"case": "synthetic", "result": result}], ["synthetic"])
+    assert report["usage_source"] == "unknown"
+    assert report["total_is_lower_bound"] is None
+    assert report["total_tokens"] == (999 if field == "usage" else 10)
+    assert result == before
+
+
 @pytest.mark.parametrize("mode", ["stage", "mixed", "request"])
 @pytest.mark.parametrize("nested", [False, True])
 def test_actual_retry_preserves_cost_source_through_aggregates(mode, nested):
@@ -76,7 +104,7 @@ def test_actual_retry_preserves_cost_source_through_aggregates(mode, nested):
 
 def test_reader_retains_source_from_nested_observations_without_rewriting_them():
     result = {"execution": {"usage": {"total_tokens": 10}, "case_attempts": [
-        {"execution": {"usage_source": "legacy_stage_metadata_lower_bound"}},
+        {"execution": {"usage": {"total_tokens": 10}, "usage_source": "legacy_stage_metadata_lower_bound"}},
     ]}}
     before = deepcopy(result)
     assert result_usage(result)["source"] == "legacy_stage_metadata_lower_bound"
