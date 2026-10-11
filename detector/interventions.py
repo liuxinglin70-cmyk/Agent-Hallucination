@@ -971,6 +971,30 @@ def _validate_artifact_binding(
     return binding
 
 
+def _validate_executor_binding(
+    entry: Mapping[str, Any],
+    executor: SemanticExecutor | ComponentExecutor,
+    runner: str,
+) -> dict[str, str]:
+    """Results must belong to the artifact pinned by the entry."""
+    intervention_id = str(entry.get("intervention_id") or "?")
+    declared = entry.get("artifact") or {}
+    actual = executor.identity()
+    for field in ("id", "digest"):
+        if not str(declared.get(field) or ""):
+            raise ValueError(
+                f"{intervention_id}: {runner} entry declares no artifact.{field}"
+            )
+        if str(declared.get(field)) != str(actual.get(field) or ""):
+            raise ValueError(
+                f"{intervention_id}: the executor loaded artifact "
+                f"{actual.get(field)!r} but the entry pins "
+                f"{declared.get(field)!r}; refusing to attribute results to "
+                "an artifact that did not produce them"
+            )
+    return actual
+
+
 def _validate_body(
     entry: Mapping[str, Any],
     intervention_type: str,
@@ -1725,21 +1749,7 @@ class InterventionPlan:
                 "supplied to this detection call. A learned judgment cannot be "
                 "simulated by the deterministic default."
             )
-        declared = entry.get("artifact") or {}
-        actual = executor.identity()
-        for field in ("id", "digest"):
-            if not str(declared.get(field) or ""):
-                raise ValueError(
-                    f"{intervention_id}: typed_semantic entry declares no "
-                    f"artifact.{field}"
-                )
-            if str(declared.get(field)) != str(actual.get(field) or ""):
-                raise ValueError(
-                    f"{intervention_id}: the executor loaded artifact "
-                    f"{actual.get(field)!r} but the entry pins "
-                    f"{declared.get(field)!r}; refusing to attribute results to "
-                    "an artifact that did not produce them"
-                )
+        actual = _validate_executor_binding(entry, executor, "typed_semantic")
         semantic_context = dict(context)
         if window_proj is not None:
             semantic_context["window_projection"] = window_proj
@@ -1947,22 +1957,7 @@ class InterventionPlan:
                 "the evolution layer and injected, so a missing one means the "
                 "caller did not build it -- not that the component is absent."
             )
-        declared = entry.get("artifact") or {}
-        actual = executor.identity()
-        for field in ("id", "digest"):
-            if not str(declared.get(field) or ""):
-                raise ValueError(
-                    f"{intervention_id}: sandboxed_component entry declares no "
-                    f"artifact.{field}"
-                )
-            if str(declared.get(field)) != str(actual.get(field) or ""):
-                raise ValueError(
-                    f"{intervention_id}: the executor loaded artifact "
-                    f"{actual.get(field)!r} but the entry pins "
-                    f"{declared.get(field)!r}; refusing to attribute results to "
-                    "an artifact that did not produce them"
-                )
-        component = body.get("component") or {}
+        _validate_executor_binding(entry, executor, COMPONENT_RUNNER)
         inputs = body.get("component_inputs") or {}
         arguments: dict[str, Any] = {}
         for name, field in inputs.items():

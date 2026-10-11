@@ -28,7 +28,7 @@
 
 B35六条重放/并发和五条recall输出边界正式反例先失败后通过。三个实际记忆入口共用_append_record，在线程锁及现有进程租约内校验逻辑键、完整JSON内容与历史结构，检查和追加作为一个操作；同键内容变化拒绝，同键同内容返回实际持久化独立副本。旧_already_present和重复SHA实现删除，episode摘要复用共享digest。纠正记录验证原episode摘要后独立追加，新证据可再分类，原始episode字节不变。recall只写目录内JSON快照，不覆盖JSONL或越界。新44项、相关130项及末次58项/6项通过，覆盖实际Engine、线程竞争/委托上下文、独立进程租约、写入前后OSError/KeyboardInterrupt、JSON类型/非有限值/所有权、未知/重复历史及纠正。ef2ed2ca完整1947/58、AST80/三CLI/源码不变检查通过；[记忆核验](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/430f54e639134c6f8bfffa6d85982d43/memory-commit-verification.md)、[纯代码](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/430f54e639134c6f8bfffa6d85982d43/summary.json)、[平台](../artifacts/code_quality/ef2ed2ca2f93198be6d5f9fe582bf3dbc36f237f2ad010ef7708fcd23f843a75/cbdff2c773744c61b7adc1fcf6a7468f/summary.json)。
 
-B38/B39/B40已分别提交a6318f4、15ddf50、6c241be，历史证据保留Git及台账。本轮修复B41：工具、移动和启动共用有限英文肯定指令规则，不由禁止、询问、解释、引用或已测试的陈述提及生成义务；明确请求及许可pending业务保留。初轮14条、追加4条正式反例先失败后通过，新41项及相关194项通过；中间ba63a21c完整2070/58后发现陈述反例，进一步修复后最终7f3b8e7c完整2076项纯代码/58项平台、AST80/三CLI/源码不变通过。M01–M08的50项条件重绑当前实现及实际断言；删除Judge失效唯一召回说明。动作和合同覆盖指纹变化，历史校准/语料未改或重测。M07实际executor摘要验证重复待统一；223条扫描命中重绑当前行号，5条合同待最终审查，18包未全部验收。该规则不证明通用语义或真实收益；原1480秒、数据和历史正文保留。证据及下一步见[实施台账](../IMPLEMENTATION_PLAN.md)。
+B38–B41已提交Git，B41修复有限英文肯定指令规则，原反例和验证报告保留。本轮M07统一语义/组件实际executor的id/digest校验，保留精确比较、拒绝消息、scope及evidence-only权限；删除两套重复循环和无用component局部变量。相关74项、4512647c完整2076项纯代码/58项平台及AST80/三CLI/源码不变通过。M01–M08的50项条件重绑当前定义与实际JUnit，内置校准指纹未变。223条扫描命中绑定当前行号，5条公开合同及18包最终验收未闭合。原数据、1480秒记录及历史正文保留，无真实模型或重测；该重构不证明检测或进化收益。证据和下一步见[实施台账](../IMPLEMENTATION_PLAN.md)。
 
 ## 2026-09-24 至 09-27：三轮自进化与 G0 检测器基线
 

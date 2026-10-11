@@ -6,9 +6,9 @@
 |---|---|
 | 当前任务 | 根据本次用户请求恢复完整18包代码重构；按Pristine逐根因修复、离线验证并最终整理doc、README及实验日志 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | B41三分支共用有限肯定指令规则，过滤禁止/询问/解释/引用及陈述中的动作提及，保留真实明确要求；初轮14条、追加4条正式反例先失败后通过，新41项及相关194项通过。删除Judge失效唯一召回说明；7f3b8e7c完整2076/58、AST80/三CLI/源码不变通过。M01–M08的50个条件按当前定义/实际断言重新核对；M07实际executor摘要检查仍重复，需统一。独立复审、其余包与完整18包最终验收未完成；[条件核验](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/5dfbc6465360429aa8b0410ef4798424/task-card-review.json)、[纯代码](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/5dfbc6465360429aa8b0410ef4798424/summary.json)、[平台](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/c89ce36acda04f9894e738020278e61c/summary.json)。 |
-| 代码实施 | M00已验收；M03/M05本轮规则修复待审查；M07实际executor绑定重复检查待统一；其他包继续按§6验收，独立复审未闭合 |
-| 下一工作包 | M07：统一语义/组件实际executor的id/digest验证，保留各runner权限及错误合同；继续M09–M17及全局清理/复审。 |
+| 本轮已完成 | M07实际executor绑定校验统一为_validate_executor_binding，两runner消费；删除两套重复循环及无用component局部变量。相关74项通过；4512647c完整2076/58、AST80/三CLI/源码不变通过，内置校准指纹未变。M01–M08的50个条件重绑当前定义/实际JUnit；独立复审、其余包及18包最终验收未完成。[清理证据](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/153786988d464e018788e8097ae81ad7/executor-binding-cleanup.json)、[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/153786988d464e018788e8097ae81ad7/task-card-review.json)、[纯代码](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/153786988d464e018788e8097ae81ad7/summary.json)、[平台](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/4860ddcb75cb4e1a8d236ad124963d36/summary.json)。 |
+| 代码实施 | M00已验收；M07绑定重复规则已统一并离线验证，待审查；M03/M05规则修复及其他包按§6继续验收，独立复审未闭合 |
+| 下一工作包 | M09：核对风险画像、候选排序的任务卡条件及实际消费者；继续M10–M17、5条公开合同和全局清理/复审。 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
 | 更新时间 | 2026-10-11，Asia/Shanghai |
 
@@ -139,7 +139,7 @@ B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fak
 | R01 | M02 已实现 event_window_projection.v2：内容/packet 摘要、独立数据、遗漏 ID/截断原因、交付锚点；后续活动仅名 has_subsequent_activity | 565f191 已核销（独立 39 项）；实际依赖闭包和已纠正证据由 M10/M11 实现 | M02/M07/M10 |
 | R02 | M01 已实现文件/直接配置共用校验，保留 causal 块，拒绝未知键、负数、NaN、无穷及 bool 混作整数，无凭据解析不读 .env | 校验子任务 c58a147 独立 69 项核销；有效配置已进入 Detector/批次 execution identity，演化侧继续实施 | M01 |
 | R03 | frozen Tracer 已比较实际 causal_context_digest；上下文证据摘要排除耗时/成本，策略变化重新执行 Tracer | 相同输入复用及策略变化重跑 2 个反例通过；共享detector.replay阶段reach、直接失效与fresh来源唯一；固定复核发现外部API丢失full-view action，完整/仅hearings信封共4正式反例修复后相关155通过，7e45ecb固定复核独立38+相关120通过；Scanner身份与完整周期仍由M06/M13核验 | M06/M12/M13 |
-| R04 | 引用集合枚举、step→event、provider forwarding、executor 身份验证重复 | 证明职责相同后归一，保持阶段信息权限差异 | M02/M03/M05/M07 |
+| R04 | 引用集合枚举、step→event、provider forwarding、executor 身份验证重复 | 实际executor绑定已统一为_validate_executor_binding，语义/组件共用；其他重复规则按职责和权限边界继续核销，不强行合并阶段信息权限 | M02/M03/M05/M07 |
 | R05 | engine当前5322行、_run_cycle885行；共用准备与开发修订已各有唯一实现 | cycle_preparation及development_adapter已成为实际调用方，旧重复算法、适配回调及delta定义删除；7a512d25完整1818/57/AST79/CLI/源码不变通过。门编排和完整生命周期按M15/M16继续核验，独立复审未完成 | M14/M16 |
 | R06 | 原viability仅接受结构不可能；本轮补齐当前听证/packet/实际策略重算的同claim任务证书 | 首个规范声明/实际交付材料性/符号修复均核验且独立指出与开发注释一致的首次位置，可接受verified_same_claim；另一指控、伪证书、漂移及定位冲突保持needs_review。20项新增及63fb723a完整1802/57通过，完整包和独立复审待完成 | M14 |
 | R07 | wheel 不包含数据/实验协议，运行使用调用方提供的 --measurement/--plan；README 已明确路径合同 | 仓库外 wheel 安装后检测、批次、评估、baseline 和三个 help 入口通过；默认缺资源错误提示继续核验 | M17 |
@@ -213,7 +213,7 @@ evolution/
 | M04 | Provider、并发、预算、取消、请求记录 | M00 | 2–3 | 实施中 | B04/B06 已关闭；8082ee9 新增预算共享且跨重试不重领；全运行 RunStopped 与案例 CaseDeadlineExceeded 分型，取消不再被 provider/backend 转成案例失败；两个反例先失败后通过，相关 85 项、扩展 584 项、AST 71 文件通过；recaller/defense重复forwarding已删除，直接消费provider_call的统一cache_tag签名，snapshot完整摘要覆盖初次/repair，6反例修复后相关158通过；模块完整收尾/复核待完成 |
 | M05 | Judge/Recall/Tracer/Defense 阶段合同 | M03/M04 | 2–3 | 实施中 | 引用/quote、投票/quorum/repair、Recall输入隔离及Defense/Upgrade证据约束保留；B40/B41机械规则由真实任务和有限肯定指令生成义务，不由模型或陈述补造。Judge失效唯一召回说明已删除；当前6项条件重映射，完整2076/58通过，最终清理/消费者及独立复审未完成；[条件核验](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/5dfbc6465360429aa8b0410ef4798424/task-card-review.json) |
 | M06 | API、听证、冻结验证与回放 | M01/M02/M03/M05 | 3–4 | 实施中 | hearing完整目标、阶段实际输入摘要与因果上下文决定复用；升级派生共用已验证行，各听证镜像和采纳事实绑定。当前7项条件已映射，33112d1a完整2035/58通过；最终消费者/清理及固定源码独立复审未完成；[条件核验](artifacts/code_quality/33112d1afab82a14589b41d24bb1b9739bd2727614195cf6da999ef29b2da603/9e176ba7493b43deab4d0502f58471d0/task-card-review.json) |
-| M07 | 干预执行器和 scope 合同 | M02/M03/M04 | 2–3 | 实施中 | 6项条件关联实际定义/执行断言，模型与组件仍evidence-only，身份/引用/DSL限额及沙箱实际限额保留。当前语义与组件实际executor的id/digest检查重复，待统一真源；最终独立审查与清理未完成；[条件核验](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/5dfbc6465360429aa8b0410ef4798424/task-card-review.json) |
+| M07 | 干预执行器和 scope 合同 | M02/M03/M04 | 2–3 | 待审查 | 统一实际executor id/digest规则，两runner消费；删除重复循环与无用component局部变量。相关74项及4512647c完整2076/58通过，6项条件重绑当前实现及执行断言；最终消费者/清理和独立复审未完成；[清理证据](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/153786988d464e018788e8097ae81ad7/executor-binding-cleanup.json)、[条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/153786988d464e018788e8097ae81ad7/task-card-review.json) |
 | M08 | 批处理、存储、恢复、成本和分母 | M01/M04/M06 | 2–3 | 实施中 | 6项条件已映射：输入/恢复身份、路径封闭、同attempt输入/结果/耗时提交、共同writer租约、集合守恒及三种成本作用范围。当前完整2076/58通过；最终消费者/清理和独立复审未完成；[条件核验](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/5dfbc6465360429aa8b0410ef4798424/task-card-review.json) |
 | M09 | 风险画像与候选选择 | M01/M02/M03/M07 | 2–3 | 实施中 | 1a4d156/595b468：只读信号及有界候选接入 Detector，PPL unsupported；扩展 515 项、修复后相关 148 项、独立复核 17 项/7 反例通过；审计/定位消费者待接续 |
 | M10 | 实际依赖图与闭包 | M02/M03/M09 | 2–3 | 实施中 | 1a4d156：call/result 及声明字段消费、远距离祖先/后缀/交付投影接通，未核验自然语言保持未知；有限审查除 M09 数值阻断外无新增问题，该阻断 595b468 关闭；本轮补齐declared_literal_consumption：可重算算术观察与显式dimensionless字段声明共用依赖匹配/预算/闭包规则，来源唯一且前置，后续复用字段传播；缺边反例先失败，新增13项及相关177项通过，受控预算/歧义2项通过。babab472完整code_only1727/AST75文件/三CLI/源码不变通过；[核验](artifacts/code_quality/babab4721003eb81ac54213fbdea0ae24aae965a182ad3e1003059813d90a92d/13f9060034fc419f84dc88b5c2b3d594/literal-consumption-verification.md)。graph.v2字段路径身份及context.v3观察消费链绑定已接通，完整材料性/首次引入及独立审查未完成 |
@@ -516,8 +516,8 @@ python -m experiments --help
 
 ### 10.3 当前固定源码验收映射
 
-源码`7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413`；相对`6c241be`统一工具/移动/启动的有限肯定指令规则，删除Judge失效说明，新增41项测试实例。完整纯代码2076项、平台58项、AST80/三CLI/源码不变通过。M01–M08的50个条件重绑实际定义与本次JUnit；子集重叠不可相加，自检不替代整包清理或独立审查，M07重复绑定规则待统一。
-机器索引：[当前18包执行子集](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/5dfbc6465360429aa8b0410ef4798424/acceptance-inventory.json)；[M01–M08的50个条件核验](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/5dfbc6465360429aa8b0410ef4798424/task-card-review.json)；[B41根因/回归核验](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/5dfbc6465360429aa8b0410ef4798424/task-directive-verification.json)。M07子集增加runner注册、权限及DSL实际测试类，见机器索引；任务卡未全部验收。
+源码`4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4`；相对`cac6d31`统一语义/组件实际executor id/digest验证，移除重复循环及无用局部变量，保留runner错误合同和evidence-only权限。完整纯代码2076项、平台58项、AST80/三CLI/源码不变通过。M01–M08的50个条件重绑当前定义及实际JUnit；子集重叠不可相加，自检不替代整包清理或独立审查。
+机器索引：[当前18包执行子集](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/153786988d464e018788e8097ae81ad7/acceptance-inventory.json)；[M01–M08的50个条件核验](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/153786988d464e018788e8097ae81ad7/task-card-review.json)；[M07单一绑定规则与清理](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/153786988d464e018788e8097ae81ad7/executor-binding-cleanup.json)。B41原验证证据保留原报告和Git提交；任务卡未全部验收。
 
 | 包 | 当前真源 | 已执行子集（纯代码/平台） | 剩余验收 |
 |---|---|---:|---|
@@ -528,8 +528,8 @@ python -m experiments --help
 | M04 | [provider.py](detector/provider.py)、[provider_worker.py](detector/provider_worker.py)、[runtime.py](detector/runtime.py) | 58/2 | 6项条件已映射；最终消费者/清理及独立审查未完成 |
 | M05 | [judge.py](detector/judge.py)、[recaller.py](detector/recaller.py)、[step_tracer.py](detector/step_tracer.py)、[defense.py](detector/defense.py) | 79/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
 | M06 | [api.py](detector/api.py)、[hearing.py](detector/hearing.py)、[replay.py](detector/replay.py)、[adjudication.py](detector/adjudication.py) | 88/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M07 | [interventions.py](detector/interventions.py)、[sandbox.py](evolution/sandbox.py) | 113/42 | 条件已映射；M07重复绑定待统一，最终清理/独立复审未完成 |
-| M08 | [runner.py](detector/runner.py)、[measurement.py](detector/measurement.py)、[evaluation.py](detector/evaluation.py) | 61/0 | 条件已映射；M07重复绑定待统一，最终清理/独立复审未完成 |
+| M07 | [interventions.py](detector/interventions.py)、[sandbox.py](evolution/sandbox.py) | 113/42 | 条件已映射；M07绑定重复已核销，其他清理及独立复审未完成 |
+| M08 | [runner.py](detector/runner.py)、[measurement.py](detector/measurement.py)、[evaluation.py](detector/evaluation.py) | 61/0 | 条件已映射；M07绑定重复已核销，其他清理及独立复审未完成 |
 | M09 | [step_uncertainty.py](detector/step_uncertainty.py)、[causal_contracts.py](detector/causal_contracts.py) | 53/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
 | M10 | [causal_graph.py](detector/causal_graph.py) | 75/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
 | M11 | [causal_audit.py](detector/causal_audit.py) | 97/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
@@ -559,9 +559,9 @@ python -m experiments --help
 四项检查点（就地覆盖）：
 
 - **当前任务**：按本次用户请求继续完整18包重构，遵守Pristine；整体完成后核销冗余脚本/文档、整合doc并将组会材料置于子目录。
-- **进度**：B41共用有限肯定指令规则，新41项及相关194项通过，已删除Judge失效说明；7f3b8e7c完整2076/58、AST80/三CLI/源码不变通过。M01–M08的50项条件重新核对实际源码与执行断言；本轮修改完成离线验证，固定源码独立复审及最终包验收未完成。
-- **下一步**：M07统一语义与组件实际executor的id/digest验证；继续M09–M17条件核验、5条公开合同及全局冗余清理。
-- **未定事项**：18包未完成；B32–B41、当前固定源码独立复审和最终消费者/清理未闭合，只读子代理授权未收到。M07重复规则、M09–M17及M15/M16完整生命周期继续核销。有限英文指令不证明通用语义或真实收益；历史数据、校准、报告和实验正文保留，本期不重测。
+- **进度**：M07实际executor绑定统一，两runner使用同一规则，重复循环/无用变量删除。相关74及4512647c完整2076/58、AST80/三CLI/源码不变通过；校准指纹未变，50项条件重绑当前实现与实际JUnit。离线自检完成，独立复审及最终包验收未完成。
+- **下一步**：M09核查风险画像、候选排序及正式入口；继续M10–M17条件核验、5条公开合同和全局冗余清理。
+- **未定事项**：18包未完成；B32–B41、M07本次重构及当前固定源码独立复审未闭合，只读子代理授权未收到。M09–M17、M15/M16完整生命周期及最终消费者/清理继续核销。历史数据、校准、报告和实验正文保留，本期不重测。
 
 ## 12. 本期最终完成与延期项
 
@@ -575,4 +575,4 @@ python -m experiments --help
 | 外部新轨迹、人工因果标注和独立泛化评估 | 保留研究设计引用，不启动采集或标注 |
 | 新行为生产激活与真实多轮准入 | 配置默认关闭；本期只以 Fake 验证完整接口和门 |
 
-当前验证证据见§6、§10.3及四项检查点；原样固定扫描器selftest通过，7f3b8e7c的223条命中逐行绑定当前源码和分类，5条活跃公开合同仍待最终审查。[扫描](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/pristine_b41/summary.json)、[单一动作规则](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/5dfbc6465360429aa8b0410ef4798424/task-directive-source-check.json)、[M07重复核销证据](artifacts/code_quality/7f3b8e7c3382ff2eb5f3681162c31eac0687fcdff5c35fe562ab40e832797413/5dfbc6465360429aa8b0410ef4798424/executor-binding-cleanup-probe.json)。完整18包最终验收未完成，没有真实模型请求。
+当前验证证据见§6、§10.3及四项检查点；原样固定扫描器selftest通过，4512647c的223条命中逐行绑定当前源码和分类，5条活跃公开合同仍待最终审查。[扫描](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/pristine_m07/summary.json)、[单一执行器绑定与清理](artifacts/code_quality/4512647c4138419f9b682fe868255b900ce404fe02891e4265503f7db9d039c4/153786988d464e018788e8097ae81ad7/executor-binding-cleanup.json)。完整18包最终验收未完成，没有真实模型收益结论。
