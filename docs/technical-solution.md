@@ -187,6 +187,8 @@ L1 开发回放要求两臂恰好覆盖预定 target∪neighbor，每例各一�
 
 记忆写入由memory._append_record统一负责：在模块线程锁和现有进程writer租约内读取、校验逻辑键/JSON类型、比对完整内容并追加。同键同内容返回实际持久化副本，同键内容变化拒绝；未知结构、键类型不符或重复历史不被修补或扩写。新记录和recall输出拥有独立JSON内容，非有限值拒绝；写入前后中断传播原异常，重放按实际落盘判断，不返回未落盘的内容。record_episode_correction在同一写入边界内验证原episode摘要，独立追加复核记录，允许后续有新证据的重新分类；原episode字节不变。write_recall只写目录内JSON快照，不覆盖JSONL历史或越界。
 
+CycleJournal的save与权威绑定共用独立JSON发布：原子替换成功后才更新内存；写入异常后核对实际落盘是否为旧提交或本次提交，无法确认则拒绝状态读取、保存和新观察，要求重新打开。state返回独立快照，合同、起始注册表和更新输入不保留外部可变引用；非有限JSON拒绝。Engine.run_cycle将恢复准备和执行纳入同一清理作用域；原始取消、fatal或业务异常保持对象身份传播，checkpoint与ledger中断记录分别尝试，记录故障以cycle_recording_errors中的(stage, exception)元组附在原异常对象上，兼容Python 3.10。该合同不等于周期报告、部署和全部事件已经形成统一发布。
+
 ### 核心不变量
 
 1. STRUCTURAL 验证候选合同、执行边界、失败族和目标类型；结构失败不消耗真实候选测量。

@@ -33,21 +33,21 @@ class CycleJournal:
         if self.path.exists():
             if not resume:
                 raise RuntimeError("cycle checkpoint exists; use --resume")
-            self.state = self.load_state(self.path, contract)
+            self._state = self.load_state(self.path, contract)
         else:
             if resume:
                 raise RuntimeError("no checkpoint: historical incomplete cycles cannot be reconstructed")
-            self.state = {
+            self._state = {
                 "schema_version": "evolution.cycle_checkpoint.v3",
                 "contract": contract, "status": "started", "used_seconds": 0.0,
                 "authority": None,
             }
-        if registry_before is not None and "registry_before" not in self.state:
+        if registry_before is not None and "registry_before" not in self._state:
             # The registry the cycle started from. Resuming needs it to
             # re-establish that starting point if the interrupted run already
             # committed its own admission.
-            self.state["registry_before"] = registry_before
-        self.previous_seconds = float(self.state.get("used_seconds", 0))
+            self._state["registry_before"] = registry_before
+        self.previous_seconds = float(self._state.get("used_seconds", 0))
         self.save()
 
     @staticmethod
@@ -83,32 +83,55 @@ class CycleJournal:
         if current != previous:
             raise RuntimeError("checkpoint authority input changed; refusing a new observation")
 
-    def _persist_state(self):
-        self.state["used_seconds"] = self.previous_seconds + time.monotonic() - self.started
-        save_json(self.path, self.state)
+    @property
+    def state(self) -> dict:
+        with self.lock:
+            if self._state is None:
+                raise RuntimeError("checkpoint commit is unknown; reopen before reuse")
+            return json.loads(json.dumps(self._state, ensure_ascii=False, allow_nan=False))
+
+    def _persist_state(self, **updates):
+        if self._state is None:
+            raise RuntimeError("checkpoint commit is unknown; reopen before reuse")
+        previous = self._state
+        candidate = json.loads(json.dumps({**previous, **updates}, ensure_ascii=False, allow_nan=False))
+        candidate["used_seconds"] = self.previous_seconds + time.monotonic() - self.started
+        try:
+            save_json(self.path, candidate)
+        except BaseException:
+            # Atomic replacement can finish before a signal reaches the caller.
+            try:
+                persisted = json.loads(self.path.read_text(encoding="utf-8"))
+                if digest(persisted) not in {digest(previous), digest(candidate)}:
+                    raise RuntimeError("checkpoint commit changed during publication")
+                self._state = persisted
+            except BaseException:
+                self._state = None
+            raise
+        self._state = candidate
 
     def save(self, **updates):
         with self.lock:
-            self.state.update(updates)
-            self._persist_state()
+            self._persist_state(**updates)
 
     def _bind_authority(self, authority):
         with self.lock:
+            if self._state is None:
+                raise RuntimeError("checkpoint commit is unknown; reopen before reuse")
             view = None
-            if authority is not None or self.state.get("authority") is not None:
+            if authority is not None or self._state.get("authority") is not None:
                 from detector.conviction_calibration import default_calibration
                 view = default_calibration()
-            self._verify_authority(self.state, calibration=view)
+            self._verify_authority(self._state, calibration=view)
             if authority is None:
                 return
-            previous = self.state["authority"]
+            previous = self._state["authority"]
             names = sorted(set(authority["status"]) | set((previous or {}).get("status", {})))
             if view.identity(list(authority["status"])) != authority:
                 raise RuntimeError("checkpoint authority input changed; refusing a new observation")
             combined = view.identity(names)
             if combined != previous:
-                self.state["authority"] = combined
-                self._persist_state()
+                self._persist_state(authority=combined)
 
     def evaluate(self, cases, *, registry, fresh, evaluate, kwargs):
         arm = digest({"registry": registry, "fresh": fresh})

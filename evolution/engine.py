@@ -3211,31 +3211,40 @@ class EvolutionEngine:
             resume=resume,
             registry_before=self.registry.registry,
         )
-        self._resuming = resume
-        if resume:
-            self._restore_resume_registry(cycle)
-        backend = self.backend
-        while hasattr(backend, "backend"):
-            backend = backend.backend
-        # A new cycle may retry an outage; within this cycle keep the exact
-        # baseline, including failures, for all paired candidate arms.
-        memory = getattr(backend, "_base_results", None)
-        if isinstance(memory, dict):
-            for key in list(memory):
-                if memory[key].get("decision_authority") != "authoritative":
-                    del memory[key]
-        if "proposal" in self._journal.state:
-            saved = ProposalBatch(**self._journal.state["proposal"])
-            if proposal_batch is not None and proposal_batch != saved:
-                raise RuntimeError("resume may not replace persisted proposals")
-            proposal_batch = saved
         try:
+            self._resuming = resume
+            if resume:
+                self._restore_resume_registry(cycle)
+            backend = self.backend
+            while hasattr(backend, "backend"):
+                backend = backend.backend
+            # A new cycle may retry an outage; within this cycle keep the exact
+            # baseline, including failures, for all paired candidate arms.
+            memory = getattr(backend, "_base_results", None)
+            if isinstance(memory, dict):
+                for key in list(memory):
+                    if memory[key].get("decision_authority") != "authoritative":
+                        del memory[key]
+            if "proposal" in self._journal.state:
+                saved = ProposalBatch(**self._journal.state["proposal"])
+                if proposal_batch is not None and proposal_batch != saved:
+                    raise RuntimeError("resume may not replace persisted proposals")
+                proposal_batch = saved
             report = self._run_cycle(cycle, proposal_batch=proposal_batch)
             self._journal.save(status="completed")
             return report
         except BaseException as exc:
-            self._journal.save(status="interrupted", error_type=type(exc).__name__)
-            self._ledger("cycle_interrupted", {"cycle": cycle, "error_type": type(exc).__name__})
+            recording_errors = []
+            try:
+                self._journal.save(status="interrupted", error_type=type(exc).__name__)
+            except BaseException as failure:
+                recording_errors.append(("checkpoint", failure))
+            try:
+                self._ledger("cycle_interrupted", {"cycle": cycle, "error_type": type(exc).__name__})
+            except BaseException as failure:
+                recording_errors.append(("ledger", failure))
+            if recording_errors:
+                exc.cycle_recording_errors = tuple(recording_errors)
             raise
         finally:
             self._journal = None
