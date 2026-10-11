@@ -238,6 +238,8 @@ def _detect_required_actions(question: str) -> set[str]:
             if pos < 0:
                 break
             start = pos + max(1, len(marker))
+            if not _action_is_required(question, pos):
+                continue
             tail = question[pos + len(marker): pos + len(marker) + 80]
             obj = _TOOL_OBJECT_RE.search(tail)
             if obj is None or obj.start() > _TOOL_OBJECT_WINDOW:
@@ -256,7 +258,8 @@ def _detect_required_actions(question: str) -> set[str]:
     for match in re.finditer(
         r"required_action\s*[:=]\s*[\"']([^\"']+)[\"']", question, re.I,
     ):
-        actions.add(match.group(1).strip().lower())
+        if _action_is_required(question, match.start()):
+            actions.add(match.group(1).strip().lower())
     return {name for name in actions if name}
 
 
@@ -340,33 +343,66 @@ _DESTINATION_STOPWORDS = frozenset({
 #: A destination inside a question or a hypothetical clause is not an
 #: instruction: "perhaps we could swing by the nearest tire shop?" asks whether
 #: to act, it does not require it.
-_HYPOTHETICAL_RE = re.compile(r"\b(?:if|whether|perhaps|maybe|in case|unless)\b", re.I)
+_HYPOTHETICAL_RE = re.compile(r"\b(?:if|perhaps|maybe|in case|unless)\b", re.I)
+_NON_EXECUTION_PREFIX_RE = re.compile(
+    r"\b(?:[a-z]+n['’]t|not|never|cannot|avoid|without|"
+    r"ask|explain|describe|teach|how|whether|could|may|might|"
+    r"example|quote|print|say|write)\b",
+    re.I,
+)
+_TASK_QUOTED_SPAN_RE = re.compile(r'"[^"\n]*"|“[^”\n]*”|(?<!\w)\x27[^\x27\n]*\x27(?!\w)')
+_EXECUTION_PREFIX_RE = re.compile(
+    r"^(?:(?:please|kindly|first|next|now|then|also|finally)\s+)*"
+    r"(?:"
+    r"(?:I (?:want|need) (?:you )?to|I would like (?:you )?to|let(?:'s| us))\s+"
+    r"|(?:(?:you(?: are)?|(?:the )?(?:agent|assistant)(?: is)?)\s+)?"
+    r"(?:(?:must|should|shall|required to|have to|has to)\s+)?"
+    r"(?:(?:proceed to|go ahead and|go ahead to)\s+)?"
+    r")$", re.I,
+)
+_ENGINE_START_RE = re.compile(
+    r"\bstart\s+(?:(?:the|my|your|an?)\s+)?"
+    r"(?:[A-Za-z_][A-Za-z0-9_-]*['’]s\s+)?(?:engine|ignition)\b", re.I,
+)
 
 _MIN_DESTINATION_CHARS = 6
 
 
 def _clause_at(text: str, position: int) -> str:
-    """The sentence containing ``position``, approximated by hard punctuation."""
+    """The punctuation-delimited clause containing an action."""
     start = max(
         text.rfind(".", 0, position), text.rfind("?", 0, position),
-        text.rfind("!", 0, position), text.rfind("\n", 0, position),
+        text.rfind("!", 0, position), text.rfind(";", 0, position),
+        text.rfind("\n", 0, position),
     ) + 1
     end = len(text)
-    for stop in ".?!\n":
+    for stop in ".?!;\n":
         found = text.find(stop, position)
         if found >= 0:
             end = min(end, found + 1)
     return text[start:end]
 
 
-def _movement_requirements(texts: Iterable[str]) -> list[str]:
-    """Destinations the task asks the agent to travel to.
+def _action_is_required(text: str, position: int) -> bool:
+    # Mentioning an action in a quote, question or explanation does not demand it.
+    if position and (text[position - 1].isalnum() or text[position - 1] == "_"):
+        return False
+    if any(match.start() <= position < match.end()
+           for match in _TASK_QUOTED_SPAN_RE.finditer(text)):
+        return False
+    clause = _clause_at(text, position)
+    if "?" in clause or _HYPOTHETICAL_RE.search(clause):
+        return False
+    prefix = _clause_at(text[:position], position)
+    if _NON_EXECUTION_PREFIX_RE.search(prefix):
+        return False
+    prefix = re.split(r",|\band(?:\s+then)?\b", prefix, flags=re.I)[-1]
+    normalized = _clean(prefix)
+    return _EXECUTION_PREFIX_RE.fullmatch(normalized + " " if normalized else "") is not None
 
-    Three conditions, each aimed at one misread: a destination is long enough to
-    be a place, does not start with a function word ("...plan a visit and need
-    to know" names no place), and does not sit in an interrogative or
-    hypothetical clause.
-    """
+
+def _movement_requirements(texts: Iterable[str]) -> list[str]:
+    """Explicit destinations in task execution directives."""
     found: list[str] = []
     for text in texts:
         for match in _DESTINATION_RE.finditer(text):
@@ -378,8 +414,7 @@ def _movement_requirements(texts: Iterable[str]) -> list[str]:
                 continue
             if target.split()[0].lower().strip(".-'") in _DESTINATION_STOPWORDS:
                 continue
-            clause = _clause_at(text, match.start())
-            if "?" in clause or _HYPOTHETICAL_RE.search(clause):
+            if not _action_is_required(text, match.start()):
                 continue
             if target.lower() not in found:
                 found.append(target.lower())
@@ -442,10 +477,9 @@ def predicate_required_action_present(
             movement_violated.append(target)
 
     start_pending = False
-    engine_requested = (
-        "start" in question.lower() and (
-            "engine" in question.lower() or "ignition" in question.lower()
-        )
+    engine_requested = any(
+        _action_is_required(question, match.start())
+        for match in _ENGINE_START_RE.finditer(question)
     )
     if engine_requested and _permission_pending(packet):
         start_pending = True

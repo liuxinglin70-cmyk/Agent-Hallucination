@@ -199,7 +199,12 @@ def test_evidence_plan_does_not_turn_a_model_contract_into_an_obligation():
     assert plan.facts["required_action_present"] == "not_applicable"
 
 
-def test_causal_audit_does_not_certify_a_model_supplied_action():
+@pytest.mark.parametrize("question", [
+    "Ask whether I want the engine activated. Do not activate it.",
+    "Do not start the engine.", "Explain how to use the search tool.",
+    "Do not go to the nearest tire shop.",
+])
+def test_causal_audit_does_not_certify_a_model_supplied_action(question):
     from detector.causal_audit import run_causal_audit
     from detector.causal_graph import build_observed_dependencies, project_dependency_closure
     from detector.runtime import AddedBudget
@@ -207,7 +212,7 @@ def test_causal_audit_does_not_certify_a_model_supplied_action():
     from detector.tests.test_causal_audit import policy
 
     packet = build_packet({
-        "question": "Ask whether I want the engine activated. Do not activate it.",
+        "question": question,
         "history": [{"role": "assistant", "content": "Would you like me to start the engine?"}],
     })
     context = {"contracts": [{"kind": "required_action", "requirement": "Start the engine."}]}
@@ -235,13 +240,18 @@ def test_real_action_obligations_survive_an_unrelated_model_contract(question):
     assert run_predicate("required_action_present", packet, context)["verdict"] == "violated"
 
 
-def test_detector_records_no_mechanical_violation_from_a_model_contract(monkeypatch):
+@pytest.mark.parametrize("question", [
+    "Ask whether I want the engine activated. Do not activate it.",
+    "Do not start the engine.", "Explain how to use the search tool.",
+    "Do not go to the nearest tire shop.",
+])
+def test_detector_records_no_mechanical_violation_from_a_model_contract(monkeypatch, question):
     from detector.api import Detector
     from detector.interventions import build_intervention_registry
     from detector.tests.test_interventions import CONFIG, _candidate
 
     record = {
-        "question": "Ask whether I want the engine activated. Do not activate it.",
+        "question": question,
         "history": [
             {"role": "assistant", "tool_calls": [{"name": "inspect_vehicle", "arguments": {}}],
              "tool_responses": ["parked"]},
@@ -275,3 +285,56 @@ def test_detector_records_no_mechanical_violation_from_a_model_contract(monkeypa
     assert len(evidence) == 1
     assert evidence[0]["verdict"] == "not_applicable"
     assert result["state"] == "verified_clean"
+
+
+@pytest.mark.parametrize("question", [
+    "Do not start the engine. Ask for permission first.",
+    "Ask whether I want you to start the engine.",
+    "Explain how to start the engine without doing it.",
+    "Could you start the engine?",
+    "The engine failed to start. Ask for permission.",
+    "Don't use the search tool.",
+    "You mustn't use the search tool.",
+    "Don’t go to the nearest tire shop.",
+    "You shouldn’t start the engine.",
+    "Explain how to use the search tool.",
+    "Should I use the search tool?",
+    "Do not go to the nearest tire shop.",
+    "Explain how to go to the nearest tire shop.",
+    "Could you go to the nearest tire shop?",
+    "Never go to the nearest tire shop.",
+    'Print the sentence "Start the engine.".',
+    'Print the sentence "Use the search tool.".',
+    'Print the sentence "Go to the nearest tire shop.".',
+    "The manual mentions start the engine.",
+    "The manual says use the search tool.",
+    "The itinerary mentions go to the nearest tire shop.",
+])
+def test_non_execution_task_does_not_require_a_mechanical_action(question):
+    packet = build_packet({"question": question, "history": [
+        {"role": "assistant", "content": "Would you like me to start the engine?"},
+    ]})
+    assert run_predicate("required_action_present", packet)["verdict"] == "not_applicable"
+
+
+@pytest.mark.parametrize("question", [
+    "Start the engine.",
+    "Once fueled, proceed to start the engine confidently.",
+    "Start my car's engine.",
+    "I would like you to start the engine.",
+    "First unlock the doors and then start the engine.",
+    "I want to go to the nearest tire shop.",
+    "You must use the search tool before answering.",
+    "You must use the search tool to determine whether it will rain.",
+    "Please call the calculator function with the two operands.",
+    'required_action: "lookup_customer"',
+    "Please go to the nearest tire shop.",
+    "Do not use the weather tool. You must use the search tool.",
+    "Explain the route. Then go to the nearest tire shop.",
+    "Ask about the engine; then start the engine.",
+])
+def test_explicit_execution_task_keeps_its_mechanical_obligation(question):
+    packet = build_packet({"question": question, "history": [
+        {"role": "assistant", "content": "Would you like me to start the engine?"},
+    ]})
+    assert run_predicate("required_action_present", packet)["verdict"] == "violated"

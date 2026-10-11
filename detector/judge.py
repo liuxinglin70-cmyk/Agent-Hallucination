@@ -1,9 +1,4 @@
-"""Stage 1: Outcome Judge.
-
-Single end-to-end judgement over the full trajectory. It is the ONLY recall
-source in the detector; later stages can only overturn a positive with
-evidence, never invent a conviction.
-"""
+"""Outcome judgment over the complete task trajectory."""
 
 from __future__ import annotations
 

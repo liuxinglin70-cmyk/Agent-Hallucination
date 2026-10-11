@@ -71,7 +71,7 @@ Judge保留每张无效票的结构化失败。全部无效票为同一失败类
 
 `api.Detector` 编排阶段；`judge.py`、`recaller.py`、`step_tracer.py`、`defense.py` 各自校验模型输出。Judge 阳性和召回升级候选进入 hearing 队列；`adjudication.py` 校验证据引用、指控和确认步骤，计算终态。内置机械谓词的定罪能力受 `conviction_calibration.py` 和校准记录约束；证据型组件不能自行获得定罪权。 已验证typed DSL按程序/guard的声明合同确定权限，模型typed semantic仍无定罪权。
 
-终态交付谓词仅把精确success状态、JSON对象success=true、字面success或完整固定完成banner识别为成功；失败/unknown、false、unsuccessful及普通查询字符串不触发成功交付义务，过深或非法JSON保持不适用。内置动作谓词只从packet.question提取机械义务；模型合同不能额外产生启动或移动要求，公开谓词、干预证据、风险画像/因果审计和Detector共享此规则。明确启动要求但轨迹终止于许可询问仍属于既有permission pending分支。当前任务解析仍采用有限词形规则，禁止、询问和解释语句可能被误读为执行义务，登记B41待修复；不声称通用任务理解或真实检测收益。
+终态交付谓词仅把精确success状态、JSON对象success=true、字面success或完整固定完成banner识别为成功；失败/unknown、false、unsuccessful及普通查询字符串不触发成功交付义务，过深或非法JSON保持不适用。内置动作谓词只从packet.question提取机械义务；模型合同不能额外产生启动或移动要求，公开谓词、干预证据、风险画像/因果审计和Detector共享此规则。明确启动要求但轨迹终止于许可询问仍属于既有permission pending分支。工具、移动及启动的机械分支共用_action_is_required：动作须匹配有限英文肯定指令前缀和字面对象；禁止/否定缩写、许可询问、解释、引用及已测试的陈述性提及不产生义务。已测试的分句明确指令与I want/need/would like等请求仍可识别；条件和不支持的句型不生成机械义务。这不判断通用自然语言、工具实际状态变化或真实检测收益。动作与contract_coverage的精确源码指纹随共享规则变化，旧校准不能授权新源码；原校准文件和语料未改、未重测。
 
 `interventions.py` 负责统一 schema、内容哈希、hook 和执行计划；`predicate_dsl.py`、`predicate_context.py` 定义可执行谓词及可用上下文。冻结阶段回放必须匹配证据身份，并拒绝覆盖待测干预的目标阶段。配置文件与 `Detector(config=...)` 共用 `config.validate_config`，解析有效 route 并保留默认 off 的审计配置，未知字段、非法数值与缺失声明工件直接报错；`require_credentials=False` 不读取仓库 .env。审计默认关闭；shadow 与 tracer_context 执行分支已接通，完整模块验收状态见实施台账。
 
