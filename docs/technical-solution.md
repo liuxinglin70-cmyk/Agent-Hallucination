@@ -69,7 +69,9 @@ Detector在请求前取得此身份并写入provenance，backend将其复制进�
 
 Judge保留每张无效票的结构化失败。全部无效票为同一失败类型时，阶段保留该类型（包括contract_error及provider的具体超时类型）；不足quorum或混合失败类型报告no_quorum。一次合同repair与有限vote_topup继续受原预算约束，fatal与取消继续传播。Defense的初次票与补票调用同一汇总规则，证词与权限不变。归档审计只读检查历史记录的原始步号、结构类别与计数，不将旧模型输出重新包装成当前合同的验证结果。
 
-`api.Detector` 编排阶段；`judge.py`、`recaller.py`、`step_tracer.py`、`defense.py` 各自校验模型输出。Judge 阳性和召回升级候选进入 hearing 队列；`adjudication.py` 校验证据引用、指控和确认步骤，计算终态。机械谓词的定罪能力受 `conviction_calibration.py` 和校准记录约束；证据型组件不能自行获得定罪权。
+`api.Detector` 编排阶段；`judge.py`、`recaller.py`、`step_tracer.py`、`defense.py` 各自校验模型输出。Judge 阳性和召回升级候选进入 hearing 队列；`adjudication.py` 校验证据引用、指控和确认步骤，计算终态。内置机械谓词的定罪能力受 `conviction_calibration.py` 和校准记录约束；证据型组件不能自行获得定罪权。 已验证typed DSL按程序/guard的声明合同确定权限，模型typed semantic仍无定罪权。
+
+终态交付谓词仅把精确success状态、JSON对象success=true、字面success或完整固定完成banner识别为成功；失败/unknown、false、unsuccessful及普通查询字符串不触发成功交付义务，过深或非法JSON保持不适用。动作谓词仍会消费Judge合同的动作文本；离线反例显示其可能给真实任务补出不存在的启动义务，登记为台账B40，正式入口影响及源头修复待完成，未证明最终定罪。
 
 `interventions.py` 负责统一 schema、内容哈希、hook 和执行计划；`predicate_dsl.py`、`predicate_context.py` 定义可执行谓词及可用上下文。冻结阶段回放必须匹配证据身份，并拒绝覆盖待测干预的目标阶段。配置文件与 `Detector(config=...)` 共用 `config.validate_config`，解析有效 route 并保留默认 off 的审计配置，未知字段、非法数值与缺失声明工件直接报错；`require_credentials=False` 不读取仓库 .env。审计默认关闭；shadow 与 tracer_context 执行分支已接通，完整模块验收状态见实施台账。
 

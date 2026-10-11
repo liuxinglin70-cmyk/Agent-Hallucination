@@ -36,6 +36,7 @@ written to state what they can actually establish:
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any, Iterable, Mapping
 
@@ -124,15 +125,6 @@ _PERMISSION_PHRASES = (
     "shall i", "may i",
 )
 
-#: Tools whose name reads as moving to a place. The satisfaction test no longer
-#: requires one of these -- a destination may be served by a tool named for the
-#: destination (``find_nearest_tire_shop``) -- but the vocabulary still
-#: documents which names this module regards as movement.
-_MOVEMENT_TOOLS = frozenset({
-    "cd", "chdir", "navigate", "goto", "go", "travel", "drive",
-    "move", "visit", "head", "swing", "walk",
-})
-
 _STOPWORDS = frozenset({"the", "a", "an", "to", "and", "of", "in", "on"})
 
 #: The runtime wraps every tool observation in this envelope; the completion
@@ -141,7 +133,8 @@ _OBSERVATION_ENVELOPE_RE = re.compile(
     r"Observed output of cmd `[^`]*` executed:"
 )
 _COMPLETION_BANNER_RE = re.compile(
-    r"The interaction has been completed with status: success"
+    r"^The interaction has been completed with status: success[ \t\r]*$",
+    re.MULTILINE,
 )
 
 #: How much text a tool observation must still carry, envelope and banner
@@ -153,6 +146,23 @@ def _delivery_payload(observation: Any) -> str:
     """The observation with its fixed runtime frame removed."""
     text = _OBSERVATION_ENVELOPE_RE.sub("", str(observation or ""))
     return _COMPLETION_BANNER_RE.sub("", text).strip()
+
+
+def _reports_success(value: Any) -> bool:
+    if isinstance(value, str):
+        text = value.strip()
+        if text.casefold() == "success" or _COMPLETION_BANNER_RE.search(text):
+            return True
+        try:
+            value = json.loads(text)
+        except (json.JSONDecodeError, RecursionError):
+            return False
+    if not isinstance(value, Mapping):
+        return False
+    if "status" in value:
+        status = value["status"]
+        return isinstance(status, str) and status.strip().casefold() == "success"
+    return value.get("success") is True
 
 
 def _clean(value: Any) -> str:
@@ -429,10 +439,6 @@ def predicate_required_action_present(
             token for token in target.split()
             if token not in _STOPWORDS
         }
-        # A destination is satisfied when some tool call refers to it. The test
-        # used to require the *tool name* to contain a movement verb, which
-        # encodes "travelling is done by a navigation tool": a destination
-        # served by ``find_nearest_tire_shop`` was read as never reached.
         satisfied = False
         for event in packet.get("events") or []:
             for interaction in event.get("tool_interactions") or []:
@@ -636,8 +642,8 @@ def predicate_final_delivery_present(
     answer_tool = anchors.get("last_answer_tool_call") or {}
     has_answer_tool = answer_tool_is_delivery(answer_tool)
     terminal_success = any(
-        "success" in str(interaction.get("arguments") or "").lower()
-        or "success" in str(interaction.get("observation") or "").lower()
+        _reports_success(interaction.get("arguments"))
+        or _reports_success(interaction.get("observation"))
         for event in packet.get("events") or ()
         for interaction in event.get("tool_interactions") or ()
     )

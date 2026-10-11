@@ -112,3 +112,47 @@ def test_answer_delivery_survives_a_closing_status_tool():
          "tool_responses": ["success"]},
     ]})
     assert run_predicate("final_delivery_present", packet)["verdict"] == "present"
+
+
+@pytest.mark.parametrize("arguments,observation", [
+    ({"status": "unsuccessful"}, "failed"),
+    ({"status": "success=false"}, "failed"),
+    ({"success": False}, "failed"),
+    ({"query": "success"}, "failed"),
+    ({}, "The interaction has been completed with status: unsuccessful"),
+    ({}, '{"success": false}'),
+    ({"status": False, "success": True}, "failed"),
+])
+def test_failure_or_ordinary_data_cannot_claim_terminal_success(arguments, observation):
+    packet = build_packet({"question": "Search for the report.", "history": [
+        {"role": "assistant", "content": "", "tool_calls": [
+            {"name": "terminate", "arguments": arguments}],
+         "tool_responses": [observation]},
+    ]})
+    assert run_predicate("final_delivery_present", packet)["verdict"] == "not_applicable"
+
+
+@pytest.mark.parametrize("arguments,observation", [
+    ({"status": "success"}, "ok"),
+    ('{"status": "success"}', "ok"),
+    ({"success": True}, "ok"),
+    ({"status": " SUCCESS "}, "ok"),
+    ({}, "The interaction has been completed with status: success"),
+])
+def test_explicit_success_still_requires_a_delivery_channel(arguments, observation):
+    packet = build_packet({"question": "Report the result.", "history": [
+        {"role": "assistant", "content": "", "tool_calls": [
+            {"name": "terminate", "arguments": arguments}],
+         "tool_responses": [observation]},
+    ]})
+    assert run_predicate("final_delivery_present", packet)["verdict"] == "missing"
+
+
+def test_nested_status_data_is_not_a_success_report():
+    depth = 10000
+    packet = build_packet({"question": "Report the result.", "history": [
+        {"role": "assistant", "content": "", "tool_calls": [
+            {"name": "terminate", "arguments": {}}],
+         "tool_responses": ['[' * depth + '"success"' + ']' * depth]},
+    ]})
+    assert run_predicate("final_delivery_present", packet)["verdict"] == "not_applicable"

@@ -6,9 +6,9 @@
 |---|---|
 | 当前任务 | 根据本次用户请求恢复完整18包代码重构；按Pristine逐根因修复、离线验证并最终整理doc、README及实验日志 |
 | 计划基线 | `main@071080622818a5da0647036f0966619ef94b0a1e`；2026-10-08 |
-| 本轮已完成 | M00–M17生产真源与已执行测试子集已映射；M01/M02的12个任务卡条件已逐条核对实现与实际通过断言，仍待独立审查及最终消费者核销。九个接口签名按现实现就地更新。固定Pristine扫描223条已分类，5条活跃读值/提案合同待审查。删除被execution记录取代的单案例计时脚本；两份组会材料移到doc/group-meetings并修复链接，旧组会工作区字节和历史实验正文保留。清理后f6da71cd完整2014/58、AST80/三CLI/源码不变通过。完整18包尚未验收；[逐条核验](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/task-card-review.json)、[纯代码](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/summary.json)、[平台](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/94d007059f4e4343b5b14e43ec474f30/summary.json)、[清理核销](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/pristine_7364d0706e934ed3921bac5b35f9fb46/cleanup-inventory.json) |
+| 本轮已完成 | B39终态成功识别已修复：失败状态、success=false及普通查询不能冒充成功，六条正式反例先失败后通过，新13项及相关168项通过。旧动作词表和失效历史注释已核销删除；动作函数AST不变，精确源码指纹正常变化，未重校准。清理后0ef8b81c完整2027/58、AST80/三CLI/源码不变通过。M03/M04的13项条件已映射，另发现B40模型合同补造动作前提的谓词反例，待正式入口回归及修复。完整18包及独立复审未完成；[逐条核验](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/4a43d55b087c44f3a742df215dce6471/m03-m04-task-card-review.json)、[纯代码](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/4a43d55b087c44f3a742df215dce6471/summary.json)、[平台](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/03966bbee4474efbaa7cf62de3282c53/summary.json)。 |
 | 代码实施 | M00已验收；M14/M16实际因果消费及共用准备职责实施中；M02/M03及本轮修改待独立复审；其余包按§6状态 |
-| 下一工作包 | 从M03任务卡继续逐条验收；核对M01摘要职责及扫描中5条活跃合同，授权到达后执行固定源码独立审查。 |
+| 下一工作包 | M03/M05：正式复现并修复B40任务动作前提；继续逐包消费者、清理和独立复审。 |
 | 实验状态 | 不执行；真实模型请求、基准测量、A/A/A/B、调参、自演化真实轮次均不在本期范围 |
 | 更新时间 | 2026-10-11，Asia/Shanghai |
 
@@ -124,7 +124,11 @@ Python 的真源标注使用合法的 `# SOURCE: <symbol>`，只指向符号，�
 | B37 | cycle_completed与报告先于终态checkpoint保存；completed保存失败后写interrupted，完成恢复快捷返回报告却不修复checkpoint | 唯一完成记录原子绑定报告/事件及身份，正常/预检/冻结共用；输出幂等投影，恢复仅补投影，提交不可改写为interrupted；全量入口走同一恢复 | M16 | 修复待审查；4条正式反例先失败后修复，新25项，首轮相关44通过/1失败为旧注入边界迁移，原恢复断言保留，后续64项及实际两周期恢复1项通过；扩大相关154项及159e505a完整1999/58、AST80/三CLI/源码不变通过，独立复审未完成；[周期发布核验](artifacts/code_quality/159e505ab06bc4ba0cb532ef1247226535e6303f21eac706631d593aad8594cc/82e4756a4123476892d2d4dff45742ec/cycle-publication-verification.md)、[纯代码](artifacts/code_quality/159e505ab06bc4ba0cb532ef1247226535e6303f21eac706631d593aad8594cc/82e4756a4123476892d2d4dff45742ec/summary.json)、[平台](artifacts/code_quality/159e505ab06bc4ba0cb532ef1247226535e6303f21eac706631d593aad8594cc/69644497dc064306b7bb57ae53046229/summary.json) |
 | B38 | run_experiment返回cycles直接别名内部历史，修改后恢复统计与磁盘相反；零/前缀请求混入其他周期，空请求仍触发验证集评估 | 私有周期历史、公开独立快照，无整体替换入口；聚合与验证集消费仅使用本次请求实际完成记录，零请求不评估 | M16 | 修复待审查；九条快照/范围及一条零请求验证集正式反例先失败后修复；新15项及首轮相关34项通过，含正常/预检/冻结、追加/清空/嵌套污染、禁止整体替换、零/前缀及历史冻结不压制本次验证；扩大相关182项及5cc27418完整2014/58、AST80/三CLI/源码不变通过，无新独立复审；[聚合快照核验](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/43877f48f3ee44b6865706ee9a5f86f9/experiment-snapshot-verification.md)、[纯代码](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/43877f48f3ee44b6865706ee9a5f86f9/summary.json)、[平台](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/a1f30cad16cf4c0f992896904c8a3f53/summary.json) |
 
+| B39 | 成功状态用substring识别，unsuccessful、success=false和普通query=success均触发交付缺失 | _reports_success统一精确状态、显式布尔True、合法JSON对象及固定完成banner，失败及未知不宣告成功 | M03 | 修复待审查；6失败/3通过正式反例，新13项及相关168项通过，0ef8b81c完整2027/58通过；[核验](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/4a43d55b087c44f3a742df215dce6471/terminal-success-verification.json) |
+| B40 | 任务要求询问许可且不要启动，Judge补出Start the engine合同使动作谓词从not_applicable变为violated | 机械动作前提由真实任务支持，模型文本不能补造义务，保留许可与诚实失败合同 | M03/M05 | 公开谓词反例已复现；正式入口回归与修复待继续，未声称最终定罪；[原始反例](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/4a43d55b087c44f3a742df215dce6471/model-contract-probe.json) |
+
 B01–B08、B10/B11、B13/B14 的审查复现使用纯内存、AST 提取或 Fake 对象，无真实 provider、无历史测量写入。B12 修复保持 evidence-only 权限，反例证明引用和投影可信性缺陷，不声称直接越权定罪。
+
 
 ### 4.2 待验证风险与能力缺口
 
@@ -255,7 +259,7 @@ B13 的 reducer 真源由 M16 在 `route_failures.py` 维护；B14 的目标 out
 - **输入**：`evidence.py`、`predicates.py`、`predicate_context.py`、`predicate_dsl.py`、`conviction_calibration.py` 和快照消费阶段。
 - **实施**：复用 packet 引用真源；区分轨迹 ref 与 snapshot citation，两类各自验证存在、适用性、摘录和冲突。统一重复引用检查入口；DSL 的字段可读性和资源限制仍可检查。
 - **清理/边界**：谓词执行规则、可定罪 verdict 和校准权限各有真源。保留 permission pending、动作/内容交付和诚实报告失败等业务分支；不能将低层诊断失败统一转成任务违规。
-- **验收**：E# 无 snapshot、引用未知来源、证据不适用、同源重复、相互冲突、超长/恶意 DSL、非法读 gold；未校准谓词及模型证据不能获得 terminal authority。
+- **验收**：E# 无 snapshot、引用未知来源、证据不适用、同源重复、相互冲突、超长/恶意 DSL、非法读 gold；未校准内置机械谓词及模型证据不能获得 terminal authority；typed DSL保留B18已验证程序与guard声明的权限合同。
 - **交付**：可供 live/frozen/causal 调用的统一引用合同，固定事实与未知状态不混用。
 
 ### M04：Provider、运行控制与成本
@@ -510,16 +514,16 @@ python -m experiments --help
 
 ### 10.3 当前固定源码验收映射
 
-源码`f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66`；相对提交`a6318f4`的代码清理仅删除失效计时脚本并更新测试中的历史来源说明。已核对定义/消费点，并按当前JUnit逐例记录核对下列测试子集；完整纯代码2014项、平台58项通过。子集互相重叠，不可相加；入口存在/测试通过不等于任务卡全部条件已核销，§10.2五项门及独立审查仍逐包执行。
-机器索引：[验收映射](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/acceptance-inventory.json)；[M01/M02逐条核验](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/task-card-review.json)。
+源码`0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805`；相对提交`9898bf6`修复终态成功识别，删除无消费者的旧词表及历史注释，新增13项边界回归。完整纯代码2027项、平台58项及AST80/三CLI/源码不变通过。子集互相重叠不可相加；B40任务前提反例仍开放，入口存在和测试通过不等于整包验收，§10.2及独立审查仍逐包执行。
+机器索引：[当前验收映射](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/4a43d55b087c44f3a742df215dce6471/acceptance-inventory.json)；[M03/M04逐条核验](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/4a43d55b087c44f3a742df215dce6471/m03-m04-task-card-review.json)。M01/M02上一固定源码核验保留原证据，尚未替代当前独立复审。
 
 | 包 | 当前真源 | 已执行子集（纯代码/平台） | 剩余验收 |
 |---|---|---:|---|
 | M00 | [verify.py](scripts/verify.py)、[source_audit.py](scripts/source_audit.py)、[conftest.py](conftest.py) | 34/2 | 已验收基线；最终全局扫描和审查仍覆盖 |
 | M01 | [config.py](detector/config.py)、[identity.py](detector/identity.py) | 107/0 | 任务卡已逐条自检；当前固定源码独立审查及最终消费者核销 |
 | M02 | [packet.py](detector/packet.py) | 52/1 | 任务卡已逐条自检；当前固定源码独立审查及最终消费者核销 |
-| M03 | [evidence.py](detector/evidence.py)、[predicate_context.py](detector/predicate_context.py)、[predicate_dsl.py](detector/predicate_dsl.py)、[conviction_calibration.py](detector/conviction_calibration.py) | 67/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
-| M04 | [provider.py](detector/provider.py)、[provider_worker.py](detector/provider_worker.py)、[runtime.py](detector/runtime.py) | 58/2 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
+| M03 | [evidence.py](detector/evidence.py)、[predicate_context.py](detector/predicate_context.py)、[predicate_dsl.py](detector/predicate_dsl.py)、[conviction_calibration.py](detector/conviction_calibration.py) | 80/0 | B40任务前提待修复；最终清理及独立审查未完成 |
+| M04 | [provider.py](detector/provider.py)、[provider_worker.py](detector/provider_worker.py)、[runtime.py](detector/runtime.py) | 58/2 | 6项条件已映射；最终消费者/清理及独立审查未完成 |
 | M05 | [judge.py](detector/judge.py)、[recaller.py](detector/recaller.py)、[step_tracer.py](detector/step_tracer.py)、[defense.py](detector/defense.py) | 79/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
 | M06 | [api.py](detector/api.py)、[hearing.py](detector/hearing.py)、[replay.py](detector/replay.py)、[adjudication.py](detector/adjudication.py) | 88/0 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
 | M07 | [interventions.py](detector/interventions.py)、[sandbox.py](evolution/sandbox.py) | 53/42 | §7逐条入口/权限/清理核销及当前固定源码独立审查 |
@@ -553,9 +557,9 @@ python -m experiments --help
 四项检查点（就地覆盖）：
 
 - **当前任务**：按本次用户请求继续完整18包重构，遵守Pristine；整体完成后核销冗余脚本/文档、整合doc并将组会材料置于子目录。
-- **进度**：M00–M17生产真源与已执行测试子集已映射；M01/M02的12个任务卡条件已逐条核对实现与实际通过断言，仍待独立审查及最终消费者核销。九个接口签名按现实现就地更新。固定Pristine扫描223条已分类，5条活跃读值/提案合同待审查。删除被execution记录取代的单案例计时脚本；两份组会材料移到doc/group-meetings并修复链接，旧组会工作区字节和历史实验正文保留。清理后f6da71cd完整2014/58、AST80/三CLI/源码不变通过。完整18包尚未验收；[逐条核验](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/task-card-review.json)、[纯代码](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/f52d253d941047c58772b28760e2aedf/summary.json)、[平台](artifacts/code_quality/f6da71cd5e76d619966578633b4db793267ce840618ba700a0d25669c4710a66/94d007059f4e4343b5b14e43ec474f30/summary.json)、[清理核销](artifacts/code_quality/5cc274185665ab5a6722ff4be57a0741e2aafe503579bec93764b4894f344285/pristine_7364d0706e934ed3921bac5b35f9fb46/cleanup-inventory.json)
-- **下一步**：读取M03任务卡并建立具体实现/断言的条件映射；继续核销M01摘要职责与5条扫描活跃合同。
-- **未定事项**：完整18包目标未完成；B32–B38和当前源码独立复审尚未闭合，只读子代理审查授权未收到。M03–M17逐条任务卡验收、M15/M16完整生命周期及全局冗余核销待继续。组会归档和已证明冗余脚本删除完成；其余历史读者/公开CLI不能仅凭无静态调用删除。受限证书不证明通用语义或工具状态变化；历史校准与原始证据保留，本期不重测；local_data及真实实验未运行。
+- **进度**：B39终态成功识别已修复：失败状态、success=false及普通查询不能冒充成功，六条正式反例先失败后通过，新13项及相关168项通过。旧动作词表和失效历史注释已核销删除；动作函数AST不变，精确源码指纹正常变化，未重校准。清理后0ef8b81c完整2027/58、AST80/三CLI/源码不变通过。M03/M04的13项条件已映射，另发现B40模型合同补造动作前提的谓词反例，待正式入口回归及修复。完整18包及独立复审未完成；[逐条核验](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/4a43d55b087c44f3a742df215dce6471/m03-m04-task-card-review.json)、[纯代码](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/4a43d55b087c44f3a742df215dce6471/summary.json)、[平台](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/03966bbee4474efbaa7cf62de3282c53/summary.json)。
+- **下一步**：补B40正式入口反例，机械动作义务由真实任务支持，核验所有消费点；继续M05/M06、M01摘要职责与5条扫描活跃合同。
+- **未定事项**：18包未完成；B32–B39和当前固定源码独立复审未闭合，只读子代理授权未收到。B40仅复现谓词输出错误，未证明最终定罪；正式入口回归与修复待继续。M15/M16完整生命周期、逐包验收及全局冗余核销待继续；组会归档和冗余计时脚本删除完成。原始数据、历史校准、报告及实验正文保留；本期无真实请求或重测。
 
 ## 12. 本期最终完成与延期项
 
@@ -569,4 +573,4 @@ python -m experiments --help
 | 外部新轨迹、人工因果标注和独立泛化评估 | 保留研究设计引用，不启动采集或标注 |
 | 新行为生产激活与真实多轮准入 | 配置默认关闭；本期只以 Fake 验证完整接口和门 |
 
-当前验证证据见§6、§10.3和四项检查点；固定Pristine扫描器与固定提交归档的字节一致，selftest通过，当前f6da71cd报告223条命中已分类，5条活跃合同仍需最终审查。历史读者、保护门键、约束参数及原始证据保留；最终验收未完成，没有真实模型请求。
+当前验证证据见§6、§10.3和四项检查点；固定扫描器selftest通过，当前0ef8b81c扫描文本经换行规范化与e800624b一致，223条已分类，5条活跃合同待最终审查。[扫描](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/pristine_b39/summary.json)、[B39核验](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/4a43d55b087c44f3a742df215dce6471/terminal-success-verification.json)、[词表核销](artifacts/code_quality/0ef8b81c3820f52fbde5954da6494c0ee3226db8473b2351e0d5754460f9c805/4a43d55b087c44f3a742df215dce6471/private-vocabulary-cleanup.json)。最终验收未完成，没有真实模型请求。
