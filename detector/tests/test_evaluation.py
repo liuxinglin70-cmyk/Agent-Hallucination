@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from detector.evaluation import binary_metrics, evaluate_run
 
 
@@ -82,6 +84,27 @@ def _write_result(runs_root, run_id, case_id, **overrides):
     payload.update(overrides)
     record_case(runs_root=runs_root, run_id=run_id, case_id=case_id,
                 input_record={"question": "q", "history": [{"content": "a"}]}, result=payload, elapsed_seconds=0)
+
+
+@pytest.mark.parametrize("authority,hits", [
+    ("authoritative", 1), ("degraded_localization_conflict", 0),
+    ("degraded", 0), ("invalid", 0),
+])
+def test_conflicted_localization_cannot_score_a_hit(tmp_path, authority, hits):
+    dataset = tmp_path / "data"
+    runs = tmp_path / "runs"
+    _write_case(dataset, "positive.json", True)
+    path = dataset / "positive.json"
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    raw["hallucination_step"] = 1
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    _write_result(runs, "r", "positive.json", state="verified_error",
+                  occurrence_state="verified_error", responsible_step=1,
+                  localization_authority=authority)
+    report = evaluate_run(runs_root=runs, run_id="r", dataset_root=dataset,
+                          cases=["positive.json"])
+    assert report["metrics"]["tp"] == 1
+    assert report["metrics"]["step_localization"]["hits"] == hits
 
 
 def test_degraded_readings_do_not_enter_the_accuracy_line(tmp_path):
@@ -232,7 +255,8 @@ def _write_envelope(run_root, case_id, *, state, step, kind, gold_step):
     }
     from detector.runner import record_case
     record_case(runs_root=run_root.parent, run_id=run_root.name, case_id=case_id,
-                input_record={"question": "q", "history": []}, result=payload, elapsed_seconds=0)
+                input_record={"question": "q", "history": [{"step": i} for i in range(1, 8)]},
+                result=payload, elapsed_seconds=0)
 
 
 def test_step_localization_is_split_by_what_kind_of_step_was_blamed(tmp_path):
@@ -247,7 +271,7 @@ def test_step_localization_is_split_by_what_kind_of_step_was_blamed(tmp_path):
         path = dataset / case
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({
-            "question": "q", "history": [],
+            "question": "q", "history": [{"step": i} for i in range(1, 8)],
             "is_hallucination": "true", "hallucination_step": str(gold_step),
         }), encoding="utf-8")
     run_root = tmp_path / "runs" / "r1"
@@ -280,7 +304,7 @@ def test_a_row_without_a_recorded_step_kind_is_unclassified_not_guessed(tmp_path
     path = dataset / "A/001.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({
-        "question": "q", "history": [],
+        "question": "q", "history": [{"step": i} for i in range(1, 4)],
         "is_hallucination": "true", "hallucination_step": "3",
     }), encoding="utf-8")
     run_root = tmp_path / "runs" / "r1"
@@ -294,7 +318,8 @@ def test_a_row_without_a_recorded_step_kind_is_unclassified_not_guessed(tmp_path
     }
     from detector.runner import record_case
     record_case(runs_root=run_root.parent, run_id=run_root.name, case_id="A/001.json",
-                input_record={"question": "q", "history": []}, result=payload, elapsed_seconds=0)
+                input_record={"question": "q", "history": [{"step": i} for i in range(1, 4)]},
+                result=payload, elapsed_seconds=0)
     report = evaluate_run(
         runs_root=tmp_path / "runs", run_id="r1",
         dataset_root=dataset, cases=["A/001.json"],

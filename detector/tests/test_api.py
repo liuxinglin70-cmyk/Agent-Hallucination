@@ -4,6 +4,7 @@ import pytest
 from detector.api import Detector, _judge_negative_needs_recall
 
 CONFIG = {
+    "causal_audit": {"mode": "off"},
     "judge_route": {
         "endpoint": "http://unused", "model": "m", "api_key_env": "K",
         "temperature": 0.0, "timeout_seconds": 5, "transport_retries": 0,

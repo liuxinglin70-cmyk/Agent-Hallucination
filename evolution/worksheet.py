@@ -743,10 +743,22 @@ def classify_family_actionability(
     signals = diagnostics.get("predicate_signals") or {}
     count = int(family.get("count") or 0)
     routes: list[str] = []
+    # The claim direction a family's candidates declare. Read by the
+    # development path's experience records and by memory recall, so it is
+    # part of this reading rather than something each consumer re-derives:
+    # two derivations of the same claim can drift, and one of them silently
+    # produced an empty polarity on every development episode.
+    polarity = (
+        "recall" if family_id.startswith("FAM-fn-")
+        else "precision" if family_id.startswith("FAM-fp-")
+        else "boundary" if family_id.startswith("FAM-loc-")
+        else ""
+    )
 
     if family_id.startswith("FAM-unresolved-"):
         return {
             "classification": "capability_gap",
+            "polarity": "",
             "reason": (
                 "unresolved families need provider reliability, not an "
                 "intervention action"
@@ -799,6 +811,7 @@ def classify_family_actionability(
     if not routes:
         return {
             "classification": "capability_gap",
+            "polarity": polarity,
             "reason": (
                 f"family kind outside the action vocabulary: {family_id!r}"
             ),
@@ -806,6 +819,7 @@ def classify_family_actionability(
         }
     return {
         "classification": "actionable",
+        "polarity": polarity,
         "reason": ACTIONABILITY["actionable"],
         "routes": routes,
     }

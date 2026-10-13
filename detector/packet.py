@@ -426,6 +426,10 @@ def project_event_window(
         "content_digest": digest(projected_events),
         "is_window_complete": not reasons,
         "coverage_reasons": reasons,
+        # Whether anything *after* the anchor event carries a tool call or
+        # non-empty prose. Positions are 1-based, so slicing from
+        # ``anchor_pos`` (not ``anchor_pos - 1``) is exactly "after the
+        # anchor"; the slice is deliberately exclusive of the anchor itself.
         "has_subsequent_activity": any(
             event.get("tool_interactions") or str(event.get("content") or "").strip()
             for event in events[anchor_pos:]
@@ -487,6 +491,19 @@ def _answer_call(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
 
 
 def answer_tool_is_delivery(interaction: Mapping[str, Any]) -> bool:
+    """Whether an answer-shaped call *delivers the answer* or reports status.
+
+    Two contract layers, deliberately different, and now stated in one place:
+    ``_answer_call`` recognises ``finish`` because agent frameworks route the
+    final answer through it in some corpora -- its call is an anchor worth
+    keeping. ``delivered_result`` then splits the anchors: a name carrying
+    ``terminate``/``finish``/``success`` reports a *completion status*, so it
+    becomes ``last_status_tool`` (used only when no real delivery exists),
+    while ``final_answer``/``submit_answer``-style names deliver payload and
+    become ``last_answer_tool``. The distinction is what keeps a
+    ``terminate(status="success")`` call from being read as the delivered
+    answer body.
+    """
     name = str(interaction.get("tool_name") or "").lower()
     return bool(interaction) and not any(marker in name for marker in ("terminate", "finish", "success"))
 

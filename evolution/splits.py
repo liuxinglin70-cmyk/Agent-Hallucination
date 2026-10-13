@@ -34,24 +34,15 @@ def bool_gold(value: Any) -> bool | None:
     raise ValueError(f"invalid is_hallucination label: {value!r}")
 
 
-def _step_gold(value: Any) -> int | None:
-    """The annotated responsible step, or ``None`` when not annotated."""
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    text = str(value).strip()
-    return int(text) if text.isdigit() else None
-
-
 def load_gold_step(dataset_root: str | Path, case_id: str) -> int | None:
     """Evaluator-side localization annotation for one case.
 
     Kept beside ``load_gold`` and read only on the evaluation side: the
     detector never receives it (``project_record`` drops every gold field).
     """
-    _record, gold = load_case(dataset_root, case_id)
-    return _step_gold(gold.get("hallucination_step"))
+    from detector.localization import gold_step_mapping
+    record, gold = load_case(dataset_root, case_id)
+    return gold_step_mapping(record, gold.get("hallucination_step"))["position"]
 
 
 def load_gold(dataset_root: str | Path, case_id: str) -> bool | None:
@@ -204,17 +195,21 @@ class FinalHoldout:
         commit: bool = True,
     ) -> list[dict[str, Any]]:
         if self.marker_path is not None and self.marker_path.exists():
-            previous = {}
+            previous_reason = "unreadable marker"
             try:
                 previous = json.loads(
                     self.marker_path.read_text(encoding="utf-8-sig")
                 )
-            except Exception:
-                pass
+                previous_reason = str(previous.get("reason") or "unrecorded")
+            except (OSError, ValueError) as exc:
+                # The refusal itself is what matters (the labels were already
+                # exposed once); the parse failure only costs the diagnosis,
+                # and it is named rather than swallowed.
+                previous_reason = f"unreadable marker ({type(exc).__name__})"
             raise RuntimeError(
                 "final verification read-once violation: marker already "
                 f"exists at {self.marker_path} "
-                f"(previous_read={previous.get('reason')})"
+                f"(previous_read={previous_reason})"
             )
         if self.reads > 0:
             raise RuntimeError(

@@ -370,11 +370,6 @@ def analyze_capability_requirement(
     else:
         classification = "capability_gap"
         missing = _OPERATION_GAP_KIND.get(operation, "executor_missing")
-    if classification == "capability_gap" and not evidence:
-        evidence.append(
-            f"operation {operation!r} needs a capability the runtime lacks "
-            f"({missing})"
-        )
     return {
         "schema_version": CAPABILITY_SCHEMA,
         "mechanism_id": mechanism_id,

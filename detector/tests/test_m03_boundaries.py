@@ -35,43 +35,71 @@ def _packet():
 
 
 @pytest.mark.parametrize("boundary", ["citation", "live", "frozen"])
-@pytest.mark.parametrize("note,accepted", [
-    ("E1 applies; E2 concerns an older Alpha revision.", False),
-    ("E1 applies; E2 concerns an older Alpha revision. E3 applies instead of E4 for Beta.", True),
-])
-def test_every_cited_conflict_needs_its_own_note(boundary, note, accepted):
-    snapshot = _snapshot()
+def test_a_conflict_is_settled_only_by_a_recorded_resolution(boundary):
+    """Prose cannot settle a conflict; a recorded resolution can.
+
+    The old contract accepted a ``conflict_note`` that merely *named* the
+    disputed ids or values -- a substring match, so "I reviewed 4 unrelated
+    things" settled a numeric conflict, and a note covering one conflict
+    licensed a decisive finding that also cited a different unresolved one.
+    A conflict is now settled by the same authority every other consumer
+    reads: a resolution recorded in the snapshot, naming the applicable
+    source. The note survives as audit context only.
+    """
+    note = (
+        "E1 applies; E2 concerns an older Alpha revision. "
+        "E3 applies instead of E4 for Beta."
+    )
+    unresolved_snapshot = _snapshot()
+    resolved_snapshot = _snapshot(resolutions=[
+        {"entity": "ReactorAlpha", "attribute": "capacity",
+         "resolved_by": "E1", "reason": "E2 describes an older revision"},
+        {"entity": "ReactorBeta", "attribute": "capacity",
+         "resolved_by": "E3", "reason": "E4 describes an older revision"},
+    ])
     row = {
         "verdict": "substantiated", "confirmed_step": 1, "evidence_refs": ["event_001"],
         "evidence_citations": ["E1", "E3"], "conflict_note": note, "reason": "capacity proof",
     }
     if boundary == "citation":
-        error = citation_error(snapshot, row["evidence_citations"], where="review",
-                               require_settled=True, conflict_note=note)
-        assert (error is None) is accepted
-    elif boundary == "live":
+        assert citation_error(
+            unresolved_snapshot, row["evidence_citations"], where="review",
+            require_settled=True,
+        ) is not None
+        assert citation_error(
+            resolved_snapshot, row["evidence_citations"], where="review",
+            require_settled=True,
+        ) is None
+        return
+    if boundary == "live":
         parsed, error = _parse_defense(row)
         assert parsed is not None, error
-        parsed, error = _validate_defense_evidence(parsed, _packet(), {"step": 1}, snapshot)
-        assert (parsed is not None) is accepted
-    else:
-        judge = {
-            "is_hallucination": False, "hallucination_step": None, "hallucination_reason": None,
-            "delivered_result": "10 units", "correct_result": "10 units", "basis": None,
-            "confidence": "high", "evidence_refs": [], "root_cause": None,
-            "contracts": [{"kind": "exact_value", "requirement": "10 units"}],
-        }
-        stages = {
-            "judge_result": {"ok": True, "parsed": judge}, "judge_status": {"state": "ok"},
-            "hearings": [{"source": "judge", "positive": {"step": 1}, "candidate_id": None,
-                          "defense_result": {"ok": True, "parsed": row},
-                          "defense_status": {"state": "ok"}}],
-        }
-        if accepted:
-            validate_frozen_stages(stages, _packet(), snapshot)
-        else:
-            with pytest.raises(ValueError, match="evidence error"):
-                validate_frozen_stages(stages, _packet(), snapshot)
+        parsed, error = _validate_defense_evidence(
+            parsed, _packet(), {"step": 1}, unresolved_snapshot,
+        )
+        assert parsed is None and error
+        parsed, error = _parse_defense(row)
+        assert parsed is not None, error
+        parsed, error = _validate_defense_evidence(
+            parsed, _packet(), {"step": 1}, resolved_snapshot,
+        )
+        assert parsed is not None, error
+        return
+    judge = {
+        "is_hallucination": False, "hallucination_step": None, "hallucination_reason": None,
+        "delivered_result": "10 units", "correct_result": "10 units", "basis": None,
+        "confidence": "high", "evidence_refs": [], "root_cause": None,
+        "contracts": [{"kind": "exact_value", "requirement": "10 units"}],
+    }
+    stages = {
+        "judge_result": {"ok": True, "parsed": judge}, "judge_status": {"state": "ok"},
+        "hearings": [{"source": "judge", "positive": {"step": 1}, "candidate_id": None,
+                      "defense_result": {"ok": True, "parsed": row},
+                      "defense_status": {"state": "ok"}}],
+    }
+    with pytest.raises(ValueError, match="evidence error"):
+        validate_frozen_stages(stages, _packet(), unresolved_snapshot)
+    validate_frozen_stages(stages, _packet(), resolved_snapshot)
 
 
 def test_resolution_must_belong_to_its_entity_and_attribute():

@@ -38,6 +38,7 @@ from detector.provider import (
     required_quorum,
 )
 from detector.semantics import (
+    contract_repair_feedback,
     RECALL_CONTRACT_REPAIR,
     RECALL_SYSTEM,
     UPGRADE_CONTRACT_REPAIR,
@@ -168,7 +169,7 @@ def run_recall_scan(
         try:
             parsed, meta = provider_call(
                 route=route, system=system,
-                user=user + RECALL_CONTRACT_REPAIR,
+                user=user + RECALL_CONTRACT_REPAIR + contract_repair_feedback(parsed, error),
                 purpose="recall_scanner_repair",
                 cache_tag=cache_tag,
             )
@@ -253,7 +254,6 @@ def _parse_upgrades(
             snapshot, cited,
             where=f"candidate {candidate_id}",
             require_settled=bool(content_error and causal),
-            conflict_note=conflict_note,
         )
         if error:
             return None, [], error
@@ -388,7 +388,7 @@ def _upgrade_sample(
         try:
             parsed, meta = provider_call(
                 route=route, system=system,
-                user=user + UPGRADE_CONTRACT_REPAIR,
+                user=user + UPGRADE_CONTRACT_REPAIR + contract_repair_feedback(parsed, error),
                 purpose="causal_upgrade_repair",
                 cache_tag=cache_tag,
             )

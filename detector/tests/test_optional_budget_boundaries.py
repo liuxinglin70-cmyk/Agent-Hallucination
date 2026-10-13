@@ -209,3 +209,38 @@ def test_tracer_feedback_eligibility_added_expiry_keeps_clean_base(monkeypatch):
     assert result['proof']['negative_feedback']['state']=='budget_exhausted'
     assert result['execution']['provider_attempts']==1
     assert not control.stopped.is_set()
+
+
+def test_an_escaped_added_budget_error_is_normalised_not_propagated(monkeypatch):
+    """A budget error that reaches the top becomes a case result, not a traceback.
+
+    Every added-request scope in the current flow catches its own exhaustion,
+    so this path is a safety net rather than a live route. But the safety net
+    is what keeps one case's budget from killing a whole batch: the exception
+    is normalised into the same unresolved envelope a case deadline produces,
+    with the still-valid base decision preserved, instead of escaping
+    ``Detector.detect`` into ``bounded_map``.
+    """
+    from detector.runtime import AddedBudgetExceeded
+
+    install_base_judge(monkeypatch)
+    cfg = feedback_config()
+    detector = Detector(cfg, require_credentials=False)
+    base = {"schema_version": "detector.detection_result.v1",
+            "case_id": "case", "state": "verified_clean",
+            "decision_authority": "authoritative", "runtime_valid": True}
+    def escaped(*args, **kwargs):
+        # The shape ``_detect`` produces: the still-valid base decision
+        # rides on the exception that left it.
+        exc = AddedBudgetExceeded("requests")
+        exc.base_detection_result = dict(base)
+        raise exc
+    monkeypatch.setattr(detector, "_detect", escaped)
+    result = detector.detect(record())
+    assert result["state"] == "unresolved"
+    assert result["runtime_valid"] is False
+    reason = result["authority_failure_reasons"][0]
+    assert reason["error_type"] == "added_budget_exceeded"
+    assert reason["retryable"] is False
+    # The base decision inside the escaped exception travels with the row.
+    assert result.get("base_detection_result", {}).get("state") == "verified_clean"

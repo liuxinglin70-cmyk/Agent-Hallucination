@@ -18,6 +18,7 @@ version's shape is a frozen contract that other reports already parse.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -88,20 +89,48 @@ class CandidateVersionGraph:
         return f"v{self.versions_created:03d}"
 
     def load_existing(self) -> None:
-        """Rebuild the version list from disk, without creating anything."""
+        """Rebuild the version list from disk, without creating anything.
+
+        The recorded ``candidate_hash`` is re-derived from the stored
+        candidate and must match. A version whose ``candidate.json`` was
+        edited after it was written is not the version that passed L0/L1, so
+        it is refused here rather than silently handed to freeze or recovery
+        -- the candidate identity that travels with a version must be the
+        candidate it actually carries.
+        """
         for path in sorted(self.output_dir.glob("v*/candidate.json")):
-            try:
-                record = json.loads(path.read_text(encoding="utf-8-sig"))
-            except (OSError, ValueError):
-                continue
-            if not isinstance(record, Mapping) or not record.get("version_id"):
-                continue
-            self.versions.append(dict(record))
+            record, _ = self.read_version(path.parent.name)
+            self.versions.append(copy.deepcopy(dict(record)))
             version_id = str(record.get("version_id"))
             if version_id.startswith("v") and version_id[1:].isdigit():
                 self.versions_created = max(
                     self.versions_created, int(version_id[1:]),
                 )
+
+    def read_version(self, version_id: str, *, certified: bool = False) -> tuple[dict, dict]:
+        """Read candidate and certification as one validated, owned snapshot."""
+        if not (version_id.startswith("v") and version_id[1:].isdigit()):
+            raise ValueError("invalid candidate version identity")
+        path = self.output_dir / version_id / "candidate.json"
+        try:
+            record = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"{version_id} candidate record is unreadable: {exc}") from exc
+        if not isinstance(record, Mapping) or record.get("version_id") != version_id:
+            raise ValueError(f"{version_id} candidate record identity mismatch")
+        candidate = record.get("candidate")
+        recorded_hash = str(record.get("candidate_hash") or "")
+        if candidate is not None and (
+            not recorded_hash or canonical_hash(candidate) != recorded_hash
+        ):
+            raise ValueError(f"{version_id} candidate content changed or hash is missing")
+        status = self.development_status(version_id)
+        eligible = status.get("status") in {"ready_for_freeze", "frozen"}
+        if certified and (not eligible or not candidate):
+            raise ValueError(f"{version_id} has no certified candidate")
+        if eligible and (not recorded_hash or status.get("candidate_hash") != recorded_hash):
+            raise ValueError(f"{version_id} certification identity differs from candidate content")
+        return copy.deepcopy(dict(record)), copy.deepcopy(status)
 
     def route_versions(self) -> dict[str, list[str]]:
         """Version ids per route, in creation order."""
@@ -167,22 +196,24 @@ class CandidateVersionGraph:
         ``candidate.json`` keeps exactly the fields it always had. The
         development status goes to a sidecar so an existing reader of the
         research format cannot be surprised by a new key.
+
+        The stored candidate is an independent snapshot (deep copy), and its
+        identity is written to the sidecar as well: the record, the sidecar
+        and the bytes on disk all carry the same candidate identity, so a
+        later caller can prove the version it froze is the version that was
+        measured instead of re-hashing whatever is on disk now.
         """
         version_dir = self.output_dir / version_id
         stored_candidate: Any = None
         if candidate is not None:
-            stored_candidate = (
-                [dict(entry) for entry in candidate]
-                if not isinstance(candidate, Mapping) else dict(candidate)
-            )
+            stored_candidate = copy.deepcopy(candidate)
+        canonical = canonical_hash(candidate) if candidate else None
         record = {
             "version_id": version_id,
             "route": route,
             "kind": "draft" if diagnosis is None else "revision",
             "candidate": stored_candidate,
-            "candidate_hash": (
-                canonical_hash(candidate) if candidate else None
-            ),
+            "candidate_hash": canonical,
             "parent_hash": (
                 canonical_hash(parent)
                 if parent is not None and diagnosis is not None
@@ -203,21 +234,23 @@ class CandidateVersionGraph:
         if parent is not None and diagnosis is not None:
             save_json(version_dir / "parent.json", {
                 "parent_hash": canonical_hash(parent),
-                "parent_candidate": (
-                    [dict(entry) for entry in parent]
-                    if not isinstance(parent, Mapping) else dict(parent)
-                ),
+                "parent_candidate": copy.deepcopy(parent),
             })
             save_json(version_dir / "diagnosis.json", diagnosis)
         self.versions.append(record)
+        sidecar: dict[str, Any] = {}
         if status or revision_reason:
-            self.write_development(version_id, {
+            sidecar.update({
                 "status": status or "draft",
                 "revision_reason": [
                     item if isinstance(item, Mapping) else {"note": str(item)}
                     for item in revision_reason
                 ],
             })
+        if canonical:
+            sidecar["candidate_hash"] = canonical
+        if sidecar:
+            self.write_development(version_id, sidecar)
         return record
 
     def write_development(

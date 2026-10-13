@@ -431,7 +431,11 @@ def test_usage_lower_bound_counts_attempts_that_reported_nothing(tmp_path, monke
 
     Written against a hand-built run tree rather than the fake: the fake takes
     the branch above, and a field that only ever reads zero would pass while
-    measuring nothing.
+    measuring nothing. The execution carries its request observations, so the
+    source attribution itself is verifiable: 20 attempts, 12 of which reported
+    no usage, with totals summed from the 8 that did. A hand-built execution
+    *without* that lineage reads as an unknown source, which the report then
+    refuses to certify as a lower bound -- both halves are asserted below.
     """
     from detector.runner import run_batch, record_case
     from detector.dataset import load_case
@@ -452,19 +456,31 @@ def test_usage_lower_bound_counts_attempts_that_reported_nothing(tmp_path, monke
     result_path = tmp_path / "runs" / "gap" / "cases" / safe_case_id(case) / "result.json"
     result = json.loads(result_path.read_text(encoding="utf-8"))
     result.pop("case_commit")
+    reported = {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+    requests = [
+        {"purpose": f"attempt_{index}", "usage": dict(reported)}
+        for index in range(8)
+    ] + [
+        {"purpose": f"attempt_{index}", "usage": None}
+        for index in range(8, 20)
+    ]
     result.update({
         "case_id": "BFCL/000.json",
         "state": "verified_error",
         "execution": {
             "provider_attempts": 20,
             "usage_missing_attempts": 12,
-            "usage": {"prompt_tokens": 100, "completion_tokens": 50,
-                      "total_tokens": 150},
+            "requests": requests,
+            "usage": {
+                "prompt_tokens": 80, "completion_tokens": 40,
+                "total_tokens": 120,
+            },
         },
         "providers": {
-            "judge": {"usage_total": {"prompt_tokens": 100,
-                                      "completion_tokens": 50,
-                                      "total_tokens": 150}},
+            "judge": {"usage_total": {
+                "prompt_tokens": 80, "completion_tokens": 40,
+                "total_tokens": 120,
+            }},
         },
     })
     record_case(runs_root=tmp_path / "runs", run_id="gap", case_id=case,
@@ -474,8 +490,40 @@ def test_usage_lower_bound_counts_attempts_that_reported_nothing(tmp_path, monke
     )
     assert report["attempts_without_usage"] == 12
     assert report["cases_with_missing_usage"] == 1
+    assert report["usage_source"] == "request_observations"
     assert report["total_is_lower_bound"] is True
-    assert report["total_tokens"] == 150
+    assert report["total_tokens"] == 120
+
+    # A hand-built execution with no observation lineage is not a source the
+    # report may certify: the totals stay, the lower-bound claim does not.
+    run_batch(runs_root=tmp_path / "runs", run_id="gap2", dataset_root=data,
+              cases=[case], config={},
+              interventions=build_intervention_registry([]), workers=1)
+    unverifiable_path = (
+        tmp_path / "runs" / "gap2" / "cases" / safe_case_id(case) / "result.json"
+    )
+    unverifiable = json.loads(unverifiable_path.read_text(encoding="utf-8"))
+    unverifiable.pop("case_commit")
+    unverifiable.update({
+        "case_id": "BFCL/000.json",
+        "state": "verified_error",
+        "execution": {
+            "provider_attempts": 20,
+            "usage_missing_attempts": 12,
+            "usage": {
+                "prompt_tokens": 80, "completion_tokens": 40,
+                "total_tokens": 120,
+            },
+        },
+    })
+    record_case(runs_root=tmp_path / "runs", run_id="gap2", case_id=case,
+                input_record=load_case(data, case)[0], result=unverifiable,
+                elapsed_seconds=1)
+    unknown = baseline.usage_report(
+        runs_root=tmp_path / "runs", run_id="gap2", cases=["BFCL/000.json"],
+    )
+    assert unknown["usage_source"] == "unknown"
+    assert unknown["total_is_lower_bound"] is None
 
 
 def test_dry_run_reports_undecided_rows_by_cause(tmp_path):

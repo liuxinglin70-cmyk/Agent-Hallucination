@@ -69,12 +69,15 @@ from evolution.gates import (
 )
 from evolution.ledger import Ledger, load_ledger
 from evolution.metrics import (
+    flipped_cases,
     gain_opportunity,
     localization_metrics,
     localization_opportunity,
+    noise_floor,
     paired_delta,
     paired_localization_delta,
     protection_repair,
+    target_opportunity,
 )
 from evolution.registry import load_active_registry
 from evolution.splits import bool_gold, load_gold, load_gold_step
@@ -1575,7 +1578,6 @@ class PromotionRun:
             [*control_rows, *candidate_rows],
         )
         report["arm_health"] = {"blocked": blocked, "per_arm": dict(self.arm_health)}
-        report["resumed_arms"] = sorted(self.resumed_arms)
 
         control_protection = [
             r for r in control_rows if r.get("case") in set(protection)
@@ -1619,6 +1621,59 @@ class PromotionRun:
 
         gates: dict[str, Any] = {"structural": structural}
 
+        # How much the instrument moves on its own. When the arms run live,
+        # the control configuration is rolled a second time: the cases the two
+        # rolls disagree on are the cases no single-case benefit may rest on,
+        # and the gates then score the benefit floor on stable gain only.
+        # Without this, a fresh promotion could admit on a case the same
+        # configuration reads two ways. A reroll that cannot be measured is a
+        # missing stability reading, not a candidate result: the run resolves
+        # as unmeasured instead of scoring an unannotated delta.
+        if fresh:
+            reroll_rows = self._run_arm(
+                control_registry, all_cases, fresh=fresh, label="control_reroll",
+            )
+            reroll_health = arm_has_infrastructure_failure(reroll_rows)
+            self.arm_health["control_reroll"] = reroll_health
+            if reroll_health:
+                report["arm_health"] = {
+                    "blocked": reroll_health, "per_arm": dict(self.arm_health),
+                }
+                report["noise_floor"] = noise_floor(
+                    provider_stage=True,
+                    reason=(
+                        "the control reroll could not be measured, so the "
+                        "instrument's own jitter is unknown"
+                    ),
+                )
+                report.update(
+                    state="promotion_unresolved",
+                    admitted=False,
+                    terminal_reason=(
+                        "the instrument's own jitter could not be measured: "
+                        + reroll_health
+                    ),
+                    gates={"structural": structural},
+                    elapsed_seconds=round(_time.monotonic() - started, 3),
+                )
+                self._write(report)
+                return report
+            reroll_delta = paired_delta(list(control_rows), list(reroll_rows))
+            unstable_cases: list[str] | None = [
+                str(case) for case in flipped_cases(control_rows, reroll_rows)
+            ]
+            report["noise_floor"] = noise_floor(
+                reroll=reroll_delta,
+                flipped=unstable_cases,
+                provider_stage=True,
+            )
+        else:
+            unstable_cases = None
+            report["noise_floor"] = noise_floor(provider_stage=False)
+        # Written after the reroll so a resumed reroll arm is reported like
+        # every other arm that came off disk.
+        report["resumed_arms"] = sorted(self.resumed_arms)
+
         # HARMLESSNESS on the protection set. Coverage is checked against the
         # control arm and is reported as unmeasured, never as a rejection.
         coverage = sentinel_coverage(control_protection, self.config)
@@ -1643,10 +1698,14 @@ class PromotionRun:
         else:
             gates["harmlessness"] = {"passed": True, "reason": "", "skipped": True}
 
-        detection = paired_delta(list(control_benefit), list(candidate_benefit))
+        detection = paired_delta(
+            list(control_benefit), list(candidate_benefit),
+            unstable_cases=unstable_cases,
+        )
         localization = paired_localization_delta(
             list(control_benefit), list(candidate_benefit),
             gold_steps=self.protocol.get("gold_steps") or {},
+            unstable_cases=unstable_cases,
         )
         report["benefit"] = {
             "detection": _delta_summary(detection),
@@ -1676,7 +1735,11 @@ class PromotionRun:
         # Repair opportunity is a property of the instrument, not of the
         # candidate: a batch where the control arm is already right in the
         # claimed direction cannot score the claim at all. Reporting that as a
-        # rejection would call an unmeasured mechanism falsified.
+        # rejection would call an unmeasured mechanism falsified. Read through
+        # ``target_opportunity`` so a claim is measured against its own
+        # objective -- boundary claims need recall+precision opportunities
+        # rather than a "boundary" key that no reading produces, and a
+        # resolution claim counts healthily-undecided cases.
         opportunity = gain_opportunity(control_benefit)
         localization_op = localization_opportunity(
             control_benefit, gold_steps=self.protocol.get("gold_steps") or {},
@@ -1685,16 +1748,15 @@ class PromotionRun:
             "detection": opportunity,
             "localization": localization_op,
         }
-        if target_kind == "detection":
-            scored_direction = any(
-                opportunity.get(
-                    str((artifact.get("claim") or {}).get("target_polarity") or "")
-                )
-                for artifact in artifacts
-            )
-            unmeasurable_claim = not scored_direction
-        else:
-            unmeasurable_claim = localization_op["improvable"] <= 0
+        unmeasurable_claim = not any(
+            (target_opportunity(
+                target_kind=candidate_target_kind(artifact),
+                polarity=str((artifact.get("claim") or {}).get("target_polarity") or ""),
+                detection=opportunity,
+                localization=localization_op,
+            ) or 0) > 0
+            for artifact in artifacts
+        )
         if gates["harmlessness"].get("passed"):
             # Each artifact must expose its own semantic behavior verdict, as
             # in a joint cycle unit: the group is sold as one version.
@@ -1986,15 +2048,64 @@ class PromotionRun:
             )
         except (ValueError, OSError, RuntimeError) as exc:
             return finish("promotion_unresolved", "runtime_unresolved", str(exc))
+        # The instrument's own jitter, measured the way the cycle measures it:
+        # a second roll of the control configuration. A benefit floor may not
+        # rest on a case the same configuration reads two ways. A reroll that
+        # cannot be measured honestly is a missing stability reading, not a
+        # candidate result.
+        if fresh:
+            try:
+                reroll = alignment.checked_rows(
+                    self._run_arm(entries, all_cases, fresh=fresh, label="control_reroll"),
+                    protocol,
+                )
+            except (ValueError, OSError, RuntimeError) as exc:
+                return finish("promotion_unresolved", "runtime_unresolved", str(exc))
+            reroll_health = arm_has_infrastructure_failure(reroll)
+            self.arm_health["control_reroll"] = reroll_health
+            if reroll_health:
+                report["noise_floor"] = noise_floor(
+                    provider_stage=True,
+                    reason=(
+                        "the control reroll could not be measured, so the "
+                        "instrument's own jitter is unknown"
+                    ),
+                )
+                return finish(
+                    "promotion_unresolved", "runtime_unresolved",
+                    "the instrument's own jitter could not be measured: "
+                    + reroll_health,
+                )
+            unstable_cases: list[str] | None = [
+                str(case) for case in flipped_cases(control, reroll)
+            ]
+            report["noise_floor"] = noise_floor(
+                reroll=paired_delta(control, reroll),
+                flipped=unstable_cases,
+                provider_stage=True,
+            )
+        else:
+            unstable_cases = None
+            report["noise_floor"] = noise_floor(provider_stage=False)
         control_gain = [row for row in control if row["case"] in gain_ids]
         active_gain = [row for row in active if row["case"] in gain_ids]
         active_protection = [row for row in active if row["case"] in protection_ids]
         control_challenge = [row for row in control if row["case"] in challenge_ids]
         active_challenge = [row for row in active if row["case"] in challenge_ids]
-        detection = paired_delta(control_gain, active_gain)
-        localization = paired_localization_delta(control_gain, active_gain, gold_steps=protocol["gold_steps"])
-        all_detection = paired_delta(control, active)
-        all_localization = paired_localization_delta(control, active, gold_steps=protocol["gold_steps"])
+        detection = paired_delta(
+            control_gain, active_gain, unstable_cases=unstable_cases,
+        )
+        localization = paired_localization_delta(
+            control_gain, active_gain, gold_steps=protocol["gold_steps"],
+            unstable_cases=unstable_cases,
+        )
+        all_detection = paired_delta(
+            control, active, unstable_cases=unstable_cases,
+        )
+        all_localization = paired_localization_delta(
+            control, active, gold_steps=protocol["gold_steps"],
+            unstable_cases=unstable_cases,
+        )
         challenge_delta = paired_delta(control_challenge, active_challenge)
         report["benefit"] = {"detection": _delta_summary(detection), "localization": _localization_summary(localization)}
         report["challenge"] = {"metric_role": "promotion-authoritative", "delta": _delta_summary(challenge_delta)}
@@ -2075,10 +2186,6 @@ class PromotionRun:
         }
         if claim_path.exists():
             recorded = json.loads(claim_path.read_text(encoding="utf-8"))
-            if recorded.get("protocol_hash") != protocol_hash:
-                raise ValueError(
-                    "protocol already consumed by another promotion attempt"
-                )
             if recorded != identity:
                 raise ValueError(
                     "protocol already consumed by another promotion attempt "
@@ -2086,15 +2193,24 @@ class PromotionRun:
                     f"{identity['output_dir']!r}); a frozen protocol is "
                     "measured once"
                 )
-            return        claim_path.parent.mkdir(parents=True, exist_ok=True)
+            return
+        claim_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             with claim_path.open("x", encoding="utf-8") as handle:
                 json.dump(identity, handle, ensure_ascii=False, sort_keys=True)
         except FileExistsError:
+            # Lost the race for the claim file. The winner's identity decides
+            # whether this run may continue: the same comparison is this run's
+            # own claim, anything else is another attempt consuming the
+            # protocol. Comparing only the protocol hash here let a different
+            # candidate and output directory ride along on the winner's claim.
             recorded = json.loads(claim_path.read_text(encoding="utf-8"))
-            if recorded.get("protocol_hash") != protocol_hash:
+            if recorded != identity:
                 raise ValueError(
-                    "protocol already consumed by another promotion attempt"
+                    "protocol already consumed by another promotion attempt "
+                    f"(recorded {recorded.get('output_dir')!r}, this run "
+                    f"{identity['output_dir']!r}); a frozen protocol is "
+                    "measured once"
                 )
 
     def _claim_aligned_protocol(self) -> None:

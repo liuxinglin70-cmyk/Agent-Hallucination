@@ -176,6 +176,10 @@ class ResearchRun:
         self.routes: dict[str, dict[str, Any]] = {}
         self.versions: list[dict[str, Any]] = []
         self.stopped: str | None = None
+        # Populated by ``execute``; the default exists so a run that stopped
+        # in its baseline stage can still write its report (the manifest
+        # packet reads this mapping).
+        self.baseline_rows: dict[str, dict[str, Any]] = {}
         # The shared version store (also used by the deployment-side development
         # loop). ``self.versions`` / ``self.routes`` below stay as the
         # research-side views the rest of this class reads.
@@ -695,6 +699,17 @@ class ResearchRun:
     # research-side names and the ``self.versions`` / ``self.routes`` views the
     # rest of this class and its tests read.
     def _new_version_id(self) -> str:
+        # The version cap is enforced here, at the one place every new version
+        # passes through. Reporting ``caps.max_versions`` next to a larger
+        # ``used.versions_created`` made the budget a promise the run could
+        # break silently; exceeding it now stops the run as ``partial``
+        # instead of creating a version that was never budgeted.
+        if self.version_graph.versions_created >= int(self.budget.max_versions):
+            raise RuntimeError(
+                f"version budget exhausted: {self.version_graph.versions_created} "
+                f"version(s) already created, max_versions="
+                f"{int(self.budget.max_versions)}"
+            )
         version_id = self.version_graph.new_version_id()
         self.budget.versions_created = self.version_graph.versions_created
         return version_id
@@ -996,11 +1011,12 @@ class ResearchRun:
     def execute(self) -> dict[str, Any]:
         self.frozen_manifest = self.freeze_manifest()
         self._load_existing_versions()
-        self.baseline_rows = self.resolve_baseline()
-        save_json(
-            self.output_dir / "baseline" / "summary.json",
-            self.baseline_rows,
-        )
+        # The baseline resolves inside the budget's own try: an exhausted
+        # baseline budget is a budget terminal state like any other, and the
+        # documented behaviour is a ``partial`` report -- not a traceback with
+        # no report at all. Writing the baseline summary is part of the same
+        # attempt, so a run that stopped at its baseline still produces the
+        # report its reader needs.
         seed_spec = dict(
             (self.frozen_manifest.get("input_manifest") or {}).get(
                 "seed_candidate"
@@ -1009,6 +1025,11 @@ class ResearchRun:
         )
         status = "screening_complete"
         try:
+            self.baseline_rows = self.resolve_baseline()
+            save_json(
+                self.output_dir / "baseline" / "summary.json",
+                self.baseline_rows,
+            )
             if seed_spec:
                 seed_route = str(seed_spec.get("route") or "C")
                 # Idempotent on resume: the seed is already on disk as a

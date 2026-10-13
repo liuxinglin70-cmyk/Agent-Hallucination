@@ -171,10 +171,16 @@ class Detector:
                     frozen_judge=frozen_judge, frozen_stages=frozen_stages,
                     evidence=evidence,
                 )
-            except (ProviderError, CaseDeadlineExceeded) as failure:
-                exc = failure if isinstance(failure, ProviderError) else ProviderError(
-                    "case", str(failure), error_type="case_deadline_exceeded", retryable=False,
-                )
+            except (ProviderError, CaseDeadlineExceeded, AddedBudgetExceeded) as failure:
+                if isinstance(failure, AddedBudgetExceeded):
+                    exc = ProviderError(
+                        "case", str(failure),
+                        error_type="added_budget_exceeded", retryable=False,
+                    )
+                else:
+                    exc = failure if isinstance(failure, ProviderError) else ProviderError(
+                        "case", str(failure), error_type="case_deadline_exceeded", retryable=False,
+                    )
                 result = {
                     "schema_version": "detector.detection_result.v1", "case_id": case_id,
                     "state": "unresolved", "occurrence_state": "unresolved",

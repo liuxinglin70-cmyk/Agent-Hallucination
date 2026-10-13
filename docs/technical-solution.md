@@ -1,8 +1,8 @@
 # 核心技术文档
 
-更新：2026-10-11。本文描述当前实现及约束；历史实验、旧方案和数值统一见 [实验日志](experiment-log.md)。
+更新：2026-10-12。本文描述当前实现及约束；历史实验、旧方案和数值统一见 [实验日志](experiment-log.md)。
 
-> **研究方向与验收目标**：详见 [疑惑度引导的双向因果轨迹审计技术设计](uncertainty-guided-causal-audit-design-20261008.md)，简明版见 [2026-10-08 组会汇报](../doc/group-meetings/group-meeting-uncertainty-causal-feedback-20261008.md)。
+> **研究方向与验收目标**：详见 [疑惑度引导的双向因果轨迹审计技术设计](uncertainty-guided-causal-audit-design-20261008.md)，简明版见 [2026-10-13 组会汇报](../doc/group-meetings/group-meeting-hallucination-localization-results-20261013.md)。
 
 代码重构、缺陷修复及新功能的当前实施状态统一见根目录 [实施台账](../IMPLEMENTATION_PLAN.md)。本期采用离线代码验收，不开展真实模型实验；本文件仍只描述已实现合同。
 
@@ -59,6 +59,8 @@ Judge 的阳性 root_cause.quote 和 Tracer 的 quote 必须是非空字符串�
 
 `hearing.run_hearing` 执行单次 Tracer/Defense 听证；API 保留诊断准备、Judge 翻案及 Recall 重开顺序。`replay.match_frozen_hearing` 只在来源、候选身份和完整目标同时匹配时选择已验证听证，Tracer 另核对上下文摘要；复用的结果和状态独立复制。听证队列是阶段结果的唯一来源。无论首听证来自Judge还是Recall，顶层proof、阶段状态与provider镜像均取首听证；实际责任步及决定性事实取被采纳的定罪听证，后续Recall不继承被推翻Judge的答案字段。决定性事实记录其candidate_id，Judge听证为None。首镜像与采纳步的分歧继续进入localization_sources/conflict，不改变检测裁决权威。无听证不调用Tracer/Defense，也不生成镜像。
 
+Defense 的 substantiated_upgraded 保持 confirmed_step=None，裁决在核对指控步骤和引用后认可该形状，检测权限仍为 degraded_judge_only。Tracer 定位取被采纳听证，分歧方向分别记录 earlier/later；不能把没有确认步号当成错误步号。
+
 冻结阶段的ok必须为布尔值，并与state=ok一致。失败阶段的parsed必须为空或缺失，不能将成功裁决混入失败信封；合法失败状态及错误信息可以复用，避免通过重抽模型请求掩盖失败。此校验与所有成功阶段的原解析器一起执行。
 
 `replay.build_replay_inputs` 生成 `detector.replay_inputs.v1`，绑定每个模型阶段的源码、packet、有效路由、基础 prompt及共享hook政策指定的阶段干预条目；Scanner、Upgrade、Defense另绑定适用快照，Tracer绑定审计策略和声明的scorer工件，启用阴性复审时Judge也绑定复审策略。
@@ -71,9 +73,9 @@ Judge保留每张无效票的结构化失败。全部无效票为同一失败类
 
 `api.Detector` 编排阶段；`judge.py`、`recaller.py`、`step_tracer.py`、`defense.py` 各自校验模型输出。Judge 阳性和召回升级候选进入 hearing 队列；`adjudication.py` 校验证据引用、指控和确认步骤，计算终态。内置机械谓词的定罪能力受 `conviction_calibration.py` 和校准记录约束；证据型组件不能自行获得定罪权。 已验证typed DSL按程序/guard的声明合同确定权限，模型typed semantic仍无定罪权。
 
-终态交付谓词仅把精确success状态、JSON对象success=true、字面success或完整固定完成banner识别为成功；失败/unknown、false、unsuccessful及普通查询字符串不触发成功交付义务，过深或非法JSON保持不适用。内置动作谓词只从packet.question提取机械义务；模型合同不能额外产生启动或移动要求，公开谓词、干预证据、风险画像/因果审计和Detector共享此规则。明确启动要求但轨迹终止于许可询问仍属于既有permission pending分支。工具、移动及启动的机械分支共用_action_is_required：动作须匹配有限英文肯定指令前缀和字面对象；禁止/否定缩写、许可询问、解释、引用及已测试的陈述性提及不产生义务。已测试的分句明确指令与I want/need/would like等请求仍可识别；条件和不支持的句型不生成机械义务。这不判断通用自然语言、工具实际状态变化或真实检测收益。动作与contract_coverage的精确源码指纹随共享规则变化，旧校准不能授权新源码；原校准文件和语料未改、未重测。
+终态交付谓词仅把精确success状态、JSON对象success=true、字面success或完整固定完成banner识别为成功；失败/unknown、false、unsuccessful及普通查询字符串不触发成功交付义务，过深或非法JSON保持不适用。内置动作谓词只从packet.question提取机械义务；模型合同不能额外产生启动或移动要求，公开谓词、干预证据、风险画像/因果审计和Detector共享此规则。明确启动要求但轨迹终止于许可询问仍属于既有permission pending分支。工具、移动及启动的机械分支共用_action_is_required：动作须匹配有限英文肯定指令前缀和字面对象；禁止/否定缩写、许可询问、解释、引用及已测试的陈述性提及不产生义务。已测试的分句明确指令与I want/need/would like等请求仍可识别；条件和不支持的句型不生成机械义务。这不判断通用自然语言、工具实际状态变化或真实检测收益。动作与contract_coverage的精确源码指纹随共享规则变化，旧校准不能授权新源码；本轮不改原始语料；当前校准记录由用户在 2026-10-12 修复阶段更新，当前权限以 source fingerprint、记录摘要和启动预检为准，不沿用旧源码的通过结论。
 
-`interventions.py` 负责统一 schema、内容哈希、hook 和执行计划；`predicate_dsl.py`、`predicate_context.py` 定义可执行谓词及可用上下文。冻结阶段回放必须匹配证据身份，并拒绝覆盖待测干预的目标阶段。配置文件与 `Detector(config=...)` 共用 `config.validate_config`，解析有效 route 并保留默认 off 的审计配置，未知字段、非法数值与缺失声明工件直接报错；`require_credentials=False` 不读取仓库 .env。审计默认关闭；shadow 与 tracer_context 执行分支已接通，完整模块验收状态见实施台账。
+`interventions.py` 负责统一 schema、内容哈希、hook 和执行计划；`predicate_dsl.py`、`predicate_context.py` 定义可执行谓词及可用上下文。冻结阶段回放必须匹配证据身份，并拒绝覆盖待测干预的目标阶段。配置文件与 `Detector(config=...)` 共用 `config.validate_config`，解析有效 route 并默认启用 tracer_context 的语义风险诊断，未知字段、非法数值与缺失声明工件直接报错；`require_credentials=False` 不读取仓库 .env。审计默认 tracer_context；off 是显式对照，shadow 是旁路诊断，完整模块验收状态见实施台账。
 
 Packet 的 `packet_reference_index` 统一事件和实际工具交互的引用归属，canonical position 与原始 source_step_id 分开；局部窗口 v2 覆盖 anchor/target 双端，携带 packet/内容摘要、遗漏 ID、截断原因与独立数据，后续活动不标为恢复。
 
@@ -87,7 +89,7 @@ Recall/Upgrade 的 live 与 frozen 解析使用同一适用证据快照；`recal
 
 `packet_reference_error` 统一 Judge、Recall、Tracer、Defense、引用谓词和 scoped semantic 的轨迹引用类型、存在性及范围验证；外部 snapshot citation 仍由 evidence.citation_error 验证。scoped semantic 的 supported/contradicted 必须带生产者提供的非空引用，abstained 可明确提供空列表，运行时不填造窗口引用。工具引用按实际所属 event 核验窗口范围。semantic executor 接收 packet/context 的独立副本，校验使用未被 executor 修改的投影；scoped/unscoped semantic 共用其返回及引用校验路径。语义和组件runner的实际artifact id/digest由 `_validate_executor_binding` 在调用judge前统一核验，精确比较声明和实际identity，保留各runner的缺失executor/字段及摘要不匹配错误；注册时的声明合法性仍由 `_validate_artifact_binding` 单独核验。证据型 runner 不获得定罪权限。
 
-**证据与权限边界**：DSL 正则在可终止子进程中执行，单次预算 0.5 秒、同一程序共享 1 秒，并受 case deadline 和 run cancellation 约束。资源耗尽输出 `not_applicable` 和 `execution_status=resource_exhausted`，不生成事实、不触发 Recall、不授权定罪；整例期限及取消继续传播。决定性引用逐一检查相关冲突说明，snapshot 的 resolution 来源绑定对应规范实体/属性组；packet 优先保留实质 answer 工具交付，closing status 保留为无实质交付时的锚点。deterministic 及无 runner 的公开裁决输入只可绑定内置定罪词汇并通过校准，typed DSL 保留显式程序权限。交付识别修改使旧校准源码指纹失效，历史记录保持原始字节，运行时拒绝复用其权限。DSL规范化保留 `when.packet_features`，`when.facts` 编译入现有 typed conditions；任意上下文字段扫描路径已删除，所有条件共享字段白名单、hook权限及合并条件数量上限；规则字段闭合，旧派生条件及未知字段明确拒绝，避免静默丢失约束。完整验收状态以实施台账为准。
+**证据与权限边界**：DSL 正则在可终止子进程中执行，单次预算 0.5 秒、同一程序共享 1 秒，并受 case deadline 和 run cancellation 约束。资源耗尽输出 `not_applicable` 和 `execution_status=resource_exhausted`，不生成事实、不触发 Recall、不授权定罪；整例期限及取消继续传播。决定性引用只接受 snapshot 中已验证的 resolution；自由文本 conflict_note 不授予解决冲突的权限。resolution 来源绑定对应规范实体/属性组；packet 优先保留实质 answer 工具交付，closing status 保留为无实质交付时的锚点。deterministic 及无 runner 的公开裁决输入只可绑定内置定罪词汇并通过校准，typed DSL 保留显式程序权限。交付识别修改使旧校准源码指纹失效，历史记录保持原始字节，运行时拒绝复用其权限。DSL规范化保留 `when.packet_features`，`when.facts` 编译入现有 typed conditions；任意上下文字段扫描路径已删除，所有条件共享字段白名单、hook权限及合并条件数量上限；规则字段闭合，旧派生条件及未知字段明确拒绝，避免静默丢失约束。完整验收状态以实施台账为准。
 
 批次 `run_summary.v3` 分别记录 requested/returned/not_started/missing，completed 只统计实际返回的非 not_started 行。工作线程登记完成结果，调度器中断后仍保留已提交案例；没有返回行的已开始案例记为 missing，不写成阴性或未开始。重复及额外案例行拒绝进入汇总。
 
@@ -166,6 +168,12 @@ flowchart TD
 
 L1 开发回放要求两臂恰好覆盖预定 target∪neighbor，每例各一行；配对指标模块统一验证覆盖和布尔 gold/prediction。覆盖缺失、非法读值和不健康运行归为未测，delta 留空，版本不能冻结。已知 gold step 时，定位回退只计基线原本精确命中而候选失去命中的案例；wrong→wrong 保持未改善。
 
+开发候选由 CandidateVersionGraph.read_version 统一核对目录版本号、candidate_hash 和内容。ready_for_freeze/frozen 的 sidecar 必须绑定同一 candidate_hash；load、freeze 和 recovery 都消费此规则，恢复再次读取磁盘，不把 self-consistent 的新内容配给旧 L0/L1 资格。record 深拷贝候选；缺失或漂移身份拒绝，不通过重算摘要为旧证据补资格。
+
+开发起草的调用额度只在本次 drafter 作用域生效，包括内部格式 repair；调用返回或异常均恢复 proposer 原有额度。预检拒绝不消费起草调用额度，预留位于实际 provider_call 之前。全周期 llm_calls 另行记账。准入预算不足的所有提前返回均记录 budget_unselected_entries；联合单元每个成员的经验都是 budget_unselected，不记为 falsified。
+
+failed_stage_state 同时读取顶层 stage_status 和 proof.hearings 中每次 Tracer/Defense 状态，arm 门禁、健康未决分类、机制及定位健康读者使用同一规则。健康 semantic-unresolved 可以成为 resolution 机会，阶段失败、非权威或 runtime-invalid 的未决不能成为收益。组合、晋升及治理按声明的 target_kind 读取目标，治理 fired_rate 复用实际归因 active_rows，不额外重跑 active arm。
+
 普通单位提前检查、替换集合的 coverage 和路线反馈共用 target_opportunity：定位使用可纠正定位数，联合使用检测机会与定位机会之和。替换按 localization 方向的显式策略执行，并以实际替换集合报告机会。联合收益门保留“至少一个目标改善、两个目标均不回退”的既有语义。
 
 指标模块 target_outcome 统一读取 detection/localization/joint/resolution 的收益与损伤，并携带目标类型和 delta_basis。周期入口按实际 benefit set 为每个候选成员产生 outcome；即使行为门未通过，读值仍保留。缺少相应指标归为未测；joint_broken、检测损伤及健康退化归为损伤，路线反馈只记录可测且未改善、未损伤的结果。定位机会来自基线可纠正的 annotated positive，不能用检测 FN/FP 机会替代。
@@ -236,7 +244,7 @@ engine、backends、promotion、interventions 仍承担较多职责，后续物�
 
 **现有代码事实**：`api.py::_judge_negative_needs_recall` 根据多票一致性和置信度决定部分阴性是否需要 Recall；`Detector._detect` 的 `negative_needs_recall` 还接受现有部署干预与适用证据快照触发；一旦进入 Recall，仍需 `run_causal_upgrade`、独立听证的 Tracer/Defense 和 `adjudicate`。阳性 Tracer 已支持输入单项指控，但尚无逐步困惑度或后续反事实推演的标准输入。
 
-`causal_contracts.py`、`step_uncertainty.py`、`causal_graph.py` 和 `causal_audit.py` 实现只读诊断及 shadow 审计。Detector 在非 off 模式于基础终态生成后输出 `proof.causal_diagnostics`：StepRiskProfile、Top-K 与 mandatory 候选、DependencyGraph、CausalProjection 和 CausalAudit。默认 off 不计算诊断；默认 deterministic_only 不增加 provider 调用。
+`causal_contracts.py`、`step_uncertainty.py`、`causal_graph.py` 和 `causal_audit.py` 实现只读诊断及 shadow 审计。Detector 在非 off 模式于基础终态生成后输出 `proof.causal_diagnostics`：StepRiskProfile、Top-K 与 mandatory 候选、DependencyGraph、CausalProjection 和 CausalAudit。显式 off 不计算诊断；默认 tracer_context 接入诊断与定位风险上下文，deterministic_only 不增加 provider 调用。
 
 风险排序优先采用 calculator 字面算术的局部偏差、相同 entity/attribute/unit/time 的显式字段冲突候选，以及未核验内容。同优先级按已核验信号数量降序，再按原事件位置稳定排序。画像绑定packet、策略、context、snapshot及实际scorer工件内容，候选选择拒绝不匹配策略和摘要不匹配的画像；Top-K、mandatory和预算遗漏分别记录，容量不足明确未知。机械缺失动作保留轨迹级 null locus。字段冲突是 hypothesis，工具观察不自动归责；缺失/未知 role 不记为零风险，teacher-forced PPL 明确 unsupported。算术核验仅支持可精确表示的字面四则运算；数值转换前限制十进制数量级，运算中限制分子/分母位长，超限保持未知。不执行工具代码，不把局部结果当作任务级违规证明。
 
@@ -287,3 +295,30 @@ engine smoke 的共享合成配置明确选择 `proposer.mode=offline`，模块�
 历史架构方案归入 [设计归档](design-archive/architecture-review-20260924.md)，其中的提案和交付记录描述当时状态；当前接口以本文为准，任务状态仅由根目录实施台账维护。归档只修正搬迁后的实验日志链接，不更新历史数值或设计声明。
 
 新增实验先冻结输入、源码/配置身份、角色、预算和判据；结束后将日期、分母、结果、失败、中断、更正和成本追加到唯一实验日志。运行缓存不作为永久文档提交。算法文件按职责命名，日期放运行 ID；夹具只服务具体测试断言，不存放任意实验备份。
+
+
+### 数据集首错定位与风险上下文合同
+
+当前定位目标为 `dataset_first_error_event.v1`：同一材料性错误在完整交互事件中首次出现的位置，包含 content、tool arguments、tool observation 和由工具承载的人类回复；后续助手采纳及交付分别是传播和交付，不重新计为首错。仍需独立证明错误影响实际交付，未使用或已纠正的错误不是目标。工具输出证明工具实际返回了什么，生成式答案/推理或人类指导的领域正确性仍需检查。Judge/Recall/Tracer/Defense 与自进化提案共用这一目标，检测器不读取 gold。
+
+`responsible_step` 始终为 packet 的一基事件位置。结果 `localization` 明确目标、位置、原始 source_step_id 与引用通道；原始步骤编号不用于模型输出坐标。评估侧 gold_step_mapping 优先把唯一原始步骤编号映射为事件位置；缺少所有原始编号时才按位置读取。重复或无法映射的标注不猜测，不计定位分母，并在报告列出 unmapped_annotations。独立 evaluate 与 evolution load_gold_step 复用同一映射；显式不同定位目标不计定位命中。历史结果没有目标声明时保留未知，历史证据不改写。
+
+独立评估只对 `authoritative` 定位计命中（历史缺失权限字段保持原读取合同）；`degraded_localization_conflict` 等降级状态不能计命中，检测 TP 不受影响。风险上下文目标超出画像容量时返回无上下文，保留基础 Tracer；上下文的 `omitted_event_ids` 同时包含画像容量和候选容量截断，不能把未评分事件描述为已覆盖。
+
+Tracer 的逆向追溯必须继续检查后续采纳之前的同一错误来源，不能在第一个逆向文本命中处停止。来源、传播和交付分开判断；首源定位不要求“仅修改源事件、保持后续错误副本原样”就能修正最终答案，仍要求同一偏差真实传播到交付结果，并排除无关或已经纠正的错误。
+
+共享配置缺省启用 tracer_context/semantic_proxy，默认 autodl 配置显式声明同一机制。缺 role 的事件仍保留 role=None，可按可见 content/arguments/observation 生成风险假设；未知角色不会被冒认成助手。长事件逐通道有界读取，保留截断标记及非证据性的风险候选；每事件最多扫描 32 个 interaction。semantic_proxy.v2 以已核验偏差、字段冲突、人类指导、未核验动作/观察和未核验内容排序；它不是 token PPL。
+
+听证先尝试强局部算术证书；无法绑定时可使用 `detector.risk_context.v1`。通用上下文绑定 packet、policy、完整 hearing target，包含有界候选/通道片段、缺失角色、截断和省略信息，decision_authority/localization_authority 均为 none、claim_equivalence 为 unestablished。Tracer 调用前重新生成并逐字段比较，重封哈希不能认证篡改的候选、片段、优先级或权限；实际输入与 hearing target 必须一致。上下文最多 6000 UTF-8 字节，并消费同一个 AddedBudget 的输入额度；repair 再次预留，额度或时间耗尽时保留基础 Tracer并记录 fallback/实际 context_digest。源码、配置、上下文或 hearing 变化使相应缓存/冻结阶段失效。
+
+进化后端使用同一个 Detector/default config，并保留实际诊断与上下文。失败记录将通用风险以 hypothesis 消费并传给提案，不把它升级为自动因果修复证书。有限算术 task_certificate 单独记录 verified_local_result_origin 与 assistant_adoption；只有既有材料性/显式声明传播/符号修复成立且更早局部偏差已排除时，进化才用错误来源事件而非采纳事件对齐定位目标。teacher_forced_ppl 仍显式 unsupported；生产阴性扩展的独立校准门维持，默认不启用，风险分数不能绕过定罪/准入门。
+
+### 请求超时、增量时间预算与中止观测
+
+Judge、Recall、Causal Upgrade、Tracer 和 Defense 的合同修复请求统一附带具体校验错误与上一条解析输出（最多12000字符，超限标记截断）。该输出作为不可信数据，修复仍须通过各阶段原有引用、事件范围、证据与投票验证；禁止靠改成阴性或伪造引用规避校验。风险上下文只传入Tracer，不改变Judge或Defense的初次请求。真实补测使用独立目录，保留首次结果，按预定非权威集合及首次权威恢复规则合并，不用金标选择尝试。
+
+共享MATERIALITY规则逐项检查每个必需交付物：先前成功动作不能替代后续新请求或状态核验。如实报告工具失败不构成虚假成功，但也不豁免从任务及可见能力独立成立的必需动作遗漏或顺序错误；缺失工具说明时不臆造前置动作。Judge的失败/拒答排除条款服从这条共享规则，避免与DELIVERABLE BREACH冲突。
+
+provider_call 的累计 deadline 同时约束容量排队与传输/重试；排队超时属于该调用的传输失败，案例截止/取消仍优先传递。新增机制时间预算扣除基础 provider 调用等待的并集，多票重叠等待不重复扣除；added_request_scope 内的新机制请求仍消耗新增时间，案例总截止不延长。snapshot 同时报 baseline_wait_seconds 与新增 elapsed_seconds。
+
+运行时 request_observer_scope 提供统一的 queued/started/finished 观测，唯一 request_id 关联排队、发送和完成；正式 batch 在每个案例 attempt/requests.jsonl 实时 flush+fsync，保留阶段、时间、超时、排队与已观测 usage，不记录凭据/完整 prompt/响应正文。观测不增加 usage 计数，不构成裁决或完整测量；硬中止后只有完整结果进入评分，未完成远端请求的用量仍未知。

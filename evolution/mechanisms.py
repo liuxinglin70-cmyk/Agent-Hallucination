@@ -669,7 +669,7 @@ def _assemble(
     ]
     bindings.append({"field": "proof.stage_status", "role": "detector_failure"})
     if mode in {"same_claim_late", "same_claim_early"}:
-        bindings.append({"field": "causal_failure", "role": "verified_declared_result"})
+        bindings.append({"field": "causal_failure", "role": "verified_local_result_origin"})
     if path_signature:
         bindings.append({
             "field": "proof.terminal_basis.decisive_facts",

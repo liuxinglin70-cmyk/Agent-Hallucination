@@ -23,6 +23,7 @@ from detector.provider import (
 )
 from detector.runtime import parallel_ordered
 from detector.semantics import (
+    contract_repair_feedback,
     CONTRACT_KINDS,
     JUDGE_BASIS_VALUES,
     JUDGE_CONFIDENCE_VALUES,
@@ -157,7 +158,7 @@ def _cast_vote(
         try:
             parsed, meta = provider_call(
                 route=route, system=system,
-                user=user + JUDGE_CONTRACT_REPAIR,
+                user=user + JUDGE_CONTRACT_REPAIR + contract_repair_feedback(parsed, error),
                 purpose="judge_repair",
             )
             result, error = _parse_judge(parsed, packet)
@@ -183,10 +184,14 @@ def run_judge(
     Recoverable provider or contract failures return an abstention status.
     Terminal failures propagate with their classification. When the route requests
     more than one vote, independent samples decide ``is_hallucination``
-    by strict majority; a tie or no quorum keeps the negative verdict and
-    the stage degrades, because a positive verdict is the extraordinary
-    claim. ``vote_topup`` re-casts abstained ballots a bounded number of
-    times so transport jitter cannot shrink the quorum between runs.
+    by strict majority; a tie keeps the negative verdict -- a positive verdict
+    is the extraordinary claim and must carry a majority -- while the stage
+    itself records ``state: "ok"`` and the tie in ``provider.vote.tie``. The
+    tie is a reading about the ensemble's uncertainty, and it is the caller's
+    rule that acts on it: ``Detector._judge_negative_needs_recall`` forces the
+    recall net for a tied or split vote instead of accepting a 3/3-or-better
+    clean verdict. ``vote_topup`` re-casts abstained ballots a bounded number
+    of times so transport jitter cannot shrink the quorum between runs.
     """
     plan = plan or empty_plan()
     route = dict(config["judge_route"])

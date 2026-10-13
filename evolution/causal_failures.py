@@ -8,6 +8,7 @@ from detector.causal_audit import validate_hearing_context
 from detector.causal_contracts import seal
 from detector.identity import digest
 from detector.packet import build_packet
+from detector.localization import LOCALIZATION_TARGET
 from evolution.metrics import mechanism_row_healthy, row_responsible_step
 
 
@@ -71,6 +72,14 @@ def build_causal_failure_record(
     except (ValueError, KeyError, TypeError) as exc:
         result["evidence_state"] = "invalid"
         return finish(str(exc))
+    if context.get("scope") == "diagnostic_event_priority":
+        result.update(evidence_state="hypothesis", scope=context["scope"],
+                      packet_digest=digest(packet), target_digest=context["target_digest"],
+                      context_digest=context["digest"],
+                      risk_candidates=[{key: candidate[key] for key in
+                                       ("event_id", "position", "priority", "signals")}
+                                      for candidate in context["candidates"]])
+        return finish("risk_priorities_do_not_verify_causal_repair")
     certificate = context["task_certificate"]
     result.update(packet_digest=digest(packet), target_digest=context["target_digest"],
                   context_digest=context["digest"], scope=certificate["scope"],
@@ -78,25 +87,31 @@ def build_causal_failure_record(
                   repair_status=certificate["counterfactual"]["status"])
     if (certificate["materiality"] != "verified"
             or certificate["first_introduction"] != "verified_declared_result"
+            or certificate.get("localization", {}).get("target") != LOCALIZATION_TARGET
+            or certificate.get("localization", {}).get("origin_status") != "verified_local_result_origin"
             or certificate["counterfactual"]["status"] != "verified_symbolic"):
         result["evidence_state"] = "unknown"
         return finish("same_claim_first_introduction_and_repair_not_verified")
     first = next(event for event in packet["events"]
-                 if event["event_id"] == certificate["earliest_supported_event_id"])
+                 if event["event_id"] == certificate["localization"]["origin_event_id"])
     step = row_responsible_step(row)
     first_step = first["position"]
-    result.update(evidence_state="verified", first_event_id=first["event_id"],
+    result.update(evidence_state="verified", first_introduction="verified_local_result_origin",
+                  localization_target=LOCALIZATION_TARGET, first_event_id=first["event_id"],
                   first_source_step_id=first["source_step_id"], first_position=first_step)
     if step is None:
         return finish("responsible_position_missing")
     classification = "late" if step > first_step else "early" if step < first_step else "aligned"
     result.update(classification=classification, repair_operation=(
-        "trace_first_declared_result" if classification in {"late", "early"} else "none"))
+        "trace_first_error_event" if classification in {"late", "early"} else "none"))
     return finish()
 
 
 def causal_failure_prompt_view(failure: Mapping[str, Any]) -> dict[str, Any]:
-    return {key: failure[key] for key in (
+    view = {key: failure[key] for key in (
         "schema_version", "classification", "evidence_state", "scope", "materiality",
         "first_introduction", "repair_status", "repair_operation", "reasons",
     )}
+    if "risk_candidates" in failure:
+        view["risk_candidates"] = failure["risk_candidates"]
+    return view

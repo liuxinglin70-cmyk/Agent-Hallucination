@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, Mapping
+from detector.localization import localization_record
 
 RESULT_SCHEMA = "detector.detection_result.v1"
 VALID_STATES = frozenset({"verified_error", "verified_clean", "unresolved"})
@@ -37,6 +38,7 @@ def build_detection_output(
         "runtime_valid": bool(proof.get("runtime_valid")),
         "responsible_event_id": proof.get("responsible_event_id"),
         "responsible_step": proof.get("responsible_step"),
+        "localization": localization_record(packet, proof),
         "incident_occurred": proof.get("incident_occurred"),
         "occurrence_state": state,
         "proof": dict(proof),

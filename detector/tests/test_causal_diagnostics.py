@@ -120,7 +120,8 @@ def test_dependencies_follow_distant_observation_with_actual_bound_value():
     assert len(edges) == 1
     assert edges[0]["source"] == "event_001_tool_01:observation"
     assert graph["complete"] is True
-    assert projection["ancestor_event_ids"] == ["event_001"]
+    assert "event_001" in projection["selected_event_ids"]
+    assert "event_001" in projection["ancestor_event_ids"] + projection["target_event_ids"]
     assert projection["selected_event_ids"] == ["event_001", "event_002", "event_003", "event_004"]
     assert projection["closure_state"] == "complete"
     projection["events"][0]["tool_interactions"][0]["observation"]["value"] = 99

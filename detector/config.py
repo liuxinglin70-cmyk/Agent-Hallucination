@@ -68,7 +68,7 @@ _ROUTE_FIELDS = frozenset(_PROVIDER_DEFAULTS) | frozenset(_INTEGER_MINIMUMS) | {
     "json_mode", "extra_body",
 }
 _CAUSAL_DEFAULTS = {
-    "mode": "off", "score_source": "semantic_proxy", "policy_version": "causal-v1",
+    "mode": "tracer_context", "score_source": "semantic_proxy", "policy_version": "dataset-origin-risk-v2",
     "top_k": 3, "max_projection_events": 16, "max_graph_edges": 64,
     "max_dependency_depth": 8, "max_added_provider_requests_per_case": 1,
     "max_added_prompt_tokens_per_case": 6000, "max_added_output_tokens_per_case": 1500,

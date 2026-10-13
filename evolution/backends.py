@@ -273,6 +273,7 @@ class DetectionBackend:
                 "state": result.get("state"),
                 "authority": result.get("decision_authority"),
                 "responsible_step": result.get("responsible_step"),
+                "localization_target": (result.get("localization") or {}).get("target"),
                 "responsible_step_kind": result.get("responsible_step_kind"),
                 # How this row reads as a *measurement*, in one vocabulary
                 # shared with the batch runner. ``prediction is None`` alone
@@ -735,7 +736,6 @@ class MockDetectorBackend(DetectionBackend):
         *,
         base_predictions: Mapping[str, bool | None] | None = None,
         overrides: Mapping[str, Mapping[str, bool | None]] | None = None,
-        fired_always: bool = True,
     ) -> None:
         self.base_predictions = {
             str(k).replace("__", "/"): v for k, v in (base_predictions or {}).items()
@@ -848,8 +848,14 @@ class MockDetectorBackend(DetectionBackend):
             str(entry.get("intervention_id") or "")
             for entry in self._active_ids(registry)
         }
-        prediction = self.base_predictions.get(case_id)
-        if prediction is None:
+        # "No entry for this case" falls back to gold (the oracle default);
+        # an explicit ``None`` entry is an injected unresolved reading and must
+        # stay one. Reading the missing key through ``.get`` made the two
+        # indistinguishable, so ``base_predictions`` could not express the
+        # "control arm is undecided" fixture the resolution metrics need.
+        if case_id in self.base_predictions:
+            prediction = self.base_predictions[case_id]
+        else:
             prediction = gold
         plan = None
         actions: list[str] = []

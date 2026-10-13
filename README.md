@@ -10,7 +10,7 @@
 - [实验结果与证据索引](docs/results/README.md)：已完成结果、待执行计划、原始报告和账本归档。
 
 - [疑惑度与因果轨迹审计优化设计](docs/uncertainty-guided-causal-audit-design-20261008.md)：拟议的快慢审计、定位反哺检测、代码接入点及验收方案；风险画像、局部审计与听证上下文已接通，完整验收状态见实施台账。
-- [组会汇报｜疑惑度反哺检测](doc/group-meetings/group-meeting-uncertainty-causal-feedback-20261008.md)：可直接讨论的简明方案与决策点。
+- [组会汇报｜疑惑度反哺检测](doc/group-meetings/group-meeting-hallucination-localization-results-20261013.md)：可直接讨论的简明方案与决策点。
 - [组会汇报｜检测与自进化结果](doc/group-meetings/meeting_report_20260924.md)：2026-09-28 历史汇报，保留原测量结论与来源。
 - [核心技术文档](docs/technical-solution.md)：系统模型、模块职责、合同、审查结论和维护规则。
 - [实验日志](docs/experiment-log.md)：历史实验、数值、失败、更正、旧方案及来源摘要。

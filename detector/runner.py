@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import copy
 import math
+import os
 from pathlib import Path
 import threading
 import sys
@@ -66,6 +67,7 @@ from detector.runtime import (
     deadline_scope,
     exclusive_writer,
     remaining_seconds,
+    request_observer_scope,
     run_scope,
     utc_now,
     usage_scope,
@@ -128,6 +130,7 @@ def detect_with_transport_retry(
     interventions: Mapping[str, Any] | None = None,
     attempts: int = 3,
     attempt_observer: Callable[[Mapping[str, Any]], None] | None = None,
+    request_observer: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Whole-detection retry for outage-shaped results.
 
@@ -151,7 +154,7 @@ def detect_with_transport_retry(
             attempt_started_at = utc_now()
             result = {}
             failure: BaseException | None = None
-            with usage_scope() as requests:
+            with request_observer_scope(request_observer), usage_scope() as requests:
                 try:
                     result = detector.detect(record, case_id=case_id, interventions=interventions)
                 except BaseException as exc:
@@ -470,6 +473,16 @@ def run_batch(
             index = _previous_attempts(case_dir) + 1
             case_attempt_id = _attempt_id(index)
             completed_attempts: list[Mapping[str, Any]] = []
+            request_journal = case_dir / "attempts" / case_attempt_id / "requests.jsonl"
+            request_journal.parent.mkdir(parents=True, exist_ok=True)
+            journal_lock = threading.Lock()
+
+            def preserve_request(observation: Mapping[str, Any]) -> None:
+                line = json.dumps(dict(observation), ensure_ascii=False, allow_nan=False)
+                with journal_lock, request_journal.open("a", encoding="utf-8") as journal:
+                    journal.write(line + "\n")
+                    journal.flush()
+                    os.fsync(journal.fileno())
 
             def preserve_attempt(attempt: Mapping[str, Any]) -> None:
                 completed_attempts.append(attempt)
@@ -487,6 +500,7 @@ def run_batch(
                 detector, record, case_id=case_id,
                 interventions=interventions,
                 attempt_observer=preserve_attempt,
+                request_observer=preserve_request,
             )
             observed_identity = (result.get("provenance") or {}).get("execution_identity")
             if observed_identity is not None and observed_identity != execution_identity:

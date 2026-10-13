@@ -1,6 +1,14 @@
 {
   "schema_version": "detector.config.v1",
   "case_timeout_seconds": 10800,
+  "causal_audit": {
+    "mode": "tracer_context",
+    "score_source": "semantic_proxy",
+    "policy_version": "dataset-origin-risk-v2",
+    "max_added_prompt_tokens_per_case": 24000,
+    "counterfactual_mode": "deterministic_only",
+    "negative_feedback_enabled": false
+  },
   "provider": {
     "endpoint": "https://www.autodl.art/api/v1",
     "model": "GLM-5.3-flash",

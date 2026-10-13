@@ -206,9 +206,21 @@ def load_gap_state(path: str | Path) -> dict[str, dict[str, Any]]:
                 current[key] = value
     for record in load_gap_resolutions(path):
         identity = str(record.get("identity") or "")
-        if identity in state:
-            state[identity]["resolved_cycle"] = int(record["cycle"])
-            state[identity]["resolution"] = str(record.get("note") or "")
+        candidate = state.get(identity)
+        if candidate is None:
+            continue
+        # A resolution closes the epoch it was recorded in. A gap observed
+        # again in a *later* round is an open gap again: the backlog exists to
+        # carry "this is still missing", and a resolution is history, not a
+        # permanent deletion. Resolutions recorded at or after the last
+        # observation still close the entry, so replaying a resolved cycle
+        # does not reopen it.
+        resolved_cycle = int(record["cycle"])
+        if resolved_cycle < int(candidate.get("last_seen_cycle") or 0):
+            candidate["resolved_earlier_cycle"] = resolved_cycle
+            continue
+        candidate["resolved_cycle"] = resolved_cycle
+        candidate["resolution"] = str(record.get("note") or "")
     return state
 
 

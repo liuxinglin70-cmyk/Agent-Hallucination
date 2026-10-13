@@ -44,7 +44,7 @@ def test_arm_policy_reaches_effective_detector_config_without_mutating_plan(tmp_
     _, seen = stage(tmp_path, monkeypatch, plan, "g0", config=CONFIG)
     assert seen[0]["config"]["causal_audit"]["mode"] == "shadow"
     assert seen[0]["config"]["causal_audit"]["top_k"] == 7
-    assert "causal_audit" not in CONFIG
+    assert CONFIG["causal_audit"] == {"mode": "off"}
     assert plan.arms["g0"]["detector_policy"]["causal_audit"] == {"mode": "shadow", "top_k": 7}
 
 

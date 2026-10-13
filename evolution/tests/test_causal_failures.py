@@ -32,11 +32,11 @@ def test_verified_same_claim_enters_localization_viability():
     failure = build_causal_failure_record(row, record, policy=policy)
     assert failure["classification"] == "late"
     assert failure["evidence_state"] == "verified"
-    assert failure["first_event_id"] == "event_002"
-    assert failure["first_position"] == 2
+    assert failure["first_event_id"] == "event_001"
+    assert failure["first_position"] == 1
     assert failure["first_source_step_id"] is None
-    assert failure["repair_operation"] == "trace_first_declared_result"
-    assert localization_repair_viability(row, record, gold_steps={row["case"]: 2},
+    assert failure["repair_operation"] == "trace_first_error_event"
+    assert localization_repair_viability(row, record, gold_steps={row["case"]: 1},
                                          causal_policy=policy)[0] == "verified_same_claim"
 
 
@@ -77,7 +77,7 @@ def test_invalid_or_ambiguous_evidence_cannot_admit_a_localization_repair(change
 
 def test_certificate_does_not_follow_an_incompatible_annotation():
     row, record, policy = example()
-    assert localization_repair_viability(row, record, gold_steps={row["case"]: 1},
+    assert localization_repair_viability(row, record, gold_steps={row["case"]: 2},
                                          causal_policy=policy)[0] == "needs_review"
 
 
@@ -86,7 +86,7 @@ def test_proposer_projection_has_no_target_answer_or_case_step_literals():
     failure = build_causal_failure_record(row, record, policy=policy)
     projected = causal_failure_prompt_view(failure)
     assert projected["classification"] == "late"
-    assert projected["repair_operation"] == "trace_first_declared_result"
+    assert projected["repair_operation"] == "trace_first_error_event"
     assert set(projected) == {"schema_version", "classification", "evidence_state", "scope",
                               "materiality", "first_introduction", "repair_status", "repair_operation", "reasons"}
 
@@ -95,7 +95,7 @@ def test_actual_family_diagnosis_mechanism_and_hybrid_input_consume_evidence(tmp
     row, record, policy = example()
     rows = [row, {**deepcopy(row), "case": "second.json"}]
     records = {item["case"]: record for item in rows}
-    gold_steps = {item["case"]: 2 for item in rows}
+    gold_steps = {item["case"]: 1 for item in rows}
     for case in records:
         (tmp_path / case).write_text(json.dumps({**record, "hallucination_step": 999,
                                                "hallucination_reason": "GOLD_SECRET"}), encoding="utf-8")
@@ -131,7 +131,7 @@ def test_actual_family_diagnosis_mechanism_and_hybrid_input_consume_evidence(tmp
     assert "GOLD_SECRET" not in captured["user"]
 
 
-@pytest.mark.parametrize("step,classification", [(1, "early"), (2, "aligned")])
+@pytest.mark.parametrize("step,classification", [(1, "aligned"), (2, "late")])
 def test_position_comparison_does_not_invent_a_source_step_id(step, classification):
     row, record, policy = example()
     row["responsible_step"] = step

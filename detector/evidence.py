@@ -467,15 +467,16 @@ def citation_error(
     *,
     where: str,
     require_settled: bool = False,
-    conflict_note: str = "",
 ) -> str | None:
     """Validate cited evidence ids; ``None`` means the citation is usable.
 
     ``require_settled`` additionally refuses a decisive citation of rows that
-    carry an unresolved conflict unless the ``conflict_note`` names what it
-    resolves — a conflicted id or one of the disputing values. A tie between
-    conflicting rows must be settled by context, never by repetition or
-    majority vote, and the note is recorded for audit.
+    carry an unresolved conflict. "Settled" is the module's own definition: a
+    conflict is resolved when the snapshot records which source applies and
+    why (``resolutions``). Prose cannot settle it -- a free-text note saying
+    the right ids or values were "considered" is not a resolution, so it does
+    not authorize a decisive finding. A caller that records such a note keeps
+    it as audit context; the finding itself must be reported undecided.
     """
     cited = [str(item) for item in ids if str(item)]
     if not cited:
@@ -491,11 +492,16 @@ def citation_error(
             snapshot["sources"], cited,
             snapshot.get("resolutions") or (),
         )
-        unresolved: list[dict[str, Any]] = []
         for conflict in conflicts:
             if not conflict["resolved"]:
-                unresolved.append(conflict)
-                continue
+                return (
+                    f"{where} grounds a decisive finding on unresolved "
+                    f"conflicts {sorted(set(conflict['evidence_ids']))} "
+                    f"(values {sorted(set(str(value) for value in conflict['values']))}): "
+                    "the snapshot records no resolution, so the finding must "
+                    "be reported undecided (a conflict is settled by a "
+                    "recorded resolution, never by prose)"
+                )
             if str(conflict["resolved_by"]) not in cited:
                 return (
                     f"{where} cites {sorted(set(cited))} on the "
@@ -503,19 +509,6 @@ def citation_error(
                     "but the snapshot resolves it in favour of "
                     f"{conflict['resolved_by']}; cite the resolved source or "
                     "report the finding undecided"
-                )
-        note = " ".join(str(conflict_note or "").split())
-        for conflict in unresolved:
-            disputed = set(conflict["evidence_ids"])
-            values = {str(value) for value in conflict["values"]}
-            addressed = any(token in note for token in disputed | values)
-            if not addressed:
-                return (
-                    f"{where} grounds a decisive finding on unresolved "
-                    f"conflicts {sorted(disputed)} (values {sorted(values)}) "
-                    "without resolving them: the snapshot records no "
-                    "resolution and the conflict_note does not address it, "
-                    "so the finding must be reported undecided"
                 )
     return None
 

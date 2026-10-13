@@ -125,12 +125,14 @@ def record_episode(
 ) -> dict[str, Any]:
     """Record one attempt as it happened.
 
-    ``outcome`` is the realised result (``admitted``/``rejected``/``audit``),
-    ``gate`` names the first gate that decided, and ``unevaluable`` marks a
-    rejection that came from missing evaluation coverage rather than from a
-    falsified mechanism. Keeping those two apart is the whole point: a
-    rejection that means "not measured" must not suppress the mechanism as if
-    it had been refuted.
+    ``outcome`` is the realised result (``admitted``/``rejected``/``audit``/
+    ``budget_unselected``), ``gate`` names the first gate that decided, and
+    ``unevaluable`` marks a rejection that came from missing evaluation
+    coverage rather than from a falsified mechanism. ``budget_unselected``
+    marks a unit that passed every gate but was not taken by the entry
+    budget, which is likewise not a verdict about the mechanism. Keeping
+    those apart is the whole point: neither "not measured" nor "not selected"
+    may suppress the mechanism as if it had been refuted.
     """
     paths = _ensure(root)
     record = {

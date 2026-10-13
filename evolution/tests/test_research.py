@@ -486,6 +486,75 @@ def test_screening_budget_exhaustion_stops_partial(tmp_path):
     assert report["routes"]["C"]["versions"] == []
 
 
+def test_version_budget_exhaustion_stops_partial(tmp_path):
+    """``max_versions`` is enforced, not merely reported next to its use.
+
+    The budget block publishes ``caps.max_versions`` beside
+    ``used.versions_created``; with the cap never compared, a run could
+    create more versions than it declared (two archived logs show exactly
+    that). The cap is now checked where every version is created, and the
+    overrun stops the run as ``partial`` instead of minting an unbudgeted
+    version.
+    """
+    dataset_root = _write_dataset(tmp_path)
+    baseline = _write_baseline_ref(tmp_path, dataset_root)
+    manifest = _write_manifest(
+        tmp_path, dataset_root, baseline_runs=[baseline],
+        budget={
+            "baseline_case_evaluations": 0,
+            "screening_case_evaluations": 16,
+            "proposer_calls_per_route": 3,
+            "max_versions": 1,
+            "workers": 1,
+        },
+    )
+    backend = FakeBackend()
+    # Route B's failing draft wants a revision, which route C also wants:
+    # both need a second version and the cap is one.
+    proposer = FakeProposer([
+        ProposalBatch(candidates=[_candidate_with("A first attempt.")]),
+        ProposalBatch(candidates=[_route_candidate("C")]),
+    ])
+    report = run_research(manifest, tmp_path / "run", backend, proposer)
+    assert report["status"] == "partial"
+    assert report["stopped"] and "version budget" in report["stopped"]
+    assert report["budget"]["used"]["versions_created"] == 1
+    assert report["budget"]["caps"]["max_versions"] == 1
+    versions = sorted(
+        path.name for path in (tmp_path / "run").glob("v*") if path.is_dir()
+    )
+    assert versions == ["v001"]
+
+
+def test_exhausted_baseline_budget_still_writes_a_partial_report(tmp_path):
+    """A baseline budget stop is a terminal state with a report, not a raise.
+
+    The baseline resolves before the route loop, and it used to sit outside
+    the handler that records ``partial``: an exhausted baseline budget left
+    the process with a traceback and no ``report.json``/``selection.json`` at
+    all, so the documented partial vocabulary described a state the run could
+    not reach.
+    """
+    dataset_root = _write_dataset(tmp_path)
+    manifest = _write_manifest(
+        tmp_path, dataset_root, baseline_runs=[],  # nothing reusable
+        budget={
+            "baseline_case_evaluations": 0,  # and nothing to spend
+            "screening_case_evaluations": 16,
+            "proposer_calls_per_route": 3,
+            "max_versions": 4,
+            "workers": 1,
+        },
+    )
+    report = run_research(
+        manifest, tmp_path / "run", FakeBackend(), FakeProposer([]),
+    )
+    assert report["status"] == "partial"
+    assert report["stopped"] == "baseline_budget_exhausted"
+    assert (tmp_path / "run" / "report.json").exists()
+    assert (tmp_path / "run" / "selection.json").exists()
+
+
 def test_resume_skips_routes_that_already_froze_a_passing_version(tmp_path):
     dataset_root = _write_dataset(tmp_path)
     baseline = _write_baseline_ref(tmp_path, dataset_root)

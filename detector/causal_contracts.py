@@ -16,9 +16,10 @@ CAUSAL_PROJECTION_SCHEMA = "detector.causal_projection.v1"
 SCORE_STATUSES = frozenset({"scored", "unknown", "unsupported", "truncated"})
 SIGNAL_PRIORITY = {
     "verified_deviation": 0, "bound_field_conflict": 1,
-    "action_precondition": 2, "unsupported_claim": 3,
+    "external_guidance": 1, "action_precondition": 2,
+    "unverified_action": 2, "unverified_observation": 2, "unsupported_claim": 3,
 }
-SCORER = {"id": "semantic_proxy.v1", "priority": SIGNAL_PRIORITY}
+SCORER = {"id": "semantic_proxy.v2", "priority": SIGNAL_PRIORITY}
 
 
 def seal(payload: Mapping[str, Any], key: str = "digest") -> dict[str, Any]:

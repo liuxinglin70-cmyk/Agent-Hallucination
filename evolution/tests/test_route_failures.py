@@ -308,9 +308,55 @@ def test_joint_opportunity_can_come_from_a_detection_repair(kind, expected):
                                              ({"U->T": 1}, 1, "regressed"),
                                              ({}, 0, "unchanged")])
 def test_resolution_outcome_preserves_resolution_gain_and_harm(flips, harm, status):
+    """Raw flips are not enough: a healthy control row must be behind them.
+
+    The resolution reading counts only rows that were *healthily undecided*
+    in the control arm, so the delta is built from real paired rows rather
+    than a hand-made flips mapping -- a hand-made ``U->T`` with no healthy
+    baseline row is exactly the outage-shaped reading the contract refuses.
+    """
+    from evolution.metrics import paired_delta
+
     entry, _, delta = fired_but_unchanged()
     entry["claim"]["target_kind"] = "resolution"
-    outcome = _outcome(entry, {**delta, "flips": flips, "new_errors": harm})
+
+    def _row(prediction, *, gold=True):
+        return {
+            "case": "A/1.json", "gold": gold, "prediction": prediction,
+            "authority": "authoritative", "state": (
+                "verified_error" if prediction is True
+                else "verified_clean" if prediction is False else "unresolved"
+            ),
+            "result": {
+                "schema_version": "detector.detection_result.v1",
+                "case_id": "A/1.json",
+                "state": (
+                    "verified_error" if prediction is True
+                    else "verified_clean" if prediction is False else "unresolved"
+                ),
+                "occurrence_state": (
+                    "verified_error" if prediction is True
+                    else "verified_clean" if prediction is False else "unresolved"
+                ),
+                "decision_authority": "authoritative",
+                "runtime_valid": True,
+                "stage_status": {},
+            },
+        }
+
+    base_row = (
+        _row(None, gold=False) if flips == {"U->F": 1} else _row(None)
+    )
+    active = {
+        "U->T": _row(True),
+        "U->F": _row(False, gold=False),
+    }.get(next(iter(flips), ""), _row(None, gold=base_row["gold"]))
+    if active["gold"] != base_row["gold"]:
+        active["gold"] = base_row["gold"]
+    measured = paired_delta([base_row], [active])
+    assert measured["flips"] == (flips or {"U->U": 1})
+    measured["new_errors"] = harm
+    outcome = _outcome(entry, measured)
     assert outcome["status"] == status
 
 

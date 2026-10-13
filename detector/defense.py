@@ -34,6 +34,7 @@ from detector.runtime import parallel_ordered
 
 
 from detector.semantics import (
+    contract_repair_feedback,
     DEFENSE_CONTRACT_REPAIR,
     DEFENSE_SYSTEM,
     DEFENSE_VERDICTS,
@@ -92,7 +93,6 @@ def _validate_defense_evidence(
         snapshot, parsed.get("evidence_citations") or [],
         where="defense",
         require_settled=parsed.get("verdict") == "substantiated",
-        conflict_note=str(parsed.get("conflict_note") or ""),
     )
     if citation_error_message:
         return None, citation_error_message
@@ -189,7 +189,7 @@ def _call_defense(
         try:
             parsed, meta = provider_call(
                 route=route, system=system,
-                user=user + DEFENSE_CONTRACT_REPAIR,
+                user=user + DEFENSE_CONTRACT_REPAIR + contract_repair_feedback(parsed, error),
                 purpose="defense_repair",
                 cache_tag=cache_tag,
             )
@@ -389,7 +389,14 @@ def run_defense(
     plan: InterventionPlan | None = None,
     snapshot: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Review one positive preliminary verdict. Never raises."""
+    """Review one positive preliminary verdict.
+
+    Terminal failures (a fatal ``ProviderError``) propagate so the caller can
+    classify the row; recoverable transport errors are absorbed into an
+    abstaining ballot. The name means "this stage does not decide by raising
+    through its own logic" -- it is not a promise that no exception can leave
+    it (compare ``detector.judge``, which states the same rule).
+    """
     if not positive:
         return {"ok": True, "parsed": None}, {
             "stage": "defense", "state": "not_needed", "attempts": 0,

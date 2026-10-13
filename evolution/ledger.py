@@ -100,7 +100,17 @@ class Ledger:
                     last = line
         if not last:
             return "0" * 64
-        return str(json.loads(last).get("entry_hash") or "0" * 64)
+        try:
+            return str(json.loads(last).get("entry_hash") or "0" * 64)
+        except ValueError as exc:
+            # A torn last line cannot provide a chain anchor. Refusing with a
+            # diagnostic keeps the failure where it happened instead of
+            # surfacing as a bare JSONDecodeError wherever recovery first
+            # calls ``last_hash``.
+            raise ValueError(
+                "ledger tail is not decodable JSON; the chain anchor cannot "
+                "be read from a torn record"
+            ) from exc
 
     def append(self, event: str, payload: Mapping[str, Any], *, idempotency_key: str | None = None) -> dict[str, Any]:
         if idempotency_key is not None and (not isinstance(idempotency_key, str) or not idempotency_key):
@@ -147,7 +157,39 @@ class Ledger:
         return records
 
     def verify(self) -> dict[str, Any]:
-        records = self.read()
+        """Whether the chain is intact, decoding included.
+
+        A torn or unreadable line is a broken chain, not an exception: the
+        callers of this function fail closed on ``valid`` and their refusal
+        message should name the record that broke, not escape as a
+        ``JSONDecodeError`` from wherever the read happened to occur.
+        """
+        if not self.path.exists():
+            return {"valid": True, "records": 0, "broken_at": None, "reason": ""}
+        raw_lines = [
+            line for line in
+            self.path.read_text(encoding="utf-8-sig").splitlines()
+            if line.strip()
+        ]
+        records: list[dict[str, Any]] = []
+        for index, line in enumerate(raw_lines):
+            try:
+                record = json.loads(line)
+            except ValueError:
+                return {
+                    "valid": False,
+                    "records": len(raw_lines),
+                    "broken_at": index,
+                    "reason": "record is not decodable JSON",
+                }
+            if not isinstance(record, Mapping):
+                return {
+                    "valid": False,
+                    "records": len(raw_lines),
+                    "broken_at": index,
+                    "reason": "record is not a JSON object",
+                }
+            records.append(dict(record))
         previous = "0" * 64
         for index, record in enumerate(records):
             if str(record.get("prev_hash") or "") != previous:

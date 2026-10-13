@@ -11,6 +11,7 @@ from detector.causal_contracts import arithmetic_check, literal_arithmetic_value
 from detector.causal_graph import build_observed_claim_lineage
 from detector.identity import digest
 from detector.packet import delivered_result, packet_reference_index
+from detector.localization import LOCALIZATION_TARGET
 
 
 TASK_CLAIM_SCHEMA = "detector.task_claim_certificate.v1"
@@ -51,6 +52,8 @@ def build_task_claim_certificate(
         "counterfactual": {"kind": "none", "status": "not_run", "repaired_value": None,
                            "repaired_event_ids": [], "assumptions": [], "state_changes_verified": False},
         "decision_authority": "none", "localization_authority": "none", "reasons": [],
+        "localization": {"target": LOCALIZATION_TARGET, "origin_event_id": None,
+                         "origin_status": "unknown", "assistant_adoption_event_id": None},
     }
 
     def unknown(reason):
@@ -108,6 +111,18 @@ def build_task_claim_certificate(
                     or arithmetic_check(interaction) is None):
                 return unknown("unverified_prefix_action")
     result.update(first_introduction="verified_declared_result", earliest_supported_event_id=first["event_id"])
+    origin = events[binding["event_id"]]
+    earlier_deviation = any(
+        check is None or check["status"] != "consistent"
+        for event in packet["events"] if event["position"] < origin["position"]
+        for interaction in event.get("tool_interactions") or ()
+        for check in [arithmetic_check(interaction)]
+    )
+    result["localization"].update(
+        origin_event_id=origin["event_id"] if not earlier_deviation else None,
+        origin_status="verified_local_result_origin" if not earlier_deviation else "unknown",
+        assistant_adoption_event_id=first["event_id"],
+    )
     binding_id = digest(["result", "value", None, None])
     repaired = {(first["event_id"], (), binding_id)}
     for _ in range(policy["max_dependency_depth"]):

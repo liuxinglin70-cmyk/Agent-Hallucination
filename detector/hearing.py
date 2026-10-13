@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
 from detector.causal_audit import context_for_hearing
+from detector.risk_context import build_risk_context
 from detector.defense import run_defense
 from detector.interventions import InterventionPlan
 from detector.replay import match_frozen_hearing
@@ -59,6 +60,8 @@ def run_hearing(
     if diagnostics is not None and diagnostics.get("audit") is not None:
         causal_context = context_for_hearing(diagnostics["audit"], positive=positive, packet=packet,
                                             policy=config["causal_audit"])
+        if causal_context is None and diagnostics["audit"]["health"]["state"] == "ok":
+            causal_context = build_risk_context(packet, positive=positive, policy=config["causal_audit"])
     context_digest = causal_context["digest"] if causal_context is not None else None
     if (entry is not None and "tracer_result" in entry
             and entry["tracer_result"].get("causal_context_digest") == context_digest):

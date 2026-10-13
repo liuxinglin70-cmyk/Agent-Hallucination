@@ -222,6 +222,47 @@ def test_resolving_an_unknown_gap_fails_closed(tmp_path):
         resolve_gap(tmp_path / "gaps.jsonl", identity="nope", cycle=1, note="x")
 
 
+def test_a_gap_re_observed_after_resolution_is_open_again(tmp_path):
+    """Resolution closes an epoch; a later sighting is a new open gap.
+
+    A capability that was built and later observed missing again is exactly
+    the information the backlog exists to carry. The previous behaviour let
+    the stale resolution permanently close the entry, so the strongest
+    recurring-gap signal could never fire for a gap that came back.
+    """
+    store = tmp_path / "gaps.jsonl"
+    record_gaps(store, cycle=1, gaps=[_gap("FAM-fn-foo")])
+    identity = open_gaps(store)[0]["identity"]
+    resolve_gap(store, identity=identity, cycle=2, note="capability built")
+    assert open_gaps(store) == []
+
+    # Cycle 4 observes the same gap again: it is open, and the resolution is
+    # kept as history (`resolved_earlier_cycle`) rather than erased.
+    backlog = record_gaps(store, cycle=4, gaps=[_gap("FAM-fn-foo")])
+    assert [item["failure_family"] for item in backlog] == ["FAM-fn-foo"]
+    assert backlog[0]["last_seen_cycle"] == 4
+    assert backlog[0]["resolved_cycle"] is None
+    assert backlog[0]["resolved_earlier_cycle"] == 2
+    summary = gap_summary(store)
+    assert summary["open"] == 1
+    assert summary["resolved"] == 0
+
+
+def test_a_replayed_resolution_still_closes_the_entry(tmp_path):
+    """The same resolved epoch replayed must not reopen the gap.
+
+    A resumed run can re-append the resolution after the observation; the
+    resolution belongs to that epoch and must still close it.
+    """
+    store = tmp_path / "gaps.jsonl"
+    record_gaps(store, cycle=1, gaps=[_gap("FAM-fn-foo")])
+    identity = open_gaps(store)[0]["identity"]
+    resolve_gap(store, identity=identity, cycle=1, note="capability built")
+    resolve_gap(store, identity=identity, cycle=1, note="capability built")
+    assert open_gaps(store) == []
+    assert gap_summary(store)["open"] == 0
+
+
 def test_backlog_orders_by_frequency(tmp_path):
     store = tmp_path / "gaps.jsonl"
     record_gaps(store, cycle=1, gaps=[_gap("FAM-a")])

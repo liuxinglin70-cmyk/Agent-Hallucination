@@ -271,7 +271,14 @@ def _hearing(source, step, verdict, candidate_id=None):
     event_id = f"event_{step:03d}"
     parsed = {
         "verdict": verdict,
-        "confirmed_step": step if verdict.startswith("substantiated") else None,
+        # The real emitter forces the field to null for an upgraded verdict:
+        # a half-conviction has no confirmed step by contract (defense.py).
+        # A fixture that hands it a step is a shape no producer can emit, and
+        # it hid the adjudication defect this fixture now exercises.
+        "confirmed_step": (
+            None if verdict == "substantiated_upgraded"
+            else step if verdict.startswith("substantiated") else None
+        ),
         "evidence_refs": [event_id],
         "reason": "r",
     }
@@ -367,6 +374,73 @@ def test_upgraded_verdict_degrades_authority(wrong_answer_packet):
     )
     assert proof["state"] == "verified_error"
     assert proof["decision_authority"] == "degraded_judge_only"
+
+
+def test_upgraded_verdict_convicts_with_the_tracer_step(wrong_answer_packet):
+    """The half-conviction convicts; only its authority degrades.
+
+    ``substantiated_upgraded`` + null ``confirmed_step`` is what the vote
+    emitter produces for a split ballot. Treating the null as a contract
+    contradiction reclassified the verdict as invalid, dropped the case into
+    the "defense unsettled" branch, and took the responsible step from the
+    raw allegation instead of the tracer -- so a degraded but real
+    conviction was scored as an unlocalized one. The conviction stands
+    (degraded authority, by the vote contract); the step is the tracer's.
+    """
+    hearings = [_hearing("judge", 2, "substantiated_upgraded")]
+    # The producer clears the field; the tracer still names its locus (1).
+    hearings[0]["tracer_result"] = {"ok": True, "parsed": {
+        "step": 1, "quote": "4", "referent": "4",
+        "evidence_refs": ["event_001"], "reason": "earliest",
+    }}
+    proof = adjudicate(
+        packet=wrong_answer_packet,
+        judge_result=JUDGE_TRUE_RESULT, judge_status=JUDGE_OK,
+        recall_result=None, recall_status=None,
+        upgrade_result=None, upgrade_status=None,
+        defense_result=hearings[0]["defense_result"],
+        defense_status={"stage": "defense", "state": "ok"},
+        hearings=hearings,
+    )
+    assert proof["state"] == "verified_error"
+    assert proof["decision_authority"] == "degraded_judge_only"
+    facts = proof["terminal_basis"]["decisive_facts"]
+    assert facts["defense"] == "substantiated_upgraded"
+    assert facts["confirmed_step"] is None
+    # The tracer's locus is adopted; the raw allegation (2) is not.
+    assert proof["responsible_step"] == 1
+    assert facts["traced_step"] == 1
+    assert facts["hearings"] == [{
+        "source": "judge", "candidate_id": None,
+        "verdict": "substantiated_upgraded",
+    }]
+
+
+def test_upgraded_verdict_with_a_disagreeing_step_still_invalidates(
+    wrong_answer_packet,
+):
+    """A *present* confirmed step that contradicts the allegation still fails.
+
+    The null is read as "no confirmation"; a real step that disagrees is a
+    contradiction and must keep the verdict invalid.
+    """
+    hearing = _hearing("judge", 2, "substantiated_upgraded")
+    hearing["defense_result"]["parsed"]["confirmed_step"] = 1
+    proof = adjudicate(
+        packet=wrong_answer_packet,
+        judge_result=JUDGE_TRUE_RESULT, judge_status=JUDGE_OK,
+        recall_result=None, recall_status=None,
+        upgrade_result=None, upgrade_status=None,
+        defense_result=hearing["defense_result"],
+        defense_status={"stage": "defense", "state": "ok"},
+        hearings=[hearing],
+    )
+    # Invalid hearing -> unsettled branch: the conviction survives on the
+    # preliminary positive with degraded authority, and the record says the
+    # defense did not settle.
+    assert proof["state"] == "verified_error"
+    assert proof["decision_authority"] == "degraded_judge_only"
+    assert proof["terminal_basis"]["decisive_facts"]["defense"] == "unsettled"
 
 
 def test_judge_topup_refills_abstained_ballots(wrong_answer_packet, monkeypatch):

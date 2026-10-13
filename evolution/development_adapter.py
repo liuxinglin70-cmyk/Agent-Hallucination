@@ -20,6 +20,7 @@ def feedback_delta(value: Any) -> dict[str, int] | None:
 
 def make_development_drafter(
     *, proposer: Any, cycle: int, family: Mapping[str, Any], mechanism_id: str, identifier: str,
+    provider_budget: Callable[[], int] | None = None,
 ) -> Callable[..., ProposalBatch]:
     family_snapshot = deepcopy(dict(family))
 
@@ -31,7 +32,7 @@ def make_development_drafter(
             candidate.pop("content_hash", None)
         return result
 
-    def draft(mechanism, _plan, parent, diagnosis, _cycle):
+    def draft_once(mechanism, _plan, parent, diagnosis, _cycle):
         one = deepcopy({**family_snapshot, "mechanism": mechanism})
         if parent is None or not diagnosis:
             return renamed(proposer.propose([one], cycle=int(cycle), max_proposals=1))
@@ -83,6 +84,16 @@ def make_development_drafter(
             return renamed(proposer.propose([one], cycle=int(cycle), max_proposals=1))
         finally:
             if callable(setter):
+                setter(previous)
+
+    def draft(mechanism, plan, parent, diagnosis, current_cycle):
+        setter = getattr(proposer, "set_provider_call_budget", None)
+        scoped = callable(setter) and callable(provider_budget)
+        previous = setter(provider_budget()) if scoped else None
+        try:
+            return draft_once(mechanism, plan, parent, diagnosis, current_cycle)
+        finally:
+            if scoped:
                 setter(previous)
 
     return draft

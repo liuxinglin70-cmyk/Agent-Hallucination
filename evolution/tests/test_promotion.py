@@ -742,7 +742,11 @@ def test_completed_arm_is_resumed_not_redrawn(tmp_path, monkeypatch):
     second = resumed.run()
     assert second["state"] == "promoted"
     assert resume_backend.calls == 0, "a completed arm must not be re-measured"
-    assert sorted(second["resumed_arms"]) == ["candidate", "control"]
+    # The fresh run measures a third arm -- the control reroll that reads the
+    # instrument's own jitter -- and it resumes from disk like the other two.
+    assert sorted(second["resumed_arms"]) == [
+        "candidate", "control", "control_reroll",
+    ]
     assert calls_after_first > 0
 
 

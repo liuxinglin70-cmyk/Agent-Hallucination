@@ -189,9 +189,14 @@ def test_citation_error_blocks_conflicted_evidence_for_decisive_use():
         built, ["E1"], where="defense", require_settled=True,
     )
     assert error is not None and "unresolved conflicts" in error
+    # Only a resolution recorded in the snapshot settles the conflict; prose
+    # never does (a decisive finding on unresolved rows must report undecided).
+    settled = snapshot(sources=rows, resolutions=[{
+        "entity": "Lisette", "attribute": "tonnage", "resolved_by": "E1",
+        "reason": "E1 is the 1873 hull; E2's caption describes another vessel",
+    }])
     assert citation_error(
-        built, ["E1"], where="defense", require_settled=True,
-        conflict_note="year differs: E1 is the 1873 hull",
+        settled, ["E1"], where="defense", require_settled=True,
     ) is None
     # A non-decisive citation is not blocked.
     assert citation_error(

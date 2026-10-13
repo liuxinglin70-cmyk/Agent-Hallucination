@@ -432,6 +432,48 @@ def test_the_same_attempt_directory_is_idempotent(tmp_path):
     assert second["state"] == first["state"]
 
 
+def test_losing_the_claim_race_compares_the_whole_identity(
+    tmp_path, monkeypatch,
+):
+    """A claim written between the exists() check and open("x") is verified fully.
+
+    Two concurrent runs that both pass the existence check race on the
+    exclusive create. The loser used to compare only the protocol hash and
+    accept any recorded claim carrying the same frozen protocol -- so a
+    different candidate writing to a different output directory rode along
+    on the winner's claim instead of being refused. The identity compared is
+    now the whole claim record.
+    """
+    _freeze_v1(tmp_path)
+    protocol = load_protocol(
+        tmp_path / "protocol.json", dataset_root=tmp_path / "data",
+        stages=("structural", "harmlessness", "behavior", "m"),
+    )
+    claim_path = Path(str(tmp_path / "protocol.json") + ".attempt.json")
+    # The winner's claim: same protocol hash, another candidate and output
+    # directory. The loser's exclusive create must find it already in place.
+    claim_path.write_text(json.dumps({
+        "protocol_hash": protocol["protocol_hash"],
+        "candidate_content_hash": "the-winner",
+        "output_dir": str((tmp_path / "winner_out").resolve()),
+    }), encoding="utf-8")
+
+    real_open = Path.open
+
+    def racing_open(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+        if self.name == claim_path.name and args and args[0] == "x":
+            raise FileExistsError("lost the claim race")
+        return real_open(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", racing_open)
+    report = _run(
+        tmp_path, protocol, backend=_ScriptedBackend(),
+        output_dir=tmp_path / "loser_out",
+    )
+    assert report["state"] == "promotion_blocked_preflight"
+    assert "already consumed" in report["terminal_reason"]
+
+
 # ---------------------------------------------------------------------------
 # The registry cycle counter
 def test_a_promotion_does_not_reset_the_registry_cycle(tmp_path):

@@ -105,6 +105,61 @@ def test_structured_required_action_spelling_still_wins():
     ) == {"lookup_customer"}
 
 
+def test_structured_required_action_is_read_from_any_clause_position():
+    """A prefixed structured spelling is still an explicit obligation.
+
+    ``_action_is_required`` demands that the clause start with an execution
+    prefix, which is the right rule for a *prose* marker and the wrong one for
+    a machine-readable statement: "Task: required_action: ..." and the
+    flattened multi-turn form "[turn 1] required_action: ..." both name the
+    action outright, and the flattened form means every turn after the first
+    could never be recognized. The same quotation, question and negation
+    exclusions still apply.
+    """
+    assert _detect_required_actions(
+        "Task: required_action: \"lookup_customer\""
+    ) == {"lookup_customer"}
+    assert _detect_required_actions(
+        "Please carry out the required_action: \"lookup_customer\""
+    ) == {"lookup_customer"}
+    assert _detect_required_actions(
+        "[turn 1] required_action: \"lookup_customer\""
+    ) == {"lookup_customer"}
+    # Quoted as an example, asked about, or negated: still not an obligation.
+    assert _detect_required_actions(
+        'Print the sentence "required_action: \'lookup_customer\'".'
+    ) == set()
+    assert _detect_required_actions(
+        'What is required_action: "lookup_customer"?'
+    ) == set()
+    assert _detect_required_actions(
+        'Do not use required_action: "lookup_customer".'
+    ) == set()
+
+
+def test_a_tool_word_alone_never_becomes_the_action_name():
+    """ "You must use the tool named X" must not register the article ``the``.
+
+    The name shape matched the phrase in front of the tool word, and for
+    "the tool" that phrase is the article itself -- so a perfectly answerable
+    question was convicted for not running a tool called "the".
+    """
+    assert _detect_required_actions(
+        "You must use the tool named lookup_customer."
+    ) == {"lookup_customer"}
+    assert _detect_required_actions(
+        "You must call the function named get_weather with the city."
+    ) == {"get_weather"}
+    for question in (
+        "You must use the tool before answering.",
+        "Please use the tool to look it up.",
+        "So you must use the tool, then report back.",
+    ):
+        actions = _detect_required_actions(question)
+        assert "the" not in actions, question
+        assert "a" not in actions, question
+
+
 def test_missing_tool_obligation_still_convicts():
     """A real missing required call is still a violation.
 

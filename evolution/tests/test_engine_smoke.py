@@ -611,7 +611,9 @@ def test_two_qualified_units_get_one_combination_arm(tmp_path):
     )
     report = engine.run_cycle(1)
     assert report["combination"]["unit_ids"] == ["IV-1-001", "IV-1-002"]
-    assert report["combination"]["reason"] == "combination arm met HARMLESSNESS and M"
+    assert report["combination"]["reason"] == (
+        "combination arm met HARMLESSNESS and each member's objective"
+    )
     assert set(report["marginal_selection"]["selected"]) == {
         "IV-1-001", "IV-1-002"
     }
@@ -1106,6 +1108,38 @@ def test_governance_runs_attribution_retirement_and_rollback(tmp_path):
     assert engine.registry.entries == []
 
 
+def test_retirement_takes_the_dependency_closure(tmp_path):
+    """An evidence_check cannot be retired out from under its guard.
+
+    The registry refuses that retirement with a ValueError; governance used
+    to apply retirements entry by entry and let the refusal (or any other
+    ValueError) kill the whole governance stage after attribution had run.
+    The closure is extended before the call, so the pair retires together and
+    the stage completes.
+    """
+    cases = _make_dataset(tmp_path / "data", n=20)
+    config = _config(tmp_path)
+    split = EvolutionSplit(
+        name="synthetic", pool=cases, sentinel=cases[:4],
+        gain=cases[4:12], patrol_pool=cases[12:], mini=True,
+    )
+    engine = EvolutionEngine(
+        config, backend=MockDetectorBackend(), split=split, mini=True,
+        proposer=OfflineProposer(),
+    )
+    evidence = _evidence_candidate()
+    guard = _mechanical_guard_candidate()
+    engine.registry.write([evidence, guard], cycle=1, reason="seeded pair")
+    for identifier in ("IV-1-001", "IV-1-002"):
+        engine.registry.record_marginal(identifier, 0, cycle=1, fired_rate=1.0)
+        engine.registry.record_marginal(identifier, 0, cycle=2, fired_rate=1.0)
+
+    report = engine.run_governance(cycle=2)
+    assert set(report["retirement"]["retired"]) == {"IV-1-001", "IV-1-002"}
+    assert "IV-1-002" in set(report["retirement"]["closure"])
+    assert engine.registry.entries == []
+
+
 def test_run_cycle_no_longer_measures_retirement_in_cycle(tmp_path):
     """Admission cycles stop sweeping the gain set for governance."""
     cases = _make_dataset(tmp_path / "data", n=20)
@@ -1161,6 +1195,44 @@ def test_meta_library_drift_reads_cycle_report_key():
         },
     ])
     assert meta["library_drift"]["net_contribution_history"] == [3]
+
+
+def test_meta_audit_verdict_is_not_run_when_no_audit_enabled():
+    """``all(())`` used to read as a pass for an audit that never happened.
+
+    An empty enabled-audit set reported ``verdict: "pass"`` and that boolean
+    is an AND term of the final overall verdict -- so a run with the audit
+    disabled (or with reports carrying no audit block) passed a gate it never
+    took. "Not run" is now its own value, and the overall consumer treats
+    anything that is not ``pass`` as fail.
+    """
+    from evolution.meta_eval import compute_meta
+
+    disabled = compute_meta([
+        {
+            "cycle": 1, "proposals": [], "gates": [],
+            "marginal_selection": {}, "active_effect_on_g": {},
+            "audit": {"enabled": False, "passed": True, "frozen": False,
+                      "reports": []},
+            "patrol": {}, "proposal_summary": {}, "active_after_cycle": [],
+        },
+    ])
+    section = disabled["defect_injection_audit"]
+    assert section["verdict"] == "not_run"
+    assert section["passed"] is None
+    assert section["enabled_cycles"] == 0
+
+    passed = compute_meta([
+        {
+            "cycle": 1, "proposals": [], "gates": [],
+            "marginal_selection": {}, "active_effect_on_g": {},
+            "audit": {"enabled": True, "passed": True, "frozen": False,
+                      "reports": []},
+            "patrol": {}, "proposal_summary": {}, "active_after_cycle": [],
+        },
+    ])
+    assert passed["defect_injection_audit"]["verdict"] == "pass"
+    assert passed["defect_injection_audit"]["passed"] is True
 
 
 def _mini_engine(tmp_path, backend, split, proposer=None):
@@ -1443,6 +1515,7 @@ def test_audit_freezes_when_defect_arm_cannot_be_scored(tmp_path, monkeypatch):
     def fail_closed_unit(*args, **kwargs):
         unit = real_run_unit(*args, **kwargs)
         unit["candidate_rows"] = unresolved_rows
+        unit["candidate_full_rows"] = unresolved_rows
         unit["harmlessness"] = {"passed": False,
                                 "reason": "all rows unresolved"}
         return unit
@@ -1566,8 +1639,12 @@ def test_gain_opportunity_counts_repairable_directions_only():
         {"case": "A/5", "gold": False, "prediction": False},  # already right
         {"case": "A/6", "gold": True, "prediction": None},    # undecided
     ]
-    assert gain_opportunity(rows) == {"recall": 2, "precision": 1}
-    assert gain_opportunity([]) == {"recall": 0, "precision": 0}
+    assert gain_opportunity(rows) == {
+        "recall": 2, "precision": 1, "resolution": 1,
+    }
+    assert gain_opportunity([]) == {
+        "recall": 0, "precision": 0, "resolution": 0,
+    }
 
 
 def test_cycle_report_reports_what_the_instrument_could_measure(tmp_path):

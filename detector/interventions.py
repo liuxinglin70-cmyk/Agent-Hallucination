@@ -122,6 +122,12 @@ FACT_NAMES: dict[str, frozenset[str]] = {
     }),
 }
 
+#: The value two disagreeing writers of one fact leave behind. It is outside
+#: every declared fact vocabulary, so no trigger can match it: a conflict
+#: neither authorizes nor suppresses, it makes the fact unusable until the
+#: writers agree.
+FACT_CONFLICT_VALUE = "__conflict__"
+
 _EVIDENCE_HOOK_BY_TYPE: dict[str, frozenset[str]] = {
     "text_boundary": SYSTEM_HOOKS,
     "evidence_check": EVIDENCE_HOOKS,
@@ -2025,14 +2031,37 @@ class InterventionPlan:
             # ``required_action_present=violated`` must only see the fact
             # produced by its own family's evidence_check, not an unrelated
             # family that happens to use the same predicate name.
+            #
+            # Two evidence rows on the same hook can carry the same family and
+            # predicate, and then they both write the same fact. Letting the
+            # later one overwrite the earlier silently would let a guard fire
+            # on whichever row happened to run last. A disagreement between
+            # two writers of one fact is recorded and the fact is left
+            # unusable: no trigger can match it, so nothing is authorized on
+            # an unresolved conflict. Agreeing writers keep the value.
             fact_key = str(result.get("predicate") or "")
             fact_family = str(
                 (entry.get("provenance") or {}).get("failure_family") or ""
             )
             fact_value = str(result.get("verdict") or "")
+            scoped_key = f"{fact_key}@{fact_family}" if fact_family else fact_key
+            previous = self.facts.get(scoped_key)
+            if previous is not None and str(previous) != fact_value:
+                conflict_value = FACT_CONFLICT_VALUE
+                self.facts[fact_key] = conflict_value
+                if fact_family:
+                    self.facts[scoped_key] = conflict_value
+                self._record(
+                    entry, "evidence_conflict",
+                    f"predicate={fact_key} family={fact_family} "
+                    f"wrote {previous!r} and {fact_value!r}; the fact is "
+                    "unusable until the writers agree",
+                )
+                results.append(result)
+                continue
             self.facts[fact_key] = fact_value
             if fact_family:
-                self.facts[f"{fact_key}@{fact_family}"] = fact_value
+                self.facts[scoped_key] = fact_value
             self._record(
                 entry, "evidence_appended",
                 f"predicate={result.get('predicate')} verdict={result.get('verdict')}",

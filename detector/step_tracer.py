@@ -8,12 +8,13 @@ from typing import Any, Mapping
 
 from detector.causal_audit import validate_hearing_context
 from detector.causal_contracts import numeric_literal
+from detector.risk_context import RISK_CONTEXT_SCHEMA
 from detector.interventions import InterventionPlan, empty_plan
 from detector.packet import (evidence_refs_support_step, event_id_for_step,
                              packet_features, packet_quote_error,
                              packet_reference_error, render_judge_view)
 from detector.provider import ProviderError, provider_call, raise_if_terminal
-from detector.semantics import TRACER_CONTRACT_REPAIR, TRACER_SYSTEM
+from detector.semantics import TRACER_CONTRACT_REPAIR, TRACER_SYSTEM, contract_repair_feedback
 from detector.runtime import AddedBudgetExceeded, current_added_budget, current_added_request_budget
 
 
@@ -84,10 +85,21 @@ def run_step_tracer(
     if causal_context is not None:
         validate_hearing_context(causal_context, packet=packet, positive=positive,
                                  policy=config["causal_audit"])
-        if (numeric_literal(delivered_result) != numeric_literal(positive["delivered_result"])
-                or numeric_literal(correct_result) != numeric_literal(positive["correct_result"])):
+        diagnostic = causal_context.get("schema_version") == RISK_CONTEXT_SCHEMA
+        matches = ((delivered_result == str(positive.get("delivered_result") or "")
+                    and correct_result == str(positive.get("correct_result") or "")) if diagnostic else
+                   (numeric_literal(delivered_result) == numeric_literal(positive["delivered_result"])
+                    and numeric_literal(correct_result) == numeric_literal(positive["correct_result"])))
+        if not matches:
             raise ValueError("causal context actual result inputs differ")
         context_block = (
+            "\n\nRISK CONTEXT: " + json.dumps(causal_context, ensure_ascii=False)
+            + "\nThese are bounded diagnostic priorities and excerpts, not verified errors or causal "
+            "certificates. Inspect the complete trajectory before deciding. Follow the same alleged "
+            "error backwards through tool observations/human guidance and assistant actions; distinguish "
+            "first origin from later adoption and delivery. High priority does not prove materiality, "
+            "claim equivalence or the earliest cause. Missing roles remain unknown."
+        ) if diagnostic else (
             "\n\nCAUSAL CONTEXT: " + json.dumps(causal_context, ensure_ascii=False)
             + "\nThe certificate binds this referenced literal arithmetic result and its observed "
             "declared field copies. An observed consistent result does not prove that stale copies "
@@ -100,8 +112,9 @@ def run_step_tracer(
     warnings: list[dict[str, str]] = []
     used_context_digest = None
 
-    def call(repair: bool = False):
+    def call(repair_feedback: str = ""):
         nonlocal used_context_digest
+        repair = bool(repair_feedback)
         block = context_block
         effective_route = route
         if block:
@@ -120,7 +133,7 @@ def run_step_tracer(
                 effective_route = {**route, "transport_retries": 0}
         used_context_digest = causal_context["digest"] if block else None
         return provider_call(route=effective_route, system=system,
-                             user=user + block + (TRACER_CONTRACT_REPAIR if repair else ""),
+                             user=user + block + (TRACER_CONTRACT_REPAIR + repair_feedback if repair else ""),
                              purpose="step_tracer_repair" if repair else "step_tracer")
 
     try:
@@ -140,7 +153,7 @@ def run_step_tracer(
     if result is None:
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
         try:
-            parsed, meta = call(repair=True)
+            parsed, meta = call(contract_repair_feedback(parsed, error))
             result, error = _parse_tracer(parsed, packet)
         except ProviderError as exc:
             raise_if_terminal(exc)

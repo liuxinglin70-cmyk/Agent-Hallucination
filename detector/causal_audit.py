@@ -21,6 +21,7 @@ from detector.provider import ProviderError, provider_call, raise_if_terminal
 from detector.predicates import run_predicate
 from detector.runtime import AddedBudget, AddedBudgetExceeded, added_request_scope, usage_scope, utc_now
 from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates
+from detector.risk_context import RISK_CONTEXT_SCHEMA, validate_risk_context
 
 AUDIT_SCHEMA = "detector.causal_audit.v1"
 CONTEXT_SCHEMA = "detector.causal_context.v4"
@@ -273,6 +274,9 @@ def validate_hearing_context(
     context: Mapping[str, Any], *, packet: Mapping[str, Any],
     positive: Mapping[str, Any] | None, policy: Mapping[str, Any],
 ) -> None:
+    if context.get("schema_version") == RISK_CONTEXT_SCHEMA:
+        validate_risk_context(context, packet=packet, positive=positive, policy=policy)
+        return
     validate_seal(context, schema=CONTEXT_SCHEMA)
     if (set(context) != {
             "schema_version", "packet_digest", "policy_digest", "audit_evidence_digest",

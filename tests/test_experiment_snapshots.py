@@ -55,7 +55,7 @@ def test_pair_classification_uses_actual_configuration(runs_fixture, monkeypatch
     plan, data, runs, config, measure = runs_fixture
     measure("g0")
     changed = deepcopy(config)
-    changed["causal_audit"]["mode"] = "tracer_context"
+    changed["causal_audit"]["mode"] = "shadow"
     measure("g0_roll2", changed)
     payload = paired_payload(monkeypatch, capsys, plan, runs, data)
     assert payload["reading"] == "effect", "identical registry selectors hid an actual policy change"

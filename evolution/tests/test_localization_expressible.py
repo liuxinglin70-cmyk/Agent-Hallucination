@@ -198,3 +198,69 @@ def test_truncation_note_is_repairable_but_a_credential_failure_is_not():
 
     assert note_for("truncated_output")["rejected"] == "provider_failure"
     assert "rejected" not in note_for("missing_credential")
+
+
+def test_the_caller_owned_call_budget_binds_internal_repairs(monkeypatch):
+    """One draft with one internal repair cannot spend two caller-provided calls.
+
+    The development loop budgets provider calls per mechanism, and it can
+    only observe what the proposer reports *after* a draft returns -- so a
+    draft containing an internal repair could issue two requests against an
+    allowance of one. The allowance is now taken before each request,
+    repair included.
+    """
+    from evolution.proposer import LLMProposer
+
+    config = {
+        "detector_config": "detector/configs/autodl.json",
+        "budget": {"llm_calls": 4},
+        "proposer": {"max_output_tokens": 1024, "max_repair_calls": 2},
+    }
+    calls = []
+
+    def fake_provider_call(*, route, system, user, purpose):
+        calls.append(purpose)
+        # A reply that fails the local contract, so the repair loop engages.
+        return {"interventions": [{"type": "not_a_real_type"}]}, {
+            "purpose": purpose, "model": "stub",
+        }
+
+    monkeypatch.setattr("evolution.proposer.provider_call", fake_provider_call)
+    proposer = LLMProposer(config)
+
+    # Without a caller allowance the repair does run (the proposer's own
+    # budget permits it): that is the pre-existing behaviour.
+    proposer.propose([_fn_family()], cycle=1, max_proposals=1)
+    unconstrained = len(calls)
+    assert unconstrained >= 2, calls
+
+    calls.clear()
+    proposer = LLMProposer(config)
+    proposer.set_provider_call_budget(1)
+    proposer.propose([_fn_family()], cycle=2, max_proposals=1)
+    assert len(calls) == 1, (
+        "the internal repair must be refused once the caller's allowance of "
+        f"one call is gone; got {len(calls)} calls"
+    )
+
+
+def _fn_family():
+    return {
+        "failure_family": FN,
+        "count": 2,
+        "failure_cases": ["BFCL/002.json", "BFCL/153.json"],
+        "sources": ["BFCL"],
+        "mechanism_signature": {
+            "judge_positive": False, "recall_path": "not_run",
+            "upgrade_positive": False, "defense_verdict": "none",
+            "positive_source": "none",
+        },
+        "actionability": {"routes": ["recall_directive"]},
+        "diagnostics": {
+            "predicate_signals": {},
+            "shared_literals": {},
+            "member_summaries": [{
+                "typed_samples": {"packet_features": ["has_tool_calls"]},
+            }],
+        },
+    }

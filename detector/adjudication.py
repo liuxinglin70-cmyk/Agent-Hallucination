@@ -48,6 +48,7 @@ LOCALIZATION_STEP_PRIORITY = (
 # its disagreement with the defense's restated allegation remains diagnostic.
 LOCALIZATION_CONFLICT_FIRST_HEARING_TRACER = "first_hearing_tracer_vs_adopted"
 LOCALIZATION_AGREEMENT_TRACER_EARLIER = "tracer_earlier_than_attested_step"
+LOCALIZATION_AGREEMENT_TRACER_LATER = "tracer_later_than_attested_step"
 LOCALIZATION_AGREEMENT_ALL_SOURCES = "all_sources_agree"
 
 CONVICTING_VERDICTS = frozenset({"substantiated", "substantiated_upgraded"})
@@ -115,6 +116,15 @@ def _hearing_verdict(
         return verdict
     alleged_step = hearing.get("step")
     confirmed_step = parsed.get("confirmed_step")
+    if verdict == "substantiated_upgraded" and confirmed_step is None:
+        # A half-conviction has no confirmed step by contract: its producer
+        # anchors on a majority-less substantiated ballot but forces
+        # ``confirmed_step`` to null (the vote could not confirm the
+        # allegation, only half-uphold it). Absence of a confirmation is not
+        # a contradiction of the alleged step; the conviction stands, still
+        # degraded (see the ``substantiated_upgraded`` authority below). A
+        # *present* step that disagrees still invalidates the verdict.
+        confirmed_step = alleged_step
     refs = parsed.get("evidence_refs") or []
     if (
         not isinstance(alleged_step, int)
@@ -222,8 +232,7 @@ def _localization_record(
         if step is not None
     ]
     overridden = [
-        entry["source"] for entry in sources
-        if not entry["adopted"] and entry["step"] != adopted_step
+        entry["source"] for entry in sources if not entry["adopted"]
     ]
     # The one contradiction: the row's own reported tracer step (mirrored from
     # the first hearing) is not the step the row adopts.
@@ -234,7 +243,20 @@ def _localization_record(
     ):
         resolution = LOCALIZATION_CONFLICT_FIRST_HEARING_TRACER
     elif overridden:
-        resolution = LOCALIZATION_AGREEMENT_TRACER_EARLIER
+        # The adopted tracer is not always *earlier* than the step it
+        # overrides: a tracer that named a later step while the allegation
+        # named an earlier one produced the same "some source lost" reading
+        # under a label that said the opposite. The direction is read from the
+        # two steps, not assumed.
+        resolution = (
+            LOCALIZATION_AGREEMENT_TRACER_LATER
+            if (
+                isinstance(allegation, int)
+                and isinstance(adopted_step, int)
+                and adopted_step > allegation
+            )
+            else LOCALIZATION_AGREEMENT_TRACER_EARLIER
+        )
     else:
         resolution = LOCALIZATION_AGREEMENT_ALL_SOURCES
     record = {
@@ -504,7 +526,14 @@ def adjudicate(
                 },
                 "authority_failure_reasons": reasons,
             }
-        last_reason = reasons[-1] if reasons else {}
+        defense_note = next(
+            (
+                str(reason.get("error_type") or "")
+                for reason in reversed(reasons)
+                if str(reason.get("component") or "") == "defense"
+            ),
+            "",
+        )
         return {
             "state": STATE_CLEAN,
             "decision_authority": (
@@ -520,7 +549,11 @@ def adjudicate(
                 "decisive_facts": {
                     "positive_source": positive["source"],
                     "defense": "refuted",
-                    "defense_reason": last_reason.get("error_type") or "",
+                    # The defense's own reason, not whatever block happens to
+                    # be last: a recall degradation appends its own reason
+                    # after the defense rows, and reading ``reasons[-1]``
+                    # would fill this field with the recall error type.
+                    "defense_reason": defense_note or defense_parsed.get("reason") or "",
                     "hearings": [
                         {
                             "source": h.get("source"),
@@ -540,7 +573,6 @@ def adjudicate(
         # No hearing substantiated and not all refuted: the defense failed
         # to settle, the preliminary verdict survives with degraded
         # authority.
-        degraded = True
         unsettled = [h for h in hearing_queue if _hearing_verdict(h) != "refuted"]
         if unsettled:
             for hearing in unsettled:
@@ -617,15 +649,9 @@ def adjudicate(
             upgrade_result, convicted,
         ) or int(working_positive.get("step") or 0)
     traced_step = None
-    traced_refs = list(
-        convicted_tracer.get("evidence_refs")
-        or working_positive.get("evidence_refs")
-        or []
-    )
     if convicted_tracer.get("step") is not None:
         traced_step = int(convicted_tracer.get("step"))
         working_positive = _clean_positive(working_positive, traced_step)
-    working_positive["evidence_refs"] = traced_refs
 
     verdict = str(convicted_parsed.get("verdict") or "")
     degraded = verdict == "substantiated_upgraded"
@@ -722,6 +748,7 @@ __all__ = [
     "AUTHORITY_INVALID",
     "LOCALIZATION_AGREEMENT_ALL_SOURCES",
     "LOCALIZATION_AGREEMENT_TRACER_EARLIER",
+    "LOCALIZATION_AGREEMENT_TRACER_LATER",
     "LOCALIZATION_AUTHORITY_AUTHORITATIVE",
     "LOCALIZATION_AUTHORITY_DEGRADED_CONFLICT",
     "LOCALIZATION_CONFLICT_FIRST_HEARING_TRACER",

@@ -21,6 +21,7 @@ R = TypeVar("R")
 _DEADLINE: ContextVar[float | None] = ContextVar("execution_deadline", default=None)
 _CONTROL: ContextVar["RunControl | None"] = ContextVar("execution_control", default=None)
 _USAGE: ContextVar[list[dict[str, Any]] | None] = ContextVar("request_usage", default=None)
+_REQUEST_OBSERVER: ContextVar[Callable[[Mapping[str, Any]], None] | None] = ContextVar("request_observer", default=None)
 _ADDED_BUDGET: ContextVar["AddedBudget | None"] = ContextVar("added_case_budget", default=None)
 _ADDED_REQUESTS: ContextVar["AddedBudget | None"] = ContextVar("added_requests", default=None)
 _WRITER_LEASES: ContextVar[Mapping[str, object] | None] = ContextVar("writer_leases", default=None)
@@ -136,16 +137,22 @@ class RunControl:
             raise RunStopped(self.reason)
 
     @contextmanager
-    def request_slot(self) -> Iterator[None]:
+    def request_slot(self, *, total_deadline: float | None = None) -> Iterator[None]:
         while True:
             self.check()
             check_request_deadline()
-            deadline = request_deadline()
+            if total_deadline is not None and time.monotonic() >= total_deadline:
+                raise TimeoutError("provider total timeout exceeded waiting for capacity")
+            limits = [value for value in (request_deadline(), total_deadline) if value is not None]
+            deadline = min(limits) if limits else None
             remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
             if self._slots.acquire(timeout=min(0.1, remaining) if remaining is not None else 0.1):
                 break
         try:
             self.check()
+            check_request_deadline()
+            if total_deadline is not None and time.monotonic() >= total_deadline:
+                raise TimeoutError("provider total timeout exceeded waiting for capacity")
             with self._lock:
                 self.active_requests += 1
                 self.peak_requests = max(self.peak_requests, self.active_requests)
@@ -189,6 +196,25 @@ def record_request(observation: Mapping[str, Any]) -> None:
     target = _USAGE.get()
     if target is not None:
         target.append(dict(observation))
+    observe_request({**dict(observation), "event": "request_finished"})
+
+
+def observe_request(observation: Mapping[str, Any]) -> None:
+    observer = _REQUEST_OBSERVER.get()
+    if observer is not None:
+        try:
+            observer({**dict(observation), "observed_at": utc_now()})
+        except OSError as exc:
+            raise RuntimeError("request observation could not be persisted") from exc
+
+
+@contextmanager
+def request_observer_scope(observer: Callable[[Mapping[str, Any]], None] | None) -> Iterator[None]:
+    token = _REQUEST_OBSERVER.set(observer or _REQUEST_OBSERVER.get())
+    try:
+        yield
+    finally:
+        _REQUEST_OBSERVER.reset(token)
 
 
 class AddedBudgetExceeded(CaseExecutionError):
@@ -209,17 +235,43 @@ class AddedBudget:
         self.output_tokens = 0
         self.negative_review_started = False
         self._lock = threading.RLock()
+        self._baseline_waiters = 0
+        self._baseline_started: float | None = None
+        self._baseline_seconds = 0.0
 
     def begin(self) -> None:
         with self._lock:
             if self.started is None:
                 self.started = time.monotonic()
+                if self._baseline_waiters:
+                    self._baseline_started = self.started
         self.check()
+
+    def _excluded_seconds(self) -> float:
+        return self._baseline_seconds + (
+            time.monotonic() - self._baseline_started
+            if self._baseline_started is not None else 0.0)
+
+    @contextmanager
+    def baseline_wait(self) -> Iterator[None]:
+        """Exclude the union of base-provider waits from the added-work clock."""
+        with self._lock:
+            if self._baseline_waiters == 0 and self.started is not None:
+                self._baseline_started = time.monotonic()
+            self._baseline_waiters += 1
+        try:
+            yield
+        finally:
+            with self._lock:
+                self._baseline_waiters -= 1
+                if self._baseline_waiters == 0 and self._baseline_started is not None:
+                    self._baseline_seconds += time.monotonic() - self._baseline_started
+                    self._baseline_started = None
 
     @property
     def deadline(self) -> float | None:
         limits = [value for value in (current_deadline(),
-                  self.started + self._policy["max_added_seconds_per_case"]
+                  self.started + self._excluded_seconds() + self._policy["max_added_seconds_per_case"]
                   if self.started is not None else None) if value is not None]
         return min(limits) if limits else None
 
@@ -231,7 +283,7 @@ class AddedBudget:
         if case_deadline is not None and time.monotonic() >= case_deadline:
             raise CaseDeadlineExceeded("case deadline exceeded")
         if (self.started is not None and time.monotonic() >=
-                self.started + self._policy["max_added_seconds_per_case"]):
+                self.started + self._excluded_seconds() + self._policy["max_added_seconds_per_case"]):
             raise AddedBudgetExceeded("time")
 
     def reserve(self, *, system: str, user: str, output_tokens: int,
@@ -277,7 +329,8 @@ class AddedBudget:
                 "policy_digest": self.policy_digest, "reserved_requests": self.requests,
                 "reserved_input_bytes": self.input_bytes, "reserved_output_tokens": self.output_tokens,
                 "input_budget_method": "utf8_content_bytes_without_tokenizer",
-                "elapsed_seconds": max(0.0, time.monotonic() - self.started)
+                "baseline_wait_seconds": self._excluded_seconds(),
+                "elapsed_seconds": max(0.0, time.monotonic() - self.started - self._excluded_seconds())
                 if self.started is not None else 0.0,
             }
 

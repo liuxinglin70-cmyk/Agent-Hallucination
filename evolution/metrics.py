@@ -11,6 +11,7 @@ from typing import Any, Collection, Mapping, Sequence
 
 from detector.measurement import measurement_status
 from detector.result import RESULT_SCHEMA, prediction_state
+from detector.localization import LOCALIZATION_TARGET
 
 
 def mcnemar_improvement_p(delta: Mapping[str, Any]) -> float:
@@ -73,6 +74,21 @@ def _bool_prediction(value: bool | None) -> bool | None:
     )
 
 
+INFRASTRUCTURE_STATE_PREFIXES = (
+    "provider_error", "invalid", "contract_error", "degraded", "no_quorum",
+    "timeout", "not_rendered",
+)
+
+
+def failed_stage_state(result: Mapping[str, Any]) -> str:
+    """Read failures from stage mirrors and every recorded hearing."""
+    statuses = list((result.get("stage_status") or {}).values())
+    for hearing in (result.get("proof") or {}).get("hearings") or ():
+        statuses.extend(hearing.get(name) or {} for name in ("tracer_status", "defense_status"))
+    return next((str((status or {}).get("state") or "") for status in statuses
+                 if str((status or {}).get("state") or "").startswith(INFRASTRUCTURE_STATE_PREFIXES)), "")
+
+
 def evaluate_row_state(row: Mapping[str, Any]) -> str:
     """Classify a row or detection result into one of the 8 EvaluationState values."""
     if not isinstance(row, Mapping):
@@ -104,6 +120,8 @@ def evaluate_row_state(row: Mapping[str, Any]) -> str:
             return EvaluationState.INFRASTRUCTURE_FAILURE
         if status == "degraded":
             return EvaluationState.DEGRADED
+        if row.get("authority", "authoritative") != "authoritative":
+            return EvaluationState.DEGRADED
         if status == "authoritative":
             pred = prediction_state(result)
             if pred is None and row.get("prediction") is not None:
@@ -123,19 +141,9 @@ def evaluate_row_state(row: Mapping[str, Any]) -> str:
         if status == "semantic_unresolved":
             is_valid = result.get("runtime_valid") is True
             authority = str(result.get("decision_authority") or "")
-            if not is_valid or authority.startswith("degraded"):
+            if not is_valid or authority != "authoritative":
                 return EvaluationState.DEGRADED
-            statuses = list((result.get("stage_status") or {}).values())
-            for hearing in (result.get("proof") or {}).get("hearings") or ():
-                statuses.extend(
-                    hearing.get(name) or {} for name in ("tracer_status", "defense_status")
-                )
-            if any(
-                str((s or {}).get("state") or "").startswith(
-                    ("provider_error", "invalid", "contract_error", "degraded", "no_quorum", "timeout")
-                )
-                for s in statuses
-            ):
+            if failed_stage_state(result):
                 return EvaluationState.INFRASTRUCTURE_FAILURE
             return EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
 
@@ -152,11 +160,13 @@ def evaluate_row_state(row: Mapping[str, Any]) -> str:
         if explicit_m_status == "invalid_envelope":
             return EvaluationState.INVALID_ENVELOPE
 
-    authority = str(row.get("authority") or row.get("decision_authority") or "authoritative")
+    authority = str(row.get("authority", row.get("decision_authority", "authoritative")) or "")
     if authority.startswith("degraded"):
         return EvaluationState.DEGRADED
     if authority in ("infrastructure_failure", "fatal_provider"):
         return authority
+    if authority != "authoritative":
+        return EvaluationState.DEGRADED
 
     pred = None
     if "prediction" in row and row["prediction"] is not None:
@@ -254,9 +264,17 @@ def target_opportunity(
     *, target_kind: str, polarity: str,
     detection: Mapping[str, Any], localization: Mapping[str, Any] | None = None,
 ) -> int | None:
-    """The reported benefit-set opportunities for the declared objective."""
+    """The reported benefit-set opportunities for the declared objective.
+
+    ``target_kind`` selects the objective family and ``polarity`` the detection
+    direction; a resolution claim reads the healthy-unresolved count rather
+    than a recall/precision direction, because the case it repairs is one the
+    control arm left undecided (see ``gain_opportunity``).
+    """
     if target_kind == "localization":
         value = (localization or {}).get("improvable")
+    elif target_kind == "resolution":
+        value = detection.get("resolution")
     elif target_kind == "joint":
         counts = [detection.get("recall"), detection.get("precision"),
                   (localization or {}).get("improvable")]
@@ -309,7 +327,10 @@ def target_outcome(
     )}
     detection_gain = detection_delta["correctness_improved"]
     if target_kind == "resolution":
-        gain = flips.get("U->T", 0) + flips.get("U->F", 0)
+        # Only healthy-undecided rows the candidate decided correctly count.
+        # The raw U->T / U->F flips would let a control-arm outage read as a
+        # resolution the candidate performed.
+        gain = resolution_gain(detection_delta)
     elif target_kind in {"localization", "joint"}:
         if not isinstance(localization_delta, Mapping) or any(
             type(localization_delta.get(key)) is not int
@@ -330,12 +351,35 @@ def target_outcome(
             flips.get("F->T", 0) if polarity == "recall" else
             flips.get("T->F", 0) if polarity == "precision" else detection_gain
         )
-    improved = gain > 0 or detection_gain > 0 or detection_delta["marginal_cases"] > 0
+    improved = gain > 0 or (
+        target_kind != "resolution"
+        and (detection_gain > 0 or detection_delta["marginal_cases"] > 0)
+    )
     status = "regressed" if any(harm.values()) else "improved" if improved else "unchanged"
     return {
         **outcome, "measurable": True, "status": status, "target_gain": gain,
         "detection_gain": detection_gain, "harm": harm,
     }
+
+
+def objective_marginal(
+    *,
+    target_kind: str,
+    delta: Mapping[str, Any],
+    localization_delta: Mapping[str, Any] | None = None,
+) -> int:
+    """The benefit one entry's own objective records on a paired measurement.
+
+    Retirement and attribution must not read a binary ``marginal_cases`` for a
+    claim whose benefit is a corrected responsible step or a resolved case:
+    those legitimately read zero on the binary scale while doing exactly what
+    they promised, and a zero-marginal history retires them.
+    """
+    if target_kind in {"localization", "joint"}:
+        return int((localization_delta or {}).get("joint_delta") or 0)
+    if target_kind == "resolution":
+        return resolution_gain(delta)
+    return int(delta.get("marginal_cases") or 0)
 
 
 def binary_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -388,7 +432,11 @@ def paired_delta(
     """Paired confusion delta for the same case set.
 
     ``marginal_cases`` is the number of all-case correct predictions gained;
-    ``new_errors`` is correct-or-decisive -> wrong-or-unresolved transitions.
+    ``new_errors`` counts gold-positive rows that lost a correct decision
+    (``new_fn``) plus clean rows newly called positive (``fp_added``). A clean
+    row that regresses from correct to unresolved is not in ``new_errors``:
+    it is counted by ``unresolved_added``, which the gates refuse on its own.
+    The two fields answer different questions and neither subsumes the other.
 
     ``unstable_cases`` names cases the *baseline configuration itself* read
     differently when it was rolled twice (``flipped_cases``). Supplying it adds
@@ -790,11 +838,17 @@ def repeated_roll_disagreement(
 
 
 def gain_opportunity(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
-    """How many cases the marginal set can actually reward, per polarity.
+    """How many cases the marginal set can actually reward, per objective.
 
-    ``marginal_cases`` counts all-case correct predictions gained, so a claim
-    can only be scored where the control arm is *wrong in that direction*. This
-    is a property of the instrument (the evaluation set together with the
+    ``recall`` / ``precision`` count where the control arm is *wrong in that
+    direction*; ``resolution`` counts where it is *healthily undecided*, which
+    is the only state a resolution claim can repair. An undecided row that is
+    not healthy (a provider outage, a failed stage, a non-authoritative
+    terminal) is not a resolution opportunity, and ``evaluate_row_state`` is
+    the one definition of that distinction -- a second reading here would let
+    an outage masquerade as an opportunity the candidate appears to fill.
+
+    This is a property of the instrument (the evaluation set together with the
     baseline's behaviour), not of any candidate, which is why it is reported
     per round rather than inferred from a rejection.
     """
@@ -807,7 +861,32 @@ def gain_opportunity(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
             1 for row in rows
             if row.get("gold") is False and row.get("prediction") is True
         ),
+        "resolution": sum(
+            1 for row in rows
+            if evaluate_row_state(row) == EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
+        ),
     }
+
+
+def resolution_gain(delta: Mapping[str, Any]) -> int:
+    """Healthy-undecided -> authoritative-correct transitions in a paired delta.
+
+    The flips alone (``U->T`` / ``U->F``) count every prediction change out of
+    ``None``, including a row that was undecided because a provider died. A
+    resolution claim is about deciding cases the instrument genuinely left
+    open, so both sides must be healthy: the control row was a healthy
+    unresolved reading and the candidate row is an authoritative correct
+    decision. ``paired_delta`` stamps ``baseline_health`` / ``active_health``
+    on every row for exactly this question.
+    """
+    return sum(
+        1 for row in delta.get("rows") or ()
+        if row.get("baseline_prediction") is None
+        and row.get("baseline_health") is True
+        and row.get("active_prediction") is not None
+        and row.get("active_prediction") == row.get("gold")
+        and row.get("active_health") is True
+    )
 
 
 def localization_opportunity(
@@ -987,15 +1066,7 @@ def mechanism_row_healthy(row: Mapping[str, Any]) -> bool:
         return False
     if result.get("decision_authority", "authoritative") != "authoritative":
         return False
-    statuses = list((result.get("stage_status") or {}).values())
-    for hearing in (result.get("proof") or {}).get("hearings") or ():
-        statuses.extend(hearing.get(name) or {} for name in ("tracer_status", "defense_status"))
-    return not any(
-        str((status or {}).get("state") or "").startswith(
-            ("provider_error", "invalid", "contract_error", "degraded", "no_quorum", "timeout")
-        )
-        for status in statuses
-    )
+    return not failed_stage_state(result)
 
 
 def protection_repair(
@@ -1087,24 +1158,27 @@ def protection_repair(
 
 
 def _row_health(row: Mapping[str, Any] | None) -> bool:
+    """Health of normalized metric rows; explicit runtime metadata can deny it."""
     if not row:
         return False
-    if str(row.get("authority") or "") != "authoritative":
+    authority = row.get("authority", "authoritative")
+    if str(authority or "") != "authoritative":
         return False
     result = row.get("result") or {}
+    if result.get("decision_authority", authority) != "authoritative":
+        return False
     if result and not bool(result.get("runtime_valid", True)):
         return False
-    for status in (result.get("stage_status") or {}).values():
-        if str((status or {}).get("state") or "").startswith(
-            ("provider_error", "invalid", "contract_error", "degraded")
-        ):
-            return False
-    return True
+    return not failed_stage_state(result)
 
 
 def row_responsible_step(row: Mapping[str, Any] | None) -> int | None:
     """The responsible step a row asserts, from the row or its result."""
     if not row:
+        return None
+    result = row.get("result") or {}
+    target = row.get("localization_target", (result.get("localization") or {}).get("target"))
+    if target not in {None, LOCALIZATION_TARGET}:
         return None
     value = row.get("responsible_step")
     if value is None:
@@ -1230,9 +1304,11 @@ def paired_localization_delta(
         active_step = row_responsible_step(active_by_case.get(case))
         base_hit = (
             item["baseline_prediction"] is True and base_step == gold_step
+            and _row_health(base_by_case.get(case))
         )
         active_hit = (
             item["active_prediction"] is True and active_step == gold_step
+            and _row_health(active_by_case.get(case))
         )
         base_joint += int(base_hit)
         active_joint += int(active_hit)
@@ -1268,6 +1344,8 @@ def paired_localization_delta(
     return {
         "n": len(paired),
         "localizable_n": localizable,
+        "localization_target": LOCALIZATION_TARGET,
+        "step_unit": "trajectory_event_position",
         "base_joint": base_joint,
         "active_joint": active_joint,
         "joint_delta": active_joint - base_joint,
@@ -1381,6 +1459,8 @@ def localization_metrics(
         )
     return {
         "annotated_positive": annotated,
+        "localization_target": LOCALIZATION_TARGET,
+        "step_unit": "trajectory_event_position",
         "authoritative_detected": detected,
         "joint_hits": hits,
         "joint_accuracy": (hits / annotated) if annotated else None,
@@ -1524,10 +1604,12 @@ __all__ = [
     "mechanism_row_healthy",
     "noise_floor",
     "noise_floor_flipped_cases",
+    "objective_marginal",
     "paired_delta",
     "paired_localization_delta",
     "protection_repair",
     "repeated_roll_disagreement",
+    "resolution_gain",
     "row_responsible_step",
     "source_deltas",
     "source_of",

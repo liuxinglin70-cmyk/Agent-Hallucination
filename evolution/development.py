@@ -962,6 +962,13 @@ class CandidateDeveloper:
         what keeps a candidate that failed a neighbour check from reaching a
         frozen protocol: the gates judge candidates, they do not re-run the
         development loop's job.
+
+        The candidate is re-identified before the hand-off, reading the record
+        back from disk: its content must still hash to the ``candidate_hash``
+        the version was recorded with, and to the identity in its development
+        sidecar. Freezing a candidate whose bytes changed since L0/L1 would
+        carry the old certification to an unverified candidate, so a mismatch
+        refuses and demands a new version re-developed under its own evidence.
         """
         known = {
             str(item.get("version_id") or "")
@@ -971,30 +978,22 @@ class CandidateDeveloper:
             # Unknown is reported before status: a version that does not exist
             # has no status, and "not ready" would misdescribe the problem.
             raise ValueError(f"unknown version {version_id!r}")
-        status = self.graph.development_status(version_id)
+        record, status = self.graph.read_version(str(version_id))
         state = str(status.get("status") or "")
         if state != "ready_for_freeze":
             raise ValueError(
                 f"{version_id} is {state!r}, not ready_for_freeze; a candidate "
                 "that did not pass L1 must not reach a promotion protocol"
             )
-        record = next(
-            (
-                item for item in self.graph.versions
-                if str(item.get("version_id") or "") == str(version_id)
-            ),
-            None,
-        )
-        candidate = (record or {}).get("candidate")
-        if not candidate:
-            raise ValueError(f"{version_id} carries no candidate")
+        candidate = record["candidate"]
+        current_hash = record["candidate_hash"]
         self.graph.write_development(version_id, {"status": "frozen"})
         return {
             "version_id": str(version_id),
             "mechanism_id": str(status.get("mechanism_id") or ""),
             "route": str(status.get("action_class") or ""),
             "candidate": copy.deepcopy(candidate),
-            "candidate_hash": canonical_hash(candidate),
+            "candidate_hash": current_hash,
             "lineage": self.graph.lineage(version_id),
             "development_evidence": dict(
                 status.get("development_evidence") or {},

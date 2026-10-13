@@ -78,10 +78,22 @@ def compute_meta(
         for report in cycle_reports
         if report.get("audit") is not None
     ]
-    audit_passed = all(
-        bool(audit.get("passed")) for audit in audits
-        if audit.get("enabled", True)
-    )
+    # The verdict is a three-way reading, not a boolean. An empty ``all(())``
+    # used to read as a pass: a run whose audit was disabled, or one whose
+    # reports carried no audit block at all, reported ``verdict: "pass"`` for
+    # an audit that never happened -- and that boolean is an AND term of the
+    # final overall verdict. "Not run" is now its own value.
+    enabled_audits = [
+        audit for audit in audits if audit.get("enabled", True)
+    ]
+    if not enabled_audits:
+        audit_passed: bool | None = None
+        audit_verdict = "not_run"
+    else:
+        audit_passed = all(
+            bool(audit.get("passed")) for audit in enabled_audits
+        )
+        audit_verdict = "pass" if audit_passed else "freeze"
     marginals = [
         int(row.get("m_marginal_cases") or 0)
         for row in rows
@@ -135,9 +147,10 @@ def compute_meta(
         "capability_surface": capability_surface_report(),
         "defect_injection_audit": {
             "cycles": len(audits),
+            "enabled_cycles": len(enabled_audits),
             "passed": audit_passed,
             "action_threshold": "freeze on any defect passing the gate",
-            "verdict": "pass" if audit_passed else "freeze",
+            "verdict": audit_verdict,
         },
         "marginal_distribution": {
             "values": marginals,

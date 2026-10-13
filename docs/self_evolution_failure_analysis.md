@@ -642,7 +642,7 @@ flowchart TD
 
 对进化引擎，应在 `worksheet.py`/机制诊断中区分 `late_attribution`、`missed_detection`、`evidence_missing`、`ambiguous_multi_error`、`runtime_unmeasurable`；把可核实的首次错误、后续传播、正常反例、父候选及逐例差分传给已有 Proposer/L1。测量故障应重测同一冻结候选，不能被记为算法失败；定位标注有歧义时不得为了迎合 gold 强迫改步。
 
-**下一步验证约束**：冻结底座、Top-K、因果窗口、证据快照、总 token 预算与开发/正式数据角色；先 shadow 运行，后做定位、检测反哺、跨轮自进化三组独立配对消融，并跟踪权威性、FN/FP、精确步命中与成本。详见 [技术优化设计](uncertainty-guided-causal-audit-design-20261008.md) 和 [组会一页版](../doc/group-meetings/group-meeting-uncertainty-causal-feedback-20261008.md)。
+**下一步验证约束**：冻结底座、Top-K、因果窗口、证据快照、总 token 预算与开发/正式数据角色；先 shadow 运行，后做定位、检测反哺、跨轮自进化三组独立配对消融，并跟踪权威性、FN/FP、精确步命中与成本。详见 [技术优化设计](uncertainty-guided-causal-audit-design-20261008.md) 和 [组会一页版](../doc/group-meetings/group-meeting-hallucination-localization-results-20261013.md)。
 
 ## 9. 附录：本地证据、复核方法与文件清单
 

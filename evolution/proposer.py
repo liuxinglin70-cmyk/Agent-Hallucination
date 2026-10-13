@@ -300,6 +300,14 @@ class LLMProposer:
         # experiment must never exhaust its drafting ability mid-run.
         self.calls_by_cycle: dict[int, int] = {}
         self.repairs_by_cycle: dict[int, int] = {}
+        # A caller-owned, tighter provider-call allowance for the *next*
+        # draft (the development loop's per-mechanism cap). ``None`` means the
+        # caller has no tighter cap and only ``max_calls`` applies. The
+        # allowance is consumed in ``_take_provider_call`` before each
+        # request, including an internal repair, so a repair cannot exceed
+        # what the caller said it could spend. Notes still report the actual
+        # cost; this is a control, not a report.
+        self.provider_call_budget: int | None = None
         self.max_repair_calls = max(
             0,
             int((framework_config.get("proposer") or {}).get(
@@ -334,6 +342,27 @@ class LLMProposer:
         scored, and supplying them changes no gate.
         """
         self.memory_context = dict(context or {})
+
+    def set_provider_call_budget(self, count: int | None) -> int | None:
+        """Bound the provider requests the next draft may issue, including repairs.
+
+        The development loop budgets model calls per mechanism; it can only
+        observe the proposer's own notes *after* a draft returns, and one
+        draft may contain an internal repair. Setting the remaining allowance
+        here makes the cap a control before the request instead of an estimate
+        afterwards. Return the previous allowance so scoped callers restore it.
+        """
+        previous = self.provider_call_budget
+        self.provider_call_budget = None if count is None else max(0, int(count))
+        return previous
+
+    def _take_provider_call(self) -> bool:
+        if self.provider_call_budget is None:
+            return True
+        if self.provider_call_budget <= 0:
+            return False
+        self.provider_call_budget -= 1
+        return True
 
     def set_components(
         self, components: Sequence[Mapping[str, Any]] | None,
@@ -601,6 +630,12 @@ class LLMProposer:
             + f"Stable bare-base failure families:\n{family_block}\n\n"
             f"Draft at most {max_proposals} interventions."
         )
+        if not self._take_provider_call():
+            return ProposalBatch(notes=[{
+                "generator": "llm",
+                "provider_called": False,
+                "reason": "the caller's provider-call budget for this mechanism is exhausted",
+            }])
         try:
             self.calls_by_cycle[int(cycle)] = calls_used + 1
             parsed, meta = provider_call(
@@ -1070,6 +1105,10 @@ class HybridProposer:
         """Forward retrieved H_t memory to the LLM drafting stage."""
         self.llm.set_memory_context(context)
 
+    def set_provider_call_budget(self, count: int | None) -> int | None:
+        """Forward the caller-owned per-draft allowance to the LLM stage."""
+        return self.llm.set_provider_call_budget(count)
+
     def propose(
         self,
         families: Sequence[Mapping[str, Any]],
@@ -1408,7 +1447,7 @@ class HybridProposer:
         that can change the outcome is the one that names the step. The
         directive is deliberately mechanism-level rather than case-level: it
         states the property the shared members exhibit (a delivery whose named
-        step is not the first assistant-authored event that fixes the claim),
+        step is not the first event that introduces the material error),
         which a tracer can apply without knowing the case.
         """
         shared = cls._shared_packet_features(family) or ["has_tool_calls"]
@@ -1428,8 +1467,10 @@ class HybridProposer:
                     "unsupported, not the step at which the unsupported claim "
                     "is finally restated. When several steps repeat a wrong "
                     "value, the responsible step is the earliest "
-                    "assistant-authored event that introduces it and would "
-                    "have to change for the delivery to be correct."
+                    "whole-interaction event that introduces it, including a "
+                    "tool observation or human reply subsequently adopted. "
+                    "Distinguish the origin from later assistant adoption and delivery; "
+                    "establish the same material error independently."
                 ),
                 "not_when": (
                     "do not move the named step without evidence for the same "
@@ -1439,8 +1480,8 @@ class HybridProposer:
             },
             "claim": {
                 "expected_behavior": (
-                    "the tracer reports the earliest assistant-authored event "
-                    "that fixes the delivered claim, so localization matches "
+                    "the tracer reports the earliest trajectory event "
+                    "introducing the material error, so localization matches "
                     "the introduction of the error rather than its repetition"
                 ),
                 "target_polarity": "precision",

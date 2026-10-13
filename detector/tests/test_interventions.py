@@ -250,6 +250,86 @@ def test_mechanical_guard_requires_bound_violating_evidence(sample_packet):
     ]
 
 
+def test_two_writers_of_one_fact_cannot_override_each_other(sample_packet):
+    """Same hook, same family, same predicate, disagreeing verdicts.
+
+    The later evidence row used to overwrite the fact the earlier one wrote,
+    with no record, so a guard fired on whichever row happened to run last.
+    A disagreement now leaves the fact unusable (outside every declared
+    vocabulary) and records the conflict: nothing is authorized on it.
+    """
+    from detector.interventions import FACT_CONFLICT_VALUE
+
+    first = _candidate(
+        intervention_id="IV-E-A",
+        type="evidence_check",
+        hook="judge.post",
+        body={
+            "predicate": "required_action_present",
+            "runner": "deterministic",
+            "output_verdicts": ["satisfied", "violated", "not_applicable"],
+        },
+    )
+    second = _candidate(
+        intervention_id="IV-E-B",
+        type="evidence_check",
+        hook="judge.post",
+        body={
+            "predicate": "required_action_present",
+            "runner": "deterministic",
+            "output_verdicts": ["satisfied", "violated", "not_applicable"],
+        },
+    )
+    plan = InterventionPlan.from_registry(
+        build_intervention_registry([first, second])
+    )
+    # One writer already recorded a verdict for this family's fact; the two
+    # evidence rows about to run produce another. Both keys are seeded the way
+    # the producer writes them.
+    plan.facts["required_action_present"] = "violated"
+    plan.facts["required_action_present@FAM-test"] = "violated"
+    rows = plan.evidence_for(
+        "judge.post", sample_packet,
+        {"contracts": [{"kind": "required_action", "requirement": "Start the engine."}]},
+    )
+    # The packet's own predicate reads not_applicable here; the second writer
+    # disagrees with the pre-seeded fact, so the conflict is recorded and the
+    # value is unusable.
+    conflicts = [
+        item for item in plan.fired if item.get("event") == "evidence_conflict"
+    ]
+    assert conflicts, plan.fired
+    assert plan.facts["required_action_present"] == FACT_CONFLICT_VALUE
+    assert plan.facts["required_action_present@FAM-test"] == FACT_CONFLICT_VALUE
+    # Neither declared value survives, so no trigger can match the fact.
+    assert "violated" not in plan.facts["required_action_present"]
+    assert rows
+
+
+def test_agreeing_writers_keep_the_fact_value(sample_packet):
+    first = _candidate(
+        intervention_id="IV-E-A", type="evidence_check", hook="judge.post",
+        body={"predicate": "required_action_present", "runner": "deterministic",
+              "output_verdicts": ["satisfied", "violated", "not_applicable"]},
+    )
+    second = _candidate(
+        intervention_id="IV-E-B", type="evidence_check", hook="judge.post",
+        body={"predicate": "required_action_present", "runner": "deterministic",
+              "output_verdicts": ["satisfied", "violated", "not_applicable"]},
+    )
+    plan = InterventionPlan.from_registry(
+        build_intervention_registry([first, second])
+    )
+    plan.evidence_for(
+        "judge.post", sample_packet,
+        {"contracts": [{"kind": "required_action", "requirement": "Start the engine."}]},
+    )
+    assert not [
+        item for item in plan.fired if item.get("event") == "evidence_conflict"
+    ]
+    assert plan.facts["required_action_present"] == "not_applicable"
+
+
 def test_mechanical_guard_without_evidence_partner_is_rejected_before_runtime():
     guard = _candidate(
         intervention_id="IV-G-M",

@@ -18,6 +18,7 @@ import os
 import subprocess
 import sys
 import time
+from uuid import uuid4
 from http.client import IncompleteRead
 from pathlib import Path
 from typing import Any, Mapping
@@ -26,7 +27,7 @@ from urllib import request as urlrequest
 from contextlib import nullcontext
 from detector.runtime import (
     CaseDeadlineExceeded, CaseExecutionError, check_request_deadline, current_added_request_budget,
-    current_control, current_deadline, deadline_scope, record_request, request_deadline,
+    current_added_budget, current_control, current_deadline, deadline_scope, observe_request, record_request, request_deadline,
 )
 
 _DIRECT_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))
@@ -277,8 +278,10 @@ def provider_call(
                 system=system, user=user, output_tokens=int(route.get("max_tokens") or 1500),
                 extra_input=route.get("extra_body"),
             )}
-        result = _provider_call(route=route, system=system, user=user,
-                                purpose=purpose, cache_tag=cache_tag)
+        case_budget = current_added_budget()
+        with case_budget.baseline_wait() if case_budget is not None and budget is None else nullcontext():
+            result = _provider_call(route=route, system=system, user=user,
+                                    purpose=purpose, cache_tag=cache_tag)
         check_request_deadline()
         return result
     except CaseDeadlineExceeded as exc:
@@ -414,12 +417,20 @@ def _provider_call(
         if control is not None:
             control.check()
         request_started = time.perf_counter()
+        request_id = uuid4().hex
+        observe_request({"event": "request_queued", "request_id": request_id,
+                         "purpose": purpose, "attempt": attempts, "timeout_seconds": timeout})
         queue_seconds = 0.0
+        transport_started = False
         try:
-            with control.request_slot() if control is not None else nullcontext():
+            with control.request_slot(total_deadline=deadline) if control is not None else nullcontext():
                 queue_seconds = time.perf_counter() - request_started
                 check_request_deadline()
                 timeout = min(timeout, max(0.001, deadline - time.monotonic()))
+                observe_request({"event": "request_started", "request_id": request_id,
+                                 "purpose": purpose, "attempt": attempts,
+                                 "queue_seconds": queue_seconds, "timeout_seconds": timeout})
+                transport_started = True
                 status, raw = _isolated_transport(
                     url=url, headers=headers, body=body, timeout=timeout,
                 )
@@ -432,7 +443,9 @@ def _provider_call(
             ValueError,
             IncompleteRead,
         ) as exc:
-            record_request({"purpose": purpose, "attempt": attempts,
+            if not transport_started:
+                queue_seconds = time.perf_counter() - request_started
+            record_request({"request_id": request_id, "purpose": purpose, "attempt": attempts,
                             "elapsed_seconds": time.perf_counter() - request_started,
                             "queue_seconds": queue_seconds, "status": "transport_error",
                             "error_type": type(exc).__name__, "usage": None})
@@ -448,7 +461,7 @@ def _provider_call(
         if not isinstance(data, Mapping):
             data = {}
         observed_usage = data.get("usage")
-        record_request({"purpose": purpose, "attempt": attempts,
+        record_request({"request_id": request_id, "purpose": purpose, "attempt": attempts,
                         "elapsed_seconds": time.perf_counter() - request_started,
                         "queue_seconds": queue_seconds, "http_status": status,
                         "status": "response", "model": str(data.get("model") or route.get("model") or ""),

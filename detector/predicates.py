@@ -228,6 +228,11 @@ def _detect_required_actions(question: str) -> set[str]:
 
     "Use the complete name with article if any" fails both: there is no tool
     word, and ``complete name with article if any`` is a sentence, not a name.
+
+    A phrase that is *only* an article ("use the tool ...") names nothing: the
+    tool word is the object, so the name must come from somewhere else. The
+    three supported spellings are ``use <name> tool``, ``use the tool named
+    <name>``, and the structured ``required_action: "<name>"``.
     """
     actions: set[str] = set()
     lowered = question.lower()
@@ -245,22 +250,55 @@ def _detect_required_actions(question: str) -> set[str]:
             if obj is None or obj.start() > _TOOL_OBJECT_WINDOW:
                 continue
             phrase = _LEAD_IN_RE.sub("", tail[:obj.start()].strip(" \t:-"))
-            shape = _NAME_SHAPE_RE.match(phrase)
-            if shape is None:
-                continue
-            name = " ".join(shape.group(0).split()).strip(" .-").lower()
-            if not name or name in {"tool", "function", "api", "command", "endpoint"}:
+            shape = _NAME_SHAPE_RE.match(phrase) if phrase else None
+            name = (
+                " ".join(shape.group(0).split()).strip(" .-").lower()
+                if shape is not None else ""
+            )
+            if not name or name in {
+                "tool", "function", "api", "command", "endpoint",
+                "the", "a", "an",
+            }:
+                # "use the tool named lookup_customer": the phrase in front of
+                # the tool word (if any) names nothing, and the name follows
+                # the tool word instead.
+                named = re.match(
+                    r"\s+(?:named|called)\s+([A-Za-z_][A-Za-z0-9_]*)",
+                    tail[obj.end():], re.I,
+                )
+                name = named.group(1).lower() if named else ""
+            if not name or name in {
+                "tool", "function", "api", "command", "endpoint",
+                "the", "a", "an",
+            }:
                 continue
             if any(ch in name for ch in ("?", "!", ";")):
                 continue
             actions.add(name)
-    # Explicit structured spelling in natural-language questions.
+    # Explicit structured spelling in natural-language questions. This form is
+    # a machine-readable contract statement, not a prose marker: it is
+    # recognized from any clause position ("Task: ...", "[turn N] ..."), while
+    # the same quotation, question and negation exclusions apply to it as to
+    # every other obligation.
     for match in re.finditer(
         r"required_action\s*[:=]\s*[\"']([^\"']+)[\"']", question, re.I,
     ):
-        if _action_is_required(question, match.start()):
+        if _structured_action_required(question, match.start()):
             actions.add(match.group(1).strip().lower())
     return {name for name in actions if name}
+
+
+def _structured_action_required(text: str, position: int) -> bool:
+    if position and (text[position - 1].isalnum() or text[position - 1] == "_"):
+        return False
+    if any(match.start() <= position < match.end()
+           for match in _TASK_QUOTED_SPAN_RE.finditer(text)):
+        return False
+    clause = _clause_at(text, position)
+    if "?" in clause or _HYPOTHETICAL_RE.search(clause):
+        return False
+    prefix = _clause_at(text[:position], position)
+    return not _NON_EXECUTION_PREFIX_RE.search(prefix)
 
 
 

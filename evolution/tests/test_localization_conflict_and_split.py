@@ -176,6 +176,24 @@ def test_tracer_naming_an_earlier_step_is_recorded_not_charged():
     assert proof["decision_authority"] == AUTHORITY_AUTHORITATIVE
 
 
+def test_the_recorded_tracer_direction_matches_the_steps_it_names():
+    """A later tracer step is labelled later, not earlier.
+
+    The label was hard-coded to "earlier" for every overridden source, so a
+    tracer whose step sat after the allegation was recorded with the opposite
+    of what its own two steps say. The direction is read from the recorded
+    numbers, so the label is reproducible from the row alone.
+    """
+    from detector.adjudication import LOCALIZATION_AGREEMENT_TRACER_LATER
+
+    proof = _run([_hearing("judge", 1, "substantiated",
+                           tracer_step=4, confirmed_step=1)])
+    sources = proof["localization_sources"]
+    assert sources["adopted_step"] == 4
+    assert sources["allegation_step"] == 1
+    assert sources["resolution"] == LOCALIZATION_AGREEMENT_TRACER_LATER
+
+
 def test_first_hearing_tracer_disagreeing_with_adopted_step_is_flagged():
     """The exact archived shape: judge hearing refuted, later hearing convicts.
 

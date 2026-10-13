@@ -674,6 +674,93 @@ def test_freeze_refuses_an_unknown_version(tmp_path):
         developer.freeze("v999")
 
 
+def test_freeze_refuses_a_candidate_whose_disk_content_drifted(tmp_path):
+    """L1 certification must not survive an edit to the candidate on disk.
+
+    The version store is the hand-off point between development and the
+    formal gates. If the candidate's bytes change after L0/L1 (a hand edit, a
+    restored backup, a partially-written file), freezing it would carry the
+    old certification to a candidate nobody measured. The freeze re-derives
+    the hash and refuses instead.
+    """
+    def l1_runner(cases, *, candidate, plan):
+        return [
+            row("A/001.json", arm="baseline", gold=True, prediction=False),
+            row("N/003.json", arm="baseline", gold=False, prediction=False),
+            row("A/001.json", arm="candidate", gold=True, prediction=True,
+                proof=fired("IV-1-001")),
+            row("N/003.json", arm="candidate", gold=False, prediction=False,
+                proof=fired("IV-1-001")),
+        ]
+
+    developer = _developer(tmp_path, l1_runner=l1_runner)
+    result = developer.develop(lambda *a, **k: [candidate()], cycle=1)
+    assert result["versions"][0]["status"] == "ready_for_freeze"
+
+    path = tmp_path / "v001" / "candidate.json"
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["candidate"]["body"]["directive"] = "a materially different instruction"
+    path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="content changed"):
+        developer.freeze("v001")
+
+
+def test_load_existing_refuses_a_record_edited_after_it_was_written(tmp_path):
+    """Reloading the store re-identifies every version it reads.
+
+    Recovery and freeze both rebuild the version list from disk. A record
+    whose ``candidate_hash`` no longer describes its ``candidate`` is refused
+    at load time, before either caller can act on it.
+    """
+    def l1_runner(cases, *, candidate, plan):
+        return [
+            row("A/001.json", arm="baseline", gold=True, prediction=False),
+            row("N/003.json", arm="baseline", gold=False, prediction=False),
+            row("A/001.json", arm="candidate", gold=True, prediction=True,
+                proof=fired("IV-1-001")),
+            row("N/003.json", arm="candidate", gold=False, prediction=False,
+                proof=fired("IV-1-001")),
+        ]
+
+    developer = _developer(tmp_path, l1_runner=l1_runner)
+    developer.develop(lambda *a, **k: [candidate()], cycle=1)
+
+    path = tmp_path / "v001" / "candidate.json"
+    record = json.loads(path.read_text(encoding="utf-8"))
+    record["candidate"]["body"]["directive"] = "edited in place"
+    path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    graph = CandidateVersionGraph(tmp_path)
+    with pytest.raises(ValueError, match="content changed"):
+        graph.load_existing()
+
+
+def test_record_snapshots_the_candidate_against_later_mutation(tmp_path):
+    """The stored candidate is an independent copy, not a live reference.
+
+    A caller that keeps mutating its own dict after ``record`` would
+    otherwise rewrite history inside the store: the version's candidate and
+    its hash would describe different content, which is exactly the drift
+    the identity checks refuse.
+    """
+    from evolution.candidate_versions import canonical_hash
+
+    graph = CandidateVersionGraph(tmp_path)
+    draft = dict(candidate())
+    graph.record(
+        "recall_directive", "v001", draft, parent=None, diagnosis=None,
+        draft_notes=[], evaluation=None, verdict=None, status="draft",
+    )
+    recorded_hash = graph.versions[0]["candidate_hash"]
+    assert recorded_hash == canonical_hash(draft)
+    draft["body"]["directive"] = "mutated after the record was written"
+    assert graph.versions[0]["candidate"]["body"]["directive"] != (
+        "mutated after the record was written"
+    )
+    assert graph.versions[0]["candidate_hash"] == recorded_hash
+
+
 def test_development_status_is_a_sidecar_not_a_change_to_the_version_record(
     tmp_path,
 ):

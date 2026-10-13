@@ -34,11 +34,14 @@ from evolution.contracts import (
     structured_key,
 )
 from evolution.metrics import (
+    INFRASTRUCTURE_STATE_PREFIXES,
+    failed_stage_state,
     deployment_events,
     evidence_increment_rows,
     fired_rate,
     paired_delta,
     paired_localization_delta,
+    resolution_gain,
 )
 from evolution.metamorphic import admission_error
 
@@ -124,46 +127,45 @@ def _decisive_correction(delta: Mapping[str, Any]) -> tuple[int, int]:
     return fixed, broken
 
 
-INFRASTRUCTURE_STATE_PREFIXES = (
-    "provider_error", "invalid", "contract_error", "degraded", "no_quorum",
-    "timeout", "not_rendered",
-)
-
-
 def arm_has_infrastructure_failure(
     rows: Sequence[Mapping[str, Any]],
 ) -> str:
     """Return a reason when an arm could not be scored honestly.
 
-    A gate rejection caused by an unresolved row, a missing label, a
-    non-authoritative terminal, or a failed stage is not evidence that the
-    gate *logic* rejected the candidate. The defect-injection audit must
+    A gate rejection caused by a missing label, a non-authoritative terminal,
+    a runtime-invalid row or a failed stage is not evidence that the gate
+    *logic* rejected the candidate. The defect-injection audit must
     distinguish the two, otherwise a deadline or outage that fail-closes every
     row would certify the gates without exercising them.
+
+    An authoritative row whose prediction is ``None`` is *not* one of those
+    reasons: that is a healthy semantic-unresolved reading produced by the
+    judge/defense design when the evidence genuinely conflicts, and the same
+    reading layer elsewhere classifies it as ``semantic_unresolved`` /
+    ``SEMANTIC_UNRESOLVED_HEALTHY``. Treating it as infrastructure failure made
+    every resolution claim unscorable by construction: the control arm of a
+    resolution measurement necessarily contains such rows. A row that is
+    undecided *and* unhealthy (non-authoritative, runtime-invalid, failed
+    stage) is still refused by the checks below.
     """
     if not rows:
         return "arm produced no rows"
     for row in rows:
         if row.get("gold") is not True and row.get("gold") is not False:
             return f"missing boolean gold for case {row.get('case')}"
-        if row.get("prediction") is None:
-            return f"unresolved row for case {row.get('case')}"
         if str(row.get("authority") or "") != "authoritative":
             return (
                 f"non-authoritative row for case {row.get('case')} "
                 f"({row.get('authority')})"
             )
         result = row.get("result") or {}
+        if result.get("decision_authority", row.get("authority")) != "authoritative":
+            return f"non-authoritative result for case {row.get('case')}"
         if result and not bool(result.get("runtime_valid", True)):
             return f"runtime-invalid row for case {row.get('case')}"
-        for status in (result.get("stage_status") or {}).values():
-            if str((status or {}).get("state") or "").startswith(
-                INFRASTRUCTURE_STATE_PREFIXES
-            ):
-                return (
-                    f"failed stage {status.get('state')!r} on case "
-                    f"{row.get('case')}"
-                )
+        failed_state = failed_stage_state(result)
+        if failed_state:
+            return f"failed stage {failed_state!r} on case {row.get('case')}"
     return ""
 
 
@@ -963,7 +965,9 @@ def resolution_behavior_gate(
     Checks:
     1. Fired rate > 0 on the resolution evaluation set (if behavior_require_fired).
     2. Zero health regressions.
-    3. At least one previously unresolved case is converted to authoritative correct (U->T or U->F).
+    3. At least one *healthy* unresolved case is converted to an authoritative
+       correct decision; a row that was undecided because a provider failed or a
+       stage broke is not a case this claim resolved.
     4. No previously correct decisions are harmed (tp_lost == 0, fp_added == 0).
     """
     gate_cfg = config.get("gates") or {}
@@ -991,11 +995,11 @@ def resolution_behavior_gate(
             behavior_event_kind=behavior_event_kind,
         )
 
-    flips = delta.get("flips") or {}
-    resolved = int(flips.get("U->T") or 0) + int(flips.get("U->F") or 0)
+    resolved = resolution_gain(delta)
     if resolved <= 0:
         return _policy_fail(
-            "resolution claim resolved no unresolved case to authoritative correct",
+            "resolution claim resolved no healthy unresolved case to an "
+            "authoritative correct decision",
             delta=delta,
             fired_rate=rate,
             behavior_events=behavior_events,
@@ -1242,15 +1246,17 @@ def meets_resolution(
 ) -> tuple[bool, list[str]]:
     """Resolution admission rule over precomputed paired delta.
 
-    Requires at least min_resolved_cases (default 1) to transition from unresolved to correct,
-    with zero new errors allowed (or <= m_new_errors_allowed),
-    zero new unresolved added, zero health regressions, and no TP lost or FP added.
+    Requires at least min_resolved_cases (default 1) *healthy* unresolved rows
+    to become authoritative correct decisions -- an unrestricted ``U->T`` /
+    ``U->F`` flip would also count a control-arm outage the candidate papered
+    over -- with zero new errors allowed (or <= m_new_errors_allowed),
+    zero new unresolved added, zero health regressions, and no TP lost or FP
+    added.
     """
     gate_cfg = config.get("gates") or {}
     failures = []
     minimum = max(0, int(gate_cfg.get("resolution_min_resolved_cases", 1)))
-    flips = delta.get("flips") or {}
-    resolved = int(flips.get("U->T") or 0) + int(flips.get("U->F") or 0)
+    resolved = resolution_gain(delta)
 
     if resolved < minimum:
         failures.append(f"resolved_correct={resolved} < {minimum}")

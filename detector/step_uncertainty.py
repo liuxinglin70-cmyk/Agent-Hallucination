@@ -27,11 +27,13 @@ def build_step_risk_profile(
     for event in packet["events"][:event_limit]:
         eid = event["event_id"]
         signals = []
-        recognized = event.get("role") in {"assistant", "tool", "user", "system"}
+        recognized = event.get("role") in {None, "assistant", "tool", "user", "system"}
         truncated = len(json.dumps(event, ensure_ascii=False)) > char_limit
-        if not unsupported and recognized and not truncated:
+        if not unsupported and recognized:
             components = [(event.get("content"), eid)]
-            for interaction in event.get("tool_interactions") or ():
+            interactions = event.get("tool_interactions") or []
+            truncated |= len(interactions) > 32
+            for interaction in interactions[:32]:
                 iid = interaction["interaction_id"]
                 check = arithmetic_check(interaction)
                 if check and check["status"] == "deviation":
@@ -40,9 +42,21 @@ def build_step_risk_profile(
                         "verification_status": "verified", "evidence_refs": [iid],
                         "certificate": check, "responsibility": "tool_observation",
                     })
+                for value, signal in (
+                    (interaction.get("arguments"), "unverified_action"),
+                    (interaction.get("observation"), "external_guidance"
+                     if interaction.get("tool_name") == "ask_human" else "unverified_observation"),
+                ):
+                    if value not in (None, "", {}):
+                        signals.append({"signal": signal, "producer": "visible_channel.v1",
+                                        "verification_status": "hypothesis", "evidence_refs": [iid],
+                                        "responsibility": "unassigned"})
                 components.extend([(interaction.get("arguments"), iid),
                                    (interaction.get("observation"), iid)])
             for value, ref in components:
+                if len(json.dumps(value, ensure_ascii=False)) > char_limit:
+                    truncated = True
+                    continue
                 fields, clipped = bound_fields(value)
                 truncated |= clipped
                 for field in fields:
@@ -58,7 +72,7 @@ def build_step_risk_profile(
                     if len(signals) >= 64:
                         truncated = True
                         break
-            if event.get("role") == "assistant" and event.get("content") not in (None, ""):
+            if event.get("role") in {None, "assistant"} and event.get("content") not in (None, ""):
                 signals.append({
                     "signal": "unsupported_claim", "producer": "unverified_content.v1",
                     "verification_status": "unknown", "evidence_refs": [eid],
@@ -98,13 +112,23 @@ def build_step_risk_profile(
 def select_causal_candidates(
     profile: Mapping[str, Any], *, mandatory_event_ids: Sequence[str], policy: Mapping[str, Any],
 ) -> dict[str, Any]:
+    """Pick the events the causal projection may walk.
+
+    ``state`` is load-bearing downstream: ``closure_state`` reads it (see
+    ``detector.causal_graph``), and a ``"unknown"`` state degrades the causal
+    context and the task certificate for the whole case. It is ``"selected"``
+    only when the selection is complete -- nothing was cut by capacity and
+    every mandatory event was found in the profile -- and ``"unknown"``
+    otherwise, so a truncated projection is never reported as a full one.
+    """
     validate_seal(profile, schema=RISK_PROFILE_SCHEMA)
     if profile["policy_digest"] != digest(policy):
         raise ValueError("candidate policy differs from risk profile")
     if isinstance(mandatory_event_ids, str) or any(not isinstance(eid, str) for eid in mandatory_event_ids):
         raise ValueError("mandatory event ids must be strings")
     mandatory = list(dict.fromkeys(mandatory_event_ids))
-    ranked = sorted((row for row in profile["by_event"] if row["score_status"] == "scored"),
+    ranked = sorted((row for row in profile["by_event"]
+                     if row["score_status"] in {"scored", "truncated"} and row["risk_signals"]),
                     key=lambda row: (row["priority"], -sum(
                         signal["verification_status"] == "verified" for signal in row["risk_signals"]),
                         row["position"]))

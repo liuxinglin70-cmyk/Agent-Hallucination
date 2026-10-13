@@ -91,11 +91,11 @@ def test_evaluate_row_state_with_result_envelope():
     assert evaluate_row_state({"case": "c1", "gold": False, "result": corr_env}) == EvaluationState.AUTHORITATIVE_WRONG
 
     # Semantic unresolved healthy from envelope
-    unres_env = _result_envelope(state="unresolved", authority="unresolved")
+    unres_env = _result_envelope(state="unresolved", authority="authoritative")
     assert evaluate_row_state({"case": "c2", "gold": True, "result": unres_env}) == EvaluationState.SEMANTIC_UNRESOLVED_HEALTHY
 
     # Infrastructure failure in stage
-    fail_env = _result_envelope(state="unresolved", authority="unresolved", stage_error="provider_error")
+    fail_env = _result_envelope(state="unresolved", authority="invalid", stage_error="provider_error")
     assert evaluate_row_state({"case": "c3", "gold": True, "result": fail_env}) == EvaluationState.INFRASTRUCTURE_FAILURE
 
     # Degraded authority

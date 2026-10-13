@@ -21,6 +21,8 @@ from typing import Any, Mapping, Sequence
 
 from detector.dataset import load_case
 from detector.result import prediction_state
+from detector.localization import gold_step_mapping, LOCALIZATION_TARGET
+from detector.adjudication import LOCALIZATION_AUTHORITY_AUTHORITATIVE
 from detector.runner import safe_case_id, validate_case_commit
 from detector.runtime import contained_path, exclusive_writer, validate_path_id
 
@@ -101,11 +103,8 @@ def evaluate_run(
             raw = json.loads(
                 contained_path(dataset_root, case_id).read_text(encoding="utf-8-sig")
             )
-            gold_step = raw.get("hallucination_step")
-            if str(gold_step or "").isdigit():
-                gold_step = int(gold_step)
-            else:
-                gold_step = None
+            mapping = gold_step_mapping(_record, raw.get("hallucination_step"))
+            gold_step = mapping["position"]
             label = gold.get("is_hallucination")
             if isinstance(label, bool):
                 gold_bool = label
@@ -123,6 +122,7 @@ def evaluate_run(
                     "prediction": None,
                     "terminal_prediction": None,
                     "gold_step": gold_step,
+                    "gold_step_mapping": mapping,
                     "responsible_step": None,
                     "state": "missing_result",
                     "authority": "invalid",
@@ -149,6 +149,9 @@ def evaluate_run(
                 "prediction": prediction,
                 "terminal_prediction": terminal_prediction,
                 "gold_step": gold_step,
+                "gold_step_mapping": mapping,
+                "localization_target": (result.get("localization") or {}).get("target"),
+                "localization_authority": result.get("localization_authority"),
                 "responsible_step": result.get("responsible_step"),
                 # What kind of step the verdict blames: the event's own structure
                 # carries either assistant prose or tool calls, and the two are
@@ -236,6 +239,8 @@ def evaluate_run(
             hit = (
                 row["prediction"] is True
                 and row["responsible_step"] == row["gold_step"]
+                and row.get("localization_authority") in {None, LOCALIZATION_AUTHORITY_AUTHORITATIVE}
+                and row.get("localization_target") in {None, LOCALIZATION_TARGET}
             )
             if hit:
                 step_hits += 1
@@ -253,6 +258,12 @@ def evaluate_run(
                 bucket["hits"] / bucket["n"] if bucket["n"] else None
             )
         metrics["step_localization"] = {
+            "target": LOCALIZATION_TARGET,
+            "step_unit": "trajectory_event_position",
+            "unmapped_annotations": sum(row["gold"] and row.get("gold_step_mapping", {}).get(
+                "mapping_state") in {"ambiguous", "unmapped"} for row in rows),
+            "target_mismatch_rows": sum(row.get("localization_target") not in {None, LOCALIZATION_TARGET}
+                                        for row in rows),
             "n": step_total,
             "hits": step_hits,
             "accuracy": step_hits / step_total if step_total else None,

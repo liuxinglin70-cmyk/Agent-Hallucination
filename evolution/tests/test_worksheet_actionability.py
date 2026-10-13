@@ -82,3 +82,32 @@ def test_fp_family_with_positive_source_opens_withhold():
     })
     assert verdict["classification"] == "actionable"
     assert "withhold_guard" in verdict["routes"]
+
+
+def test_actionability_carries_the_family_polarity():
+    """The claim direction travels with the actionability reading.
+
+    Consumers read ``actionability["polarity"]`` to record a development
+    episode and to score memory recall; a producer that never emitted the key
+    left every development episode with an empty polarity, which the recall
+    scoring then could never match.
+    """
+    assert classify_family_actionability(_fn_family())["polarity"] == "recall"
+    assert classify_family_actionability({
+        "failure_family": "FAM-fp-judge_conviction",
+        "count": 2,
+        "mechanism_signature": {"positive_source": "judge"},
+        "diagnostics": {"predicate_signals": {}},
+    })["polarity"] == "precision"
+    assert classify_family_actionability({
+        "failure_family": "FAM-loc-tracer_wrong-a41",
+        "count": 2,
+        "mechanism_signature": {},
+        "diagnostics": {"predicate_signals": {}},
+    })["polarity"] == "boundary"
+    assert classify_family_actionability({
+        "failure_family": "FAM-unresolved-abc123",
+        "count": 3,
+        "mechanism_signature": {},
+        "diagnostics": {"predicate_signals": {}},
+    })["polarity"] == ""

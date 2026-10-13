@@ -58,6 +58,8 @@ from evolution.gates import (
     marginal_floor_rests_on_unstable,
     meets_localization,
     meets_m,
+    meets_resolution,
+    resolution_behavior_gate,
     structural_gate,
     harmlessness_gate,
     localization_behavior_gate,
@@ -77,6 +79,7 @@ from evolution.metrics import (
     mechanism_opportunity,
     mcnemar_improvement_p,
     noise_floor,
+    objective_marginal,
     paired_delta,
     paired_localization_delta,
     row_responsible_step,
@@ -415,8 +418,21 @@ def _defect_rejection_after_exclusions(
     traces, which the audit's row summary does not carry, so re-running it here
     would report "never fired" for every defect and manufacture a rejection --
     the exact artifact this function exists to catch.
+
+    The rows are read from ``candidate_full_rows`` when the unit carries them:
+    the display summary drops ``result``, so a runtime-invalid or stage-failed
+    row would otherwise be invisible to the exclusion sweep. A defect arm that
+    produced no rows at all cannot be re-derived at all: there is nothing to
+    certify.
     """
-    candidate_rows = list(unit.get("candidate_rows") or ())
+    candidate_rows = list(
+        unit.get("candidate_full_rows") or unit.get("candidate_rows") or ()
+    )
+    if not candidate_rows:
+        return (
+            "defect evaluation produced no candidate rows to re-derive a "
+            "rejection from"
+        )
     unusable = _unmeasurable_cases([*baseline_rows, *candidate_rows])
     if not unusable:
         # Nothing was excluded, so the verdict already rests on measurable
@@ -1803,6 +1819,9 @@ class EvolutionEngine:
                     family=target["family"],
                     mechanism_id=mechanism_id,
                     identifier=draft_identifier,
+                    provider_budget=(
+                        lambda budget=budget: budget.provider_calls_left()
+                    ),
                 ),
                 cycle=int(cycle),
                 max_versions=int(
@@ -1934,6 +1953,11 @@ class EvolutionEngine:
         statuses ``freeze`` can produce are accepted: ``ready_for_freeze`` and
         ``frozen``. A ``failed_l0``/``failed_l1`` version is still a failure on
         re-entry, exactly as it was the first time.
+
+        Version identity is enforced by ``load_existing``: a version whose
+        stored candidate no longer hashes to its recorded ``candidate_hash``
+        is refused before recovery can pair stale L0/L1 certification with
+        fresh candidate content.
         """
         admissible = {"ready_for_freeze", "frozen"}
         recovered: dict[str, Any] | None = None
@@ -1944,14 +1968,15 @@ class EvolutionEngine:
             )
             if status not in admissible:
                 continue
+            version, certificate = developer.graph.read_version(version_id, certified=True)
             candidate = version.get("candidate")
             if not isinstance(candidate, Mapping):
                 continue
             recovered = {
                 "version_id": version_id,
                 "candidate_hash": str(version.get("candidate_hash") or ""),
-                "candidate": dict(candidate),
-                "status": status,
+                "candidate": deepcopy(candidate),
+                "status": certificate["status"],
             }
         return recovered
 
@@ -2249,13 +2274,17 @@ class EvolutionEngine:
         gate_reports: Sequence[Mapping[str, Any]],
         rejected: Sequence[Mapping[str, Any]],
         selected: Sequence[Mapping[str, Any]],
+        not_selected: Sequence[str] = (),
     ) -> None:
         """Persist this cycle's attempts and, for admitted ones, procedures.
 
         Only admitted interventions become procedural memory: a procedure
         claims how to do something, and that claim is only established once a
         gate has accepted it. A rejection that was merely unevaluable is kept
-        distinguishable from a falsified mechanism.
+        distinguishable from a falsified mechanism, and a unit that passed
+        every gate but did not fit the admission entry budget is recorded as
+        *not selected*: no verdict was made about it, so calling it rejected
+        would store a qualified mechanism as falsified.
         """
         family_by_name = {
             str(item.get("failure_family") or ""): item
@@ -2268,6 +2297,7 @@ class EvolutionEngine:
         admitted_ids = {
             str(item.get("intervention_id") or "") for item in selected
         }
+        not_selected_ids = {str(item) for item in not_selected}
         for report in gate_reports:
             candidate = dict(report.get("candidate") or {})
             intervention_id = str(candidate.get("intervention_id") or "")
@@ -2282,6 +2312,14 @@ class EvolutionEngine:
             )
             if intervention_id in admitted_ids:
                 outcome, gate, reason, unevaluable = "admitted", None, "", False
+            elif intervention_id in not_selected_ids:
+                outcome = "budget_unselected"
+                gate = None
+                reason = (
+                    "the unit passed every gate but the admission entry budget "
+                    "could not take it; no verdict was made about the mechanism"
+                )
+                unevaluable = True
             else:
                 rejection = rejected_by_id.get(intervention_id) or {}
                 outcome = "rejected"
@@ -2404,12 +2442,29 @@ class EvolutionEngine:
         for candidate in defect_candidates():
             # Defects enter the same STRUCTURAL -> one S+G arm -> HARMLESSNESS/BEHAVIOR/M pipeline
             # as real candidates; a leaked defect would pass all of them.
+            #
+            # The audit runs STRUCTURAL with the checks that are meaningful for
+            # synthetic defects. The cycle's own call additionally passes
+            # ``allowed_failure_cases`` (this round's patrol), ``diagnosed_families``
+            # and their contexts: a synthetic defect's hard-coded failure cases
+            # are not this round's patrol, so feeding them in would reject
+            # (or pass) the defect for a reason that says nothing about the
+            # live rules. That reduction is stated on every report instead of
+            # being left implicit -- an audit that claims to have exercised
+            # rule sets it never ran is worse than one that names its scope.
             structural = structural_gate(
                 candidate, active_entries=self.registry.entries, config=self.config,
             )
             report: dict[str, Any] = {
                 "intervention_id": candidate.get("intervention_id"),
                 "structural": structural,
+                "structural_parameters": "reduced",
+                "structural_parameters_note": (
+                    "synthetic defects carry their own failure cases; the "
+                    "patrol-scoped checks (allowed_failure_cases, "
+                    "diagnosed_families, patrol_rows) are not exercised by "
+                    "this audit"
+                ),
                 "harmlessness": None,
                 "behavior": None,
                 "m": None,
@@ -2440,31 +2495,43 @@ class EvolutionEngine:
                     # they must not be conflated:
                     #
                     # 1. The gate could not score the defect at all (its verdict
-                    #    is not evaluable). Insufficient baseline-correct
-                    #    coverage means the gates were never exercised.
+                    #    is not evaluable for a reason that survives excluding
+                    #    bad rows -- insufficient baseline-correct coverage, no
+                    #    measurement opportunity). Then the gates were never
+                    #    exercised.
                     # 2. The gate could score it, but only because of rows that
                     #    could not be measured. Removing those rows and
                     #    re-deriving the rejection tests exactly that.
                     #
-                    # The whole-batch sweep this replaces treated *any*
-                    # unmeasurable row anywhere as disqualifying, which froze an
-                    # entire multi-cycle run because one sentinel case hit its
-                    # case deadline -- a case in neither the verdict's evidence
-                    # nor its cause. A genuinely leaking defect still leaks on
-                    # the healthy cases, so excluding the unmeasured ones
-                    # weakens nothing; and an audit that refuses to certify
-                    # whenever any background case degrades is not more honest,
-                    # only more fragile.
-                    unmeasured = any(
+                    # The re-derivation runs on the full rows, never on the
+                    # display summary: the summary drops ``result``, so a
+                    # runtime-invalid or stage-failed row would be invisible to
+                    # it. A verdict marked ``infrastructure_failure`` is
+                    # precisely the case where unmeasurable rows were seen, so
+                    # it must be re-derived rather than short-circuited -- the
+                    # whole-batch sweep this replaces treated *any* unmeasurable
+                    # row anywhere as disqualifying, which froze an entire
+                    # multi-cycle run because one sentinel case hit its case
+                    # deadline. A genuinely leaking defect still leaks on the
+                    # healthy cases, so excluding the unmeasured ones weakens
+                    # nothing; and an audit that refuses to certify whenever any
+                    # background case degrades is not more honest, only more
+                    # fragile.
+                    verdicts = (
+                        unit.get("harmlessness") or {},
+                        unit.get("behavior") or {},
+                        unit.get("m") or {},
+                    )
+                    gate_limited = any(
                         verdict.get("passed") is False
                         and verdict.get("evaluable") is False
-                        for verdict in (
-                            unit.get("harmlessness") or {},
-                            unit.get("behavior") or {},
-                            unit.get("m") or {},
-                        )
+                        and verdict.get("infrastructure_failure") is not True
+                        for verdict in verdicts
                     )
-                    if unmeasured:
+                    if gate_limited:
+                        # The gate itself reports it could not score the defect
+                        # (missing coverage, no measurement opportunity): the
+                        # gates were never exercised, whatever the rows say.
                         infrastructure = (
                             "defect evaluation has insufficient measurement "
                             "coverage"
@@ -2486,7 +2553,7 @@ class EvolutionEngine:
                         # re-deriving it from the delta.
                         report["unmeasured_rows"] = [
                             row for row in (
-                                *(unit.get("candidate_rows") or ()),
+                                *(unit.get("candidate_full_rows") or ()),
                                 *baseline_s,
                                 *baseline_g,
                             )
@@ -2582,7 +2649,17 @@ class EvolutionEngine:
             (candidate.get("claim") or {}).get("target_polarity") or ""
         )
         kind = candidate_target_kind(candidate)
-        coverage_direction = "localization" if kind in {"localization", "joint"} else polarity
+        # The coverage-response policy is keyed by the *evaluation set* a claim
+        # needs: localization and joint claims need the mislocated-but-
+        # convicted set (the "localization" policy key), resolution claims need
+        # healthily-undecided cases ("resolution"), and detection claims key on
+        # their polarity. Falling back per family keeps the existing policy
+        # names meaning what they always meant.
+        coverage_direction = (
+            "localization" if kind in {"localization", "joint"}
+            else "resolution" if kind == "resolution"
+            else polarity
+        )
         sentinel = list(self.split.sentinel)
         control = (
             fresh_control_rows if fresh and fresh_control_rows is not None
@@ -2687,6 +2764,7 @@ class EvolutionEngine:
                 "measurement_gain_cases": measurement_gain,
                 "coverage_response": response,
                 "candidate_rows": [],
+                "candidate_full_rows": [],
                 "harmlessness": blocked if not coverage["evaluable"] else None,
                 "behavior": None,
                 "member_behavior": {},
@@ -2742,9 +2820,13 @@ class EvolutionEngine:
             # detection BEHAVIOR/M pair asks whether the binary verdict moved,
             # which a tracer directive deliberately leaves alone, so scoring a
             # localization claim there would report "never fired" or "no
-            # marginal gain" for a claim that did exactly what it promised.
+            # marginal gain" for a claim that did exactly what it promised. A
+            # resolution claim gets its own pair for the same reason: the case
+            # it repairs is one the control arm left undecided, which the
+            # binary scale reads as no movement.
             for member in [*partners, dict(candidate)]:
                 member_id = str(member.get("intervention_id") or "")
+                member_kind = candidate_target_kind(member)
                 member_behavior[member_id] = (
                     localization_behavior_gate(
                         member,
@@ -2753,7 +2835,14 @@ class EvolutionEngine:
                         config=self.config,
                         gold_steps=self.gold_step_map,
                     )
-                    if candidate_target_kind(member) in {"localization", "joint"}
+                    if member_kind in {"localization", "joint"}
+                    else resolution_behavior_gate(
+                        member,
+                        baseline_rows=control,
+                        candidate_rows=candidate_rows,
+                        config=self.config,
+                    )
+                    if member_kind == "resolution"
                     else behavior_gate(
                         member,
                         baseline_rows=control,
@@ -2775,6 +2864,14 @@ class EvolutionEngine:
                         "reason": "; ".join(failures),
                         "delta": delta,
                         "localization_delta": localization_delta,
+                        "target_kind": kind,
+                    }
+                elif kind == "resolution":
+                    passed, failures = meets_resolution(delta, config=self.config)
+                    m = {
+                        "passed": passed,
+                        "reason": "; ".join(failures),
+                        "delta": delta,
                         "target_kind": kind,
                     }
                 else:
@@ -2902,6 +2999,7 @@ class EvolutionEngine:
             "measurement_gain_cases": measurement_gain,
             "coverage_response": response,
             "candidate_rows": _summarise_rows(candidate_rows),
+            "candidate_full_rows": list(candidate_rows),
             "route_measurement": build_route_measurement(
                 candidate=candidate, partners=partners, cases=measurement_gain,
                 control_rows=control_g, candidate_rows=candidate_g,
@@ -4029,10 +4127,10 @@ class EvolutionEngine:
                     {},
                 )
                 unit = unit_outcomes.get(intervention_id) or {}
-                marginal = int(
-                    ((unit.get("m") or {}).get("delta") or {}).get(
-                        "marginal_cases"
-                    ) or 0
+                marginal = objective_marginal(
+                    target_kind=candidate_target_kind(candidate),
+                    delta=(unit.get("m") or {}).get("delta") or {},
+                    localization_delta=(unit.get("m") or {}).get("localization_delta"),
                 )
                 fired = float((unit.get("behavior") or {}).get("fired_rate", 0.0))
                 partner_ids = list(report.get("partner_ids") or [])
@@ -4142,6 +4240,13 @@ class EvolutionEngine:
                 "delta": combination["delta"],
                 "reason": combination["reason"],
                 "stability_limited": bool(combination.get("stability_limited")),
+                # Qualified units the entry budget could not take. Reported so
+                # "nothing was selected" is distinguishable from "everything
+                # was rejected", and so the experience store can record them as
+                # not-selected rather than as falsified mechanisms.
+                "budget_unselected_units": list(
+                    combination.get("budget_unselected_units") or ()
+                ),
             },
             "marginal_selection": {
                 "selected": [
@@ -4198,6 +4303,10 @@ class EvolutionEngine:
             gate_reports=gate_reports,
             rejected=cycle_rejections,
             selected=selected,
+            not_selected=[
+                str(entry["intervention_id"])
+                for entry in combination.get("budget_unselected_entries") or ()
+            ],
         )
         report["harness"] = self.record_harness(cycle)
         return report
@@ -4229,26 +4338,28 @@ class EvolutionEngine:
         max_admits = int(
             (self.config.get("budget") or {}).get("max_admits", 2)
         )
-        if max_admits <= 0:
-            return {
-                "unit_ids": [],
-                "entries": [],
-                "delta": None,
-                "reason": "admission budget is zero",
+        def budget_exclusion(excluded, reason):
+            entries = {
+                entry["intervention_id"]: deepcopy(entry)
+                for unit in excluded for entry in [*unit["partners"], unit["candidate"]]
             }
+            return {
+                "unit_ids": [], "entries": [], "delta": None, "reason": reason,
+                "budget_unselected_entries": list(entries.values()),
+                "budget_unselected_units": list(dict.fromkeys(
+                    str(unit["intervention_id"]) for unit in excluded
+                )),
+            }
+        if max_admits <= 0:
+            return budget_exclusion(qualified, "admission budget is zero")
         if len(qualified) == 1:
             unit = qualified[0]
             unit_entries = [*unit["partners"], unit["candidate"]]
             if len(unit_entries) > max_admits:
-                return {
-                    "unit_ids": [],
-                    "entries": [],
-                    "delta": None,
-                    "reason": (
+                return budget_exclusion([unit],
                         f"qualified unit needs {len(unit_entries)} admission "
                         f"slots; limit is {max_admits}"
-                    ),
-                }
+                )
             return {
                 "unit_ids": [unit["intervention_id"]],
                 "entries": unit_entries,
@@ -4272,15 +4383,10 @@ class EvolutionEngine:
             unit = units[0]
             unit_entries = [*unit["partners"], unit["candidate"]]
             if len(unit_entries) > max_admits:
-                return {
-                    "unit_ids": [],
-                    "entries": [],
-                    "delta": None,
-                    "reason": (
+                return budget_exclusion([unit],
                         f"joint unit needs {len(unit_entries)} admission slots; "
                         f"limit is {max_admits}"
-                    ),
-                }
+                )
             return {
                 "unit_ids": [unit["intervention_id"]],
                 "entries": unit_entries,
@@ -4288,10 +4394,16 @@ class EvolutionEngine:
                 "reason": "qualified units collapse into one joint group",
             }
         selected_units: list[Mapping[str, Any]] = []
+        admitted_by_budget: list[Mapping[str, Any]] = []
         selected_entry_count = 0
         for unit in units:
             size = len([*unit["partners"], unit["candidate"]])
             if selected_entry_count + size > max_admits:
+                # A unit that passed every gate but did not fit the entry
+                # budget is *not selected*, which is not the same as rejected:
+                # recording it as a rejection would mark a qualified
+                # mechanism as falsified in experience memory.
+                admitted_by_budget.append(unit)
                 continue
             selected_units.append(unit)
             selected_entry_count += size
@@ -4302,6 +4414,14 @@ class EvolutionEngine:
                 "entries": [],
                 "delta": None,
                 "reason": "no qualified unit fits the admission entry budget",
+                "budget_unselected_entries": [
+                    dict(entry)
+                    for unit in admitted_by_budget
+                    for entry in [*unit["partners"], unit["candidate"]]
+                ],
+                "budget_unselected_units": [
+                    str(unit["intervention_id"]) for unit in admitted_by_budget
+                ],
             }
         entries: list[dict[str, Any]] = []
         for unit in units:
@@ -4332,7 +4452,64 @@ class EvolutionEngine:
                 None if unstable_cases is None else list(unstable_cases)
             ),
         )
-        passed_m, failures = meets_m(delta, config=self.config)
+        combo_localization = (
+            paired_localization_delta(
+                control_g, combo_g, gold_steps=self.gold_step_map,
+                unstable_cases=(
+                    None if unstable_cases is None else list(unstable_cases)
+                ),
+            )
+            if any(
+                candidate_target_kind(entry) in {"localization", "joint"}
+                for unit in units for entry in [*unit["partners"], unit["candidate"]]
+            )
+            else None
+        )
+        # Each unit is scored by the objective it declared, exactly as in
+        # ``_run_unit``: a localization member whose binary verdict is
+        # deliberately unchanged reads as no movement under M, and a
+        # resolution member repairs cases the binary scale counts as undecided.
+        # Scoring every member with M would report a pure-localization
+        # combination as a failure of the members that succeeded alone.
+        failures: list[str] = []
+        passed_m = True
+        floors_from_noise: list[bool] = []
+        for unit in units:
+            unit_kind = candidate_target_kind(unit["candidate"])
+            if unit_kind in {"localization", "joint"}:
+                unit_passed, unit_failures = meets_localization(
+                    combo_localization or {},
+                    config=self.config,
+                    detection_delta=delta,
+                    target_kind=unit_kind,
+                )
+                if not unit_passed:
+                    floors_from_noise.append(
+                        localization_floor_rests_on_unstable(
+                            combo_localization or {},
+                            config=self.config,
+                            detection_delta=delta,
+                            target_kind=unit_kind,
+                        )
+                    )
+            elif unit_kind == "resolution":
+                unit_passed, unit_failures = meets_resolution(
+                    delta, config=self.config,
+                )
+                if not unit_passed:
+                    floors_from_noise.append(False)
+            else:
+                unit_passed, unit_failures = meets_m(delta, config=self.config)
+                if not unit_passed:
+                    floors_from_noise.append(
+                        marginal_floor_rests_on_unstable(delta, config=self.config)
+                    )
+            if not unit_passed:
+                passed_m = False
+                failures.extend(
+                    f"{unit['intervention_id']} ({unit_kind}): {failure}"
+                    for failure in unit_failures
+                )
         passed = combo_harmlessness["passed"] and passed_m
         if not combo_harmlessness["passed"]:
             failures = [combo_harmlessness["reason"], *failures]
@@ -4341,18 +4518,30 @@ class EvolutionEngine:
         # members interfere; it is a round that cannot score them together.
         stability_limited = bool(
             not passed_m
-            and marginal_floor_rests_on_unstable(delta, config=self.config)
+            and floors_from_noise
+            and all(floors_from_noise)
         )
         unit_ids = [unit["intervention_id"] for unit in units]
+        budget_unselected_entries = [
+            dict(entry)
+            for unit in admitted_by_budget
+            for entry in [*unit["partners"], unit["candidate"]]
+        ]
+        budget_unselected_units = [
+            str(unit["intervention_id"]) for unit in admitted_by_budget
+        ]
         if passed:
             return {
                 "unit_ids": unit_ids,
                 "entries": entries,
                 "delta": delta,
+                "localization_delta": combo_localization,
                 "harmlessness": combo_harmlessness,
-                "reason": "combination arm met HARMLESSNESS and M",
+                "reason": "combination arm met HARMLESSNESS and each member's objective",
                 "dropped_entries": [],
                 "failed_entries": [],
+                "budget_unselected_entries": budget_unselected_entries,
+                "budget_unselected_units": budget_unselected_units,
                 "stability_limited": False,
             }
         # The earliest units keep their earned admission; the tail units are
@@ -4382,6 +4571,8 @@ class EvolutionEngine:
             ),
             "dropped_entries": dropped_entries,
             "failed_entries": [dict(entry) for entry in entries],
+            "budget_unselected_entries": budget_unselected_entries,
+            "budget_unselected_units": budget_unselected_units,
             "stability_limited": stability_limited,
         }
 
@@ -4676,6 +4867,7 @@ class EvolutionEngine:
         arms = _ArmRunner(self, deadline)
 
         attribution: list[dict[str, Any]] = []
+        active_rows: list[dict[str, Any]] = []
         if self.registry.entries:
             fresh = requires_fresh_evaluation(self.registry.entries)
             active_rows = arms.run(
@@ -4683,9 +4875,17 @@ class EvolutionEngine:
             )
             for entry in self.registry.entries:
                 intervention_id = str(entry.get("intervention_id") or "")
+                # A leave-one-out arm must be a constructible deployment. A
+                # guard whose evidence_check partner was removed consumes a
+                # predicate no live entry writes, and the registry refuses to
+                # build it at all -- so the unit is attributed as a whole:
+                # the entry plus whatever depends on it. That is the same
+                # closure retirement applies, which keeps attribution and
+                # retirement reading the same unit.
+                removed = self._retirement_closure({intervention_id})
                 without = [
                     item for item in self.registry.entries
-                    if str(item.get("intervention_id") or "") != intervention_id
+                    if str(item.get("intervention_id") or "") not in removed
                 ]
                 without_rows = arms.run(
                     self.split.gain, registry=make_registry(without), fresh=fresh,
@@ -4702,23 +4902,46 @@ class EvolutionEngine:
                 attribution.append({
                     "intervention_id": intervention_id,
                     "delta": delta,
+                    "localization_delta": (
+                        paired_localization_delta(
+                            without_rows, active_rows,
+                            gold_steps=self.gold_step_map,
+                        )
+                        if candidate_target_kind(entry) in {"localization", "joint"}
+                        else None
+                    ),
                     "attribution": "leave_one_out_committed_configuration",
+                    "removed_with": sorted(removed - {intervention_id}),
                     "measured": not blocked,
                     "unmeasured_reason": blocked,
                 })
+        entry_kinds = {
+            str(entry.get("intervention_id") or ""): candidate_target_kind(entry)
+            for entry in self.registry.entries
+        }
+        fired_rates = {
+            str(entry.get("intervention_id") or ""): fired_rate(
+                active_rows, str(entry.get("intervention_id") or ""),
+            )
+            for entry in self.registry.entries
+        }
         for item in attribution:
             if not item["measured"]:
                 continue
+            # The recorded marginal must be the objective the entry declares:
+            # a localization claim whose binary verdict is deliberately
+            # unchanged records joint movement, and a resolution claim records
+            # healthy unresolved -> correct. A binary zero would retire a
+            # member that did exactly what it promised.
             self.registry.record_marginal(
                 item["intervention_id"],
-                int(item["delta"]["marginal_cases"]),
-                cycle=cycle,
-                fired_rate=fired_rate(
-                    self._evaluate(
-                        self.registry.registry, self.split.gain,
-                    ),
-                    item["intervention_id"],
+                objective_marginal(
+                    target_kind=entry_kinds.get(item["intervention_id"], "detection"),
+                    delta=item["delta"],
+                    localization_delta=item.get("localization_delta"),
                 ),
+                cycle=cycle,
+                fired_rate=fired_rates.get(item["intervention_id"], 0.0),
             )
 
         retirement = self._apply_retirement(cycle)
@@ -4755,6 +4978,27 @@ class EvolutionEngine:
         })
         return report
 
+    def _retirement_closure(self, retiring_ids: set[str]) -> set[str]:
+        """``retiring_ids`` plus every entry that depends on them, transitively.
+
+        One definition for the two places that must remove a constructible
+        unit rather than a single entry: governance attribution's leave-one-out
+        arm and outcome-driven retirement. Removing an evidence_check while a
+        decision_guard still consumes its predicate produces a registry the
+        validator refuses, so both operations work on the closure.
+        """
+        closure = set(retiring_ids)
+        changed = True
+        while changed:
+            changed = False
+            for identifier in self.registry.check_retire_dependencies(
+                sorted(closure)
+            ):
+                if identifier not in closure:
+                    closure.add(identifier)
+                    changed = True
+        return closure
+
     def _apply_retirement(self, cycle: int) -> dict[str, Any]:
         threshold = int(
             (self.config.get("library") or {}).get(
@@ -4779,8 +5023,27 @@ class EvolutionEngine:
                 retire_ids.append(intervention_id)
         if not retire_ids:
             return {"retired": [], "threshold": threshold}
+        # A retirement is applied to the dependency closure of the flagged
+        # entries, never to a member on its own: removing an evidence_check
+        # while a decision_guard still reads its predicate would orphan the
+        # guard, and the registry refuses that with an exception the caller
+        # used to have no way to handle. The closure is extended here, before
+        # the call, so a failing governance stage never happens at all.
+        closure = self._retirement_closure(set(retire_ids))
+        skipped: list[dict[str, str]] = []
+        if closure != set(retire_ids):
+            skipped = [
+                {
+                    "intervention_id": identifier,
+                    "reason": (
+                        "retired as part of a dependency closure with "
+                        f"{sorted(closure - set(retire_ids))}"
+                    ),
+                }
+                for identifier in sorted(closure - set(retire_ids))
+            ]
         retired = self.registry.retire(
-            retire_ids,
+            sorted(closure),
             cycle=cycle,
             library_cfg=self.config.get("library") or {},
         )
@@ -4791,9 +5054,19 @@ class EvolutionEngine:
                 "reason": (
                     f"marginal <= 0 for the last {threshold} cycles "
                     "(outcome-driven retirement)"
+                    + (
+                        "; retired within a dependency closure"
+                        if intervention_id in set(closure - set(retire_ids))
+                        else ""
+                    )
                 ),
             })
-        return {"retired": retired, "threshold": threshold}
+        return {
+            "retired": retired,
+            "threshold": threshold,
+            "closure": sorted(closure),
+            "closure_additions": skipped,
+        }
 
     def _apply_rollback_check(
         self, cycle: int, arms: _ArmRunner,
@@ -5345,10 +5618,16 @@ def run_full_self_evolution(
             engine.paths["reports"] / "meta_eval.json",
         )
         nonempty = bool(engine.registry.entries)
+        audit_verdict = str(
+            meta_report["defect_injection_audit"].get("verdict") or ""
+        )
+        # ``not_run`` (every audit disabled) is not a pass: the overall verdict
+        # may only be ``pass`` when an audit actually ran and passed. The
+        # meta_eval vocabulary owns the three values; this is the consumer.
         overall = (
             "pass"
             if nonempty and final_report["verdict"]["overall"] == "pass"
-            and bool(meta_report["defect_injection_audit"]["passed"])
+            and audit_verdict == "pass"
             and bool(ledger_status["valid"])
             else "fail"
         )

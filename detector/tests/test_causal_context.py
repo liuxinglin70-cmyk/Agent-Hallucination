@@ -129,7 +129,7 @@ def test_tracer_recomputes_resealed_local_context_before_provider(monkeypatch, p
                         positive=positive(), causal_context=context)
 
 
-def test_valid_local_context_falls_back_for_a_prose_claim_without_any_extra_provider(monkeypatch):
+def test_prose_claim_uses_diagnostic_priorities_without_a_local_certificate(monkeypatch):
     seen = []
     parsed = {"is_hallucination": True, "hallucination_step": 1,
               "hallucination_reason": "unverified broader claim", "root_cause": {"quote": "5"},
@@ -148,7 +148,11 @@ def test_valid_local_context_falls_back_for_a_prose_claim_without_any_extra_prov
     result = Detector(config(), require_credentials=False).detect(record())
     assert result["state"] == "verified_error"
     assert len(seen) == 1 and "CAUSAL CONTEXT:" not in seen[0]
-    assert result["proof"]["hearings"][0]["tracer_result"]["causal_context_digest"] is None
+    tracer = result["proof"]["hearings"][0]["tracer_result"]
+    assert "RISK CONTEXT:" in seen[0]
+    assert tracer["causal_context_digest"]
+    assert tracer["causal_context"]["scope"] == "diagnostic_event_priority"
+    assert tracer["causal_context"]["decision_authority"] == "none"
 
 
 @pytest.mark.parametrize("values", [("7", "4"), ("5", "6")])
