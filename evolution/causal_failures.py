@@ -2,17 +2,89 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
+import json
 
 from detector.causal_audit import validate_hearing_context
 from detector.causal_contracts import seal
 from detector.identity import digest
-from detector.packet import build_packet
+from detector.packet import build_packet, delivered_result
+from detector.next_action import build_next_action_audit
+from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates
 from detector.localization import LOCALIZATION_TARGET
 from evolution.metrics import mechanism_row_healthy, row_responsible_step
 
 
 FAILURE_SCHEMA = "evolution.causal_failure_record.v1"
+ACTION_FAILURE_SCHEMA = "evolution.action_failure_triplet.v1"
+
+
+def shared_action_rule_conditions(family: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Intersect diagnostic action patterns across independent family members."""
+    members = (family.get("diagnostics") or {}).get("member_summaries") or []
+    if len(members) < 2:
+        return []
+    shared: set[tuple[str, str]] | None = None
+    for member in members:
+        conditions = (member.get("causal_failure") or {}).get("action_rule_conditions") or []
+        patterns = {(condition["risk_pattern"], condition["divergence_pattern"])
+                    for condition in conditions
+                    if condition.get("action_state") == "divergent"
+                    and condition.get("risk_pattern") == "observed_tool_failure"
+                    and condition.get("divergence_pattern") == "success_claim_without_observed_recovery"}
+        shared = patterns if shared is None else shared.intersection(patterns)
+    return [{"risk_pattern": risk, "divergence_pattern": action}
+            for risk, action in sorted(shared or ())]
+
+
+def matching_action_normal_neighbors(
+    patterns: Sequence[Mapping[str, str]], neighbors: Sequence[Mapping[str, Any]], *,
+    policy: Mapping[str, Any],
+) -> list[str]:
+    """Select healthy clean records whose same prefix risk has a compliant next event."""
+    required = {pattern["risk_pattern"] for pattern in patterns}
+    selected: list[str] = []
+    for neighbor in neighbors:
+        case = str(neighbor.get("case") or "")
+        if (not case or neighbor.get("gold") is not False or neighbor.get("prediction") is not False
+                or not mechanism_row_healthy(neighbor)):
+            continue
+        record = neighbor.get("record")
+        if not isinstance(record, Mapping):
+            continue
+        triplets = build_action_failure_triplets(record, policy=policy)
+        compliant = {triplet["predecessor_risk"]["risk_pattern"] for triplet in triplets
+                     if triplet["next_action"]["action_state"] == "compliant"}
+        if required and required <= compliant:
+            selected.append(case)
+    return list(dict.fromkeys(selected))
+
+
+def build_action_failure_triplets(
+    record: Mapping[str, Any], *, policy: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Archive prefix risk, recorded next action and actual delivery, never a gold answer."""
+    packet = build_packet(record)
+    profile = build_step_risk_profile(packet, policy=policy)
+    selection = select_causal_candidates(profile, mandatory_event_ids=[], policy=policy)
+    audit = build_next_action_audit(packet, selection["top_k_event_ids"])
+    delivery = delivered_result(packet)
+    prose = next((event for event in packet["events"]
+                  if event["event_id"] == delivery["last_prose_event_id"]), None)
+    delivery = {**delivery, "last_prose_content": prose["content"] if prose else None}
+    encoded_delivery = json.dumps(delivery, ensure_ascii=False)
+    return [seal({
+        "schema_version": ACTION_FAILURE_SCHEMA, "packet_digest": digest(packet),
+        "policy_digest": digest(policy), "audit_digest": audit["digest"],
+        "predecessor_risk": comparison["boundary"],
+        "next_action": {key: comparison[key] for key in (
+            "next_event_id", "next_position", "action_state", "divergence_pattern", "evidence_refs")},
+        "terminal_delivery": {"excerpt": encoded_delivery[:1024],
+                              "truncated": len(encoded_delivery) > 1024,
+                              "delivery_digest": digest(delivery), "deviation_status": "unverified"},
+        "decision_authority": "none", "localization_authority": "none",
+        "evidence_state": "hypothesis",
+    }) for comparison in audit["comparisons"]]
 
 
 def build_causal_failure_record(
@@ -31,6 +103,14 @@ def build_causal_failure_record(
     def finish(reason=None):
         if reason is not None:
             result["reasons"].append(reason)
+        if record is not None and policy is not None:
+            try:
+                triplets = build_action_failure_triplets(record, policy=policy)
+            except (ValueError, KeyError, TypeError) as exc:
+                result["reasons"].append("action_triplet_unavailable:" + str(exc))
+            else:
+                if triplets:
+                    result["action_triplets"] = triplets
         return seal(result)
 
     if not mechanism_row_healthy(row):
@@ -114,4 +194,13 @@ def causal_failure_prompt_view(failure: Mapping[str, Any]) -> dict[str, Any]:
     )}
     if "risk_candidates" in failure:
         view["risk_candidates"] = failure["risk_candidates"]
+    if "action_triplets" in failure:
+        view["action_rule_conditions"] = [{
+            "risk_pattern": triplet["predecessor_risk"]["risk_pattern"],
+            "allowed_actions": triplet["predecessor_risk"]["allowed_actions"],
+            "action_state": triplet["next_action"]["action_state"],
+            "divergence_pattern": triplet["next_action"]["divergence_pattern"],
+            "terminal_deviation_status": triplet["terminal_delivery"]["deviation_status"],
+            "decision_authority": "none",
+        } for triplet in failure["action_triplets"]]
     return view

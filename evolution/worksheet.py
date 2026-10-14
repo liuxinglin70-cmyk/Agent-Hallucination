@@ -16,7 +16,10 @@ from detector.dataset import load_case
 from detector.predicate_context import judge_predicate_context
 
 from evolution.metrics import source_of, binary_metrics
-from evolution.causal_failures import build_causal_failure_record, causal_failure_prompt_view
+from evolution.causal_failures import (
+    build_causal_failure_record, causal_failure_prompt_view,
+    shared_action_rule_conditions, matching_action_normal_neighbors,
+)
 from evolution.mechanisms import (
     infer_mechanism,
     member_reading,
@@ -845,6 +848,7 @@ def diagnose_failure_families(
 
     row_by_case = {str(row.get("case") or ""): row for row in rows}
     diagnosed: list[dict[str, Any]] = []
+    normal_action_pool: list[dict[str, Any]] | None = None
     for family in families:
         item = dict(family)
         members = [
@@ -948,6 +952,23 @@ def diagnose_failure_families(
             }
             signal["shared_literals"] = _shared_literals(profiles)
         item["diagnostics"] = signal
+        patterns = shared_action_rule_conditions(item)
+        if patterns and dataset_root and causal_policy is not None:
+            if normal_action_pool is None:
+                normal_action_pool = []
+                for row in rows:
+                    if row.get("gold") is not False or row.get("prediction") is not False:
+                        continue
+                    case = str(row.get("case") or "")
+                    if not case:
+                        continue
+                    try:
+                        record, _gold = load_case(dataset_root, case)
+                    except (ValueError, OSError):
+                        continue
+                    normal_action_pool.append({**row, "record": record})
+            matching = set(matching_action_normal_neighbors(patterns, normal_action_pool, policy=causal_policy))
+            item["normal_action_neighbors"] = [row for row in normal_action_pool if row["case"] in matching][:4]
         diagnosed.append(item)
     return diagnosed
 

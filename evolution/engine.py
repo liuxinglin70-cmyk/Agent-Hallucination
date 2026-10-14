@@ -1559,6 +1559,15 @@ class EvolutionEngine:
                 skipped.append({"failure_family": family_id, "reason": reason})
                 continue
             mechanism = dict(mechanism)
+            from evolution.causal_failures import shared_action_rule_conditions
+            action_patterns = shared_action_rule_conditions(family)
+            normal_action_neighbors = list(family.get("normal_action_neighbors") or [])
+            if action_patterns:
+                mechanism["action_boundary_patterns"] = action_patterns
+                mechanism["normal_neighbors"] = list(dict.fromkeys([
+                    *(mechanism.get("normal_neighbors") or []),
+                    *(row["case"] for row in normal_action_neighbors),
+                ]))
             members = {str(case) for case in mechanism.get("member_cases") or ()}
             member_cases = [
                 str(case) for case in family.get("failure_cases") or ()
@@ -1579,6 +1588,7 @@ class EvolutionEngine:
                     or family_id.startswith("FAM-loc-")
                     else "detection"
                 ),
+                "normal_action_neighbors": normal_action_neighbors,
             })
         return targets, skipped
 
@@ -1801,6 +1811,8 @@ class EvolutionEngine:
                 target_cases=target["target_cases"],
                 neighbor_cases=target["neighbor_cases"],
                 active_entries=self.registry.entries,
+                normal_neighbors=target["normal_action_neighbors"],
+                causal_policy=self._causal_policy(),
                 target_kind=target["target_kind"],
                 gold_steps=self.gold_step_map,
                 l1_runner=lambda cases, *, candidate, plan: self.develop_rows(

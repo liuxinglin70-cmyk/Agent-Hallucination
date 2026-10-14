@@ -99,6 +99,12 @@ def run_step_tracer(
             "error backwards through tool observations/human guidance and assistant actions; distinguish "
             "first origin from later adoption and delivery. High priority does not prove materiality, "
             "claim equivalence or the earliest cause. Missing roles remain unknown."
+            " Single-next-event action audits derive legal boundaries from the prefix and compare "
+            "only the recorded t+1 event. Divergence is a tracing priority, never a verdict. "
+            "Verify that a failed action and any later success claim concern this hearing's "
+            "same task obligation; inspect retry, available fallback, permission and correction "
+            "before attributing responsibility. Follow renamed variables and wrapped copies "
+            "through their actual source values; do not stop at an intermediate duplicate."
         ) if diagnostic else (
             "\n\nCAUSAL CONTEXT: " + json.dumps(causal_context, ensure_ascii=False)
             + "\nThe certificate binds this referenced literal arithmetic result and its observed "

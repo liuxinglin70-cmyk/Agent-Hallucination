@@ -40,6 +40,7 @@ from detector.provider import ProviderError, provider_call
 from evolution.config import resolve_path
 from evolution.contracts import redact_case_ids, structured_key
 from evolution.mechanisms import mechanism_prompt_view
+from evolution.causal_failures import shared_action_rule_conditions
 
 
 @dataclass
@@ -53,6 +54,15 @@ class ProposalBatch:
 _LLM_DRAFT_SYSTEM_TEMPLATE = """\
 Return ONLY one JSON object: {"interventions": [ ... ]}.
 Do not explain your answer, use Markdown, case ids, labels, or case text.
+
+When compound_action_conditions are supplied, use BOTH the semantic risk pattern
+AND the recorded next-action divergence as the antecedent of a tracing rule.
+These are diagnostic hypotheses with no conviction authority. Such a rule may
+only use tracer.system and target_kind=localization; it must trace the already
+alleged error through actual observations and verify its propagation. Never
+use action divergence in judge, defense, conviction predicates or vote facts.
+Exclude observed recovery, legitimate retries, honest failure reports, unknown
+fallback legality and unrelated obligations. No guessed external Observation.
 
 Every intervention must use exactly ONE of these mutually exclusive schemas.
 
@@ -547,6 +557,7 @@ class LLMProposer:
                     "member_summaries": (f.get("diagnostics") or {}).get(
                         "member_summaries", []
                     ),
+                    "compound_action_conditions": shared_action_rule_conditions(f),
                 }
                 for f in families[:5]
                 if str(f.get("failure_family") or "") in family_cases
@@ -1195,8 +1206,33 @@ class HybridProposer:
                 # Without this branch a localization family produced nothing in
                 # the fallback at all, so when the LLM proposer truncated the
                 # entire localization objective fell through silently.
-                candidates.extend(self._localization_candidates(family, cycle))
+                if shared_action_rule_conditions(family):
+                    candidates.append(self._action_localization_candidate(family, cycle))
+                else:
+                    candidates.extend(self._localization_candidates(family, cycle))
         return candidates[:max_proposals]
+
+    @classmethod
+    def _action_localization_candidate(cls, family: Mapping[str, Any], cycle: int) -> dict[str, Any]:
+        return {
+            "schema_version": "detector.intervention.v1",
+            "intervention_id": f"IV-{cycle}-action_origin",
+            "type": "text_boundary", "hook": "tracer.system",
+            "trigger": {"packet_features": ["has_tool_calls"], "facts": []},
+            "body": {
+                "directive": "Only when an observed tool failure AND the recorded next event's "
+                "success claim without observed recovery concern the hearing's same required action, "
+                "prioritize tracing that action to the earliest task-grounded source. Verify actual "
+                "propagation through renamed or wrapped copies before assigning a responsibility step. "
+                "The compound signal is a tracing hypothesis, never conviction evidence.",
+                "not_when": "Do not apply after observed recovery or a legitimate retry, honest "
+                "failure report, uncertain fallback, missing next event, unrelated obligation, "
+                "corrected error or unverified terminal materiality.",
+            },
+            "claim": {"expected_behavior": "trace the same alleged deviation under both action conditions",
+                      "target_polarity": "boundary", "target_kind": "localization"},
+            "provenance": cls._base_provenance(family, cycle),
+        }
 
     @staticmethod
     def _shared_packet_features(

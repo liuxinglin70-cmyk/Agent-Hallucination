@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any, Mapping
 
 from detector.interventions import InterventionPlan, empty_plan
@@ -305,6 +306,16 @@ def run_judge(
             ),
             ballots[0],
         )
+        if not winner:
+            # Recall may be skipped only if every supporting negative is certain.
+            # Keep raw ballots intact so the ensemble remains auditable.
+            result = deepcopy(result)
+            confidence_rank = {"low": 0, "medium": 1, "high": 2}
+            result["confidence"] = min(
+                (ballot["confidence"] for ballot in ballots
+                 if ballot["is_hallucination"] is False),
+                key=confidence_rank.__getitem__,
+            )
     if topups_used:
         vote_meta["topups"] = topups_used
     sample_meta["vote"] = vote_meta

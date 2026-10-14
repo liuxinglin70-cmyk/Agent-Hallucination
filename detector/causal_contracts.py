@@ -15,7 +15,7 @@ DEPENDENCY_GRAPH_SCHEMA = "detector.dependency_graph.v2"
 CAUSAL_PROJECTION_SCHEMA = "detector.causal_projection.v1"
 SCORE_STATUSES = frozenset({"scored", "unknown", "unsupported", "truncated"})
 SIGNAL_PRIORITY = {
-    "verified_deviation": 0, "bound_field_conflict": 1,
+    "verified_deviation": 0, "bound_field_conflict": 1, "observed_tool_failure": 1,
     "external_guidance": 1, "action_precondition": 2,
     "unverified_action": 2, "unverified_observation": 2, "unsupported_claim": 3,
 }
@@ -59,6 +59,13 @@ def bound_fields(value: Any, *, limit: int = 64) -> tuple[list[dict[str, Any]], 
                     "value": item["value"], "unit": item.get("unit"), "time": item.get("time"),
                     "source_ref": item.get("source_ref"),
                 })
+                if "source_binding" in item:
+                    alias = item["source_binding"]
+                    valid = (isinstance(alias, Mapping) and set(alias) == {"entity", "attribute", "unit", "time"}
+                             and all(isinstance(alias[key], str) and alias[key].strip() for key in ("entity", "attribute"))
+                             and all(alias[key] is None or type(alias[key]) in {str, int, float}
+                                     for key in ("unit", "time")))
+                    fields[-1]["source_binding"] = [alias[key] for key in ("entity", "attribute", "unit", "time")] if valid else []
             for key, nested in sorted(item.items(), key=lambda pair: str(pair[0])):
                 if isinstance(nested, (Mapping, list)):
                     visit(nested, [*path, str(key)], depth + 1)

@@ -67,6 +67,17 @@ GROUNDING RULES:
    not erase an independently established missing required action or wrong
    action order. Ground that breach in the task and observed capabilities;
    do not invent a prerequisite from an unavailable tool specification.
+   ACTION RESPONSIBILITY: distinguish a failed authorized attempt from an
+   avoidable omission. A failure-report exemption applies to an honest,
+   genuinely blocked attempt; it does not cover an observed necessary,
+   feasible and already-authorized recovery that was skipped, or a separate
+   core deliverable that remained possible but was never provided. Identify
+   the unfulfilled obligation, the failure, the available recovery and its
+   authorization before alleging that omission. Do not require retries that
+   cannot work, unavailable fallback tools or actions needing new permission.
+   An earlier query of state is not an answer to a later request after that
+   state changed. Do not promote an agent's own plans, subagent instructions
+   or verification preferences into additional user-required deliverables.
 5. Distinguish the requested entity or value from its representation.
    Quotation marks around a name do not by themselves require byte-for-byte
    serialization. Conventional notation that preserves the same referent
@@ -74,6 +85,17 @@ GROUNDING RULES:
    the literal output, format or tool argument; do not infer that constraint
    merely from quotation marks. A genuinely different entity, numeric value,
    destination or explicitly fixed string remains a material deviation.
+   Explicit field assignment (for example 'set field to' or 'put description
+   as' followed by its supplied value) fixes that whole field unless the task
+   permits additions; 'should be like' is an approximate template. Harmless
+   punctuation or currency notation may preserve a semantic value, but an
+   explicitly closed literal field cannot be silently extended or shortened.
+   A spelling variant is harmless only when the same identity is established;
+   neither equal context nor string distance alone proves entity equivalence.
+   Missing units remain unknown. Do not infer a source unit from a tool name
+   or prove a conversion wrong merely because two numeric arguments differ.
+   A partial viewport or excerpt cannot prove that omitted page content is
+   absent. Missing corroboration alone does not prove a delivered fact false.
 6. CONFLICTED OBSERVATIONS. When the trajectory's own tool observations give
    different values for the same point, that point is not settled by the
    record. A delivered result that agrees with one of those observations is
@@ -83,6 +105,9 @@ GROUNDING RULES:
    instead of material. This restricts only conflicted records: a public
    fact that no observation addresses, or that every observation agrees on,
    is still checked against real-world knowledge.
+   Distinguish certain public knowledge from uncertain recollection. Without
+   applicable evidence, an uncertain alternative is unestablished; never
+   describe a model's memory as an observed source or an external snapshot.
 """
 
 EVIDENCE_LAW = """\

@@ -88,7 +88,7 @@ def build_observed_dependencies(packet: Mapping[str, Any], *, policy: Mapping[st
                 continue
             sources = fields_by_ref.get(source_ref, ()) if isinstance(source_ref, str) else ()
             matches = [(node, "declared_field_consumption", source) for node, source in sources
-                       if field_binding(source) == field_binding(field)
+                       if field_binding(source) == tuple(field.get("source_binding", field_binding(field)))
                        and source["value"] == field["value"]]
             literal = literal_sources.get(source_ref) if isinstance(source_ref, str) else None
             # A scalar has no unit or time binding; a declaration cannot supply either as evidence.
@@ -108,6 +108,7 @@ def build_observed_dependencies(packet: Mapping[str, Any], *, policy: Mapping[st
                 "binding": list(field_binding(field)), "value": field["value"],
                 "source_path": source_field["path"] if source_field is not None else None,
                 "target_path": field["path"],
+                **({"source_binding": field["source_binding"]} if "source_binding" in field else {}),
             })
     return seal({
         "schema_version": DEPENDENCY_GRAPH_SCHEMA, "packet_digest": digest(packet),
@@ -161,7 +162,7 @@ def build_observed_claim_lineage(
                 return None
         elif (edge["relation"] != "declared_field_consumption"
               or tuple(field["source_path"]) != state[1]
-              or digest(field["binding"]) != state[2]):
+              or digest(field.get("source_binding", field["binding"])) != state[2]):
             return None
         return (edge["target"], tuple(field["target_path"]), digest(field["binding"]))
 

@@ -43,6 +43,7 @@ from detector.api import Detector
 from detector.config import load_config
 from detector.dataset import load_case
 from detector.identity import build_execution_identity, digest, source_identity
+from detector.trajectory_budget import REQUEST_BUDGET_DEFAULTS
 from detector.interventions import load_intervention_registry, authority_identity
 from detector.packet import build_packet
 from detector.measurement import (
@@ -145,6 +146,13 @@ def detect_with_transport_retry(
     completed: list[dict[str, Any]] = []
     started = time.perf_counter()
     started_at = utc_now()
+    request_budget_policy = {
+        name: {key: route.get(key, REQUEST_BUDGET_DEFAULTS.get(key)) for key in (
+            "max_tokens", "max_output_tokens_per_request", "long_input_threshold_characters",
+            "long_output_tokens_per_request")}
+        for name, route in (detector.config or {}).items()
+        if name.endswith("_route") and isinstance(route, Mapping)
+    }
     # All attempts consume the same case deadline.
     with case_deadline_ctx(
         (detector.config or {}).get("case_timeout_seconds")
@@ -186,6 +194,7 @@ def detect_with_transport_retry(
         completed, started_at=started_at, finished_at=utc_now(),
         elapsed_seconds=time.perf_counter() - started,
     )
+    result.setdefault("provenance", {})["request_budget_policy"] = request_budget_policy
     return result
 
 

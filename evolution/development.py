@@ -44,6 +44,7 @@ from evolution.metrics import PairedCoverageError, paired_delta, row_responsible
 from evolution.mechanisms import repair_requirements
 from evolution.metamorphic import admission_error
 from evolution.route_failures import route_of
+from evolution.causal_failures import matching_action_normal_neighbors
 
 DEVELOPMENT_SCHEMA = "evolution.candidate_development.v1"
 
@@ -174,6 +175,9 @@ def check_l0(
     target_kind: str = "detection",
     target_cases: Sequence[str] = (),
     gold_steps: Mapping[str, Any] | None = None,
+    causal_policy: Mapping[str, Any] | None = None,
+    require_action_neighbors: int = 2,
+    replay_neighbor_cases: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Deterministic pre-flight: everything checkable without a model call.
 
@@ -186,6 +190,21 @@ def check_l0(
 
     def record(name: str, passed: bool, detail: str = "") -> None:
         checks.append({"check": name, "passed": bool(passed), "detail": detail})
+
+    patterns = mechanism.get("action_boundary_patterns") or []
+    if patterns:
+        eligible: list[str] = []
+        error = "causal policy missing"
+        if causal_policy is not None:
+            try:
+                eligible = matching_action_normal_neighbors(patterns, normal_neighbors, policy=causal_policy)
+                if replay_neighbor_cases is not None:
+                    eligible = [case for case in eligible if case in replay_neighbor_cases]
+                error = ""
+            except (ValueError, KeyError, TypeError) as exc:
+                error = str(exc)
+        record("action_normal_neighbor_coverage", not error and len(eligible) >= max(1, require_action_neighbors),
+               error or f"{len(eligible)} matching compliant normal neighbors; required {max(1, require_action_neighbors)}")
 
     # 1. Schema and executor validity, including the executable bounds a
     #    registry entry needs. Any exception is recorded rather than raised: a
@@ -619,6 +638,7 @@ class CandidateDeveloper:
         gold_steps: Mapping[str, Any] | None = None,
         l1_runner: Callable[..., Sequence[Mapping[str, Any]]] | None = None,
         predicate_runner: Callable[[Mapping[str, Any], Mapping[str, Any]], str] | None = None,
+        causal_policy: Mapping[str, Any] | None = None,
     ) -> None:
         self.output_dir = Path(output_dir)
         self.budget = budget
@@ -635,6 +655,7 @@ class CandidateDeveloper:
         self.gold_steps = dict(gold_steps or {})
         self.l1_runner = l1_runner
         self.predicate_runner = predicate_runner
+        self.causal_policy = copy.deepcopy(causal_policy)
         self.graph = CandidateVersionGraph(self.output_dir)
         self.graph.load_existing()
 
@@ -783,6 +804,9 @@ class CandidateDeveloper:
                 target_kind=self.target_kind,
                 target_cases=self.target_cases,
                 gold_steps=self.gold_steps,
+                causal_policy=self.causal_policy,
+                require_action_neighbors=self.budget.require_normal_neighbors,
+                replay_neighbor_cases=self.neighbor_cases,
             )
             l1: dict[str, Any] | None = None
             status = "failed_l0"

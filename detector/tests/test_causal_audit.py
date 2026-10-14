@@ -36,7 +36,7 @@ def inputs(cfg=None):
     graph = build_observed_dependencies(p, policy=cfg)
     projection = project_dependency_closure(p, candidates=candidates, graph=graph, policy=cfg)
     return {"packet": p, "profile": profile, "projection": projection,
-            "config": {**CONFIG, "causal_audit": cfg}}
+            "config": {**deepcopy(CONFIG), "causal_audit": cfg}}
 
 
 def fake_hypotheses(**kwargs):
@@ -129,6 +129,24 @@ def test_budget_refuses_request_before_provider(monkeypatch, limits, resource):
     audit, health = run_causal_audit(**inputs(cfg), budget=AddedBudget(cfg))
     assert health == {"state": "budget_exhausted", "warnings": [resource]}
     assert audit["cost"]["provider_attempts"] == 0
+
+
+@pytest.mark.parametrize("available,route_limit,expected", [(2000, 13, 13), (5, 13, 5), (2000, None, 1500)])
+def test_audit_request_cap_and_case_output_quota_have_distinct_owners(monkeypatch, available, route_limit, expected):
+    cfg = policy(counterfactual_mode="model_hypothesis", max_added_output_tokens_per_case=available)
+    data = inputs(cfg)
+    if route_limit is not None:
+        data["config"]["judge_route"]["max_tokens"] = route_limit
+    dispatched = []
+    def transport(**kwargs):
+        dispatched.append(kwargs["route"]["max_tokens"])
+        return {"candidates": []}, {}
+    monkeypatch.setattr("detector.provider._provider_call", transport)
+    budget = AddedBudget(cfg)
+    _, health = run_causal_audit(**data, budget=budget)
+    assert health["state"] == "ok"
+    assert dispatched == [expected]
+    assert budget.snapshot()["reserved_output_tokens"] == expected
 
 
 def test_nested_budget_and_hearings_share_admissions():

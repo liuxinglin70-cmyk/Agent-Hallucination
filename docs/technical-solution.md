@@ -47,6 +47,12 @@ flowchart TD
 
 `dataset.py` 分离任务输入和标签；`packet.py` 建立事件 ID、位置、工具观察、交付物及答案锚点。gold 只用于评估，不能参与判断或责任步骤映射。`semantics.py` 是各模型阶段共享的判错与定位规则。
 
+Judge 多票阴性结果的 confidence 取所有支持阴性票的最低值，原始 ballots 保持不变；多数裁决、quorum、分票和弃权逻辑不变。只有完整且全部 high 的一致阴性可以跳过常规 Recall，弱置信票不再因代表票顺序被隐藏。
+
+`next_action.py` 从截至 t 的前缀生成明确工具失败后的只读动作边界，并比较真实 t+1；不调用 provider，不生成工具 Observation，不在缺失下一步时补造动作。明确重试或诚实失败报告可成为合规邻居，不同工具的潜在 fallback 仍为 unknown；没有明确恢复观察却宣称成功构成诊断偏离。所有结果保持 hypothesis、decision_authority=none、localization_authority=none。失败信号进入静态风险排序，Top K 候选的 action audit 仅随绑定 risk context 传入 Tracer；Judge/Defense/裁决不消费它。
+
+`evolution.causal_failures.build_action_failure_triplets` 将前序风险、真实下一步动作及实际终端交付归档为密封 `evolution.action_failure_triplet.v1`。终端摘录最多1024字符，并保留完整delivery digest与截断状态；启发式偏离不宣称终端错误已成立。`build_causal_failure_record` 在记录与policy可用时自动附加三元组，包括无阳性hearing的漏检；prompt视图只保留抽象risk_pattern/action_state/divergence_pattern和允许动作，不携带案例、步号或交付答案。正常邻居强制保护及复合起草器已接入：多个成员共享风险AND下一步偏离时，只起草Tracer定位模板；L0要求至少两个匹配且将回放的健康合规正常邻居，L1禁止收益抵消邻居退化。当前离线与真实验收状态见实施台账及detector-deep-optimization-20261013.md。
+
 可定罪对象包括结果错误、任务固定的交付动作/参数/次序/渠道违约、虚假完成、伪造归因与伪造验证。合法探索和未改变交付物的风格偏差不构成幻觉。观测冲突时，不得用模型世界知识挑边定罪，需要适用的独立证据快照裁决。诚实报告过程失败不自动等于结果性幻觉，例如 BFCL/041 与数据集标签有已知口径分歧。不得为通过预检改标签、种子或门限。
 
 责任步骤是最早引入实质错误的 assistant 内容或动作。提交工具调用首次引入错误时可以是根因，仅重复已有错误时应追溯早先步骤；工具观察不是 assistant 本身的幻觉。内容步和动作步都可命中，但指标必须分列，不能将动作步命中解释为语义根因追踪成功。

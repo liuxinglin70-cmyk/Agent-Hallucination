@@ -12,6 +12,7 @@ from detector.causal_contracts import (
 from detector.identity import artifact_digest, digest
 from detector.packet import step_kind, validate_packet
 from detector.predicates import run_predicate
+from detector.next_action import observation_failed, scan_static_action_risks
 
 
 def build_step_risk_profile(
@@ -35,6 +36,12 @@ def build_step_risk_profile(
             truncated |= len(interactions) > 32
             for interaction in interactions[:32]:
                 iid = interaction["interaction_id"]
+                if observation_failed(interaction.get("observation")):
+                    signals.append({
+                        "signal": "observed_tool_failure", "producer": "observed_failure.v1",
+                        "verification_status": "hypothesis", "evidence_refs": [iid],
+                        "responsibility": "unassigned",
+                    })
                 check = arithmetic_check(interaction)
                 if check and check["status"] == "deviation":
                     signals.append({
@@ -102,11 +109,23 @@ def build_step_risk_profile(
             if policy.get("scorer_artifact") is not None else None,
         }), "context_digest": digest(context), "snapshot_digest": digest(snapshot),
         "by_event": rows, "task_signals": task_signals, "omitted_event_ids": omitted,
+        "static_action_scan": scan_static_action_risks(packet, top_k=policy["top_k"]),
         "health": {"state": "unsupported" if unsupported else "truncated" if omitted or any(
             row["score_status"] == "truncated" for row in rows) else "ok",
             "reason": "teacher_forced_backend_unavailable" if unsupported else None},
         "cost": {"provider_requests": 0, "input_budget_unit": "characters"},
     })
+
+
+def risk_candidate_rows(profile: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    """Combine bounded semantic rows with full-trajectory explicit failure anchors."""
+    rows = {row["event_id"]: row for row in profile["by_event"]}
+    if profile["health"]["state"] != "unsupported":
+        for row in (profile.get("static_action_scan") or {}).get("candidate_rows") or []:
+            existing = rows.get(row["event_id"])
+            if existing is None or existing["priority"] is None:
+                rows[row["event_id"]] = row
+    return rows
 
 
 def select_causal_candidates(
@@ -127,7 +146,8 @@ def select_causal_candidates(
     if isinstance(mandatory_event_ids, str) or any(not isinstance(eid, str) for eid in mandatory_event_ids):
         raise ValueError("mandatory event ids must be strings")
     mandatory = list(dict.fromkeys(mandatory_event_ids))
-    ranked = sorted((row for row in profile["by_event"]
+    selection_rows = risk_candidate_rows(profile)
+    ranked = sorted((row for row in selection_rows.values()
                      if row["score_status"] in {"scored", "truncated"} and row["risk_signals"]),
                     key=lambda row: (row["priority"], -sum(
                         signal["verification_status"] == "verified" for signal in row["risk_signals"]),
@@ -137,7 +157,7 @@ def select_causal_candidates(
     capacity = policy["max_projection_events"]
     omitted = selected[capacity:]
     selected = selected[:capacity]
-    known = {row["event_id"] for row in profile["by_event"]}
+    known = set(selection_rows)
     unresolved = [eid for eid in mandatory if eid not in known]
     return seal({
         "schema_version": "detector.causal_candidates.v1", "profile_digest": profile["digest"],

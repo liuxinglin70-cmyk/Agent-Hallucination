@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from detector.env import load_local_env
+from detector.trajectory_budget import REQUEST_BUDGET_DEFAULTS
 
 CONFIG_SCHEMA = "detector.config.v1"
 ROUTE_NAMES = ("judge", "defense", "recall")
@@ -54,6 +55,7 @@ _PROVIDER_DEFAULTS: dict[str, Any] = {
     "total_timeout_seconds": 480,
     "transport_retries": 2,
     "timeout_growth_factor": 1.5,
+    **REQUEST_BUDGET_DEFAULTS,
     "context_cache": {
         "enabled": True,
         "mode": "automatic",
@@ -63,6 +65,8 @@ _PROVIDER_DEFAULTS: dict[str, Any] = {
 _INTEGER_MINIMUMS = {
     "max_tokens": 1, "timeout_seconds": 1, "total_timeout_seconds": 1,
     "transport_retries": 0, "votes": 1, "vote_topup": 0, "vote_concurrency": 1,
+    "max_output_tokens_per_request": 1, "long_input_threshold_characters": 1,
+    "long_output_tokens_per_request": 1,
 }
 _ROUTE_FIELDS = frozenset(_PROVIDER_DEFAULTS) | frozenset(_INTEGER_MINIMUMS) | {
     "json_mode", "extra_body",
@@ -132,6 +136,8 @@ def _validate_route(route: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"detector route {key} must be a non-empty string")
         resolved[key] = resolved[key].strip()
     for key, minimum in _INTEGER_MINIMUMS.items():
+        if key in REQUEST_BUDGET_DEFAULTS and resolved.get(key) is None:
+            raise ValueError(f"{key} must be a positive integer")
         if key in resolved and resolved[key] is not None:
             resolved[key] = _integer(resolved[key], key, minimum)
     resolved["temperature"] = _number(resolved["temperature"], "temperature", 0, 2)
@@ -197,6 +203,10 @@ def resolve_route(
         raise ValueError(f"unknown detector route: {name}")
     provider_block = _object(provider_block if provider_block is not None else {}, "provider", _ROUTE_FIELDS)
     route_block = _object(route_block if route_block is not None else {}, f"{name}_route", _ROUTE_FIELDS)
+    for block in (provider_block, route_block):
+        for key in REQUEST_BUDGET_DEFAULTS:
+            if key in block and block[key] is None:
+                raise ValueError(f"{key} must be a positive integer")
     merged = deepcopy(_PROVIDER_DEFAULTS)
     if provider_block:
         merged.update({

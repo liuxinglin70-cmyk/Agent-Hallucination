@@ -5,7 +5,9 @@ from typing import Any, Mapping
 from detector.causal_contracts import seal, validate_seal
 from detector.identity import digest
 from detector.packet import packet_reference_error
-from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates
+from detector.next_action import build_next_action_audit
+from detector.code_lineage import build_code_lineage, code_ancestor_events
+from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates, risk_candidate_rows
 
 
 RISK_CONTEXT_SCHEMA = "detector.risk_context.v1"
@@ -37,11 +39,17 @@ def build_risk_context(
     selection = select_causal_candidates(profile, mandatory_event_ids=mandatory, policy=policy)
     if selection["unresolved_event_ids"]:
         return None
-    risk = {r["event_id"]: r for r in profile["by_event"]}
+    code_lineage = build_code_lineage(packet, max_edges=policy["max_graph_edges"])
+    ancestors = code_ancestor_events(code_lineage, mandatory[0])
+    selected = list(dict.fromkeys([*selection["selected_event_ids"], *ancestors[:policy["top_k"]]]))
+    selected = selected[:policy["max_projection_events"]]
+    risk = risk_candidate_rows(profile)
     needles = [positive.get(key) for key in ("quote", "delivered_result")
                if isinstance(positive.get(key), str)]
     candidates = []
-    for eid in selection["selected_event_ids"]:
+    for eid in selected:
+        if eid not in risk:
+            continue
         event = events[eid]
         channels = []
         if event.get("content") not in (None, ""):
@@ -60,11 +68,19 @@ def build_risk_context(
                                        for s in risk[eid]["risk_signals"][:8]],
                            "channels": channels,
                            "excerpted": True})
+        action_audit = build_next_action_audit(packet, [eid])
+        if action_audit["comparisons"]:
+            candidates[-1]["next_action_audit"] = action_audit
     payload = {"schema_version": RISK_CONTEXT_SCHEMA, "packet_digest": digest(packet),
                "policy_digest": digest(policy), "target_digest": digest(positive),
                "scope": "diagnostic_event_priority", "claim_equivalence": "unestablished",
                "decision_authority": "none", "localization_authority": "none",
                "score_source": "semantic_proxy", "profile_health": profile["health"],
+               "code_lineage": {key: code_lineage[key] for key in (
+                   "schema_version", "digest", "scope", "execution_state", "decision_authority", "localization_authority",
+                   "omitted_interaction_ids")},
+               "code_consumption_hints": [edge for edge in code_lineage["edges"]
+                                          if edge["target_event_id"] in {*ancestors, mandatory[0]}][:8],
                "candidates": candidates, "omitted_event_ids": list(dict.fromkeys([
                    *profile["omitted_event_ids"], *selection["omitted_event_ids"],
                ]))}

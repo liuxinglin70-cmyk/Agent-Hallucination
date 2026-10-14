@@ -25,6 +25,8 @@ from typing import Any, Mapping
 from urllib import error as urlerror
 from urllib import request as urlrequest
 from contextlib import nullcontext
+from dataclasses import asdict
+from detector.trajectory_budget import bound_request_route
 from detector.runtime import (
     CaseDeadlineExceeded, CaseExecutionError, check_request_deadline, current_added_request_budget,
     current_added_budget, current_control, current_deadline, deadline_scope, observe_request, record_request, request_deadline,
@@ -267,6 +269,8 @@ def provider_call(
     *, route: Mapping[str, Any], system: str, user: str,
     purpose: str, cache_tag: str = "",
 ) -> tuple[Any, dict[str, Any]]:
+    added_output_tokens = int(route.get("max_tokens") or 1500)
+    route, request_budget = bound_request_route(route, system=system, user=user)
     control = current_control()
     try:
         if control is not None:
@@ -275,7 +279,7 @@ def provider_call(
         budget = current_added_request_budget()
         if budget is not None:
             route = {**route, "transport_retries": 0, "max_tokens": budget.reserve(
-                system=system, user=user, output_tokens=int(route.get("max_tokens") or 1500),
+                system=system, user=user, output_tokens=min(added_output_tokens, route["max_tokens"]),
                 extra_input=route.get("extra_body"),
             )}
         case_budget = current_added_budget()
@@ -283,7 +287,9 @@ def provider_call(
             result = _provider_call(route=route, system=system, user=user,
                                     purpose=purpose, cache_tag=cache_tag)
         check_request_deadline()
-        return result
+        parsed, meta = result
+        return parsed, {**meta, "request_budget": {**asdict(request_budget),
+                                                  "output_token_limit": route["max_tokens"]}}
     except CaseDeadlineExceeded as exc:
         raise ProviderError(
             str(route.get("_route_name") or purpose), str(exc),

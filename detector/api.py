@@ -59,6 +59,8 @@ def _judge_negative_needs_recall(
     requested = max(
         1, int((config.get("judge_route") or {}).get("votes", 1) or 1),
     )
+    if (judge_result.get("view_meta") or {}).get("degraded"):
+        return True
     if requested == 1:
         return True
     parsed = judge_result.get("parsed") or {}

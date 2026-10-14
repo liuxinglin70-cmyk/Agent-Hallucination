@@ -8,6 +8,7 @@ never enter or persist in a detector input.
 from __future__ import annotations
 
 import ast
+import re
 from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
@@ -688,14 +689,72 @@ def render_index_tail_view(
     return "\n".join(lines), meta
 
 
-def render_judge_view(packet: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
-    """Judge view: full fidelity, degrading to index+tail beyond budget."""
+def _sparse_excerpt(value: Any, limit: int) -> tuple[str, bool]:
+    text = str(value) if value is not None else ""
+    if len(text) <= limit:
+        return text, False
+    if limit < 96:
+        return text[:max(0, limit - 20)] + " [excerpt omitted]", True
+    width = max(12, (limit - 80) // 4)
+    starts = {0, max(0, len(text) - width)}
+    for match in re.finditer(r"(?im)\b(?:error|exception|traceback|failed|source_ref|result|answer)\b", text):
+        starts.add(max(0, match.start() - width // 3))
+        if len(starts) >= 4:
+            break
+    pieces = [text[start:start + width] for start in sorted(starts)]
+    return "\n[excerpt gap]\n".join(pieces), True
+
+
+def render_sparse_view(packet: Mapping[str, Any], *, max_characters: int = 48000) -> tuple[str, dict[str, Any]]:
+    """Chronological channel excerpts retain coordinates and disclose every omission."""
+    if isinstance(max_characters, bool) or not isinstance(max_characters, int) or max_characters < 1024:
+        raise ValueError("sparse view budget must be an integer >=1024")
+    events = list(packet["events"])
+    question, task_clipped = _sparse_excerpt(packet["question"], max_characters // 3)
+    lines = ["SPARSE TRAJECTORY: excerpts are incomplete; gaps are not evidence of absence.",
+             "QUESTION: " + question]
+    meta = _view_meta()
+    meta.update(degraded=True, projection_kind="sparse_channels", task_truncated=task_clipped,
+                packet_digest=digest(packet), omitted_event_ids=[], max_characters=max_characters)
+    remaining = max_characters - len("\n".join(lines))
+    channel_count = sum(1 + 2 * len(event["tool_interactions"]) for event in events)
+    cap = max(32, (remaining - 160 * channel_count) // max(1, channel_count))
+    for event in events:
+        chunks = [f"EVENT {event['event_id']} (position={event['position']}, role={event.get('role') or '?'})"]
+        clipped = False
+        content, cut = _sparse_excerpt(event.get("content"), cap)
+        clipped |= cut
+        if content:
+            chunks.append(content)
+        for item in event["tool_interactions"]:
+            arguments, args_cut = _sparse_excerpt(item.get("arguments"), cap)
+            observation, obs_cut = _sparse_excerpt(item.get("observation"), cap)
+            clipped |= args_cut or obs_cut
+            chunks.append(f"TOOL {item['interaction_id']} name={item['tool_name']} "
+                          f"arguments={arguments}\nobservation={observation}")
+        chunk = "\n".join(chunks)
+        if len(chunk) + 1 > remaining:
+            meta["omitted_event_ids"].extend(e["event_id"] for e in events if e["position"] >= event["position"])
+            meta["packet_truncated"] = True
+            break
+        lines.append(chunk)
+        remaining -= len(chunk) + 1
+        meta["rendered_event_ids"].append(event["event_id"])
+        if clipped:
+            meta["truncated_event_ids"].append(event["event_id"])
+    meta["packet_truncated"] |= task_clipped or bool(meta["truncated_event_ids"])
+    text = "\n".join(lines)
+    meta["rendered_characters"] = len(text)
+    return text, meta
+
+
+def render_judge_view(packet: Mapping[str, Any], *, max_characters: int = 48000) -> tuple[str, dict[str, Any]]:
+    """Use complete short trajectories and bounded sparse projections for long inputs."""
     text, meta = render_full_view(packet)
-    if not meta["packet_truncated"]:
+    if not meta["packet_truncated"] and not meta["truncated_event_ids"] and len(text) <= max_characters and len(packet["question"]) <= 4000:
         meta["degraded"] = False
         return text, meta
-    degraded_text, degraded_meta = render_index_tail_view(packet)
-    degraded_meta["degraded"] = True
+    degraded_text, degraded_meta = render_sparse_view(packet, max_characters=max_characters)
     degraded_meta["full_render_chars"] = len(text)
     return degraded_text, degraded_meta
 
