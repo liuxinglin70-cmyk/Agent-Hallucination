@@ -1,0 +1,10 @@
+{
+  "transport_calls": 1,
+  "observed_events": [
+    "request_queued",
+    "request_started"
+  ],
+  "execution_requests": [],
+  "expected": "已dispatch的新增预算终止也应记录request_finished，usage未知，不触发重试；当前缺失，待冻结实验结束后修复provider异常记录。",
+  "live_provider_called": false
+}

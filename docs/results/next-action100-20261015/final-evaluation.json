@@ -1,0 +1,2539 @@
+{
+  "schema_version": "research.authority_recovery_evaluation.v1",
+  "run_id": "next_action100_quote_fixed_merged",
+  "metrics": {
+    "decisive": 100,
+    "unresolved": 0,
+    "completion": 1.0,
+    "decisive_accuracy": 0.76,
+    "all_case_accuracy": 0.76,
+    "tp": 42,
+    "fp": 4,
+    "fn": 20,
+    "tn": 34,
+    "positive_precision": 0.9130434782608695,
+    "positive_recall": 0.6774193548387096,
+    "positive_f1": 0.7777777777777777,
+    "macro_precision": 0.7713365539452496,
+    "macro_recall": 0.7860780984719864,
+    "macro_f1": 0.7584541062801933,
+    "authoritative": 100,
+    "requested_cases": 100,
+    "step_localization": {
+      "n": 62,
+      "hits": 27,
+      "accuracy": 0.43548387096774194
+    }
+  },
+  "rows": [
+    {
+      "case": "Magentic_One/061.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 43,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/023.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/085.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 5,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 5,
+        "position": 5,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/115.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 8,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 8,
+        "position": 8,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/087.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 12,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 12,
+        "position": 12,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/031.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/129.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/022.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 7,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/030.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 12,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 12,
+        "position": 12,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 12,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/155.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 6,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 6,
+        "position": 6,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 9,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/058.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/011.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/012.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/040.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/078.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/001.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/065.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/011.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/077.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/027.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/114.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 7,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/072.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/090.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/091.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/022.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/042.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/021.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/020.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/118.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 5,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 5,
+        "position": 5,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/010.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/028.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/043.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/060.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 9,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/055.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/025.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 6,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 6,
+        "position": 6,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/043.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/071.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/066.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/071.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/056.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/055.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/102.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/065.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/088.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/027.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/043.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/074.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/073.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/022.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/043.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/097.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/047.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 6,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/088.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/076.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/083.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/052.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/064.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/040.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/086.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/000.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/023.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/016.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/034.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/037.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/095.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/122.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/055.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/021.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 9,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 9,
+        "position": 9,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 9,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/016.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/032.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/072.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/037.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/090.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/051.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/011.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/055.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/085.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/024.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 6,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 6,
+        "position": 6,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/007.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/031.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 8,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 8,
+        "position": 8,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/071.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/150.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/062.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/014.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/048.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/068.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/144.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/036.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/006.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/125.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/076.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/024.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 6,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/068.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/031.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/087.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/090.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/084.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/130.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 7,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 7,
+        "position": 7,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 10,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/127.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/012.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 18,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 18,
+        "position": 18,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 24,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    }
+  ],
+  "adopted_recovery_cases": [
+    "OpenDeepSearch/043.json",
+    "Magentic_One/060.json",
+    "BFCL/052.json",
+    "Magentic_One/031.json"
+  ],
+  "provenance": [
+    {
+      "case": "Magentic_One/061.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Magentic_One__061.json\\result.json",
+      "sha256": "1dcceaee5023cdb81ed0715932e3fd96d0a4b84ce39d54385f2b5ac655da46a9"
+    },
+    {
+      "case": "OpenDeepSearch/023.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__023.json\\result.json",
+      "sha256": "688de1e6eb848da6d9e9139ec1b98825364b3768379e0b51da092b959f5745d0"
+    },
+    {
+      "case": "BFCL/085.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__085.json\\result.json",
+      "sha256": "c982160338e1c3256352fec9f40f0afe95e30c2ac13eefd2cf3400585cba383c"
+    },
+    {
+      "case": "BFCL/115.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__115.json\\result.json",
+      "sha256": "d9203dd0b3f351a5fcad0c857384fa7551b2a5342161c0d2c00d60aaac0bebb8"
+    },
+    {
+      "case": "BFCL/087.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__087.json\\result.json",
+      "sha256": "e234738cf2662a1eaf70907d72efccdb1ca1a545097c6ddd56289f609599d2c0"
+    },
+    {
+      "case": "BFCL/031.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__031.json\\result.json",
+      "sha256": "aa89f6d5eb4471156e519701a95a1e6343c62620cbfbe3763598db6b4cf38c5b"
+    },
+    {
+      "case": "BFCL/129.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__129.json\\result.json",
+      "sha256": "99e2a374ea331142186a711d118d50553d355346f35f566bc77a2b1d25de7450"
+    },
+    {
+      "case": "Camel/022.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__022.json\\result.json",
+      "sha256": "79a9be0f2a55873aff594ad67b41d673f5b8003c39d946d6e1b164145e1fdff6"
+    },
+    {
+      "case": "BFCL/030.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__030.json\\result.json",
+      "sha256": "3034124a99c4d17d7974e80fb8b0d12249600d4d85cc36908eac3a198af468ac"
+    },
+    {
+      "case": "BFCL/155.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__155.json\\result.json",
+      "sha256": "5522ec83f71293363ab7189cae4a2584e9a4cc1e477673e9f27e9573e63e1177"
+    },
+    {
+      "case": "OpenDeepSearch/058.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__058.json\\result.json",
+      "sha256": "c7fd049c167175b282afd7ebe165acf46b58b4312d7fcc892d119f32076c8a4c"
+    },
+    {
+      "case": "SmolAgents/011.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__011.json\\result.json",
+      "sha256": "f4cefc5f66a6b9e8845283c602857d7d5fc99016e597876227a937d5cb4a5d28"
+    },
+    {
+      "case": "OpenManus/012.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__012.json\\result.json",
+      "sha256": "88c221fc4ea4dd0310d836b8001464f7bb83d61be4492c0cdd8b2a5c86460c0e"
+    },
+    {
+      "case": "OpenManus/040.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__040.json\\result.json",
+      "sha256": "9fb5a515de09a086aa06acd14acd42ef710ca0ae165703b6fab734b56cbf5956"
+    },
+    {
+      "case": "Magentic_One/078.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Magentic_One__078.json\\result.json",
+      "sha256": "54a9dcf3ddcd5113450a82065baa2be2cff237dd83d2b4ff87109a5635e6dce6"
+    },
+    {
+      "case": "Camel/001.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__001.json\\result.json",
+      "sha256": "72c767104d9b9c16e1a8af2963816509d57e4b88abdd9b35af79f14cb94b0aa8"
+    },
+    {
+      "case": "Magentic_One/065.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Magentic_One__065.json\\result.json",
+      "sha256": "8ed1bb274b446a494ea1d55b7d0499c1ce942db878bedc23a771c32bed1c199c"
+    },
+    {
+      "case": "OpenDeepSearch/011.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__011.json\\result.json",
+      "sha256": "0c9815d7bb390cc1320c8f3ec8b54ffc4431207ac151ad12357f0fec6191ee62"
+    },
+    {
+      "case": "Camel/077.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__077.json\\result.json",
+      "sha256": "8d6a80942d7d8648feb2d5337e513e8bc0e71b42bdcc73955f9a76203341401d"
+    },
+    {
+      "case": "OpenDeepSearch/027.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__027.json\\result.json",
+      "sha256": "a245ed40847ec22fa2352355807a8a0966dfcffd1809b58a6dfb58c5605aaa67"
+    },
+    {
+      "case": "BFCL/114.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__114.json\\result.json",
+      "sha256": "4f89b53ab9885625e157947a61e9e9eab9900954b60cc21a100fca5a9073108c"
+    },
+    {
+      "case": "BFCL/072.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__072.json\\result.json",
+      "sha256": "1cc394c923a7ae998dfaa7d1ce80f7c5433fa3ae40710ac4d73bb31cd5e99241"
+    },
+    {
+      "case": "SmolAgents/090.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__090.json\\result.json",
+      "sha256": "864ea94d679ee10c98603ba8b6d20b7d8e1e540d5c8dfe9de2ed3db531e8f287"
+    },
+    {
+      "case": "Magentic_One/091.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Magentic_One__091.json\\result.json",
+      "sha256": "61093f337e96265df7b2286a963134bb005b0cd27cd852fdbcf2fdb25ce703a6"
+    },
+    {
+      "case": "SmolAgents/022.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__022.json\\result.json",
+      "sha256": "8f4732ba675639562243f3475296bc1bb64bc00bb349c0c2fc8b1d70bef82bc5"
+    },
+    {
+      "case": "OpenDeepSearch/042.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__042.json\\result.json",
+      "sha256": "83ea96c7e29e2fcfa6c174f31cff2b4d330ebb285c7cbe87978b342b4af236b2"
+    },
+    {
+      "case": "Camel/021.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__021.json\\result.json",
+      "sha256": "3f50e7da37560d938aaef034cb2ca2ee5a0d94a073e3bf8633fe491eaa8912a6"
+    },
+    {
+      "case": "Octotools/020.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Octotools__020.json\\result.json",
+      "sha256": "aa24685f203240f07594b218faa8ef6b972c5b3960d901fd4e5055c809716919"
+    },
+    {
+      "case": "BFCL/118.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__118.json\\result.json",
+      "sha256": "4b7f0aa15a396a3aa5515e98efecc7791dbf36897aebb56e722b956d7ba39a49"
+    },
+    {
+      "case": "Camel/010.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__010.json\\result.json",
+      "sha256": "e7303c8f97c43e75e95e4648eb995ac8db7093ee286d30deea5c9249fe7f7692"
+    },
+    {
+      "case": "Octotools/028.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Octotools__028.json\\result.json",
+      "sha256": "bcdd12fe0e43031a14ee077fd3d7625788cadcc022a989d1d78fb3e8863104b4"
+    },
+    {
+      "case": "OpenDeepSearch/043.json",
+      "run": "next_action100_quote_fixed_recovery",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed_recovery\\cases\\OpenDeepSearch__043.json\\result.json",
+      "sha256": "0606d3da42317deb18560b929ba9c792459280f6438ee2fd37790be7cb697268"
+    },
+    {
+      "case": "Magentic_One/060.json",
+      "run": "next_action100_quote_fixed_recovery",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed_recovery\\cases\\Magentic_One__060.json\\result.json",
+      "sha256": "59fa044a19f5ac22ae6cfd2fd3034eca9fb4ed8cda8fa31c48e06e24003bee2e"
+    },
+    {
+      "case": "OpenDeepSearch/055.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__055.json\\result.json",
+      "sha256": "2d349f96a10f2dd6aecd4cb2d110962a981456d18c0695caf3d72d2d3fda7623"
+    },
+    {
+      "case": "Magentic_One/025.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Magentic_One__025.json\\result.json",
+      "sha256": "c70779ea65ca465e2527cc66430440d65679233414bff1b1a7ea245096998a0e"
+    },
+    {
+      "case": "SmolAgents/043.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__043.json\\result.json",
+      "sha256": "ef7997404d468861ae9fbce0821caea546c02b26bf4a0f5d1bc6ab00bdf087c1"
+    },
+    {
+      "case": "OpenDeepSearch/071.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__071.json\\result.json",
+      "sha256": "8d16ecb016e9c10ed53cf93c98cb33e7ac5978089ddb7f496b39857e4a78df61"
+    },
+    {
+      "case": "SmolAgents/066.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__066.json\\result.json",
+      "sha256": "21593797865e27f3f636d07730bba2cf2918089a10dfce803fd7399c9789a7aa"
+    },
+    {
+      "case": "BFCL/071.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__071.json\\result.json",
+      "sha256": "8a0e549d041caade2886148b7d9d48637e4e7732df7c1f4af5c525b649a6700d"
+    },
+    {
+      "case": "BFCL/056.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__056.json\\result.json",
+      "sha256": "8f5bd9d69ea97121c76896a6641eef3044e5909e10e4183a582222b0ad82a033"
+    },
+    {
+      "case": "OpenManus/055.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__055.json\\result.json",
+      "sha256": "34f4169426681c7e0fd5a07429e028532e78104f72bae2ef03c945d08c2eebf3"
+    },
+    {
+      "case": "OpenManus/102.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__102.json\\result.json",
+      "sha256": "81427cb753251df86a821fb4571f828baa6b67fe516ac98b5d3a45a1fece81ef"
+    },
+    {
+      "case": "OpenDeepSearch/065.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__065.json\\result.json",
+      "sha256": "96cd25cd33e9061cbc8ec9950209180f0c1dfe760fefdad0b61fc39ea7a17b16"
+    },
+    {
+      "case": "SmolAgents/088.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__088.json\\result.json",
+      "sha256": "80756fe545d31a5cdb81862fde31a4de66c74c75210e504db1150b5ca59138af"
+    },
+    {
+      "case": "Magentic_One/027.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Magentic_One__027.json\\result.json",
+      "sha256": "04f96e7860e71edf49b0ddc862fc69186f753ae6281c04a913f925f87c801b5b"
+    },
+    {
+      "case": "OpenManus/043.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__043.json\\result.json",
+      "sha256": "bdb003a7fb0838f2d375e7af264c41745dc4106dcbcbab04fe17ccf504ea3aef"
+    },
+    {
+      "case": "Magentic_One/074.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Magentic_One__074.json\\result.json",
+      "sha256": "76d20478dbee01431a94cf99ce620eb2bad89710e31fac7fa49d8e343579f0b5"
+    },
+    {
+      "case": "OpenManus/073.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__073.json\\result.json",
+      "sha256": "8b93ae2f8d387f58eda25129db1159a072eb9bc1b655781fc4f5b8ab7c4d2ce1"
+    },
+    {
+      "case": "OpenDeepSearch/022.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__022.json\\result.json",
+      "sha256": "3c08e62caae1bb977d8512e6edda389dfb3107c6f26044bf0e247964d71d2f1d"
+    },
+    {
+      "case": "Camel/043.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__043.json\\result.json",
+      "sha256": "b4c038eb6d8084e1de3de03048f22b91ad7869d32d385703fc35627703d5ae4e"
+    },
+    {
+      "case": "OpenManus/097.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__097.json\\result.json",
+      "sha256": "8f6c84b89fc3d4d263c4bf99f4dc9017142842e35667ef532bb65fff5fc5416e"
+    },
+    {
+      "case": "SmolAgents/047.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__047.json\\result.json",
+      "sha256": "11fca64f02af293cf20c89b8b643598adfc6bfa3e80aa9879661c4a0c1d3e880"
+    },
+    {
+      "case": "BFCL/088.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__088.json\\result.json",
+      "sha256": "7c79dc26617aea2b396366e3b58105a543ce7d12ca9ce8087911b30699faafee"
+    },
+    {
+      "case": "Camel/076.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__076.json\\result.json",
+      "sha256": "9ba613a98c381f19f5d43df2d4aa829bba274d7cfca1393f48e6898f8d4825d8"
+    },
+    {
+      "case": "OpenManus/083.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__083.json\\result.json",
+      "sha256": "238fd60fefeda3fe4b346a7b8e00ab604746c53c5a3e2b710fe08f6b0c8706c4"
+    },
+    {
+      "case": "BFCL/052.json",
+      "run": "next_action100_quote_fixed_recovery",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed_recovery\\cases\\BFCL__052.json\\result.json",
+      "sha256": "d440083d990b0bef3cb0ec85537e1261507d52fb887bcd9b0da3e9550b951309"
+    },
+    {
+      "case": "OpenManus/064.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__064.json\\result.json",
+      "sha256": "bb1b5ea06a2c68cf5293d926126962c2d8ebef803e01996e65024d4a8985d832"
+    },
+    {
+      "case": "OpenDeepSearch/040.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__040.json\\result.json",
+      "sha256": "cbd81e705037c1ca0632f9583ae94b905fba1fecd0531a718d481e67a055b532"
+    },
+    {
+      "case": "Camel/086.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__086.json\\result.json",
+      "sha256": "72c09a6d57720bc08269a0752a4af9716d370d53f125b8af78c3a99dac3964ba"
+    },
+    {
+      "case": "BFCL/000.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__000.json\\result.json",
+      "sha256": "ee7f5161236bf684be1e646adffad29b2e6bb6d01d230acda27c10d32df8890d"
+    },
+    {
+      "case": "Octotools/023.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Octotools__023.json\\result.json",
+      "sha256": "d88500a49d319cffad58c12a1b250809aef22773ae51748db6c93bec460706d4"
+    },
+    {
+      "case": "OpenManus/016.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__016.json\\result.json",
+      "sha256": "2315b23c51fb81b9915735e08226a53280d009a310b3b73a3e8732fd910895bb"
+    },
+    {
+      "case": "OpenDeepSearch/034.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__034.json\\result.json",
+      "sha256": "0d67fca36ccfcb511d798e38dec5587bd5ca3e108870d40193ec1aeba64976c7"
+    },
+    {
+      "case": "OpenManus/037.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__037.json\\result.json",
+      "sha256": "d1fcec505bf12dcc2cebbf00847647c0fd120a8d6e416ad2788495da44c8f9ec"
+    },
+    {
+      "case": "OpenManus/095.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__095.json\\result.json",
+      "sha256": "0bced30e83472c0813201c5038a6367f0be9dbf69639f3066bf29dc8ed9dfd3c"
+    },
+    {
+      "case": "BFCL/122.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__122.json\\result.json",
+      "sha256": "faa957e1a2c10052c70a3d9bf9ca739a4427fad34bb2b804cf742a2297176e9a"
+    },
+    {
+      "case": "BFCL/055.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__055.json\\result.json",
+      "sha256": "772eb5b35c66eeffc8055056ffba1158f5a8ace7492f0039bebae73aaae43aa8"
+    },
+    {
+      "case": "BFCL/021.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__021.json\\result.json",
+      "sha256": "3351960ad82554a4999bc76c8f49d254faf46c155902e4811dd76b5ee15b7149"
+    },
+    {
+      "case": "Camel/016.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__016.json\\result.json",
+      "sha256": "7d6b4123315c5a568f26118671d46e710abb62ef9382ef82e6568a03985aa3ce"
+    },
+    {
+      "case": "Camel/032.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__032.json\\result.json",
+      "sha256": "4eee802fcce39431df4fcedea1084f5ba7371402be9da49c859bbb44f3f15a8d"
+    },
+    {
+      "case": "OpenDeepSearch/072.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__072.json\\result.json",
+      "sha256": "aa903fbb63be70c3f72d4f99923f519d93ccd9a973fec4838bb5fed0bc57ac17"
+    },
+    {
+      "case": "BFCL/037.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__037.json\\result.json",
+      "sha256": "e3ab79b7f6244784762939dfc10740a879721fc0b04739366f6037447f6da406"
+    },
+    {
+      "case": "OpenDeepSearch/090.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__090.json\\result.json",
+      "sha256": "9f487f999de9cbe1da791cc133ef459b15fe99bee9e61b759ea2b0887b6662c2"
+    },
+    {
+      "case": "SmolAgents/051.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__051.json\\result.json",
+      "sha256": "8b8aebb7aba5211b21f3a401e8fbf2098b0d8b8fa9261dad56eb3a68da086710"
+    },
+    {
+      "case": "BFCL/011.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__011.json\\result.json",
+      "sha256": "93f2491af20c4414d7d0d363150f8c150985f4fc5af94e6d7b8986c04b79647a"
+    },
+    {
+      "case": "Magentic_One/055.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Magentic_One__055.json\\result.json",
+      "sha256": "9f75f7aee01db3cf890488dd9df087f929ef10239607d1223a82cf89c0d23cb3"
+    },
+    {
+      "case": "SmolAgents/085.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__085.json\\result.json",
+      "sha256": "8c51874496db50bd30652a53db1c93d3ea79ac03bff24a92e2561527754e55ea"
+    },
+    {
+      "case": "SmolAgents/024.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__024.json\\result.json",
+      "sha256": "cd53dfebdc31228bdd497960c1de93367f79cdda85a2e131506f0d72cada53c5"
+    },
+    {
+      "case": "OpenDeepSearch/007.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__007.json\\result.json",
+      "sha256": "16649c26ed7b8aed92a6298f0a0c7b44e201ddf4bfe8ae2c0b2cafdd2958f794"
+    },
+    {
+      "case": "OpenManus/031.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__031.json\\result.json",
+      "sha256": "9dfb6f910d066c830f8acbb9e434f382669a4ff6c7e6a1152131605b496a4247"
+    },
+    {
+      "case": "Magentic_One/071.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Magentic_One__071.json\\result.json",
+      "sha256": "71ec05d8e039bcb362b4065a9df527b00142f3c63b77cca85d8483472278974a"
+    },
+    {
+      "case": "BFCL/150.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__150.json\\result.json",
+      "sha256": "20ad448bac4adb7ef1d25dc26967f809f94d4c3dc53a4527acfefb4308d77c03"
+    },
+    {
+      "case": "SmolAgents/062.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__062.json\\result.json",
+      "sha256": "0c5e51ea9f3bf8c6f16312464b96b52e1fc8b48abf71019c4ea275a33e12ebf6"
+    },
+    {
+      "case": "OpenDeepSearch/014.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__014.json\\result.json",
+      "sha256": "3688589cae038fc15d6499500a0adaed265ca0f987158210cf0ad5094f77e39f"
+    },
+    {
+      "case": "SmolAgents/048.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__048.json\\result.json",
+      "sha256": "d83e3e8ecc4cbd034f163cd7d92c3f4717711d80bc3ec4650b593c9ce57c5c39"
+    },
+    {
+      "case": "OpenDeepSearch/068.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__068.json\\result.json",
+      "sha256": "f4e917e926d7044bb18b1a740ec3c2cd837bb176698fbedde53127a866a9b4dc"
+    },
+    {
+      "case": "BFCL/144.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__144.json\\result.json",
+      "sha256": "ba3099e4697a9d98f835815a6e98fb89d9e2ff88dd6924a4790a0eac0715e9dc"
+    },
+    {
+      "case": "OpenDeepSearch/036.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__036.json\\result.json",
+      "sha256": "ab1554c43e246a25233d0d5ccf6a3533ac93b31ba7f5c17370510626f9bc31c5"
+    },
+    {
+      "case": "Camel/006.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__006.json\\result.json",
+      "sha256": "494dc3e47950ed2e426771f664b7b2e9e4a04564dbe51399abf7ace3d587950f"
+    },
+    {
+      "case": "BFCL/125.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__125.json\\result.json",
+      "sha256": "5a99a85533ba25a836cd96f2f7a202719ac271b9350f9e83842c95353d782797"
+    },
+    {
+      "case": "Magentic_One/076.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Magentic_One__076.json\\result.json",
+      "sha256": "42d7944fa15bf5ad4f034e874d15c44b712e712469eb7382e663b9e6afcea598"
+    },
+    {
+      "case": "Camel/024.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__024.json\\result.json",
+      "sha256": "58fd049d47310abf194fdabe1908837eb9cdf77ea6cb895a9f83eb27b5891e03"
+    },
+    {
+      "case": "OpenManus/068.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__068.json\\result.json",
+      "sha256": "9a33fde8ce9ed96cd5fadf0562987226fb969c5bf60bf902c7c6d7b97830104e"
+    },
+    {
+      "case": "Magentic_One/031.json",
+      "run": "next_action100_quote_fixed_recovery",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed_recovery\\cases\\Magentic_One__031.json\\result.json",
+      "sha256": "a58eef608a9bba740c278754c4f514eca358a52cebb406db70afb82f74336307"
+    },
+    {
+      "case": "OpenDeepSearch/087.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__087.json\\result.json",
+      "sha256": "57ce9d5e60ffe947a4dff39fa63b442aa78d72ec9d2cacde53cdcd3306676bdd"
+    },
+    {
+      "case": "Magentic_One/090.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Magentic_One__090.json\\result.json",
+      "sha256": "bd4a74c4e77920e9d64ca5f4fee349cd6874db5b7c0c9d4abfa8565058defc04"
+    },
+    {
+      "case": "Camel/084.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__084.json\\result.json",
+      "sha256": "3cf83c381835e726639faca6794b895e058419c15780fd2b6af5a8bef3e2c0d6"
+    },
+    {
+      "case": "BFCL/130.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__130.json\\result.json",
+      "sha256": "a4cb8d6db12414199ca149d8838dd8f4fa4a30f10f6ad43a8a92d7317cc7a410"
+    },
+    {
+      "case": "BFCL/127.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\BFCL__127.json\\result.json",
+      "sha256": "31776953dfe5a38c04a106f0cd7f22d6ba032dcd17f6f93e16fa64a85e80c7ab"
+    },
+    {
+      "case": "Camel/012.json",
+      "run": "next_action100_quote_fixed",
+      "path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Camel__012.json\\result.json",
+      "sha256": "a867fa10746aca4bca191a6408a0a033c70c6d0f62a7a5eb8c8ff29c5fc48ae7"
+    }
+  ],
+  "selection_rule": "首轮全部非权威/缺失案例统一补测一次；仅补测恢复权威时采用，否则保留首轮；选择不读取金标或正确性。"
+}

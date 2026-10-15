@@ -1,0 +1,119 @@
+{
+  "cases": 100,
+  "same_case_order_as_previous": true,
+  "sources": {
+    "Magentic_One": 13,
+    "OpenDeepSearch": 19,
+    "BFCL": 25,
+    "Camel": 14,
+    "SmolAgents": 12,
+    "OpenManus": 14,
+    "Octotools": 3
+  },
+  "positive_cases": 62,
+  "source_matches_frozen": true,
+  "prior_evaluations_unchanged": true,
+  "baseline_git": "1137a50",
+  "verification_state": "passed",
+  "critical_regressions_passed": 115,
+  "model": "GLM-5.3-flash",
+  "case_timeout_seconds": 10800,
+  "votes": 3,
+  "forecast_budget": {
+    "mode": "tracer_context",
+    "score_source": "semantic_proxy",
+    "policy_version": "dataset-origin-risk-v2",
+    "top_k": 3,
+    "max_projection_events": 16,
+    "max_graph_edges": 64,
+    "max_dependency_depth": 8,
+    "max_added_provider_requests_per_case": 1,
+    "max_added_prompt_tokens_per_case": 60000,
+    "max_added_output_tokens_per_case": 4096,
+    "max_added_seconds_per_case": 180,
+    "counterfactual_mode": "deterministic_only",
+    "negative_feedback_enabled": false,
+    "negative_feedback_policy": null,
+    "scorer_artifact": null,
+    "next_action_mode": "judge_context"
+  },
+  "label_free_inputs": true,
+  "frozen_policy_coverage": {
+    "deterministic_cases": 22,
+    "model_candidate_cases": 71,
+    "any_candidate_cases": 74,
+    "forecast_input_bytes_median": 2903,
+    "forecast_input_bytes_max": 6609,
+    "provider_requests": 0,
+    "scope": "引用修正后的冻结配置，只读候选和UTF-8输入规模；未进行模型测量。"
+  },
+  "credentialed_configuration_check": {
+    "checked_at": "2026-10-15T14:11:23.628343+00:00",
+    "credentials_available": true,
+    "case_timeout_seconds": 10800,
+    "routes": {
+      "judge_route": {
+        "model": "GLM-5.3-flash",
+        "votes": 3,
+        "vote_topup": 2,
+        "temperature": 0.0,
+        "max_tokens": null,
+        "transport_retries": 2
+      },
+      "defense_route": {
+        "model": "GLM-5.3-flash",
+        "votes": 3,
+        "vote_topup": 2,
+        "temperature": 0.0,
+        "max_tokens": null,
+        "transport_retries": 2
+      },
+      "recall_route": {
+        "model": "GLM-5.3-flash",
+        "votes": null,
+        "vote_topup": null,
+        "temperature": 0.0,
+        "max_tokens": null,
+        "transport_retries": 2
+      }
+    },
+    "provider_requests": 0
+  },
+  "live_mechanism_spotcheck": [
+    {
+      "case": "BFCL/087.json",
+      "case_commit_valid": true,
+      "prefix_and_actual_next_valid": true,
+      "grounded_quotes_valid": null,
+      "unicode_replacement_character_present": false,
+      "model_quotes_checked": 0,
+      "quote_check_state": "not_applicable_no_accepted_model_prediction"
+    },
+    {
+      "case": "BFCL/115.json",
+      "case_commit_valid": true,
+      "prefix_and_actual_next_valid": true,
+      "grounded_quotes_valid": true,
+      "unicode_replacement_character_present": false,
+      "model_quotes_checked": 2,
+      "quote_check_state": "checked_accepted_model_constraints"
+    }
+  ],
+  "live_mechanism_spotcheck_scope": "Prior source: envelope identities checked. BFCL/087 had no accepted model constraints and is not evidence of model quote availability.",
+  "spotcheck_correction": {
+    "original": "artifacts\\detector\\live_checks\\next_action100_20261015\\quote-fix-preflight-source.json",
+    "sha256": "e6713e6dc2e01d9ff559ea805e58d04bc2dee8c6f37d0b4abc0fb385c4893d72",
+    "reason": "Identity/seal validation alone does not prove that accepted model constraints exist. The zero-constraint BFCL/087 quote claim is withdrawn."
+  },
+  "pre_quote_fix_coverage": {
+    "deterministic_cases": 22,
+    "model_candidate_cases": 71,
+    "any_candidate_cases": 74,
+    "forecast_input_bytes_median": 2907,
+    "forecast_input_bytes_max": 6621,
+    "provider_requests": 0,
+    "scope": "Frozen effective policy, read-only candidate and UTF-8 input size analysis; no model measurement."
+  },
+  "verification_report": "E:\\agent hallucination\\agent hallucination\\artifacts\\code_quality\\2317dcfb377ef9c1372f6cab40169f38d1e0c70e9af97b7b919983c2f4ba6d55\\dff592a7718c4accb6d29620f7c063e6",
+  "implementation_commit": "2fa0a5665602f1525045a4b5e327306a4780d3ce"
+}

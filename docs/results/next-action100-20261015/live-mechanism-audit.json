@@ -1,0 +1,79 @@
+{
+  "state": "in_progress",
+  "checked_at": "2026-10-15T19:04:50.031845+00:00",
+  "scope": "仅验证已完成案例的真实前缀、下一事件、原文引用和身份，不等于局部比较语义正确或检测增益。",
+  "witnesses": [
+    {
+      "case": "Octotools/023.json",
+      "source_event_id": "event_002",
+      "next_event_id": "event_003",
+      "state": "matched",
+      "case_result_path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\Octotools__023.json\\result.json",
+      "sha256": "d88500a49d319cffad58c12a1b250809aef22773ae51748db6c93bec460706d4",
+      "case_commit_and_prefix_and_quotes_valid": true
+    },
+    {
+      "case": "OpenDeepSearch/007.json",
+      "source_event_id": "event_002",
+      "next_event_id": "event_003",
+      "state": "divergent",
+      "case_result_path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__007.json\\result.json",
+      "sha256": "16649c26ed7b8aed92a6298f0a0c7b44e201ddf4bfe8ae2c0b2cafdd2958f794",
+      "case_commit_and_prefix_and_quotes_valid": true
+    },
+    {
+      "case": "OpenDeepSearch/036.json",
+      "source_event_id": "event_002",
+      "next_event_id": "event_003",
+      "state": "matched",
+      "case_result_path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__036.json\\result.json",
+      "sha256": "ab1554c43e246a25233d0d5ccf6a3533ac93b31ba7f5c17370510626f9bc31c5",
+      "case_commit_and_prefix_and_quotes_valid": true
+    },
+    {
+      "case": "OpenDeepSearch/068.json",
+      "source_event_id": "event_002",
+      "next_event_id": "event_003",
+      "state": "matched",
+      "case_result_path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__068.json\\result.json",
+      "sha256": "f4e917e926d7044bb18b1a740ec3c2cd837bb176698fbedde53127a866a9b4dc",
+      "case_commit_and_prefix_and_quotes_valid": true
+    },
+    {
+      "case": "OpenDeepSearch/072.json",
+      "source_event_id": "event_002",
+      "next_event_id": "event_003",
+      "state": "matched",
+      "case_result_path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__072.json\\result.json",
+      "sha256": "aa903fbb63be70c3f72d4f99923f519d93ccd9a973fec4838bb5fed0bc57ac17",
+      "case_commit_and_prefix_and_quotes_valid": true
+    },
+    {
+      "case": "OpenManus/016.json",
+      "source_event_id": "event_001",
+      "next_event_id": "event_002",
+      "state": "matched",
+      "case_result_path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\OpenManus__016.json\\result.json",
+      "sha256": "2315b23c51fb81b9915735e08226a53280d009a310b3b73a3e8732fd910895bb",
+      "case_commit_and_prefix_and_quotes_valid": true
+    },
+    {
+      "case": "SmolAgents/048.json",
+      "source_event_id": "event_002",
+      "next_event_id": "event_003",
+      "state": "divergent",
+      "case_result_path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__048.json\\result.json",
+      "sha256": "d83e3e8ecc4cbd034f163cd7d92c3f4717711d80bc3ec4650b593c9ce57c5c39",
+      "case_commit_and_prefix_and_quotes_valid": true
+    },
+    {
+      "case": "SmolAgents/066.json",
+      "source_event_id": "event_002",
+      "next_event_id": "event_003",
+      "state": "divergent",
+      "case_result_path": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\runs\\next_action100_quote_fixed\\cases\\SmolAgents__066.json\\result.json",
+      "sha256": "21593797865e27f3f636d07730bba2cf2918089a10dfce803fd7399c9789a7aa",
+      "case_commit_and_prefix_and_quotes_valid": true
+    }
+  ]
+}

@@ -49,7 +49,17 @@ flowchart TD
 
 Judge 多票阴性结果的 confidence 取所有支持阴性票的最低值，原始 ballots 保持不变；多数裁决、quorum、分票和弃权逻辑不变。只有完整且全部 high 的一致阴性可以跳过常规 Recall，弱置信票不再因代表票顺序被隐藏。
 
-`next_action.py` 从截至 t 的前缀生成明确工具失败后的只读动作边界，并比较真实 t+1；不调用 provider，不生成工具 Observation，不在缺失下一步时补造动作。明确重试或诚实失败报告匹配局部合规模式，不证明参数正确或任务全部履约；不同工具的潜在 fallback 仍为 unknown，没有明确恢复观察却宣称成功构成诊断偏离。当前粒度是下一原始事件，事件内动作、返回与声明未拆成严格决策时序。所有结果保持 hypothesis、decision_authority=none、localization_authority=none。失败信号进入静态风险排序，Top K 候选的 action audit 仅随绑定 risk context 传入 Tracer；Judge/Defense/裁决不消费它。
+`next_action.py` 从截至 t 的前缀生成明确工具失败后的只读动作边界，并比较真实 t+1；不调用 provider，不生成工具 Observation，不在缺失下一步时补造动作。明确重试或诚实失败报告匹配局部合规模式，不证明参数正确或任务全部履约；不同工具的潜在 fallback 仍为 unknown，没有明确恢复观察却宣称成功构成诊断偏离。当前粒度是下一原始事件，事件内动作、返回与声明未拆成严格决策时序。所有结果保持 hypothesis、decision_authority=none、localization_authority=none。失败信号进入静态风险排序，Top K 候选的 action audit 仅随绑定 risk context 传入 Tracer；该risk_context通路不直接交给Judge/Defense/裁决；新增Judge诊断通路见下节action_forecast。
+
+### 高危前缀预测与真实下一步对比
+
+`action_forecast.py` 在 Judge 前复用 `build_step_risk_profile` / `select_causal_candidates` 的 Top K。明确工具失败继续使用 `next_action.py` 的零请求边界；优先级0–2且有下一助手事件的其余候选，最多选择一个做模型预测。预测分别读取自己的截至t前缀，不将多个不同截止点放入同一请求；仅发送最近6个事件和有界通道摘录，记录完整prefix_digest及省略状态。模型输出至多两个局部约束，每项保留允许/禁止动作、单一前缀原文引用；结构化通道显示与原Packet引文验证使用相同文本表示，直接在解码后的引用通道搜索，避免JSON转义导致合法引号/换行/反斜杠误拒。引用和短引必须同时属于实际前缀及该引用的发送通道。拒绝的预测保留有界诊断文本及截断状态，不作为Judge输入。模型不生成真实工具返回。
+
+`causal_audit.next_action_mode` 为 `off`（默认）、`shadow` 或 `judge_context`。后者通过Judge系统层的显式schema扩展将预测交给原三票，比较真实下一事件的动作/声明，输出 `matched/divergent/unknown`；关闭、旁路或上下文预算不足时使用原Judge系统合同。非unknown对比要求真实下一事件的原文及引用；未来引用和仅工具返回不支持动作判断。混合事件的声明顺序、对象对应、替代动作及省略内容由Judge保守核对，局部偏离不能直接定罪；后续修复与最终交付材料性仍走原听证和裁决。风险原型与新预测都不获得独立判定或定位权限。
+
+预测共享现有新增工作预算、整例期限、provider并发和请求日志，关闭transport重试；成功预测与成功Judge在同例同身份重试中复用，缓存命中不重复预留上下文。Judge上下文按基础票/补票及各自一次合同修复的上界预留UTF-8字节。预算、可恢复provider或预测合同失败只减少诊断覆盖；凭据/配额等全局终止和整例截止仍传播。实际请求/用量以journal为准，预留额度不等于实际费用。 已开始的新增请求因预算到期而终止时记录 `added_budget_exceeded`、资源及未知usage，异常原样传播；仅排队的预算终止不伪造已开始请求。历史缺失结束记录不回填。新增预测前缀不是完整轨迹，缺失不能证明不存在。
+
+结果位于 `proof.action_forecast`、`proof.action_forecast_used`、`proof.judge.next_action_comparisons` 和 `proof.next_action_vote_comparisons`，保留预测生产者、模型元数据、前缀视图、健康状态和各票局部比较。开启预测后，Judge回放身份额外绑定causal policy，拒绝复用关闭模式的旧Judge。`scripts/run_next_action_experiment.py` 提供冻结、运行、状态、报告入口。[本次同100例](results/next-action100-20261015/report.md)检测76/100、首错27/62，相对最近基线持平，默认保持off；复现请用[实际配置](results/next-action100-20261015/config.json)，其中新增工作为1请求/60000 UTF-8字节/4096输出token/180秒，不等同于只改默认开关。结构化引用限制到t+1，但比较自由解释由全轨迹Judge生成，尚无严格局部语义保证。
 
 `evolution.causal_failures.build_action_failure_triplets` 将前序风险、真实下一步动作及实际终端交付归档为密封 `evolution.action_failure_triplet.v1`。终端摘录最多1024字符，并保留完整delivery digest与截断状态；启发式偏离不宣称终端错误已成立。`build_causal_failure_record` 在记录与policy可用时自动附加三元组，包括无阳性hearing的漏检；prompt视图只保留抽象risk_pattern/action_state/divergence_pattern和允许动作，不携带案例、步号或交付答案。正常邻居强制保护及复合起草器已接入：多个成员共享风险AND下一步偏离时，只起草Tracer定位模板；L0要求至少两个匹配且将回放的健康合规正常邻居，L1禁止收益抵消邻居退化。当前离线与真实验收状态见实施台账及detector-deep-optimization-20261013.md。
 

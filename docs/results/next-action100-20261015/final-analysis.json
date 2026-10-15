@@ -1,0 +1,160 @@
+{
+  "schema_version": "research.next_action_final_analysis.v1",
+  "generated_at": "2026-10-15T22:30:04.603024+00:00",
+  "metrics": {
+    "historical": {
+      "decisive": 99,
+      "unresolved": 1,
+      "completion": 0.99,
+      "decisive_accuracy": 0.6868686868686869,
+      "all_case_accuracy": 0.68,
+      "tp": 35,
+      "fp": 5,
+      "fn": 26,
+      "tn": 33,
+      "positive_precision": 0.875,
+      "positive_recall": 0.5737704918032787,
+      "positive_f1": 0.693069306930693,
+      "macro_precision": 0.7171610169491525,
+      "macro_recall": 0.7210957722174288,
+      "macro_f1": 0.6867408390323568,
+      "authoritative": 99,
+      "requested_cases": 100,
+      "step_localization": {
+        "n": 62,
+        "hits": 22,
+        "accuracy": 0.3548387096774194
+      }
+    },
+    "recent": {
+      "decisive": 99,
+      "unresolved": 1,
+      "completion": 0.99,
+      "decisive_accuracy": 0.7676767676767676,
+      "all_case_accuracy": 0.76,
+      "tp": 42,
+      "fp": 4,
+      "fn": 19,
+      "tn": 34,
+      "positive_precision": 0.9130434782608695,
+      "positive_recall": 0.6885245901639344,
+      "positive_f1": 0.7850467289719626,
+      "macro_precision": 0.7772764561115668,
+      "macro_recall": 0.7916307161345988,
+      "macro_f1": 0.766149738112355,
+      "authoritative": 99,
+      "requested_cases": 100,
+      "step_localization": {
+        "n": 62,
+        "hits": 27,
+        "accuracy": 0.43548387096774194
+      }
+    },
+    "current": {
+      "decisive": 100,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.76,
+      "all_case_accuracy": 0.76,
+      "tp": 42,
+      "fp": 4,
+      "fn": 20,
+      "tn": 34,
+      "positive_precision": 0.9130434782608695,
+      "positive_recall": 0.6774193548387096,
+      "positive_f1": 0.7777777777777777,
+      "macro_precision": 0.7713365539452496,
+      "macro_recall": 0.7860780984719864,
+      "macro_f1": 0.7584541062801933,
+      "authoritative": 100,
+      "requested_cases": 100,
+      "step_localization": {
+        "n": 62,
+        "hits": 27,
+        "accuracy": 0.43548387096774194
+      }
+    }
+  },
+  "delta": {
+    "historical": {
+      "all_case_accuracy_pp": 7.9999999999999964,
+      "step_localization_pp": 8.064516129032256,
+      "detection_fixed": 12,
+      "detection_regressed": 4,
+      "localization_fixed": 7,
+      "localization_regressed": 2
+    },
+    "recent": {
+      "all_case_accuracy_pp": 0.0,
+      "step_localization_pp": 0.0,
+      "detection_fixed": 4,
+      "detection_regressed": 4,
+      "localization_fixed": 2,
+      "localization_regressed": 2
+    }
+  },
+  "accepted_requests": 794,
+  "previous_accepted_requests": 740,
+  "accepted_journal_started_requests": 797,
+  "accepted_journal_started_without_finish": 4,
+  "accepted_request_change_percent": 7.297297297297289,
+  "accepted_latency": {
+    "case_latency_median_seconds": 966.587,
+    "case_latency_p95_seconds": 3901.381,
+    "case_seconds_sum": 129169.584
+  },
+  "previous_accepted_latency": {
+    "case_latency_median_seconds": 787.597,
+    "case_latency_p95_seconds": 4154.768,
+    "case_seconds_sum": 118683.589
+  },
+  "mechanism": {
+    "accepted_model_prediction_cases": 43,
+    "model_prediction_context_used_cases": 43,
+    "all_context_used_cases": 47,
+    "representative_model_comparison_states": {
+      "unknown": 35,
+      "divergent": 3,
+      "matched": 5
+    },
+    "all_vote_model_comparison_states": {
+      "unknown": 103,
+      "divergent": 10,
+      "matched": 16
+    },
+    "forecast_health": {
+      "ok": 72,
+      "contract_error": 3,
+      "budget_exhausted": 23,
+      "provider_error": 2
+    }
+  },
+  "batch_wall_seconds": 25167.402721200022,
+  "all_attempts_requests": 940,
+  "previous_all_attempts_requests": 866,
+  "all_attempts_request_change_percent": 8.545034642032334,
+  "usage_by_run": {
+    "next_action100": {
+      "finished": 72,
+      "prompt_tokens": 314251,
+      "completion_tokens": 597590,
+      "total_tokens": 911841,
+      "usage_missing": 1
+    },
+    "next_action100_quote_fixed": {
+      "finished": 795,
+      "prompt_tokens": 4519467,
+      "completion_tokens": 8661277,
+      "total_tokens": 13180744,
+      "usage_missing": 52
+    },
+    "next_action100_quote_fixed_recovery": {
+      "finished": 60,
+      "prompt_tokens": 335038,
+      "completion_tokens": 1148290,
+      "total_tokens": 1483328,
+      "usage_missing": 7
+    }
+  },
+  "scope": "费用含废弃技术批次；token按prompt/completion/total分别记录，不叠加别名。缺失usage及无结束记录的费用未知。历史源码和预算不同，不能归因于单模块。"
+}

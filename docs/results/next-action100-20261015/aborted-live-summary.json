@@ -1,0 +1,108 @@
+{
+  "state": "aborted_for_quote_validation_fix",
+  "timestamp": "2026-10-15T14:41:34.537623+00:00",
+  "run_id": "next_action100",
+  "source_commit": "6d75adea7d1e4ff53604ff2fa9b05ddb8caa33a7",
+  "case_results": 8,
+  "cost": {
+    "started_requests": 82,
+    "finished_requests": 72,
+    "started_without_finish": 10,
+    "by_purpose": {
+      "action_forecast": 12,
+      "judge": 49,
+      "judge_repair": 7,
+      "recall_scanner": 2,
+      "defense": 9,
+      "step_tracer": 3
+    },
+    "status_counts": {
+      "response": 71,
+      "transport_error": 1
+    },
+    "usage": {
+      "prompt_tokens": 314251,
+      "completion_tokens": 597590,
+      "total_tokens": 911841,
+      "input_tokens": 314251,
+      "output_tokens": 597590
+    },
+    "usage_missing": 1,
+    "pricing": "未取得服务实际账单单价，不估造货币费用。",
+    "journals": [
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__030.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "aef2fdb68703ff0f37cd061f52736030084eeb0c8a1d0f76d05276bdb513fab5"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__031.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "e81c1e0fee2e11185c9f3b0055c4e080d56edf4cefc5b8464f93a702e59f2445"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__085.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "6f119ed2ebcfea621296bfbbf3896c5725b193f82268bc627cb9ce61bf9db720"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__087.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "97d83617fbf9a08b1c0e4790a6ab48eb60e89076d61a285d9660a9f53b759d83"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__115.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "c1d65fdbe71ed0f17b2e7040b9c4a1f2a847b79d6e6e840bbab30f489ee0dbfd"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__129.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "4793ac45558b310fcaad419f157edddf594d6d42e38b6d531734c958dba8c450"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__155.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "c2d2fef9a4716aa7efbacddc86db0af953fdbe6a297ca2c473cf07746b1e6aaf"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\Camel__001.json\\attempts\\001_20261015T223805\\requests.jsonl",
+        "sha256": "bebb742e65005005817126d504061893e357d7164d98b38bca2c673237450fba"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\Camel__022.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "8952d03f0ff3b15be557b1179729f9de7bc7f11fe85d01f48de47e8f1528b2e8"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\Magentic_One__061.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "7a0c14bf06c5066f05b298da0e97a6d7c14bc7209a8c8479d0ce0900c52deee7"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\Magentic_One__065.json\\attempts\\001_20261015T223848\\requests.jsonl",
+        "sha256": "8ab0e20b8721a506ce813999964efff7eae8b13cce22664284205b3fa18d8652"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\Magentic_One__078.json\\attempts\\001_20261015T223752\\requests.jsonl",
+        "sha256": "7be93cdd1c93fb6087ed66a0ea937ede0966d1b94a961268c8472dfe6bb7cebe"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\OpenDeepSearch__011.json\\attempts\\001_20261015T224003\\requests.jsonl",
+        "sha256": "0cabae489df0f3f001678fd969df5a74a95cbe6f9d0f15b981a4da7cfde60278"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\OpenDeepSearch__023.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "ffee372c25d34093506de3b647d520f078b64867a284542907e0f85da3c46d18"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\OpenDeepSearch__058.json\\attempts\\001_20261015T222924\\requests.jsonl",
+        "sha256": "9fbdf1c8a7a5c60bac7e03813a9bc58167a04c2417d00bf9c6b640f9a19382b9"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\OpenManus__012.json\\attempts\\001_20261015T223320\\requests.jsonl",
+        "sha256": "8826144d028503b5c60938bfa0a0c6ae612fb143ee3b703b182e8d7c52dd8c52"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\OpenManus__040.json\\attempts\\001_20261015T223501\\requests.jsonl",
+        "sha256": "862f3948c12354f100bfb09e472b86229736180682e59dfa5d09b926388a6df7"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\SmolAgents__011.json\\attempts\\001_20261015T223016\\requests.jsonl",
+        "sha256": "c5ce017938e31c30e5ed41bd1211317acba113a101803e36f8c657472fc92730"
+      }
+    ]
+  },
+  "note": "Partial technical-failure run retained. Excluded from final effectiveness cohort, included in all-attempt expense. In-flight requests without finish are unknown, never assumed free."
+}

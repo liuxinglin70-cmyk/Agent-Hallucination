@@ -1,0 +1,42 @@
+{
+  "schema_version": "research.next_action_qualitative_review.v1",
+  "reviewed_at": "2026-10-15T19:08:37.900546+00:00",
+  "sample_rule": "在首轮97例完成时，审阅当时全部8条绑定已接受模型预测的matched/divergent比较，不读取金标或据此修改方法。",
+  "case_ids": [
+    "Octotools/023.json",
+    "OpenDeepSearch/007.json",
+    "OpenDeepSearch/036.json",
+    "OpenDeepSearch/068.json",
+    "OpenDeepSearch/072.json",
+    "OpenManus/016.json",
+    "SmolAgents/048.json",
+    "SmolAgents/066.json"
+  ],
+  "observations": [
+    {
+      "case": "OpenDeepSearch/007.json",
+      "finding": "空检索结果被当作候选谱图依据，局部比较报告divergent。reason还叙述event_004；结构化引用虽限制到t+1，自由解释仍可能带入下游信息。"
+    },
+    {
+      "case": "SmolAgents/048.json",
+      "finding": "预测要求分支与定义域检验，实际为无该分析的错误Python调用，报告divergent；这只是局部分析缺失，不自行证明最终材料性。"
+    },
+    {
+      "case": "SmolAgents/066.json",
+      "finding": "预测区分原木制Rattler与Iron Rattler，比较发现下一步转向另一实体；原版身份推断及额外输出要求仍是模型假设。"
+    },
+    {
+      "case": "OpenDeepSearch/036.json",
+      "finding": "下一步继续检索被判matched，但reason用event_004补充说明候选集开放；没有严格无未来信息的比较解释保证。"
+    },
+    {
+      "case": "Octotools/023.json",
+      "finding": "从官方页面转向Fandom仍被判matched；可靠来源要求是否得到满足是语义判断，不由短引校验自动保证。"
+    },
+    {
+      "case": "OpenManus/016.json",
+      "finding": "遵循搜索片段给出的日期被判matched；预测和实际一致不能验证该片段所述日期的独立事实真伪。"
+    }
+  ],
+  "conclusion": "真实模型预测与比较已打通，原文/身份/结构有效不等于约束蕴含、比较语义正确或检测增益。严格局部解释、预测约束语义准确率和独立事实核验仍需另行评估。"
+}

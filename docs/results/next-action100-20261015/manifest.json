@@ -1,0 +1,150 @@
+{
+  "schema_version": "research.evidence_archive.v1",
+  "created_at": "2026-10-15T22:30:04.699007+00:00",
+  "source_commit": "2fa0a5665602f1525045a4b5e327306a4780d3ce",
+  "preparation_git_head": "1137a50c67b2eadcf883e50e4cea8d93fe5b10a2",
+  "files": [
+    {
+      "file": "cases.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\cases.json",
+      "bytes": 2368,
+      "sha256": "5d4491aaa0b3102d2b544d85f5cec37947e0750dfb6791d07b0b44815bfa8db2"
+    },
+    {
+      "file": "config.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\config.json",
+      "bytes": 1150,
+      "sha256": "6e9ae5e7fa648cfedf9e417608ab5f1489d2178c98462fc78cca064601e560de"
+    },
+    {
+      "file": "first-evaluation.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\first-evaluation.json",
+      "bytes": 114429,
+      "sha256": "c759b7252d7f06effe3ae39c79c17ab418ce0c292d778ee1e74d2565a2245d61"
+    },
+    {
+      "file": "recovery-evaluation.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\recovery-evaluation.json",
+      "bytes": 9215,
+      "sha256": "938f4594a15e5e35b0235ef7f8a78bf65f5c5caab639eb5e256bb8aa1507e6c5"
+    },
+    {
+      "file": "final-evaluation.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\final-evaluation.json",
+      "bytes": 95749,
+      "sha256": "4019ea03d3d2f4c493f639cd09a8f70ceefb214b4e80ca6d0942d9d9fd1cce24"
+    },
+    {
+      "file": "comparison.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\comparison.json",
+      "bytes": 54338,
+      "sha256": "eca085eeb7dba814e72ebcd68d185dfb90e31b8504b72fa97e64b4538580d399"
+    },
+    {
+      "file": "completion-audit.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\completion-audit.json",
+      "bytes": 57282,
+      "sha256": "d613f90e3e5b4681999aacf7f3b6fd3b62bff3d14bfd4ba47ee76852472cfe98"
+    },
+    {
+      "file": "final-analysis.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\final-analysis.json",
+      "bytes": 4608,
+      "sha256": "47f8d7401e9503b0273219152c4b1f973180016e82b4d8497246f34144825f8d"
+    },
+    {
+      "file": "preflight.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\preflight.json",
+      "bytes": 4153,
+      "sha256": "8455718c1b790c25e9240c1de6ef7b0a632466bf450d4622a6ad756e7d6071da"
+    },
+    {
+      "file": "aborted-live-summary.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\aborted-live-summary.json",
+      "bytes": 5067,
+      "sha256": "e31e1c92ce47066690a1f08551757a8e77db9dced4d2698e63d37e6d6f0b69d6"
+    },
+    {
+      "file": "qualitative-review.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\qualitative-review.json",
+      "bytes": 2152,
+      "sha256": "3557a475100d275290c5d83d8cf57ded0617eae53ef1beac25655fcdd7c59e5a"
+    },
+    {
+      "file": "live-mechanism-audit.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\live-mechanism-audit.json",
+      "bytes": 4338,
+      "sha256": "2c541a577e01bf966bbe748ee3f661347b4fd8c2ffbf8cabb0d7baa5452ca319"
+    },
+    {
+      "file": "budget-journal-regression-before.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\budget-journal-regression-before.json",
+      "bytes": 351,
+      "sha256": "5add263c10219c965e4fd79e98cdda94be0de7f06eeaee3ce84cb74d3fc2891d"
+    },
+    {
+      "file": "frozen-manifest.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\manifest.json",
+      "bytes": 69000,
+      "sha256": "a12fbe4de8f55303db219daf1f5e1dbf8d5b6d031e99bc3c82e076c9306261b5"
+    },
+    {
+      "file": "verification-summary.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\code_quality\\2317dcfb377ef9c1372f6cab40169f38d1e0c70e9af97b7b919983c2f4ba6d55\\dff592a7718c4accb6d29620f7c063e6\\summary.json",
+      "bytes": 3478,
+      "sha256": "e860790113bbb37a38f450749ee376e47a00f6641129e45271d66d054b4b17ea"
+    },
+    {
+      "file": "verification-source-manifest.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\code_quality\\2317dcfb377ef9c1372f6cab40169f38d1e0c70e9af97b7b919983c2f4ba6d55\\dff592a7718c4accb6d29620f7c063e6\\source_manifest.json",
+      "bytes": 32036,
+      "sha256": "092c26d5f97058ed9cd52b2efb59e4586ed1eab5ca6c9d2bdb57018002d53ec5"
+    },
+    {
+      "file": "prior-cost-audit.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\prior-cost-audit.json",
+      "bytes": 59545,
+      "sha256": "4d317b622c95bf383514aa62d6cf222c70fcef23a99771f3aa45c7a09294058f"
+    },
+    {
+      "file": "cost-comparison.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\cost-comparison.json",
+      "bytes": 2154,
+      "sha256": "282ee1998aec6a918bbe2d04b215994fbd812a0d4a699dfd13c640b1e0f680ca"
+    },
+    {
+      "file": "report.md",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\reviewed-report.md",
+      "bytes": 8940,
+      "sha256": "0a050f03e2c1d2c81d26a61ffe38452bc346370e3594d39f620bf92c5625f0af"
+    },
+    {
+      "file": "accounting-fix-proof.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\accounting-fix-proof.json",
+      "bytes": 2352,
+      "sha256": "6cbfaf2f2d4891bfc4f8874e422bd2af12ff06d561d82f5d1b577472a0498548"
+    },
+    {
+      "file": "accounting-fix-verification-summary.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\code_quality\\797f4e56f156d73afeaaab3669eb142c2902c0e3b3ad08fc04b32a71cf49090e\\7a7adf22e27b4825a5ed65da339b3db1\\summary.json",
+      "bytes": 3490,
+      "sha256": "65947e07194c2c04481074c13b04670da03f7d60c67db41dd00a0e67875b996e"
+    },
+    {
+      "file": "accounting-fix-source-manifest.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\code_quality\\797f4e56f156d73afeaaab3669eb142c2902c0e3b3ad08fc04b32a71cf49090e\\7a7adf22e27b4825a5ed65da339b3db1\\source_manifest.json",
+      "bytes": 32036,
+      "sha256": "6d461f24e413e07b13080699b358e65605d288e57c71b9e283eef2339259930f"
+    },
+    {
+      "file": "isolated-environment-failure-summary.json",
+      "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\code_quality\\797f4e56f156d73afeaaab3669eb142c2902c0e3b3ad08fc04b32a71cf49090e\\2ef31c84e7ee46bfbab7c02c3d4477d6\\summary.json",
+      "bytes": 3491,
+      "sha256": "07a45d3726d778c8ff004627ed2e9cdabb3c29c0e1d176f6567c951e72e35c9b"
+    }
+  ],
+  "scope": "复制原字节；原始逐案proof和请求journal保留本地artifacts路径，摘要见comparison及completion-audit。",
+  "accounting_fix_commit": "4d47d100bdcadc1c742633d79b816361d310ab1e",
+  "experiment_source_commit": "2fa0a5665602f1525045a4b5e327306a4780d3ce",
+  "finalized_at": "2026-10-15T22:46:06.562988+00:00"
+}

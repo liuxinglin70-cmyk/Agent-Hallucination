@@ -1,0 +1,225 @@
+{
+  "run_id": "next_action100_quote_fixed_recovery",
+  "metrics": {
+    "decisive": 4,
+    "unresolved": 0,
+    "completion": 1.0,
+    "decisive_accuracy": 0.5,
+    "all_case_accuracy": 0.5,
+    "tp": 2,
+    "fp": 1,
+    "fn": 1,
+    "tn": 0,
+    "positive_precision": 0.6666666666666666,
+    "positive_recall": 0.6666666666666666,
+    "positive_f1": 0.6666666666666666,
+    "macro_precision": 0.3333333333333333,
+    "macro_recall": 0.3333333333333333,
+    "macro_f1": 0.3333333333333333,
+    "authoritative": 4,
+    "degraded": 0,
+    "degraded_disagreeing": 0,
+    "terminal_metrics": {
+      "decisive": 4,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.5,
+      "all_case_accuracy": 0.5,
+      "tp": 2,
+      "fp": 1,
+      "fn": 1,
+      "tn": 0,
+      "positive_precision": 0.6666666666666666,
+      "positive_recall": 0.6666666666666666,
+      "positive_f1": 0.6666666666666666,
+      "macro_precision": 0.3333333333333333,
+      "macro_recall": 0.3333333333333333,
+      "macro_f1": 0.3333333333333333
+    },
+    "provider_unresolved": 0,
+    "no_terminal_decision": 0,
+    "requested_cases": 4,
+    "found_results": 4,
+    "missing_cases": 0,
+    "step_localization": {
+      "target": "dataset_first_error_event.v1",
+      "step_unit": "trajectory_event_position",
+      "unmapped_annotations": 0,
+      "target_mismatch_rows": 0,
+      "n": 3,
+      "hits": 2,
+      "accuracy": 0.6666666666666666,
+      "by_step_kind": {
+        "unclassified": {
+          "n": 1,
+          "hits": 0,
+          "accuracy": 0.0
+        },
+        "action_step": {
+          "n": 1,
+          "hits": 1,
+          "accuracy": 1.0
+        },
+        "content_step": {
+          "n": 1,
+          "hits": 1,
+          "accuracy": 1.0
+        }
+      },
+      "note": "action-step and content-step accuracy answer different questions; read them apart, never as one rate"
+    }
+  },
+  "rows": [
+    {
+      "case": "OpenDeepSearch/043.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/060.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 9,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/052.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/031.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    }
+  ],
+  "errors": [
+    {
+      "case": "OpenDeepSearch/043.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "In 2014, Reza Aslan received the 'Great Immigrants' award from the Carnegie Corporation of New York; he was also nominated for the Andrew Carnegie Medal for Excellence in Nonfiction that same year.",
+        "correct_result": "The award Reza Aslan received in 2014 — the trajectory's own search observation identifies the 'Great Immigrants' honor from the Carnegie Corporation of New York, and the delivered answer matches that observation with no conflicting observation in the record and no certain external contradiction.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Identify the specific award Reza Aslan received in 2014"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "unknown",
+            "reason": "missing_or_invalid_comparison",
+            "evidence_refs": [],
+            "quote": "",
+            "decision_authority": "none",
+            "localization_authority": "none"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "Magentic_One/060.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The stanza that contains indented lines in Audre Lorde's \"Father Son and Holy Ghost\" is the second stanza (stanza number 2).",
+        "correct_result": "Stanza number 2 — the second stanza (\"Not that his judgment eyes … as we pass.\") is the stanza in which some lines are indented, matching the indentation visible on the consulted Poetry Foundation text.",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The question fixes the deliverable as the number of the stanza in Audre Lorde's poem \"Father Son and Holy Ghost\" in which some lines are indented (expected: 2, the second stanza)."
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 9,
+        "evidence_refs": [
+          "event_005",
+          "event_009",
+          "event_010"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: At event_009 the Coder states 'First stanza: \"I have not ever seen my father's grave.\"' and 'Second stanza: Starts at \"Not that his judgment eyes\" and runs through \"as we pass.\"', concluding '**Stanza number 2** contains indented lines.' This segmentation is factually wrong: event_005's page text shows 'I have not ever seen my father's grave.' and 'Not that his judgment eyes / have been forgotten / nor his great hands' print ... as we pass.' as consecutive lines of one continuous sentence ('I have not ever seen my father's grave. / Not that his judgment eyes / have been forgotten...') with no intervening stanza division, and the Coder's own fifth 'stanza' even merges two separate lines ('Lest I go into dust I have not ever seen my father's grave.'), confirming his divisions are misread. The correct referent, established by the shown page text and the poem's grammar, is that the first stanza is the 15-line unit running from 'I have not ever seen my father's grave.' through 'as we pass.' RELEVANCE TEST: The Coder located the indented lines (the staircase he quotes: 'one half turn each night / and he would come / drabbled with the world's business') inside exactly that 'Not that his judgment eyes ... as we pass.' unit, while reporting no indentation in the 'Each week a different woman' stanzas, the 'My father died in silence' stanza, or the closing couplet. Under correct segmentation that indented unit is the FIRST stanza, so the correct answer is 1; because the Coder excised line 1 as a bogus one-line 'first stanza', every subsequent number shifted by one and he answered 2, which event_010 then delivered verbatim ('the stanza that contains indented lines is the second stanza'). Correcting the segmentation at event_009 renumbers the indented unit to stanza 1 and makes the sole deliverable correct; no later event repairs the error. The deviation is therefore real and materially causally connected to the wrong delivered result."
+      }
+    }
+  ],
+  "degraded_disagreements": [],
+  "missing_cases": []
+}

@@ -1,0 +1,154 @@
+{
+  "started_at_utc": "2026-10-15T22:02:03.160617+00:00",
+  "finished_at_utc": "2026-10-15T22:44:11.720825+00:00",
+  "python": "3.13.7",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "scope": "all",
+  "network_policy": "loopback_only",
+  "not_run": [],
+  "source_sha256": "797f4e56f156d73afeaaab3669eb142c2902c0e3b3ad08fc04b32a71cf49090e",
+  "passed": true,
+  "tests": {
+    "tests": 2596,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 2596
+  },
+  "checks": [
+    {
+      "name": "source_audit",
+      "exit_code": 0
+    },
+    {
+      "name": "dataset_integrity",
+      "exit_code": 0
+    },
+    {
+      "name": "pytest",
+      "arguments": [
+        "-m",
+        "pytest",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "--junitxml=E:\\agent hallucination\\budget-journal-worktree\\artifacts\\code_quality\\797f4e56f156d73afeaaab3669eb142c2902c0e3b3ad08fc04b32a71cf49090e\\7a7adf22e27b4825a5ed65da339b3db1\\pytest.xml"
+      ],
+      "exit_code": 0,
+      "seconds": 2488.778
+    },
+    {
+      "name": "detector_cli",
+      "arguments": [
+        "-m",
+        "detector",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.333
+    },
+    {
+      "name": "detector_cli_registers_commands",
+      "exit_code": 0
+    },
+    {
+      "name": "evolution_cli",
+      "arguments": [
+        "-m",
+        "evolution",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.355
+    },
+    {
+      "name": "evolution_cli_registers_commands",
+      "exit_code": 0
+    },
+    {
+      "name": "experiments_cli",
+      "arguments": [
+        "-m",
+        "experiments",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.348
+    },
+    {
+      "name": "experiments_cli_registers_commands",
+      "exit_code": 0
+    },
+    {
+      "name": "capability_audit",
+      "arguments": [
+        "-m",
+        "evolution",
+        "capability-audit"
+      ],
+      "exit_code": 0,
+      "seconds": 0.851
+    },
+    {
+      "name": "capability_audit_admissible",
+      "exit_code": 0,
+      "detail": "all_admitted=True, sandbox_blockers=[]"
+    },
+    {
+      "name": "metamorphic_gate",
+      "arguments": [
+        "-m",
+        "evolution",
+        "metamorphic-gate"
+      ],
+      "exit_code": 0,
+      "seconds": 0.778
+    },
+    {
+      "name": "sandbox_check",
+      "arguments": [
+        "-m",
+        "evolution",
+        "sandbox-check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.361
+    },
+    {
+      "name": "smoke",
+      "arguments": [
+        "-m",
+        "evolution",
+        "smoke",
+        "--config",
+        "E:\\agent hallucination\\budget-journal-worktree\\artifacts\\offline_verification_7x4shqre\\config.json"
+      ],
+      "exit_code": 0,
+      "seconds": 15.423
+    },
+    {
+      "name": "smoke_admission_and_audit",
+      "exit_code": 0
+    },
+    {
+      "name": "smoke_round_path_single_shot",
+      "exit_code": 0
+    },
+    {
+      "name": "capability_smoke",
+      "arguments": [
+        "-m",
+        "evolution",
+        "capability-smoke",
+        "--config",
+        "E:\\agent hallucination\\budget-journal-worktree\\artifacts\\offline_verification_7x4shqre\\config.json"
+      ],
+      "exit_code": 0,
+      "seconds": 8.722
+    },
+    {
+      "name": "source_unchanged_during_checks",
+      "exit_code": 0
+    }
+  ]
+}

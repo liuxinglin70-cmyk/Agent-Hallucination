@@ -1,0 +1,47 @@
+{
+  "schema_version": "research.post_run_accounting_fix.v1",
+  "completed_at": "2026-10-15T22:46:06.362198+00:00",
+  "experiment_commit": "2fa0a5665602f1525045a4b5e327306a4780d3ce",
+  "accounting_fix_commit": "4d47d100bdcadc1c742633d79b816361d310ab1e",
+  "changed_source_files": [
+    "detector/provider.py",
+    "detector/tests/test_provider.py"
+  ],
+  "production_delta": "仅增加AddedBudgetExceeded的结束观察记录及导入；移除这两处后provider源文本与2fa0a56一致。预算异常原样传播，不新增重试，不改provider请求正文或裁决规则。",
+  "regression_before": {
+    "failed": 1,
+    "passed": 1,
+    "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\budget-journal-source-before.xml",
+    "sha256": "c3a61ae1c7247ef1bb98a57c713e60739ad62d8f9c570d924872e0e399b95998"
+  },
+  "targeted_after": {
+    "passed": 48,
+    "source": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\next_action100_20261015\\budget-journal-source-after.xml",
+    "sha256": "e82c28bd3ad81bca1c89c2fe61a7bb118ae497a075323c8dbaa5c8056961a7b2"
+  },
+  "full_verification": {
+    "report": "artifacts\\code_quality\\797f4e56f156d73afeaaab3669eb142c2902c0e3b3ad08fc04b32a71cf49090e\\7a7adf22e27b4825a5ed65da339b3db1",
+    "source_sha256": "797f4e56f156d73afeaaab3669eb142c2902c0e3b3ad08fc04b32a71cf49090e",
+    "tests": {
+      "tests": 2596,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 2596
+    },
+    "checks": 18,
+    "main_source_exactly_matches": true
+  },
+  "isolated_environment_failure": {
+    "report": "artifacts/code_quality/797f4e56f156d73afeaaab3669eb142c2902c0e3b3ad08fc04b32a71cf49090e/2ef31c84e7ee46bfbab7c02c3d4477d6",
+    "failures": 23,
+    "causes": [
+      "缺少离线测试所需的凭据占位值",
+      "junction解析到工作树外使离线文件保护测试失配"
+    ],
+    "correction": "使用虚拟凭据和695个原数据文件的独立副本；原23项复查全部通过（2.06秒），随后完整2596/18重验通过。"
+  },
+  "historical_journals_backfilled": false,
+  "experiment_rerun_after_accounting_fix": false,
+  "scope": "正式100+4恢复结果全部来自实验提交；后续记账修复仅单列离线验收，不将真实结果冒充为新提交实测。"
+}

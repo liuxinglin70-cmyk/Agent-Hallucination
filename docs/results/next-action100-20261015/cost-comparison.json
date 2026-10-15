@@ -1,0 +1,60 @@
+{
+  "schema_version": "research.next_action_cost_comparison.v1",
+  "source_completion_audit_sha256": "d613f90e3e5b4681999aacf7f3b6fd3b62bff3d14bfd4ba47ee76852472cfe98",
+  "source_prior_cost_audit_sha256": "4d317b622c95bf383514aa62d6cf222c70fcef23a99771f3aa45c7a09294058f",
+  "adopted_dispatched_requests": {
+    "previous": 740,
+    "current": 797,
+    "change_percent": 7.702702702702702,
+    "current_execution_observations": 794,
+    "current_started_without_finish": 4,
+    "current_finished_without_start": 1
+  },
+  "all_attempts": {
+    "previous_started": 866,
+    "current_started": 940,
+    "current_formal_started": 858,
+    "current_pilot_started": 82,
+    "current_started_without_finish": 14,
+    "current_finished_without_start": 1,
+    "current_finished": 927,
+    "current_usage_missing": 60,
+    "previous_started_without_finish": 7,
+    "previous_usage_missing": 31,
+    "formal_change_percent": -0.9237875288683584,
+    "all_change_percent": 8.545034642032334,
+    "formal_unadopted_started": 61,
+    "previous_unadopted_started": 126
+  },
+  "forecast_started_by_run": {
+    "next_action100": 12,
+    "next_action100_quote_fixed": 53,
+    "next_action100_quote_fixed_recovery": 2
+  },
+  "known_usage_lower_bound": {
+    "previous": {
+      "prompt_tokens": 5973029,
+      "completion_tokens": 10296418,
+      "total_tokens": 16269447
+    },
+    "current_all": {
+      "prompt_tokens": 5168756,
+      "completion_tokens": 10407157,
+      "total_tokens": 15575913
+    },
+    "current_formal": {
+      "prompt_tokens": 4854505,
+      "completion_tokens": 9809567,
+      "total_tokens": 14664072
+    }
+  },
+  "adopted_completion_tokens_observed": {
+    "previous": 8510632.0,
+    "current": 9055683.0
+  },
+  "latency_change_percent": {
+    "case_latency_median_seconds": 22.726089611819233,
+    "case_latency_p95_seconds": -6.098703946887052
+  },
+  "scope": "started是dispatch前的本地观察；一条仅排队失败的finished不算已dispatch请求。实际远端完成/费用未知。prompt、completion、total不叠加；缺usage和结束记录较多，已知token下界不能证明降费；无账单单价，不估造金额。"
+}

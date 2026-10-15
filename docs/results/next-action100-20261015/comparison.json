@@ -1,0 +1,1606 @@
+{
+  "historical": {
+    "decisive": 99,
+    "unresolved": 1,
+    "completion": 0.99,
+    "decisive_accuracy": 0.6868686868686869,
+    "all_case_accuracy": 0.68,
+    "tp": 35,
+    "fp": 5,
+    "fn": 26,
+    "tn": 33,
+    "positive_precision": 0.875,
+    "positive_recall": 0.5737704918032787,
+    "positive_f1": 0.693069306930693,
+    "macro_precision": 0.7171610169491525,
+    "macro_recall": 0.7210957722174288,
+    "macro_f1": 0.6867408390323568,
+    "authoritative": 99,
+    "degraded": 0,
+    "requested_cases": 100,
+    "found_results": 100,
+    "missing_cases": 0,
+    "terminal_metrics": {
+      "decisive": 99,
+      "unresolved": 1,
+      "completion": 0.99,
+      "decisive_accuracy": 0.6868686868686869,
+      "all_case_accuracy": 0.68,
+      "tp": 35,
+      "fp": 5,
+      "fn": 26,
+      "tn": 33,
+      "positive_precision": 0.875,
+      "positive_recall": 0.5737704918032787,
+      "positive_f1": 0.693069306930693,
+      "macro_precision": 0.7171610169491525,
+      "macro_recall": 0.7210957722174288,
+      "macro_f1": 0.6867408390323568
+    },
+    "step_localization": {
+      "n": 62,
+      "hits": 22,
+      "accuracy": 0.3548387096774194,
+      "target": "dataset_first_error_event.v1"
+    }
+  },
+  "recent": {
+    "decisive": 99,
+    "unresolved": 1,
+    "completion": 0.99,
+    "decisive_accuracy": 0.7676767676767676,
+    "all_case_accuracy": 0.76,
+    "tp": 42,
+    "fp": 4,
+    "fn": 19,
+    "tn": 34,
+    "positive_precision": 0.9130434782608695,
+    "positive_recall": 0.6885245901639344,
+    "positive_f1": 0.7850467289719626,
+    "macro_precision": 0.7772764561115668,
+    "macro_recall": 0.7916307161345988,
+    "macro_f1": 0.766149738112355,
+    "authoritative": 99,
+    "degraded": 1,
+    "degraded_disagreeing": 0,
+    "terminal_metrics": {
+      "decisive": 100,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.77,
+      "all_case_accuracy": 0.77,
+      "tp": 43,
+      "fp": 4,
+      "fn": 19,
+      "tn": 34,
+      "positive_precision": 0.9148936170212766,
+      "positive_recall": 0.6935483870967742,
+      "positive_f1": 0.7889908256880733,
+      "macro_precision": 0.7782015254917704,
+      "macro_recall": 0.7941426146010186,
+      "macro_f1": 0.7681217864704103
+    },
+    "provider_unresolved": 0,
+    "no_terminal_decision": 0,
+    "requested_cases": 100,
+    "found_results": 100,
+    "missing_cases": 0,
+    "step_localization": {
+      "target": "dataset_first_error_event.v1",
+      "step_unit": "trajectory_event_position",
+      "n": 62,
+      "hits": 27,
+      "accuracy": 0.43548387096774194
+    }
+  },
+  "current": {
+    "decisive": 100,
+    "unresolved": 0,
+    "completion": 1.0,
+    "decisive_accuracy": 0.76,
+    "all_case_accuracy": 0.76,
+    "tp": 42,
+    "fp": 4,
+    "fn": 20,
+    "tn": 34,
+    "positive_precision": 0.9130434782608695,
+    "positive_recall": 0.6774193548387096,
+    "positive_f1": 0.7777777777777777,
+    "macro_precision": 0.7713365539452496,
+    "macro_recall": 0.7860780984719864,
+    "macro_f1": 0.7584541062801933,
+    "authoritative": 100,
+    "requested_cases": 100,
+    "step_localization": {
+      "n": 62,
+      "hits": 27,
+      "accuracy": 0.43548387096774194
+    }
+  },
+  "paired_historical": {
+    "detection_fixed": [
+      "BFCL/085.json",
+      "BFCL/030.json",
+      "Magentic_One/065.json",
+      "OpenDeepSearch/027.json",
+      "OpenDeepSearch/071.json",
+      "BFCL/056.json",
+      "OpenManus/073.json",
+      "BFCL/052.json",
+      "BFCL/055.json",
+      "BFCL/144.json",
+      "Magentic_One/031.json",
+      "OpenDeepSearch/087.json"
+    ],
+    "detection_regressed": [
+      "Camel/001.json",
+      "BFCL/071.json",
+      "OpenManus/031.json",
+      "SmolAgents/062.json"
+    ],
+    "localization_fixed": [
+      "BFCL/085.json",
+      "BFCL/030.json",
+      "OpenDeepSearch/027.json",
+      "SmolAgents/066.json",
+      "BFCL/052.json",
+      "Magentic_One/031.json",
+      "OpenDeepSearch/087.json"
+    ],
+    "localization_regressed": [
+      "Camel/022.json",
+      "Camel/021.json"
+    ]
+  },
+  "paired_recent": {
+    "detection_fixed": [
+      "OpenDeepSearch/027.json",
+      "SmolAgents/043.json",
+      "OpenManus/095.json",
+      "Camel/012.json"
+    ],
+    "detection_regressed": [
+      "BFCL/071.json",
+      "OpenDeepSearch/034.json",
+      "OpenManus/031.json",
+      "SmolAgents/062.json"
+    ],
+    "localization_fixed": [
+      "OpenDeepSearch/027.json",
+      "SmolAgents/043.json"
+    ],
+    "localization_regressed": [
+      "BFCL/056.json",
+      "OpenManus/031.json"
+    ]
+  },
+  "cost_all_attempts": {
+    "started_requests": 940,
+    "finished_requests": 927,
+    "started_without_finish": 14,
+    "by_purpose": {
+      "action_forecast": 67,
+      "judge": 405,
+      "judge_repair": 49,
+      "recall_scanner": 35,
+      "defense": 199,
+      "step_tracer": 60,
+      "step_tracer_repair": 23,
+      "recall_scanner_repair": 21,
+      "causal_upgrade": 81
+    },
+    "started_by_run": {
+      "next_action100": 82,
+      "next_action100_quote_fixed": 798,
+      "next_action100_quote_fixed_recovery": 60
+    },
+    "status_counts": {
+      "response": 867,
+      "transport_error": 59,
+      "deadline_exceeded": 1
+    },
+    "usage": {
+      "prompt_tokens": 5168756,
+      "completion_tokens": 10407157,
+      "total_tokens": 15575913,
+      "input_tokens": 5168756,
+      "output_tokens": 10407157
+    },
+    "usage_missing": 60,
+    "pricing": "未取得服务实际账单单价，不估造货币费用。",
+    "journals": [
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__030.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "aef2fdb68703ff0f37cd061f52736030084eeb0c8a1d0f76d05276bdb513fab5"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__031.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "e81c1e0fee2e11185c9f3b0055c4e080d56edf4cefc5b8464f93a702e59f2445"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__085.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "6f119ed2ebcfea621296bfbbf3896c5725b193f82268bc627cb9ce61bf9db720"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__087.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "97d83617fbf9a08b1c0e4790a6ab48eb60e89076d61a285d9660a9f53b759d83"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__115.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "c1d65fdbe71ed0f17b2e7040b9c4a1f2a847b79d6e6e840bbab30f489ee0dbfd"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__129.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "4793ac45558b310fcaad419f157edddf594d6d42e38b6d531734c958dba8c450"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\BFCL__155.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "c2d2fef9a4716aa7efbacddc86db0af953fdbe6a297ca2c473cf07746b1e6aaf"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\Camel__001.json\\attempts\\001_20261015T223805\\requests.jsonl",
+        "sha256": "bebb742e65005005817126d504061893e357d7164d98b38bca2c673237450fba"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\Camel__022.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "8952d03f0ff3b15be557b1179729f9de7bc7f11fe85d01f48de47e8f1528b2e8"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\Magentic_One__061.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "7a0c14bf06c5066f05b298da0e97a6d7c14bc7209a8c8479d0ce0900c52deee7"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\Magentic_One__065.json\\attempts\\001_20261015T223848\\requests.jsonl",
+        "sha256": "8ab0e20b8721a506ce813999964efff7eae8b13cce22664284205b3fa18d8652"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\Magentic_One__078.json\\attempts\\001_20261015T223752\\requests.jsonl",
+        "sha256": "7be93cdd1c93fb6087ed66a0ea937ede0966d1b94a961268c8472dfe6bb7cebe"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\OpenDeepSearch__011.json\\attempts\\001_20261015T224003\\requests.jsonl",
+        "sha256": "0cabae489df0f3f001678fd969df5a74a95cbe6f9d0f15b981a4da7cfde60278"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\OpenDeepSearch__023.json\\attempts\\001_20261015T222257\\requests.jsonl",
+        "sha256": "ffee372c25d34093506de3b647d520f078b64867a284542907e0f85da3c46d18"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\OpenDeepSearch__058.json\\attempts\\001_20261015T222924\\requests.jsonl",
+        "sha256": "9fbdf1c8a7a5c60bac7e03813a9bc58167a04c2417d00bf9c6b640f9a19382b9"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\OpenManus__012.json\\attempts\\001_20261015T223320\\requests.jsonl",
+        "sha256": "8826144d028503b5c60938bfa0a0c6ae612fb143ee3b703b182e8d7c52dd8c52"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\OpenManus__040.json\\attempts\\001_20261015T223501\\requests.jsonl",
+        "sha256": "862f3948c12354f100bfb09e472b86229736180682e59dfa5d09b926388a6df7"
+      },
+      {
+        "path": "runs\\next_action100\\cases\\SmolAgents__011.json\\attempts\\001_20261015T223016\\requests.jsonl",
+        "sha256": "c5ce017938e31c30e5ed41bd1211317acba113a101803e36f8c657472fc92730"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__000.json\\attempts\\001_20261016T005847\\requests.jsonl",
+        "sha256": "c05be3bc025af500a7331a2e91be62cbc7d0719326e67ff2d6627fc8e46f6436"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__011.json\\attempts\\001_20261016T012439\\requests.jsonl",
+        "sha256": "512c84c1d106387509203660501aa1d6bc9cefb513a8e763926d403bb145fece"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__021.json\\attempts\\001_20261016T010800\\requests.jsonl",
+        "sha256": "1c3ed022297d91b4b40946ca2f3d3599fe2a62339b475dcd4e76c650d102bb74"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__030.json\\attempts\\001_20261015T232909\\requests.jsonl",
+        "sha256": "f6094e116a455b19d92a7ee46609f5de96042dd118657fc64f5d19079b4b0c52"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__031.json\\attempts\\001_20261015T232909\\requests.jsonl",
+        "sha256": "ea07f2d316c2e57322126ddacaa3ae7e9251774b70753bb719d9dfdb23fc75a7"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__037.json\\attempts\\001_20261016T012349\\requests.jsonl",
+        "sha256": "30b3d757784aad88668eeb757c8497dc93cc562c856090c14a6efe73262babda"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__052.json\\attempts\\001_20261016T005254\\requests.jsonl",
+        "sha256": "918c407a286369c5c834eb1639c98ae626419d1cfa153f84b08b90ac2fec616a"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__055.json\\attempts\\001_20261016T010619\\requests.jsonl",
+        "sha256": "eb7b15ae496cc34168a2bfe6f74f372947e9179de2502d234c82a7755f6a5f22"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__056.json\\attempts\\001_20261016T002525\\requests.jsonl",
+        "sha256": "22bc9d104a34367571e8ec81305971565a79ec5433d71c33e4f1cf2b0e2f377d"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__071.json\\attempts\\001_20261016T002506\\requests.jsonl",
+        "sha256": "e1375558bb0d3bee60e4164583bdc15186c1a426096e2a0857755921bdfe7910"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__072.json\\attempts\\001_20261015T235547\\requests.jsonl",
+        "sha256": "538354d4a3f7235cb393e104fa3d1bef2d35987b640a2dd286e36ce1590e0313"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__085.json\\attempts\\001_20261015T232909\\requests.jsonl",
+        "sha256": "09252bf34e7c50148c1b4e1947723b2c12864e8b517b369221e9a36472498dbf"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__087.json\\attempts\\001_20261015T232909\\requests.jsonl",
+        "sha256": "0370ae75bcf9f5e0385ee8e3de8c68efdd2a0ca1f3614ddedfb533bd0b04a687"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__088.json\\attempts\\001_20261016T005044\\requests.jsonl",
+        "sha256": "a3a7d90e92bf24737ce9216624998a5b203aeb04978c720ce71790cbbbd4e023"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__114.json\\attempts\\001_20261015T235403\\requests.jsonl",
+        "sha256": "2a4081c269410f32b547b2e08379eebb47fb7c09eaa5c02dd09385f2ef43b7f9"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__115.json\\attempts\\001_20261015T232909\\requests.jsonl",
+        "sha256": "6708410d3d6fac2f4d1984e123d35e9ac170db7d4fc85aa7daccc36932d2065a"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__118.json\\attempts\\001_20261016T001011\\requests.jsonl",
+        "sha256": "42b49744e818e3db0ff0d6a67cff084bb9d1a6c09dfaa4b8c85b6fd841090322"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__122.json\\attempts\\001_20261016T010526\\requests.jsonl",
+        "sha256": "db300c8bf35fb96b7aed50d99ff542da9d167d5866634e5429a568215d48c5c5"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__125.json\\attempts\\001_20261016T020509\\requests.jsonl",
+        "sha256": "668a13bb094f8deb92a5a05c4cf9a24668a10f5000f08fbe6ced0265b1dc43c8"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__127.json\\attempts\\001_20261016T024145\\requests.jsonl",
+        "sha256": "a17f0e6df6e82b9a18f0b98765cf133b6c3d135daad4fb1eca3d799252ce8cc3"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__129.json\\attempts\\001_20261015T232909\\requests.jsonl",
+        "sha256": "d777d220d1d62d8c26b6808df3998d9c20047275d080fb7412a8f036c1dd8111"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__130.json\\attempts\\001_20261016T023837\\requests.jsonl",
+        "sha256": "6103e8fe89c6f403ddc1000382f94afea92a362b64f76ef281fb92c4da85060f"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__144.json\\attempts\\001_20261016T015734\\requests.jsonl",
+        "sha256": "a961c359735dc426e4000ec4d2663f768c6a7fbac01edd7ea38106e43800e82f"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__150.json\\attempts\\001_20261016T014323\\requests.jsonl",
+        "sha256": "a9ce54308e8fadf86b64d5c4d657a6f4634edae00b861aba8275f017a9efd560"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\BFCL__155.json\\attempts\\001_20261015T232909\\requests.jsonl",
+        "sha256": "e8f68de1f5634eaa18666e1ca7740a698a5080394835e0d4b1f9af60c678d7c4"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__001.json\\attempts\\001_20261015T234627\\requests.jsonl",
+        "sha256": "2a3fd4873c5ea5a760cc38244cbd220977d88bbb53db9ced728fb1f0d5afd595"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__006.json\\attempts\\001_20261016T020054\\requests.jsonl",
+        "sha256": "2ef3d91e41b6e8e9a33b8217c3f6fa1e5582cdf0b5fe37ff6454ab1ab9c7d511"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__010.json\\attempts\\001_20261016T001608\\requests.jsonl",
+        "sha256": "a05bb2bdba30fdad0d2b564c20db55749bab626152978b491343254b47873095"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__012.json\\attempts\\001_20261016T024400\\requests.jsonl",
+        "sha256": "140080c39e3e5bb61370d3f5ec4e17dca1e8a11e55ee8b34afbc5c9a320ffc60"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__016.json\\attempts\\001_20261016T010917\\requests.jsonl",
+        "sha256": "eb4bc1960c624573d700d2582ab0bc0e070e9fd41417438cc1abb0999b35da8c"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__021.json\\attempts\\001_20261016T000322\\requests.jsonl",
+        "sha256": "c82e58131797f2d7040e0776699a25de7a3212299750a67f045b5d36e18f7e91"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__022.json\\attempts\\001_20261015T232909\\requests.jsonl",
+        "sha256": "f4482e9eb76aa3df5a7745bb14e83865e9b0e2e1375f5af68a3951382874d116"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__024.json\\attempts\\001_20261016T021105\\requests.jsonl",
+        "sha256": "206dbc9e6d2297feed223f2087523bb6db8fb3414196cd4ed45372528c7feb85"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__032.json\\attempts\\001_20261016T011731\\requests.jsonl",
+        "sha256": "623506b0e19061d5c66df839b97a9c03e1ceefb12656add1919c770d75ac560f"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__043.json\\attempts\\001_20261016T004923\\requests.jsonl",
+        "sha256": "04238cd91a753f45c41918affd405ccef2ed212b278c32866b7211962fc794a9"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__076.json\\attempts\\001_20261016T005123\\requests.jsonl",
+        "sha256": "852d379f5bcbb77e5144ec3e611c861eb0bb3aa67fc40d8f0cf27221da92ce8c"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__077.json\\attempts\\001_20261015T235037\\requests.jsonl",
+        "sha256": "54457d989fbb3a875f5af5f8e4bd3806b9ee4403d2b4e94dd823d3631dc7ceae"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__084.json\\attempts\\001_20261016T023519\\requests.jsonl",
+        "sha256": "c7aa34dfb519101aa7f0e64dfb91722f47a7b6f8f47f5470f9d4268a91b57d6b"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Camel__086.json\\attempts\\001_20261016T005710\\requests.jsonl",
+        "sha256": "43c7e8255a910b94e2b57995f472b6c2d9f5f0f2199815101975185ccc7d0829"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__025.json\\attempts\\001_20261016T002251\\requests.jsonl",
+        "sha256": "574513267b2020d3c589f109b0683641c1c9ffb446468bd1f0bf5001a2807a9f"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__027.json\\attempts\\001_20261016T004653\\requests.jsonl",
+        "sha256": "d5864144eb73321571aba9987a76a2d0bdbb777795376e530f0ce961ff0144af"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__031.json\\attempts\\001_20261016T021201\\requests.jsonl",
+        "sha256": "12b6eca0b5b4ca2b9943d0b0e0c6f443cca91101e7c66408098c5499af5efcfd"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__055.json\\attempts\\001_20261016T012544\\requests.jsonl",
+        "sha256": "ae978a38197fb530dabe976c314abf7df7395b80d58186bf127c793663e35177"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__060.json\\attempts\\001_20261016T001719\\requests.jsonl",
+        "sha256": "768a1812faeca515b8d5199e691cb40554fa1a57b15511a6d90dc100e9762e24"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__061.json\\attempts\\001_20261015T232909\\requests.jsonl",
+        "sha256": "b0ec547923c917f84daea12a085068325c3666381443c8543f0d7b79122d9912"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__065.json\\attempts\\001_20261015T234657\\requests.jsonl",
+        "sha256": "8a0a8720edf1e3458a6be991a82f3f28e5252afc8ef24d36c36c1033b30c9d36"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__071.json\\attempts\\001_20261016T014013\\requests.jsonl",
+        "sha256": "9e3645c48f60f3e53d12f932292d2c81dcc9b3d9f87243b7581e38b5d298d738"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__074.json\\attempts\\001_20261016T004901\\requests.jsonl",
+        "sha256": "0d827d97de4e3791f86f33fc083351abcda5058227f2b0b2a1526dabed6bf984"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__076.json\\attempts\\001_20261016T020526\\requests.jsonl",
+        "sha256": "a8fce6ebcb0ef6598be504c573769a7144ae3c9d86feaa8a17671f30f62a7e54"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__078.json\\attempts\\001_20261015T234542\\requests.jsonl",
+        "sha256": "ee27c200e05c27c44507316bd66989c7c4797995e82e6aa528e16da6f624cad8"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__090.json\\attempts\\001_20261016T023156\\requests.jsonl",
+        "sha256": "9c349d8847b282d6d152bb7b5dc8a930a20ca7d13b81f62ae760c9919289a2ed"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Magentic_One__091.json\\attempts\\001_20261015T235745\\requests.jsonl",
+        "sha256": "ab051ba98ea7d0baf66f1714da03a5204a92904b7cb6ef3fcd4986cea9c3a53b"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Octotools__020.json\\attempts\\001_20261016T000938\\requests.jsonl",
+        "sha256": "01a914b82f37f339b78ed81d50e496c42f3e72fc1d936f9562abd67d00e942a6"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Octotools__023.json\\attempts\\001_20261016T010100\\requests.jsonl",
+        "sha256": "a211c86b915766b742bec780f189f9260b1d9274f822b2a8c61eb9ae66f82401"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\Octotools__028.json\\attempts\\001_20261016T001622\\requests.jsonl",
+        "sha256": "83179ea034f820e0ee29781d2595fb25ba536dde7563df0b2789a4328317a3e3"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__007.json\\attempts\\001_20261016T013643\\requests.jsonl",
+        "sha256": "0c12a1d0ba328da513d370af853caa64bca6149b56795aa18abcb52e16f1c7ae"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__011.json\\attempts\\001_20261015T234801\\requests.jsonl",
+        "sha256": "fe9ba2120687c795613d5b64589d9513b9e25f7b3f215aa8ca872694c3b61ef1"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__014.json\\attempts\\001_20261016T014936\\requests.jsonl",
+        "sha256": "b9aaaa4164afa53de300dfc63c45090c804097742c61013151f52dab621a441a"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__022.json\\attempts\\001_20261016T004922\\requests.jsonl",
+        "sha256": "839f936620c414191d68bfedca44b2fcbfe5d31eedc75acbbbb0929c364e3678"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__023.json\\attempts\\001_20261015T232909\\requests.jsonl",
+        "sha256": "b15114d4f5a4d777e71b56b4b2ce24d68a50e6b87cbd6ce8edaf32e9938b964f"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__027.json\\attempts\\001_20261015T235214\\requests.jsonl",
+        "sha256": "aa2d16aa1b582d079d9853a81aa267d3716d26359baa81b0573de71cfa6478e5"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__034.json\\attempts\\001_20261016T010315\\requests.jsonl",
+        "sha256": "d20b067a12f9d5e8a2293e3d24024c044fd9fdd763430a3893cadec4e53d9fd8"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__036.json\\attempts\\001_20261016T015739\\requests.jsonl",
+        "sha256": "d6b6f48e0cfcbc4b3d94026e5de21cda6c19a3b1a5d528a19b071932205fd58a"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__040.json\\attempts\\001_20261016T005520\\requests.jsonl",
+        "sha256": "82b75ebdeb0733b28d95b81cd3b10b494c1d52ab4b9363e2ac88e473ae5b2d29"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__042.json\\attempts\\001_20261016T000049\\requests.jsonl",
+        "sha256": "691a628f53a362646ebb0a704b0855c2ccfdad8866b0719929b1301d523f963a"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__043.json\\attempts\\001_20261016T001629\\requests.jsonl",
+        "sha256": "4dd2bbeac87bd40794d189d775eb76aac06125971b5e64406e02c7929f73a5d5"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__055.json\\attempts\\001_20261016T001828\\requests.jsonl",
+        "sha256": "e24675969b744a734cecfba9c761bad1c661e2c73e330f3ddff0af89c1787a1a"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__058.json\\attempts\\001_20261015T233429\\requests.jsonl",
+        "sha256": "2484264de28a2092ad54ae046ad8d2be73f31909efc1b3e5b9fc13136f81f87c"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__065.json\\attempts\\001_20261016T004514\\requests.jsonl",
+        "sha256": "a91d44a20a3830694e7146e5dc4ca2971d7b207bb0ae76f567ce1ba5262024c1"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__068.json\\attempts\\001_20261016T015558\\requests.jsonl",
+        "sha256": "bc758cadc4987ffd437c92adfcd80dc505b05efbbf713c546e945d80b0e557cc"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__071.json\\attempts\\001_20261016T002441\\requests.jsonl",
+        "sha256": "1be3ab23392b72316d3482d5133430979a6e57e37695d7cffd1901dd8ce121c7"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__072.json\\attempts\\001_20261016T012332\\requests.jsonl",
+        "sha256": "e05ac8575bf050f88a7d1de0effe61db29fcdcad720d6d4b7df4bcc72c4fe6d3"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__087.json\\attempts\\001_20261016T022945\\requests.jsonl",
+        "sha256": "a2aa76248f3273758f7c403a8e3855d1572b58a05a85301e7263913b7aa5f65a"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenDeepSearch__090.json\\attempts\\001_20261016T012422\\requests.jsonl",
+        "sha256": "d975cf91cbda772541ed0128d87d0664053830ee8bef0ac1f975fb7ffa3f1a19"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__012.json\\attempts\\001_20261015T234451\\requests.jsonl",
+        "sha256": "923a3339018e23aea0dbc23291db92b97a5096d630f005007c2d9da84dfd6b55"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__016.json\\attempts\\001_20261016T010200\\requests.jsonl",
+        "sha256": "047f9cf3eebd48a3f4c5b298aa2fc27e51c800ce5eecf2d7a6d7f10178ecac66"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__031.json\\attempts\\001_20261016T013650\\requests.jsonl",
+        "sha256": "ce50a9d0d8f2bc97ca8776c830303b6e46f4103347308717a38c5dfcfee9693b"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__037.json\\attempts\\001_20261016T010347\\requests.jsonl",
+        "sha256": "8e33a57d29f656cf1984aa1b8b6ded8458db21feb0684192d8a6f38319576ff8"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__040.json\\attempts\\001_20261015T234516\\requests.jsonl",
+        "sha256": "517511c00c049b5b609db1a1b6e602a6438337d0f3694e204fdd8343a805be1b"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__043.json\\attempts\\001_20261016T004811\\requests.jsonl",
+        "sha256": "64c2c690b5fbab112c5c559b8a456d8c65a02a3a96f0774427e0b2b1d5f18268"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__055.json\\attempts\\001_20261016T003643\\requests.jsonl",
+        "sha256": "7ba01fa0e670dc9e902e514c0a9ed84ee3da3711bfc1f65c88363be821b45aaf"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__064.json\\attempts\\001_20261016T005500\\requests.jsonl",
+        "sha256": "978b95dcfe883f0733fface67baf64bb43e78c52cccdc065691c2403ddd8b54f"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__068.json\\attempts\\001_20261016T021129\\requests.jsonl",
+        "sha256": "893f2c356265752afebe826961918946fb5d0c5f7a02171bd8f0e7f31549f302"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__073.json\\attempts\\001_20261016T004907\\requests.jsonl",
+        "sha256": "425e6b51b8887b8d4f8b6bf3cf00e75e1dd0e52262e3521321fdc6bfc1d65290"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__083.json\\attempts\\001_20261016T005233\\requests.jsonl",
+        "sha256": "940a02350d7cb4dc2cee769cffdee6eab3b6085903957eb7aeb477bbbf039060"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__095.json\\attempts\\001_20261016T010357\\requests.jsonl",
+        "sha256": "915e626758d55333088dafa476d11d2adb1341d673200c2ccc33b13077afaf3d"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__097.json\\attempts\\001_20261016T005017\\requests.jsonl",
+        "sha256": "426c3a4f9b4dfbb130ae87b1e49c60546d2a302cf1a423507ff7a07a81269a82"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\OpenManus__102.json\\attempts\\001_20261016T004126\\requests.jsonl",
+        "sha256": "72d7bd239d91e4d4bf6bccf15f9b59cc8f73264f4ac2d269885a383f550e8657"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__011.json\\attempts\\001_20261015T233628\\requests.jsonl",
+        "sha256": "f75d9c14d9aea7353e3c51c2a6cf255907984ad8910176fa7030f95f723feee4"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__022.json\\attempts\\001_20261016T000017\\requests.jsonl",
+        "sha256": "59091cd1760626a29cb455c7fa48eed8b90cc9640f7561ab31b66ac63a261f99"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__024.json\\attempts\\001_20261016T012858\\requests.jsonl",
+        "sha256": "404f59c4b65fb39a7fd6eb5155ed06bf2db3ed4a55afca8998ec8d7b6f2f3884"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__043.json\\attempts\\001_20261016T002331\\requests.jsonl",
+        "sha256": "5df227f739ad991724ce735fe0702d19a3ab472ed6117e049a2545c81a34b89e"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__047.json\\attempts\\001_20261016T005036\\requests.jsonl",
+        "sha256": "6cc6a3bcf91784078f7ea66f53ed4a42d6626ef7079a17e462096ac1d277a753"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__048.json\\attempts\\001_20261016T015358\\requests.jsonl",
+        "sha256": "03cc1a7b0319487dcb25debaeaf2ad54046ce26d805578861a76aca6ca379bf9"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__051.json\\attempts\\001_20261016T012425\\requests.jsonl",
+        "sha256": "4179c02e3b5a00040dc7ad392cb100b1219879b1cce13af87e09f7d63206066b"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__062.json\\attempts\\001_20261016T014921\\requests.jsonl",
+        "sha256": "b1a2c57577dd01f7f380054c6a929c2cbec004006fe81930df084072f53c58cd"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__066.json\\attempts\\001_20261016T002500\\requests.jsonl",
+        "sha256": "6bd6b1b5d8a9ca9f78595650091a26e133a5ddd4ecdfcb248de7b61e310e8a1d"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__085.json\\attempts\\001_20261016T012837\\requests.jsonl",
+        "sha256": "3705cb5751c8617f262fbab9545e007cca1adb5018b17cb7806faf05fcdfc355"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__088.json\\attempts\\001_20261016T004521\\requests.jsonl",
+        "sha256": "3fdad34988e85ac1db2a7b184b16de2a284529c005279b2f98b286cad8bdd488"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed\\cases\\SmolAgents__090.json\\attempts\\001_20261015T235735\\requests.jsonl",
+        "sha256": "1870d1856e4494a1b4e037c07b70e48a5c02372405806f7a59284fd48bb517b3"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed_recovery\\cases\\BFCL__052.json\\attempts\\001_20261016T051209\\requests.jsonl",
+        "sha256": "80a3617470a80211059c6224cb7c465813e9ebadeb176a457ee766df658ce47f"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed_recovery\\cases\\Magentic_One__031.json\\attempts\\001_20261016T051209\\requests.jsonl",
+        "sha256": "e0123d53f180a5e2eb390bd6d8de890a17b8c9512aef81ce69e1d684842eba14"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed_recovery\\cases\\Magentic_One__060.json\\attempts\\001_20261016T051209\\requests.jsonl",
+        "sha256": "d2bd84ca4cc4580954aff13f9f9f4596f32674f35649d90a7ca3a9b0447bb74d"
+      },
+      {
+        "path": "runs\\next_action100_quote_fixed_recovery\\cases\\OpenDeepSearch__043.json\\attempts\\001_20261016T051209\\requests.jsonl",
+        "sha256": "27422bf64e6c23ffbeb947bb3de9b15aa5f25c47650c3aafc045d82b6fca7cf6"
+      }
+    ]
+  },
+  "mechanisms": [
+    {
+      "case": "Magentic_One/061.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/023.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "BFCL/085.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "BFCL/115.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 2
+      }
+    },
+    {
+      "case": "BFCL/087.json",
+      "health": "contract_error",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/031.json",
+      "health": "contract_error",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/129.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 2
+      }
+    },
+    {
+      "case": "Camel/022.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/030.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "BFCL/155.json",
+      "health": "contract_error",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/058.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/011.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/012.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "OpenManus/040.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Magentic_One/078.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/001.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Magentic_One/065.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/011.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Camel/077.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/027.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/114.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/072.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 2
+      }
+    },
+    {
+      "case": "SmolAgents/090.json",
+      "health": "provider_error",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Magentic_One/091.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/022.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/042.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Camel/021.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Octotools/020.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/118.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/010.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Octotools/028.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/043.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Magentic_One/060.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/055.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Magentic_One/025.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/043.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "OpenDeepSearch/071.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "SmolAgents/066.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1,
+        "divergent": 1
+      }
+    },
+    {
+      "case": "BFCL/071.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "BFCL/056.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/055.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "OpenManus/102.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "OpenDeepSearch/065.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "SmolAgents/088.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Magentic_One/027.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/043.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Magentic_One/074.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/073.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "OpenDeepSearch/022.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/043.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/097.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/047.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/088.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 2
+      }
+    },
+    {
+      "case": "Camel/076.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/083.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "BFCL/052.json",
+      "health": "budget_exhausted",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "OpenManus/064.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/040.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Camel/086.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/000.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 2
+      }
+    },
+    {
+      "case": "Octotools/023.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "OpenManus/016.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "OpenDeepSearch/034.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "OpenManus/037.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/095.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "BFCL/122.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "BFCL/055.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 3,
+      "comparison_states": {
+        "unknown": 3
+      }
+    },
+    {
+      "case": "BFCL/021.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 2
+      }
+    },
+    {
+      "case": "Camel/016.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/032.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/072.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "BFCL/037.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 3,
+      "comparison_states": {
+        "matched": 3
+      }
+    },
+    {
+      "case": "OpenDeepSearch/090.json",
+      "health": "provider_error",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/051.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "BFCL/011.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 2
+      }
+    },
+    {
+      "case": "Magentic_One/055.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/085.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/024.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 2
+      }
+    },
+    {
+      "case": "OpenDeepSearch/007.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "divergent": 1
+      }
+    },
+    {
+      "case": "OpenManus/031.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Magentic_One/071.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/150.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/062.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 2
+      }
+    },
+    {
+      "case": "OpenDeepSearch/014.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "SmolAgents/048.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1,
+        "divergent": 1
+      }
+    },
+    {
+      "case": "OpenDeepSearch/068.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "BFCL/144.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/036.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "Camel/006.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/125.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Magentic_One/076.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/024.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/068.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {}
+    },
+    {
+      "case": "Magentic_One/031.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/087.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Magentic_One/090.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/084.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/130.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/127.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/012.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    }
+  ],
+  "mechanism_used_cases": 47,
+  "case_elapsed_seconds_median": 966.5874089000281,
+  "scope": "同组100例历史内部比较；源码、输出额度和新增预算不同，不能归因为单模块因果增益。 引用校验缺陷导致的一次技术失败批次不进入效果cohort，但全部计入尝试费用；最终cohort采用同一修正源码和原100例。"
+}

@@ -2,3 +2,6 @@
 docs/results/full693-20260927/*.json -text
 docs/results/full693-20260927/*.jsonl -text
 docs/results/localization100-20261015/*.json -text
+
+docs/results/next-action100-20261015/*.json -text
+docs/results/next-action100-20261015/report.md -text
