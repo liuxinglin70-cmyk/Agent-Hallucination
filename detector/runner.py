@@ -74,6 +74,7 @@ from detector.runtime import (
     usage_scope,
     validate_path_id,
 )
+from detector.stage_retry import StageRetryCache, stage_retry_scope
 
 DEFAULT_RUNS_ROOT = Path("artifacts/detector/runs")
 RUN_SCHEMA = "detector.run_manifest.v3"
@@ -153,11 +154,13 @@ def detect_with_transport_retry(
         for name, route in (detector.config or {}).items()
         if name.endswith("_route") and isinstance(route, Mapping)
     }
+    retry_cache = StageRetryCache()
     # All attempts consume the same case deadline.
     with case_deadline_ctx(
         (detector.config or {}).get("case_timeout_seconds")
-    ), added_budget_scope((detector.config or {}).get("causal_audit")):
+    ), added_budget_scope((detector.config or {}).get("causal_audit")), stage_retry_scope(retry_cache):
         for number in range(1, max(1, int(attempts)) + 1):
+            retry_cache.begin_attempt(number)
             attempt_started = time.perf_counter()
             attempt_started_at = utc_now()
             result = {}
@@ -325,7 +328,7 @@ def _manifest_identity(manifest: Mapping[str, Any]) -> dict[str, Any]:
     return {
         key: manifest[key] for key in (
             "schema_version", "run_id", "cases", "case_set_digest",
-            "config_hash", "interventions_hash", "source_identity", "execution_identities",
+            "config_hash", "interventions_hash", "source_identity", "execution_identities", "scheduling",
         ) if key in manifest
     }
 
@@ -339,6 +342,7 @@ def run_batch(
     config: Mapping[str, Any] | None = None,
     interventions: Mapping[str, Any] | None = None,
     workers: int = 8,
+    provider_concurrency: int | None = None,
     retry_unresolved: bool = False,
     deadline_seconds: float | None = None,
     control: RunControl | None = None,
@@ -355,6 +359,12 @@ def run_batch(
     a cancelled run -- the batch stops submitting new work instead of
     reproducing the same failure once per remaining case.
     """
+    for name, value in (("workers", workers), ("provider_concurrency", provider_concurrency)):
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1):
+            raise ValueError(f"{name} must be a positive integer")
+    if control is not None and provider_concurrency is not None and control.limit != provider_concurrency:
+        raise ValueError("provider_concurrency differs from the supplied control limit")
+    effective_control = control or RunControl(provider_concurrency or workers)
     run_id = validate_path_id(run_id or new_run_id(), nested=False)
     if len(cases) != len(set(cases)):
         raise ValueError("batch cases must be unique")
@@ -392,6 +402,7 @@ def run_batch(
         "interventions_hash": digest(interventions),
         "source_identity": source,
         "execution_identities": execution_identities,
+        "scheduling": {"case_workers": workers, "provider_concurrency": effective_control.limit},
     }
     with exclusive_writer(run_dir):
         previous_manifest: dict[str, Any] | None = None
@@ -544,7 +555,6 @@ def run_batch(
                 }
                 effective_control.stop(stop_reason)
 
-        effective_control = control or RunControl(max(1, int(workers)))
         with deadline_scope(deadline_seconds), run_scope(effective_control):
             try:
                 for row in bounded_map(run, cases, workers=int(workers),

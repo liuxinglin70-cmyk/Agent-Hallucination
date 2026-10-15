@@ -39,6 +39,9 @@ def test_v10b_family_conviction_route_closed_but_recall_open():
     assert "recall_directive" in verdict["routes"]
     assert "upgrade_directive" in verdict["routes"]
     assert "evidence_only" not in verdict["routes"]
+    assert "judge_directive" in verdict["routes"]
+    from evolution.development import plan_reaches
+    assert plan_reaches("judge.system", "judge")
 
 
 def test_unanimous_authorized_predicate_opens_conviction_route():

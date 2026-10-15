@@ -49,6 +49,42 @@ def _packet():
     })
 
 
+@pytest.mark.parametrize("operator,expected", [("matches", "violated"), ("not_matches", "not_applicable")])
+def test_regex_matches_the_complete_view(operator, expected):
+    program = _program(rules=[{
+        "field": "question_text", "operator": operator,
+        "value": "BANNED$", "verdict": "violated",
+    }])
+    row = run_predicate_program(program, {"question": "x" * 4596 + "BANNED", "events": []})
+    assert row["verdict"] == expected
+
+
+def test_scalar_conditions_reuse_only_the_current_program_view(monkeypatch):
+    from detector import predicate_dsl
+
+    original = predicate_dsl._extract_view
+    fields = []
+
+    def extract(field, packet, context):
+        fields.append(field)
+        return original(field, packet, context)
+
+    def unrelated(*args, **kwargs):
+        pytest.fail("a question-only rule materialized an unrelated trajectory view")
+
+    monkeypatch.setattr(predicate_dsl, "_extract_view", extract)
+    monkeypatch.setattr(predicate_dsl, "packet_delivered_result", unrelated)
+    monkeypatch.setattr(predicate_dsl, "_flat_texts", unrelated)
+    program = _program(rules=[
+        {"field": "question_text", "operator": "contains", "value": text, "verdict": "violated"}
+        for text in ("FIRST", "SECOND")
+    ])
+    assert run_predicate_program(program, {"question": "absent", "events": []})["verdict"] == "not_applicable"
+    assert fields == ["question_text"]
+    assert run_predicate_program(program, {"question": "SECOND", "events": []})["verdict"] == "violated"
+    assert fields == ["question_text", "question_text"]
+
+
 @pytest.mark.parametrize("operator", ["matches", "not_matches"])
 @pytest.mark.parametrize("pattern,text", [
     (r"^(a?){30}a{30}$", "a" * 30),

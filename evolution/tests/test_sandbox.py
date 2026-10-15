@@ -49,6 +49,34 @@ from evolution.sandbox import (
 )
 
 
+@pytest.mark.parametrize("channel", ["stdout", "stderr"])
+def test_output_cap_is_enforced_while_reading(channel):
+    from evolution.sandbox import _run_child
+
+    limits = normalize_limits(None)
+    limits["max_output_bytes"] = 65536
+    outcome = _run_child(
+        source=f"import os; [os.write({1 if channel == 'stdout' else 2}, b'x' * 8192) for _ in range(4096)]",
+        envelope={}, limits=limits, wall_seconds=10, source_is_raw=True,
+    )
+    assert outcome["launched"] is True
+    assert outcome["completed"] is False
+    assert "output exceeded" in outcome["error"]
+    assert "stdout" not in outcome and "stderr" not in outcome
+
+
+def test_job_creation_failure_refuses_execution(monkeypatch):
+    from evolution import sandbox
+
+    monkeypatch.setattr(sandbox, "_windows_job_api", lambda: object())
+    monkeypatch.setattr(sandbox, "_apply_windows_limits", lambda *args: None)
+    outcome = sandbox._run_child(source="print('unbounded')", envelope={},
+                                 limits=normalize_limits(None), wall_seconds=1, source_is_raw=True)
+    assert outcome["launched"] is False
+    assert "job object" in outcome["error"]
+    assert admission_blockers()
+
+
 # --------------------------------------------------------------------------
 # Property: the declaration is closed
 # --------------------------------------------------------------------------

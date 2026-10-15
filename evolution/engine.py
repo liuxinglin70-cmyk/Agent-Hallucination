@@ -2302,10 +2302,11 @@ class EvolutionEngine:
             str(item.get("failure_family") or ""): item
             for item in diagnosed_families
         }
-        rejected_by_id = {
-            str(item.get("intervention_id") or ""): item
-            for item in rejected
-        }
+        rejected_by_id = {}
+        for rejection in rejected:
+            rejected_by_id[str(rejection.get("intervention_id") or "")] = rejection
+            for candidate in rejection.get("candidates") or ():
+                rejected_by_id[str(candidate.get("intervention_id") or "")] = rejection
         admitted_ids = {
             str(item.get("intervention_id") or "") for item in selected
         }
@@ -2338,6 +2339,9 @@ class EvolutionEngine:
                 gate = str(rejection.get("gate") or "") or None
                 reason = str(rejection.get("reason") or "")
                 unevaluable = bool(rejection.get("not_evaluable"))
+                if gate == "LIBRARY":
+                    outcome = "budget_unselected"
+                    unevaluable = True
             record_episode(
                 self.memory_root,
                 cycle=cycle,
@@ -3197,7 +3201,6 @@ class EvolutionEngine:
         )
         patrol_cases = patrol.cases
         patrol_rows = patrol.rows
-        patrol_contrast = patrol.contrast
         bootstrap_cases = patrol.bootstrap_cases
         route_failure_records = self.route_failure_records()
         preparation = prepare_families(
@@ -3563,15 +3566,7 @@ class EvolutionEngine:
             patrol_measurement_counts[status] = (
                 patrol_measurement_counts.get(status, 0) + 1
             )
-        unmeasured_patrol_cases = sorted({
-            str(row.get("case") or "")
-            for row in patrol_rows
-            if (
-                str(row.get("measurement") or "") != "authoritative"
-                or str(row.get("authority") or "") != "authoritative"
-                or row.get("prediction") is None
-            )
-        } - {""})
+        unmeasured_patrol_cases = sorted(_unmeasurable_cases(patrol_rows) - {""})
         worksheet["measurement_coverage"] = {
             "cases": len(patrol_rows),
             "authoritative": len(patrol_rows) - len(unmeasured_patrol_cases),
@@ -4051,7 +4046,7 @@ class EvolutionEngine:
                 "gate": "COMBINATION_M",
                 "reason": combination["reason"],
                 "delta": feedback_delta(combination.get("delta")),
-                "not_evaluable": bool(combination.get("stability_limited")),
+                "not_evaluable": bool(combination.get("not_evaluable") or combination.get("stability_limited")),
             }
             self._ledger("rejected", payload)
             self.rejection_feedback.append(payload)
@@ -4111,6 +4106,7 @@ class EvolutionEngine:
                     "gate": "LIBRARY",
                     "reason": "; ".join(library_problems),
                     "delta": None,
+                    "not_evaluable": True,
                 }
                 self._ledger("rejected", payload)
                 self.rejection_feedback.append(payload)
@@ -4252,6 +4248,8 @@ class EvolutionEngine:
                 "delta": combination["delta"],
                 "reason": combination["reason"],
                 "stability_limited": bool(combination.get("stability_limited")),
+                "not_evaluable": bool(combination.get("not_evaluable") or combination.get("stability_limited")),
+                "unmeasured_cases": list(combination.get("unmeasured_cases") or ()),
                 # Qualified units the entry budget could not take. Reported so
                 # "nothing was selected" is distinguishable from "everything
                 # was rejected", and so the experience store can record them as
@@ -4448,6 +4446,21 @@ class EvolutionEngine:
             registry=make_registry([*active_entries, *entries]),
             fresh=fresh,
         )
+        unmeasured = _unmeasurable_cases([*control, *combo_rows])
+        if unmeasured:
+            survivors = [*units[0]["partners"], units[0]["candidate"]]
+            return {
+                "unit_ids": [units[0]["intervention_id"]],
+                "entries": survivors,
+                "delta": None,
+                "reason": f"combination arm not evaluable: unmeasured cases {sorted(unmeasured)}",
+                "not_evaluable": True,
+                "unmeasured_cases": sorted(unmeasured),
+                "failed_entries": [dict(entry) for entry in entries],
+                "dropped_entries": [dict(entry) for unit in units[1:] for entry in [*unit["partners"], unit["candidate"]]],
+                "budget_unselected_entries": [dict(entry) for unit in admitted_by_budget for entry in [*unit["partners"], unit["candidate"]]],
+                "budget_unselected_units": [str(unit["intervention_id"]) for unit in admitted_by_budget],
+            }
         combo_harmlessness = harmlessness_gate(
             baseline_rows=_subset_rows(control, self.split.sentinel),
             candidate_rows=_subset_rows(combo_rows, self.split.sentinel),

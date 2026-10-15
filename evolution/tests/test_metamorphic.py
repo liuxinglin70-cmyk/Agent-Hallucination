@@ -544,13 +544,9 @@ def test_event_move_refuses_a_position_outside_the_packet():
     assert "outside the packet" in refusal
 
 
-def test_localization_class_fails_when_the_reading_is_positional():
-    """A subject whose annotation moves *with* the layout is caught.
-
-    The broken subject relabels the gold step by the *position* the root cause
-    landed on rather than by the induced permutation, which is the exact error
-    the class exists to detect: it makes the reading a function of layout.
-    """
+@pytest.mark.parametrize("positional", [False, True])
+def test_localization_class_fails_when_the_reading_is_positional(monkeypatch, positional):
+    """Exercise a layout-dependent reader as well as the recorded-step reader."""
     case = {
         "row": {
             "case": "SourceA/loc_001.json",
@@ -577,11 +573,29 @@ def test_localization_class_fails_when_the_reading_is_positional():
     assert localization_state(row, {"SourceA/loc_001.json": 2}) == "mislocated"
     # The broken reading: annotation left in the old coordinate.
     assert localization_state(row, {"SourceA/loc_001.json": 3}) == "hit"
+    if positional:
+        from evolution import metrics
+        original = metrics.row_responsible_step
+        initial_order = [event["event_id"] for event in row["packet"]["events"]]
+
+        def broken_reader(reading):
+            order = [event["event_id"] for event in reading["packet"]["events"]]
+            return original(reading) if order == initial_order else 1
+
+        monkeypatch.setattr(metrics, "row_responsible_step", broken_reader)
     report = run_gate("deterministic", subject)
     check = next(
         item for item in report["checks"] if item["class"] == LOCALIZATION_EVENT_MOVE
     )
-    assert check["passed"] is True
+    assert check["passed"] is (not positional)
+
+
+def test_admission_runs_the_registered_subject(monkeypatch):
+    class Empty(MetamorphicSubject):
+        name = "broken-reference"
+
+    monkeypatch.setitem(REFERENCE_SUBJECTS, "deterministic", Empty)
+    assert "failed metamorphic admission" in admission_error("deterministic")
 
 
 # --------------------------------------------------------------------------

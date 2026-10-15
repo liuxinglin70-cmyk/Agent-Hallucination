@@ -8,6 +8,9 @@ failures keep the positive verdict and degrade authority.
 from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
+from detector.stage_retry import memo_stage
+from detector.provider import provider_fallback_scope
+from detector.evidence_view import expand_view, referent_source_block, task_source_block
 
 from detector.evidence import (
     citation_error,
@@ -26,6 +29,7 @@ from detector.provider import (
     ProviderError,
     accumulate_usage,
     majority_vote,
+    merge_provider_meta,
     provider_call,
     raise_if_terminal,
     required_quorum,
@@ -161,21 +165,21 @@ def _call_defense(
     user: str,
     positive: Mapping[str, Any],
     snapshot: Mapping[str, Any] | None = None,
+    fallback_user: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Sample one defense ballot; a ``None`` verdict abstains."""
     cache_tag = (
         snapshot_digest(snapshot) if snapshot is not None else ""
     )
     try:
-        parsed, meta = provider_call(
-            route=route, system=system, user=user, purpose="defense",
-            cache_tag=cache_tag,
-        )
+        with provider_fallback_scope(fallback_user):
+            parsed, meta = provider_call(route=route, system=system, user=user, purpose="defense", cache_tag=cache_tag)
     except ProviderError as exc:
         raise_if_terminal(exc)
         return {"ok": False, "parsed": None, "error": exc.message,
-                "error_type": exc.error_type}, {
-            "stage": "defense", "state": "provider_error",
+                "error_type": exc.error_type, "failure": exc.as_dict(),
+                "provider": {"attempts": exc.attempts, "usage_total": exc.usage_total}}, {
+            "stage": "defense", "state": exc.error_type,
             "attempts": exc.attempts, "view": "unknown", "warnings": [],
         }
     result, error = _parse_defense(parsed)
@@ -184,15 +188,17 @@ def _call_defense(
             result, packet, positive, snapshot,
         )
     warnings: list[dict[str, str]] = []
+    if meta.get("evidence_view_fallback"):
+        warnings.append({"attempt": "initial", "error": "evidence_expansion:provider_context_limit"})
     if result is None:
+        initial_meta = dict(meta)
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
         try:
-            parsed, meta = provider_call(
-                route=route, system=system,
-                user=user + DEFENSE_CONTRACT_REPAIR + contract_repair_feedback(parsed, error),
-                purpose="defense_repair",
-                cache_tag=cache_tag,
-            )
+            feedback = DEFENSE_CONTRACT_REPAIR + contract_repair_feedback(parsed, error)
+            with provider_fallback_scope(fallback_user + feedback if fallback_user is not None else None):
+                parsed, meta = provider_call(route=route, system=system, user=user + feedback,
+                                             purpose="defense_repair", cache_tag=cache_tag)
+            meta = merge_provider_meta(initial_meta, meta)
             result, error = _parse_defense(parsed)
             if result is not None:
                 result, error = _validate_defense_evidence(
@@ -201,13 +207,15 @@ def _call_defense(
         except ProviderError as exc:
             raise_if_terminal(exc)
             return {"ok": False, "parsed": None, "error": exc.message,
-                    "error_type": exc.error_type}, {
-                "stage": "defense", "state": "provider_error",
-                "attempts": exc.attempts, "view": "unknown", "warnings": warnings,
+                    "error_type": exc.error_type, "failure": exc.as_dict(),
+                    "provider": merge_provider_meta(initial_meta, {
+                        "attempts": exc.attempts, "usage_total": exc.usage_total})}, {
+                "stage": "defense", "state": exc.error_type,
+                "attempts": int(initial_meta.get("attempts") or 0) + exc.attempts, "view": "unknown", "warnings": warnings,
             }
     if result is None:
         return {"ok": False, "parsed": None, "error": error,
-                "error_type": "contract_error", "warnings": warnings}, {
+                "error_type": "contract_error", "warnings": warnings, "provider": meta, "raw": parsed}, {
             "stage": "defense", "state": "contract_error",
             "attempts": int(meta.get("attempts") or 0), "view": "unknown",
             "warnings": warnings,
@@ -228,14 +236,13 @@ def _vote_defense(
     user: str,
     positive: Mapping[str, Any],
     snapshot: Mapping[str, Any] | None = None,
+    fallback_user: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Run the requested number of defense votes and collapse them.
 
-    The verdict is decided by strict majority over the cast ballots; ties
-    and no-quorum outcomes keep the conviction but upgrade the verdict to
-    ``substantiated_upgraded`` (a degraded confirmation, never an
-    overturn). ``vote_topup`` re-casts abstained ballots a bounded number
-    of times so transport jitter cannot shrink the quorum between runs.
+    A quorum is required before verdict aggregation. Failed ballots remain
+    runtime failures; valid but inconclusive ballots remain semantic evidence.
+    ``vote_topup`` re-casts abstained ballots a bounded number of times.
     The returned ``parsed`` is the first ballot whose verdict matches the
     collapsed verdict, or the first substantiated ballot when upgraded.
     """
@@ -248,34 +255,37 @@ def _vote_defense(
     ballots_usage: dict[str, Any] = {}
     total_attempts = 0
     warnings: list[dict[str, str]] = []
-    last_error = {"error": "every defense vote failed",
-                  "error_type": "provider_error"}
+    failures: list[dict[str, Any]] = []
     topups_used = 0
 
     def cast_at(_index: int) -> tuple[dict[str, Any], dict[str, Any]]:
         return _call_defense(
             packet=packet, route=route, system=system, user=user,
             positive=positive, snapshot=snapshot,
+            **({"fallback_user": fallback_user} if fallback_user is not None else {}),
         )
 
     def absorb(outcome: tuple[dict[str, Any], dict[str, Any]]) -> None:
-        nonlocal total_attempts, last_error, sample_meta
+        nonlocal total_attempts, sample_meta
         result, status = outcome
         total_attempts += int(status.get("attempts") or 0)
         warnings.extend(status.get("warnings") or [])
+        ballot_meta = dict(result.get("provider") or {})
+        accumulate_usage(ballots_usage, ballot_meta.get("usage_total") or ballot_meta.get("usage") or {})
+        if ballot_meta:
+            sample_meta = ballot_meta
+        if ballots_usage:
+            sample_meta["usage_total"] = dict(ballots_usage)
         if result.get("ok") and isinstance(result.get("parsed"), Mapping):
             ballots.append(dict(result["parsed"]))
-            sample_meta = dict(result.get("provider") or {})
-            accumulate_usage(
-                ballots_usage, (sample_meta or {}).get("usage") or {},
-            )
         else:
-            last_error = {
-                "error": str(result.get("error") or "defense vote failed"),
+            failures.append(result.get("failure") or {
+                "message": str(result.get("error") or "defense vote failed"),
                 "error_type": str(
                     result.get("error_type") or "provider_error"
                 ),
-            }
+                **({"raw": result["raw"]} if "raw" in result else {}),
+            })
 
     # Independent ballots, cast concurrently; index order is preserved so the
     # returned sample does not depend on completion order (see
@@ -289,23 +299,11 @@ def _vote_defense(
         topup_budget -= 1
         topups_used += 1
         absorb(cast_at(0))
-    if not ballots:
-        return {
-            "ok": False, "parsed": None,
-            "error": last_error["error"],
-            "error_type": last_error["error_type"],
-            "provider": sample_meta,
-        }, {
-            "stage": "defense", "state": last_error["error_type"],
-            "attempts": total_attempts, "view": "unknown",
-            "warnings": warnings,
-        }
     quorum = required_quorum(votes)
     if len(ballots) < quorum:
-        # Too few valid ballots to decide honestly. The defense can only
-        # overturn a conviction with proof, so an under-quorum vote keeps the
-        # conviction and degrades authority instead of letting one ballot
-        # stand in for the whole vote.
+        failure_types = {failure["error_type"] for failure in failures}
+        error_type = (next(iter(failure_types))
+                      if not ballots and len(failure_types) == 1 else "no_quorum")
         reason = (
             f"defense quorum not reached: {len(ballots)} valid ballot(s) of "
             f"{votes} (need {quorum})"
@@ -317,16 +315,10 @@ def _vote_defense(
             "quorum": quorum, "quorum_met": False,
         }
         return {
-            "ok": True,
-            "parsed": {
-                "verdict": "inconclusive",
-                "confirmed_step": None,
-                "evidence_refs": [],
-                "reason": reason,
-            },
-            "raw": ballots, "provider": sample_meta,
+            "ok": False, "parsed": None, "error": reason, "error_type": error_type,
+            "raw": ballots, "vote_failures": failures, "provider": sample_meta,
         }, {
-            "stage": "defense", "state": "ok",
+            "stage": "defense", "state": error_type,
             "attempts": total_attempts, "view": "unknown",
             "warnings": warnings,
         }
@@ -374,7 +366,7 @@ def _vote_defense(
     if ballots_usage:
         sample_meta["usage_total"] = ballots_usage
     return {"ok": True, "parsed": parsed, "raw": ballots,
-            "provider": sample_meta}, {
+            "provider": sample_meta, "vote_failures": failures}, {
         "stage": "defense", "state": "ok",
         "attempts": total_attempts, "view": "unknown",
         "warnings": warnings,
@@ -454,12 +446,22 @@ def run_defense(
         + evidence_block
     )
 
-    def user_for(view_text: str) -> str:
+    def user_for(view_text: str, *, auxiliary: bool = True) -> str:
         return (
             "Review the positive verdict below using only the shown "
             "trajectory evidence.\n\n" + allegation + "\n" + view_text
-            + snapshot_block
+            + snapshot_block + (referent_source_block(packet, positive, snapshot) + task_source_block(packet)
+                                if auxiliary else "")
         )
+
+    def vote(view_text: str, fallback_text: str | None = None):
+        user = user_for(view_text)
+        return memo_stage("defense", {"packet": packet, "route": route, "system": system,
+                                     "user": user, "positive": positive, "snapshot": snapshot,
+                                     "fallback_text": fallback_text},
+                          lambda: _vote_defense(packet=packet, route=route, system=system,
+                                               user=user, positive=positive, snapshot=snapshot,
+                                               fallback_user=user_for(fallback_text if fallback_text is not None else view_text, auxiliary=False)))
 
     if force_full_view:
         view_text, view_meta = render_judge_view(packet)
@@ -467,10 +469,12 @@ def run_defense(
         view_text, view_meta = render_defense_view(
             packet, facts["step"], evidence_refs=facts["evidence_refs"],
         )
-    result, status = _vote_defense(
-        packet=packet, route=route, system=system, user=user_for(view_text),
-        positive=positive, snapshot=snapshot,
-    )
+    base_text = view_text
+    view_text, view_meta = expand_view(packet, view_text, view_meta, positive=positive)
+    result, status = vote(view_text, base_text if view_text != base_text else None)
+    if ("evidence_expansion" in view_meta
+            and any(row.get("error") == "evidence_expansion:provider_context_limit" for row in status.get("warnings", []))):
+        view_meta["evidence_expansion"]["actual_view"] = "base_projection_in_one_or_more_ballots"
     status["view"] = (
         "complete"
         if not view_meta.get("packet_truncated") and not view_meta.get("degraded")
@@ -480,11 +484,9 @@ def run_defense(
         verdict = (result.get("parsed") or {}).get("verdict")
         if verdict == "inconclusive" and view_meta.get("omitted_event_ids"):
             full_text, full_meta = render_judge_view(packet)
-            result2, status2 = _vote_defense(
-                packet=packet, route=route, system=system,
-                user=user_for(full_text), positive=positive,
-                snapshot=snapshot,
-            )
+            base_full_text = full_text
+            full_text, full_meta = expand_view(packet, full_text, full_meta, positive=positive)
+            result2, status2 = vote(full_text, base_full_text if full_text != base_full_text else None)
             status2["view"] = (
                 "complete" if not full_meta.get("degraded") else "degraded"
             )

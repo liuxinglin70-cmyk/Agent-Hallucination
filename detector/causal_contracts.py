@@ -37,6 +37,8 @@ def validate_seal(payload: Mapping[str, Any], *, schema: str) -> None:
 
 def bound_fields(value: Any, *, limit: int = 64) -> tuple[list[dict[str, Any]], bool]:
     """Read explicit entity/attribute/value records; never infer units or entities."""
+    from detector.packet import structured_payload
+    value = structured_payload(value)
     fields: list[dict[str, Any]] = []
     truncated = False
     visits = 0
@@ -65,6 +67,7 @@ def bound_fields(value: Any, *, limit: int = 64) -> tuple[list[dict[str, Any]], 
                              and all(isinstance(alias[key], str) and alias[key].strip() for key in ("entity", "attribute"))
                              and all(alias[key] is None or type(alias[key]) in {str, int, float}
                                      for key in ("unit", "time")))
+                    valid = valid and alias.get("unit") == item.get("unit") and alias.get("time") == item.get("time")
                     fields[-1]["source_binding"] = [alias[key] for key in ("entity", "attribute", "unit", "time")] if valid else []
             for key, nested in sorted(item.items(), key=lambda pair: str(pair[0])):
                 if isinstance(nested, (Mapping, list)):
@@ -145,7 +148,8 @@ def arithmetic_check(interaction: Mapping[str, Any]) -> dict[str, Any] | None:
     """Check a calculator's literal arithmetic result, without executing tool code."""
     if str(interaction.get("tool_name") or "").lower() != "calculator":
         return None
-    arguments = interaction.get("arguments")
+    from detector.packet import structured_payload
+    arguments = structured_payload(interaction.get("arguments"))
     expression = arguments.get("expr") if isinstance(arguments, Mapping) else None
     expected = literal_arithmetic_value(expression)
     observed = numeric_literal(interaction.get("observation"))

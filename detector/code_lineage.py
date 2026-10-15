@@ -7,7 +7,7 @@ from typing import Any, Mapping
 
 from detector.causal_contracts import seal
 from detector.identity import digest
-from detector.packet import validate_packet
+from detector.packet import structured_payload, validate_packet
 
 
 def build_code_lineage(packet: Mapping[str, Any], *, max_edges: int = 64) -> dict[str, Any]:
@@ -16,8 +16,8 @@ def build_code_lineage(packet: Mapping[str, Any], *, max_edges: int = 64) -> dic
     edges: list[dict[str, Any]] = []
     omitted: list[str] = []
     for event in packet["events"]:
-        for item in event["tool_interactions"]:
-            arguments = item["arguments"]
+        for item in (event.get("tool_interactions") or []):
+            arguments = structured_payload(item.get("arguments"))
             code = arguments.get("code") if isinstance(arguments, Mapping) else arguments
             if not isinstance(code, str) or not code.strip():
                 continue
@@ -58,6 +58,7 @@ def build_code_lineage(packet: Mapping[str, Any], *, max_edges: int = 64) -> dic
                 for name in targets:
                     bindings[name] = event["event_id"]
     return seal({"schema_version": "detector.code_lineage.v1", "packet_digest": digest(packet),
+                 "event_positions": {event["event_id"]: event["position"] for event in packet["events"]},
                  "edges": edges, "omitted_interaction_ids": list(dict.fromkeys(omitted)),
                  "scope": "recorded_code_def_use", "execution_state": "unverified",
                  "decision_authority": "none", "localization_authority": "none"})
@@ -65,9 +66,13 @@ def build_code_lineage(packet: Mapping[str, Any], *, max_edges: int = 64) -> dic
 
 def code_ancestor_events(lineage: Mapping[str, Any], event_id: str) -> list[str]:
     reached = {event_id}
-    for _ in range(len(lineage["edges"]) + 1):
-        previous = set(reached)
-        reached.update(edge["source_event_id"] for edge in lineage["edges"] if edge["target_event_id"] in previous)
-        if reached == previous:
-            break
-    return sorted(reached - {event_id}, key=lambda eid: int(eid.removeprefix("event_")))
+    parents: dict[str, set[str]] = {}
+    for edge in lineage["edges"]:
+        parents.setdefault(edge["target_event_id"], set()).add(edge["source_event_id"])
+    frontier = [event_id]
+    while frontier:
+        for source in parents.get(frontier.pop(), ()):
+            if source not in reached:
+                reached.add(source)
+                frontier.append(source)
+    return sorted(reached - {event_id}, key=lambda eid: lineage["event_positions"][eid])

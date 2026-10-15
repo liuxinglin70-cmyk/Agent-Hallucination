@@ -63,6 +63,22 @@ def member(
     }
 
 
+def test_localization_states_remain_aligned_with_all_members():
+    rows = [{"case": f"A/{i:03d}.json", "gold": True, "prediction": True, "authority": "authoritative",
+             "result": {"runtime_valid": True, "stage_status": {"step_tracer": {"state": "ok"}}, "responsible_step": None}}
+            for i in range(3)]
+    families = stable_localization_families(rows, gold_steps={row["case"]: 2 for row in rows}, require_viable=False)
+    assert len(families) == 1
+    family = families[0]
+    assert family["localization_states"] == ["step_missing"] * 3
+    family["diagnostics"] = {"member_summaries": [member(name=str(i), judge_positive=True) for i in range(3)]}
+    grouped, excluded = mechanism_subgroups(families)
+    assert not excluded and len(grouped) == 1
+    assert grouped[0]["count"] == 3
+    assert grouped[0]["mechanism"]["reading_unanimous"] is True
+    assert grouped[0]["mechanism"]["observed_deviation"]["kind"] == "missing_step"
+
+
 def verbatim_predicates() -> dict:
     return {
         "required_action_present": "satisfied",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from detector.causal_audit import context_for_hearing
 from detector.risk_context import build_risk_context
@@ -11,12 +11,15 @@ from detector.defense import run_defense
 from detector.interventions import InterventionPlan
 from detector.replay import match_frozen_hearing
 from detector.step_tracer import run_step_tracer
+from detector.packet import packet_features
+from detector.runtime import parallel_ordered
 
 
 _TARGET_DEFAULTS = {
     "source": "", "candidate_id": None, "step": None, "reason": "",
     "quote": "", "referent": "", "evidence_refs": [], "evidence_citations": [],
     "delivered_result": "", "correct_result": "", "contracts": [], "confidence": "",
+    "basis": "unestablished",
 }
 
 
@@ -33,6 +36,7 @@ def judge_target(parsed: Mapping[str, Any]) -> dict[str, Any]:
         "correct_result": parsed.get("correct_result") or "",
         "evidence_refs": parsed.get("evidence_refs") or [],
         "contracts": parsed.get("contracts") or [], "confidence": parsed.get("confidence") or "",
+        "basis": parsed.get("basis") or "unestablished",
         "quote": root.get("quote") or "", "referent": root.get("referent") or "",
     })
 
@@ -53,33 +57,50 @@ def run_hearing(
     config: Mapping[str, Any], plan: InterventionPlan,
     frozen: Mapping[str, Any] | None = None,
     diagnostics: Mapping[str, Any] | None = None,
+    diagnostics_factory: Callable[[], Mapping[str, Any] | None] | None = None,
     snapshot: Mapping[str, Any] | None = None,
+    on_defense: Callable[[Mapping[str, Any], Mapping[str, Any]], None] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
     entry = match_frozen_hearing(frozen, hearing_target(positive))
-    causal_context = None
-    if diagnostics is not None and diagnostics.get("audit") is not None:
-        causal_context = context_for_hearing(diagnostics["audit"], positive=positive, packet=packet,
-                                            policy=config["causal_audit"])
-        if causal_context is None and diagnostics["audit"]["health"]["state"] == "ok":
-            causal_context = build_risk_context(packet, positive=positive, policy=config["causal_audit"])
-    context_digest = causal_context["digest"] if causal_context is not None else None
-    if (entry is not None and "tracer_result" in entry
-            and entry["tracer_result"].get("causal_context_digest") == context_digest):
-        tracer_result = deepcopy(entry["tracer_result"])
-        tracer_status = deepcopy(entry["tracer_status"])
-    else:
-        tracer_result, tracer_status = run_step_tracer(
-            packet=packet, delivered_result=str(positive.get("delivered_result") or ""),
-            correct_result=str(positive.get("correct_result") or ""), config=config,
-            plan=plan, positive=positive,
-            **({"causal_context": causal_context} if causal_context is not None else {}),
-        )
-    if entry is not None and "defense_result" in entry:
-        defense_result = deepcopy(entry["defense_result"])
-        defense_status = deepcopy(entry["defense_status"])
-    else:
-        defense_result, defense_status = run_defense(
-            packet=packet, positive=positive, config=config, plan=plan,
-            **({"snapshot": snapshot} if snapshot is not None else {}),
-        )
+    def prepare_context():
+        prepared = diagnostics_factory() if diagnostics_factory is not None else diagnostics
+        context = None
+        if prepared is not None and prepared.get("audit") is not None:
+            context = context_for_hearing(prepared["audit"], positive=positive, packet=packet,
+                                          policy=config["causal_audit"])
+            if context is None and prepared["audit"]["health"]["state"] == "ok":
+                context = build_risk_context(packet, positive=positive, policy=config["causal_audit"])
+        return context
+
+    # Frozen reuse must be decided before touching the intervention trace.
+    frozen_tracer = entry is not None and "tracer_result" in entry
+    causal_context = prepare_context() if frozen_tracer else None
+    reuse_tracer = (frozen_tracer and entry["tracer_result"].get("causal_context_digest")
+                   == (causal_context["digest"] if causal_context is not None else None))
+    # Freeze the Tracer hook before Defense writes its pre-check facts.
+    tracer_prompt = "" if reuse_tracer else plan.prompt_block(packet_features(packet), hook="tracer.system")
+
+    def stage(index: int):
+        if index == 0:
+            if reuse_tracer:
+                return deepcopy(entry["tracer_result"]), deepcopy(entry["tracer_status"])
+            context = causal_context if frozen_tracer else prepare_context()
+            return run_step_tracer(
+                packet=packet, delivered_result=str(positive.get("delivered_result") or ""),
+                correct_result=str(positive.get("correct_result") or ""), config=config,
+                plan=plan, positive=positive, intervention_prompt=tracer_prompt,
+                **({"causal_context": context} if context is not None else {}),
+            )
+        if entry is not None and "defense_result" in entry:
+            defended = deepcopy(entry["defense_result"]), deepcopy(entry["defense_status"])
+        else:
+            defended = run_defense(packet=packet, positive=positive, config=config, plan=plan,
+                                   **({"snapshot": snapshot} if snapshot is not None else {}))
+        if on_defense is not None:
+            on_defense(*defended)
+        return defended
+
+    traced, defended = parallel_ordered(stage, 2, workers=2)
+    tracer_result, tracer_status = traced
+    defense_result, defense_status = defended
     return tracer_result, tracer_status, defense_result, defense_status

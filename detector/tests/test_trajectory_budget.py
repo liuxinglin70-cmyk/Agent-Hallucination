@@ -9,9 +9,13 @@ from detector.trajectory_budget import bound_request_route
 
 
 @pytest.mark.parametrize("size,configured,limit,long", [
-    (100, {}, 16384, False), (48000, {}, 8192, True),
+    (100, {}, None, False), (48000, {}, None, True),
     (50000, {"max_tokens": 1024}, 1024, True),
-    (100, {"max_tokens": 100000}, 16384, False),
+    (100, {"max_tokens": 100000}, 100000, False),
+    (50000, {"max_tokens": 32768}, 32768, True),
+    (100, {"max_output_tokens_per_request": 16384}, 16384, False),
+    (50000, {"max_tokens": 100000, "max_output_tokens_per_request": 16384,
+             "long_output_tokens_per_request": 8192}, 8192, True),
     (50000, {"long_output_tokens_per_request": 4000}, 4000, True),
 ])
 def test_request_ceilings_are_adaptive_and_do_not_mutate_routes(size, configured, limit, long):
@@ -21,10 +25,10 @@ def test_request_ceilings_are_adaptive_and_do_not_mutate_routes(size, configured
     assert budget.long_input is long
     assert configured == original
     retried, _ = bound_request_route(route, system="", user="x" * (size + 1000))
-    assert retried["max_tokens"] <= limit
+    assert retried["max_tokens"] is None if limit is None else retried["max_tokens"] <= limit
 
 
-@pytest.mark.parametrize("value", [None, False, 0, -1, "invalid"])
+@pytest.mark.parametrize("value", [False, 0, -1, "invalid"])
 def test_invalid_budget_limits_are_rejected_before_requests(value):
     with pytest.raises(ValueError):
         validate_config({"provider": {"long_output_tokens_per_request": value}})
@@ -80,6 +84,46 @@ def test_actual_provider_uses_the_same_cap_for_transport_retries(monkeypatch):
     monkeypatch.setattr("detector.provider._isolated_transport", transport)
     monkeypatch.setattr("detector.provider.time.sleep", lambda seconds: None)
     _, meta = provider_call(route={"endpoint": "http://fixture.invalid/v1", "api_key_env": "TEST_BOUNDED_KEY",
-                                  "max_tokens": 100000, "transport_retries": 1}, system="", user="x" * 50000, purpose="judge")
+                                  "max_tokens": 100000, "max_output_tokens_per_request": 16384,
+                                  "long_output_tokens_per_request": 8192, "transport_retries": 1},
+                            system="", user="x" * 50000, purpose="judge")
     assert meta["request_budget"]["output_token_limit"] == 8192
     assert len(requests) == 2
+
+
+def test_default_provider_preserves_service_capacity_and_large_valid_output(monkeypatch):
+    import json
+    from detector.provider import provider_call
+    monkeypatch.setenv("TEST_SERVICE_KEY", "fixture")
+    payloads = []
+    def transport(**kwargs):
+        payloads.append(json.loads(kwargs["body"]))
+        body = {"choices": [{"message": {"content": '{"ok":true}'}, "finish_reason": "stop"}],
+                "usage": {"completion_tokens": 44341, "completion_tokens_details": {"reasoning_tokens": 43669}}}
+        return 200, json.dumps(body).encode()
+    monkeypatch.setattr("detector.provider._isolated_transport", transport)
+    parsed, meta = provider_call(route={"endpoint": "http://fixture.invalid/v1", "api_key_env": "TEST_SERVICE_KEY"},
+                                 system="", user="x" * 50000, purpose="judge")
+    assert parsed == {"ok": True}
+    assert "max_tokens" not in payloads[0]
+    assert meta["request_budget"]["output_token_limit"] is None
+    assert meta["usage_total"]["completion_tokens"] == 44341
+
+
+def test_default_output_capacity_remains_bounded_by_explicit_added_budget(monkeypatch):
+    from detector.provider import provider_call
+    from detector.runtime import added_budget_scope, added_request_scope, current_added_budget
+    from detector.config import validate_config
+    config = validate_config({})
+    calls = []
+    def transport(**kwargs):
+        calls.append(kwargs)
+        return {"ok": True}, {"attempts": 1}
+    monkeypatch.setattr("detector.provider._provider_call", transport)
+    with added_budget_scope(config["causal_audit"]):
+        budget = current_added_budget()
+        with added_request_scope(budget):
+            parsed, meta = provider_call(route=config["judge_route"], system="s", user="u", purpose="review")
+        assert budget.output_tokens == 1500
+    assert parsed == {"ok": True}
+    assert calls[0]["route"]["max_tokens"] == meta["request_budget"]["output_token_limit"] == 1500

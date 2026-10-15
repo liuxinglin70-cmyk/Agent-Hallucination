@@ -66,6 +66,7 @@ def test_unknown_units_cannot_verify_a_declared_conversion_by_numeric_similarity
     assert not any(edge["relation"] == "declared_field_consumption" for edge in graph["edges"])
 
 
-def test_long_reasoning_request_cannot_request_eighty_thousand_output_tokens():
-    route, _ = bound_request_route({"max_tokens": 80000}, system="s", user="x" * 50000)
+def test_long_reasoning_request_obeys_an_explicit_output_ceiling():
+    route, _ = bound_request_route({"max_tokens": 80000, "long_output_tokens_per_request": 8192},
+                                 system="s", user="x" * 50000)
     assert route["max_tokens"] == 8192

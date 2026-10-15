@@ -8,11 +8,13 @@ never enter or persist in a detector input.
 from __future__ import annotations
 
 import ast
+import json
 import re
 from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
 from detector.identity import digest
+from detector.runtime import prepare_once
 
 PACKET_SCHEMA = "detector.packet.v1"
 EVENT_WINDOW_PROJECTION_SCHEMA = "detector.event_window_projection.v2"
@@ -67,6 +69,25 @@ _INDEX_TOOL_PREVIEW = 120
 
 class PacketError(ValueError):
     """A raw record cannot safely enter the detector."""
+
+
+def structured_payload(value: Any) -> Any:
+    """Decode a recorded JSON container without rewriting its source channel."""
+    if not isinstance(value, str) or not value.lstrip().startswith(("{", "[")):
+        return value
+    def unique_object(pairs):
+        result = {}
+        for key, item in pairs:
+            if key in result:
+                raise ValueError("ambiguous recorded JSON keys")
+            result[key] = item
+        return result
+    try:
+        decoded = json.loads(value, object_pairs_hook=unique_object)
+        json.dumps(decoded, allow_nan=False)
+    except (ValueError, TypeError, RecursionError):
+        return value
+    return decoded if isinstance(decoded, (dict, list)) else value
 
 
 def _as_list(value: Any) -> list[Any]:
@@ -748,7 +769,7 @@ def render_sparse_view(packet: Mapping[str, Any], *, max_characters: int = 48000
     return text, meta
 
 
-def render_judge_view(packet: Mapping[str, Any], *, max_characters: int = 48000) -> tuple[str, dict[str, Any]]:
+def _render_judge_view(packet: Mapping[str, Any], *, max_characters: int = 48000) -> tuple[str, dict[str, Any]]:
     """Use complete short trajectories and bounded sparse projections for long inputs."""
     text, meta = render_full_view(packet)
     if not meta["packet_truncated"] and not meta["truncated_event_ids"] and len(text) <= max_characters and len(packet["question"]) <= 4000:
@@ -757,6 +778,11 @@ def render_judge_view(packet: Mapping[str, Any], *, max_characters: int = 48000)
     degraded_text, degraded_meta = render_sparse_view(packet, max_characters=max_characters)
     degraded_meta["full_render_chars"] = len(text)
     return degraded_text, degraded_meta
+
+
+def render_judge_view(packet: Mapping[str, Any], *, max_characters: int = 48000) -> tuple[str, dict[str, Any]]:
+    return prepare_once("judge_view", {"packet": packet, "max_characters": max_characters},
+                        lambda: _render_judge_view(packet, max_characters=max_characters))
 
 
 def _render_delivered_block(packet: Mapping[str, Any]) -> str:

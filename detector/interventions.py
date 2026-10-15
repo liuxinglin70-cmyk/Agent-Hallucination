@@ -1843,13 +1843,27 @@ class InterventionPlan:
                 result[name] = value
         return result
 
+    def _entry_facts(self, entry: Mapping[str, Any], facts: Mapping[str, Any]) -> dict[str, Any]:
+        family = str((entry.get("provenance") or {}).get("failure_family") or "")
+        fact_map = self._facts_map(facts)
+        scoped_predicates = {key.rsplit("@", 1)[0] for key in self.facts if "@" in key}
+        for key, value in self.facts.items():
+            if "@" not in key and key not in scoped_predicates:
+                fact_map[key] = value
+        # A global alias written by another family is not evidence for this entry.
+        for predicate in scoped_predicates:
+            fact_map.pop(predicate, None)
+            own_key = f"{predicate}@{family}"
+            if own_key in self.facts:
+                fact_map[predicate] = self.facts[own_key]
+        return fact_map
+
     def _matches(self, entry: Mapping[str, Any], features: set[str], facts: Mapping[str, Any]) -> bool:
         trigger = entry.get("trigger") or {}
         required_features = {str(x) for x in trigger.get("packet_features") or ()}
         if not required_features <= set(features):
             return False
-        fact_map = self._facts_map(facts)
-        fact_map.update(self.facts)
+        fact_map = self._entry_facts(entry, facts)
         for fact in trigger.get("facts") or ():
             if isinstance(fact, str):
                 if "=" not in fact:
@@ -2106,24 +2120,7 @@ class InterventionPlan:
         actions: list[str] = []
         for entry, matched_facts in entries:
             body = entry.get("body") or {}
-            fact_map = self._facts_map(matched_facts)
-            # Prefer family-scoped facts for this guard's own family so
-            # cross-family evidence cannot trigger or suppress unrelated guards.
-            guard_family = str(
-                (entry.get("provenance") or {}).get("failure_family") or ""
-            )
-            for key, value in self.facts.items():
-                if "@" in key:
-                    # Family-scoped fact: only merge if it belongs to this
-                    # guard's family.
-                    pred, fam = key.rsplit("@", 1)
-                    if fam == guard_family:
-                        fact_map[pred] = value
-                else:
-                    # Global fact: only set if no family-scoped version exists.
-                    scoped_key = f"{key}@{guard_family}" if guard_family else ""
-                    if scoped_key not in self.facts:
-                        fact_map.setdefault(key, value)
+            fact_map = self._entry_facts(entry, matched_facts)
             excluded = self._facts_map(
                 body.get("action_not_when_facts") or ()
             )

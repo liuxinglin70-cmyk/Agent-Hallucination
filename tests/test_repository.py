@@ -195,18 +195,13 @@ def test_shipped_proposer_budget_cannot_truncate_on_glm():
 
 
 def test_shipped_recall_budget_cannot_truncate_on_glm():
-    # Observed in the 2026-09-18 error-scope preflight: the recall scanner's
-    # 8192-token ceiling cut the reply mid-JSON (truncated_output), and since
-    # a truncated scan is a provider error rather than a contract violation it
-    # could not be repaired. The stage then read as unavailable, which
-    # degraded an otherwise authoritative clean verdict to
-    # degraded_judge_only. The scanner enumerates every candidate deviation
-    # over a long trajectory and the model always reasons first, so it needs
-    # the same headroom the proposer was given for the same reason.
+    # Both 8192 and 32768 truncated measured replies; service capacity now
+    # supplies the ceiling while wall-clock deadlines bound execution.
     raw = json.loads(
         (ROOT / "detector" / "configs" / "autodl.json").read_text(encoding="utf-8")
     )
-    assert raw["recall_route"]["max_tokens"] >= 32768
+    assert raw["recall_route"].get("max_tokens") is None
+    assert raw["defense_route"].get("max_tokens") is None
 
 
 def test_shipped_case_budget_fits_a_measured_long_trajectory():

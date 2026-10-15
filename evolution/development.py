@@ -33,7 +33,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from detector.interventions import validate_intervention
 from detector.replay import HOOK_POLICIES, partial_replay_plan
-from evolution.candidate_versions import CandidateVersionGraph, canonical_hash
+from evolution.candidate_versions import CandidateVersionGraph
 from evolution.contracts import (
     candidate_contains_case_id,
     identity_incompleteness,

@@ -88,6 +88,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
         config=config,
         interventions=interventions,
         workers=args.workers,
+        provider_concurrency=args.provider_concurrency,
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     measurement = summary.get("measurement") or {}
@@ -141,6 +142,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_batch.add_argument("--config")
     p_batch.add_argument("--interventions")
     p_batch.add_argument("--workers", type=int, default=8)
+    p_batch.add_argument("--provider-concurrency", type=int, default=None,
+                         help="shared provider in-flight capacity; defaults to case workers")
     p_batch.set_defaults(func=cmd_batch)
 
     p_eval = sub.add_parser("evaluate", help="join gold and compute metrics")

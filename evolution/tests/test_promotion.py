@@ -274,6 +274,24 @@ def _standard_protocol(tmp_path: Path, *, gold_steps: dict | None = None) -> dic
     return _protocol(tmp_path, roles=roles, gold_steps=gold_steps, gold=gold)
 
 
+def test_terminal_promotion_retry_stops_before_measurement_and_preserves_report(tmp_path):
+    protocol = _standard_protocol(tmp_path)
+    candidate = _candidate()
+    first = _run(tmp_path, candidate=candidate, protocol=protocol,
+                 backend=_ScriptedBackend(control_prediction={case: None for case in BENEFIT}))
+    assert first["state"] != "promoted"
+    terminal = tmp_path / "out" / "promotion.json"
+    original = terminal.read_bytes()
+
+    class NoMeasurements(_ScriptedBackend):
+        def evaluate_fresh(self, *args, **kwargs):
+            pytest.fail("terminal attempt was measured again")
+
+    second = _run(tmp_path, candidate=candidate, protocol=protocol, backend=NoMeasurements())
+    assert second == first
+    assert terminal.read_bytes() == original
+
+
 def test_freeze_protocol_refuses_development_overlap(tmp_path):
     roles = {
         "DEV/001.json": "benefit", "DEV/002.json": "benefit",

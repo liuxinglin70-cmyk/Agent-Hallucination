@@ -14,9 +14,12 @@ from detector.packet import (
     packet_reference_error,
     render_judge_view,
 )
+from detector.stage_retry import memo_stage
+from detector.evidence_view import task_source_block
 from detector.provider import (
     ProviderError,
     accumulate_usage,
+    merge_provider_meta,
     majority_vote,
     provider_call,
     raise_if_terminal,
@@ -141,10 +144,12 @@ def _cast_vote(
 ) -> tuple[dict | None, dict[str, Any] | None, list[dict[str, str]], dict | None]:
     """A recoverable failed ballot abstains; terminal errors propagate."""
     warnings: list[dict[str, str]] = []
+    meta: dict[str, Any] = {}
 
     def abstain(exc: ProviderError) -> tuple:
         warnings.append({"attempt": "vote", "error": exc.message})
-        return None, {"attempts": exc.attempts}, list(warnings), exc.as_dict()
+        return None, merge_provider_meta(meta, {
+            "attempts": exc.attempts, "usage_total": exc.usage_total}), list(warnings), exc.as_dict()
 
     try:
         parsed, meta = provider_call(
@@ -155,6 +160,7 @@ def _cast_vote(
         return abstain(exc)
     result, error = _parse_judge(parsed, packet)
     if result is None:
+        initial_meta = dict(meta)
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
         try:
             parsed, meta = provider_call(
@@ -162,6 +168,7 @@ def _cast_vote(
                 user=user + JUDGE_CONTRACT_REPAIR + contract_repair_feedback(parsed, error),
                 purpose="judge_repair",
             )
+            meta = merge_provider_meta(initial_meta, meta)
             result, error = _parse_judge(parsed, packet)
         except ProviderError as exc:
             raise_if_terminal(exc)
@@ -169,7 +176,7 @@ def _cast_vote(
     if result is None:
         warnings.append({"attempt": "final", "error": f"contract:{error}"})
         return None, meta, list(warnings), {
-            "error_type": "contract_error", "message": error,
+            "error_type": "contract_error", "message": error, "raw": parsed,
         }
     return result, meta, list(warnings), None
 
@@ -201,139 +208,148 @@ def run_judge(
     system = JUDGE_SYSTEM + plan.prompt_block(packet_features(packet), hook="judge.system")
     user = (
         "Judge the trajectory below. Do not use any information that is not "
-        "in the question or the trajectory.\n\n" + view_text
+        "in the question or the trajectory.\n\n" + view_text + task_source_block(packet)
     )
     view_state = "complete" if not view_meta.get("degraded") else "degraded"
 
-    votes = max(1, int(route.get("votes", 1) or 1))
-    topup_budget = max(0, int(route.get("vote_topup", 0) or 0))
-    ballots: list[dict[str, Any]] = []
-    sample_meta: dict[str, Any] = {}
-    ballots_usage: dict[str, Any] = {}
-    total_attempts = 0
-    warnings: list[dict[str, str]] = []
-    failures: list[dict[str, Any]] = []
-    topups_used = 0
+    def evaluate():
+        votes = max(1, int(route.get("votes", 1) or 1))
+        topup_budget = max(0, int(route.get("vote_topup", 0) or 0))
+        ballots: list[dict[str, Any]] = []
+        sample_meta: dict[str, Any] = {}
+        ballots_usage: dict[str, Any] = {}
+        total_attempts = 0
+        warnings: list[dict[str, str]] = []
+        failures: list[dict[str, Any]] = []
+        topups_used = 0
 
-    # Independent ballots are exactly that, so they are cast concurrently: the
-    # vote count is a majority requirement, not a serial protocol. Order is
-    # preserved (see ``parallel_ordered``) so the returned sample does not
-    # depend on which ballot happened to finish first.
-    def cast_at(_index: int) -> tuple:
-        return _cast_vote(
-            packet=packet, route=route, system=system, user=user,
-        )
-
-    def absorb(result: tuple) -> None:
-        nonlocal total_attempts, sample_meta
-        parsed, meta, vote_warnings, failure = result
-        total_attempts += int((meta or {}).get("attempts") or 0)
-        warnings.extend(vote_warnings)
-        if failure is not None:
-            failures.append(failure)
-        if parsed is not None:
-            ballots.append(parsed)
-            sample_meta = dict(meta or {})
-            accumulate_usage(ballots_usage, (meta or {}).get("usage") or {})
-
-    parallel = max(1, int((route.get("vote_concurrency") or votes) or 1))
-    outcomes = parallel_ordered(cast_at, votes, workers=parallel)
-    for outcome in outcomes:
-        absorb(outcome)
-    while len(ballots) < votes and topup_budget > 0:
-        topup_budget -= 1
-        topups_used += 1
-        absorb(cast_at(0))
-    if not ballots:
-        failure_types = {failure["error_type"] for failure in failures}
-        error_type = next(iter(failure_types)) if len(failure_types) == 1 else "no_quorum"
-        return {
-            "ok": False,
-            "parsed": None,
-            "error": "every judge vote failed",
-            "error_type": error_type,
-            "vote_failures": failures,
-        }, {
-            "stage": "judge", "state": error_type,
-            "attempts": total_attempts, "view": view_state,
-            "warnings": warnings,
-        }
-
-    quorum = required_quorum(votes)
-    if len(ballots) < quorum:
-        # Fewer valid ballots than a majority of the configured votes: the
-        # stage could not decide honestly. One surviving ballot must never
-        # stand in for the whole vote (see ``required_quorum``). This is a
-        # judge failure, so the case resolves to unresolved/invalid rather
-        # than a silently degraded verdict.
-        return {
-            "ok": False,
-            "parsed": None,
-            "error": (
-                f"judge quorum not reached: {len(ballots)} valid ballot(s) "
-                f"of {votes} (need {quorum})"
-            ),
-            "error_type": "no_quorum",
-            "vote_failures": failures,
-        }, {
-            "stage": "judge", "state": "no_quorum",
-            "attempts": total_attempts, "view": view_state,
-            "warnings": warnings,
-        }
-
-    if votes == 1:
-        result = ballots[0]
-        vote_meta: dict[str, Any] = {"votes": 1}
-    else:
-        winner, cast = majority_vote(
-            [bool(ballot.get("is_hallucination")) for ballot in ballots],
-            on_tie=False,
-        )
-        positives = sum(
-            1 for ballot in ballots if ballot.get("is_hallucination")
-        )
-        # A positive verdict needs a strict majority; an undecided vote
-        # keeps the negative verdict, the less extraordinary claim.
-        vote_meta = {
-            "votes": votes, "cast": cast, "positives": positives,
-            "winner": winner,
-            "tie": not (winner or positives * 2 < cast),
-        }
-        result = next(
-            (
-                ballot for ballot in ballots
-                if bool(ballot.get("is_hallucination")) == winner
-            ),
-            ballots[0],
-        )
-        if not winner:
-            # Recall may be skipped only if every supporting negative is certain.
-            # Keep raw ballots intact so the ensemble remains auditable.
-            result = deepcopy(result)
-            confidence_rank = {"low": 0, "medium": 1, "high": 2}
-            result["confidence"] = min(
-                (ballot["confidence"] for ballot in ballots
-                 if ballot["is_hallucination"] is False),
-                key=confidence_rank.__getitem__,
+        # Independent ballots are exactly that, so they are cast concurrently: the
+        # vote count is a majority requirement, not a serial protocol. Order is
+        # preserved (see ``parallel_ordered``) so the returned sample does not
+        # depend on which ballot happened to finish first.
+        def cast_at(_index: int) -> tuple:
+            return _cast_vote(
+                packet=packet, route=route, system=system, user=user,
             )
-    if topups_used:
-        vote_meta["topups"] = topups_used
-    sample_meta["vote"] = vote_meta
-    if ballots_usage:
-        sample_meta["usage_total"] = ballots_usage
-    return {
-        "ok": True,
-        "parsed": result,
-        "raw": ballots if votes > 1 else ballots[0],
-        "provider": sample_meta,
-        "view_meta": view_meta,
-    }, {
-        "stage": "judge",
-        "state": "ok",
-        "attempts": total_attempts,
-        "view": view_state,
-        "warnings": warnings,
-    }
+
+        def absorb(result: tuple) -> None:
+            nonlocal total_attempts, sample_meta
+            parsed, meta, vote_warnings, failure = result
+            total_attempts += int((meta or {}).get("attempts") or 0)
+            accumulate_usage(ballots_usage, (meta or {}).get("usage_total") or (meta or {}).get("usage") or {})
+            if not sample_meta and meta:
+                sample_meta = dict(meta)
+            if ballots_usage:
+                sample_meta["usage_total"] = dict(ballots_usage)
+            warnings.extend(vote_warnings)
+            if failure is not None:
+                failures.append(failure)
+            if parsed is not None:
+                ballots.append(parsed)
+                sample_meta = dict(meta or {})
+
+        parallel = max(1, int((route.get("vote_concurrency") or votes) or 1))
+        outcomes = parallel_ordered(cast_at, votes, workers=parallel)
+        for outcome in outcomes:
+            absorb(outcome)
+        while len(ballots) < votes and topup_budget > 0:
+            topup_budget -= 1
+            topups_used += 1
+            absorb(cast_at(0))
+        if not ballots:
+            failure_types = {failure["error_type"] for failure in failures}
+            error_type = next(iter(failure_types)) if len(failure_types) == 1 else "no_quorum"
+            return {
+                "ok": False,
+                "parsed": None,
+                "error": "every judge vote failed",
+                "error_type": error_type,
+                "vote_failures": failures,
+                "provider": {**sample_meta, "usage_total": ballots_usage},
+            }, {
+                "stage": "judge", "state": error_type,
+                "attempts": total_attempts, "view": view_state,
+                "warnings": warnings,
+            }
+
+        quorum = required_quorum(votes)
+        if len(ballots) < quorum:
+            # Fewer valid ballots than a majority of the configured votes: the
+            # stage could not decide honestly. One surviving ballot must never
+            # stand in for the whole vote (see ``required_quorum``). This is a
+            # judge failure, so the case resolves to unresolved/invalid rather
+            # than a silently degraded verdict.
+            return {
+                "ok": False,
+                "parsed": None,
+                "error": (
+                    f"judge quorum not reached: {len(ballots)} valid ballot(s) "
+                    f"of {votes} (need {quorum})"
+                ),
+                "error_type": "no_quorum",
+                "vote_failures": failures,
+                "provider": {**sample_meta, "usage_total": ballots_usage},
+            }, {
+                "stage": "judge", "state": "no_quorum",
+                "attempts": total_attempts, "view": view_state,
+                "warnings": warnings,
+            }
+
+        if votes == 1:
+            result = ballots[0]
+            vote_meta: dict[str, Any] = {"votes": 1}
+        else:
+            winner, cast = majority_vote(
+                [bool(ballot.get("is_hallucination")) for ballot in ballots],
+                on_tie=False,
+            )
+            positives = sum(
+                1 for ballot in ballots if ballot.get("is_hallucination")
+            )
+            # A positive verdict needs a strict majority; an undecided vote
+            # keeps the negative verdict, the less extraordinary claim.
+            vote_meta = {
+                "votes": votes, "cast": cast, "positives": positives,
+                "winner": winner,
+                "tie": not (winner or positives * 2 < cast),
+            }
+            result = next(
+                (
+                    ballot for ballot in ballots
+                    if bool(ballot.get("is_hallucination")) == winner
+                ),
+                ballots[0],
+            )
+            if not winner:
+                # Recall may be skipped only if every supporting negative is certain.
+                # Keep raw ballots intact so the ensemble remains auditable.
+                result = deepcopy(result)
+                confidence_rank = {"low": 0, "medium": 1, "high": 2}
+                result["confidence"] = min(
+                    (ballot["confidence"] for ballot in ballots
+                     if ballot["is_hallucination"] is False),
+                    key=confidence_rank.__getitem__,
+                )
+        if topups_used:
+            vote_meta["topups"] = topups_used
+        sample_meta["vote"] = vote_meta
+        if ballots_usage:
+            sample_meta["usage_total"] = ballots_usage
+        return {
+            "ok": True,
+            "parsed": result,
+            "raw": ballots if votes > 1 else ballots[0],
+            "provider": sample_meta,
+            "view_meta": view_meta,
+        }, {
+            "stage": "judge",
+            "state": "ok",
+            "attempts": total_attempts,
+            "view": view_state,
+            "warnings": warnings,
+        }
+
+    return memo_stage('judge', {"packet": packet, "route": route, "system": system, "user": user, "view_meta": view_meta}, evaluate)
 
 
 __all__ = ["run_judge"]

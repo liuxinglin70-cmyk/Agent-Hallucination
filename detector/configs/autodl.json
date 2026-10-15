@@ -31,12 +31,10 @@
   },
   "defense_route": {
     "model": "GLM-5.3-flash",
-    "max_tokens": 32768,
     "votes": 3,
     "vote_topup": 2
   },
   "recall_route": {
-    "model": "GLM-5.3-flash",
-    "max_tokens": 32768
+    "model": "GLM-5.3-flash"
   }
 }

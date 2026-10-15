@@ -44,7 +44,6 @@ meaningful: the report binds to the artifact that was actually exercised.
 
 from __future__ import annotations
 
-import json
 import unicodedata
 from typing import Any, Mapping, Sequence
 
@@ -1070,9 +1069,10 @@ def check_localization_event_move(subject: MetamorphicSubject) -> dict[str, Any]
             LOCALIZATION_EVENT_MOVE, passed=False, mutation_effective=False,
             detail=f"no admissible move: {refusal}",
         )
-    after_step = row_responsible_step(row)
+    after_step = row_responsible_step({**row, "packet": mutated})
     relocated = {
         **row,
+        "packet": mutated,
         "result": {
             **(row.get("result") or {}),
             "responsible_step": mapping.get(int(before_step), int(before_step)),
@@ -1242,19 +1242,23 @@ def admission_error(runner: str) -> str:
     spec = runner_spec(name)
     if spec is None:
         return f"runner {name!r} is not registered"
-    if reference_subject(name) is None:
+    subject = reference_subject(name)
+    if subject is None:
         return (
             f"runner {name!r} has no metamorphic admission subject; a new "
             "runner must ship with its §15.2 transformations before a "
             "candidate may name it"
         )
+    report = run_gate(name, subject)
+    if not report["passed"]:
+        return f"runner {name!r} failed metamorphic admission: {report}"
     return ""
 
 
 def admitted_runners() -> list[str]:
-    """Registered runners with an admission subject, sorted."""
+    """Registered runners whose reference subject passes admission, sorted."""
     return sorted(
-        name for name in RUNNER_REGISTRY if reference_subject(name) is not None
+        name for name in RUNNER_REGISTRY if not admission_error(name)
     )
 
 

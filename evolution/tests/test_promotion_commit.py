@@ -210,8 +210,9 @@ def test_existing_output_without_commit_cannot_deploy(tmp_path, name):
     original = b'{"existing": true}'
     path.write_bytes(original)
     before = run.registry.active_path.read_bytes()
-    with pytest.raises(ValueError, match="output already exists"):
-        run.run()
+    report = run.run()
+    assert report["state"] == "promotion_blocked_preflight"
+    assert "output already exists" in report["terminal_reason"]
     assert run.registry.active_path.read_bytes() == before
     assert path.read_bytes() == original
 

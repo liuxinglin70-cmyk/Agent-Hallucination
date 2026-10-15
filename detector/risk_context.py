@@ -7,6 +7,7 @@ from detector.identity import digest
 from detector.packet import packet_reference_error
 from detector.next_action import build_next_action_audit
 from detector.code_lineage import build_code_lineage, code_ancestor_events
+from detector.semantic_trace import build_semantic_trace, semantic_ancestors
 from detector.step_uncertainty import build_step_risk_profile, select_causal_candidates, risk_candidate_rows
 
 
@@ -41,7 +42,10 @@ def build_risk_context(
         return None
     code_lineage = build_code_lineage(packet, max_edges=policy["max_graph_edges"])
     ancestors = code_ancestor_events(code_lineage, mandatory[0])
-    selected = list(dict.fromkeys([*selection["selected_event_ids"], *ancestors[:policy["top_k"]]]))
+    semantic_trace = build_semantic_trace(packet)
+    semantic_sources = semantic_ancestors(semantic_trace, mandatory[0])
+    selected = list(dict.fromkeys([*selection["selected_event_ids"], *ancestors[:policy["top_k"]],
+                                  *semantic_sources[:policy["top_k"]]]))
     selected = selected[:policy["max_projection_events"]]
     risk = risk_candidate_rows(profile)
     needles = [positive.get(key) for key in ("quote", "delivered_result")
@@ -81,6 +85,9 @@ def build_risk_context(
                    "omitted_interaction_ids")},
                "code_consumption_hints": [edge for edge in code_lineage["edges"]
                                           if edge["target_event_id"] in {*ancestors, mandatory[0]}][:8],
+               "semantic_trace_digest": semantic_trace["digest"],
+               "semantic_consumption_hints": [edge for edge in semantic_trace["edges"]
+                                               if edge["target_event_id"] in {*semantic_sources, mandatory[0]}][:8],
                "candidates": candidates, "omitted_event_ids": list(dict.fromkeys([
                    *profile["omitted_event_ids"], *selection["omitted_event_ids"],
                ]))}

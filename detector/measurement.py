@@ -24,9 +24,16 @@ EXHAUSTED_ERRORS = frozenset({
     "cancelled", "run_cancelled", "stopped",
 })
 
+STAGE_FAILURES = frozenset({
+    "no_quorum", "contract_error", "truncated_output", "degraded_missing_rows",
+})
+
 
 def failure_reasons(result: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    return [item for item in result.get("authority_failure_reasons") or () if isinstance(item, Mapping)]
+    reasons = [item for item in result.get("authority_failure_reasons") or () if isinstance(item, Mapping)]
+    failures = [failure for item in reasons for failure in item.get("vote_failures") or ()
+                if isinstance(failure, Mapping)]
+    return reasons + failures
 
 
 def _error_types(result: Mapping[str, Any]) -> set[str]:
@@ -69,7 +76,7 @@ def measurement_status(result: Mapping[str, Any]) -> str:
     if fatal_failure(result):
         return "fatal_provider"
     errors = _error_types(result)
-    if errors & (TRANSIENT_ERRORS | EXHAUSTED_ERRORS):
+    if errors & (TRANSIENT_ERRORS | EXHAUSTED_ERRORS | STAGE_FAILURES):
         return "infrastructure_failure"
     codes = {str(item.get("code") or "") for item in failure_reasons(result)}
     if codes & {"provider_error", "recall_unavailable"}:
@@ -89,7 +96,8 @@ def retry_in_run(result: Mapping[str, Any]) -> bool:
     different competing load, the same case is worth asking again.
     """
     errors = _error_types(result)
-    if (errors & EXHAUSTED_ERRORS or fatal_failure(result)
+    # Repeating an unchanged request cannot repair an exhausted output ceiling.
+    if (errors & (EXHAUSTED_ERRORS | {"truncated_output"}) or fatal_failure(result)
             or any(reason.get("retryable") is False for reason in failure_reasons(result))):
         return False
     return measurement_status(result) == "infrastructure_failure"

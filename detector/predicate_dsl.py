@@ -8,7 +8,7 @@ applies one fixed operator, and maps the result to a declared verdict.
 
 Regex matching runs in a killable subprocess under a shared program budget,
 case deadline and run cancellation. Validation also rejects known ambiguous
-patterns and bounds the pattern and input sizes.
+patterns and bounds the pattern size.
 
 The proposer can grow the observation vocabulary of the detector at runtime,
 while the surface stays fail-closed: unknown fields, operators, verdicts,
@@ -44,7 +44,6 @@ MAX_LITERAL_CHARS = 400
 MAX_REGEX_CHARS = 300
 MAX_CONDITIONS = 4
 
-MAX_REGEX_HAYSTACK = 4096
 MAX_REGEX_SECONDS = 0.5
 MAX_PROGRAM_SECONDS = 1.0
 
@@ -75,7 +74,7 @@ def _regex_matches(pattern: str, text: str, program_deadline: float) -> bool:
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         text=True, encoding="utf-8",
     )
-    payload = json.dumps([pattern, text[:MAX_REGEX_HAYSTACK]], ensure_ascii=True)
+    payload = json.dumps([pattern, text], ensure_ascii=True)
     try:
         while True:
             _check_execution()
@@ -586,22 +585,22 @@ def _scalarize(value: Any) -> str:
 def _extract_view(field: str, packet: Mapping[str, Any], context: Mapping[str, Any]) -> Any:
     events = list(packet.get("events") or ())
     question = str(packet.get("question") or "")
-    features = packet_features(packet)
-    anchors = packet_delivered_result(packet)
+    features = packet_features(packet) if field == "packet_features" else set()
+    anchors = packet_delivered_result(packet) if field.startswith("last_") or field == "answer_anchor_status" else {}
     answer_tool = anchors.get("last_answer_tool_call") or {}
-    event_texts = _flat_texts(events)
+    event_texts = _flat_texts(events) if field == "event_texts" else []
     prose_texts = [
         str(event.get("content") or "")
         for event in events
         if isinstance(event, Mapping) and str(event.get("content") or "").strip()
-    ]
+    ] if field in {"prose_texts", "prose_event_count"} else []
     interactions = [
         interaction
         for event in events
         if isinstance(event, Mapping)
         for interaction in event.get("tool_interactions") or ()
         if isinstance(interaction, Mapping)
-    ]
+    ] if field in {"tool_names", "tool_arguments", "tool_observations", "interaction_texts", "interaction_ids", "tool_call_count", "interaction_count"} else []
     interaction_texts = [
         "\n".join((
             str(interaction.get("tool_name") or ""),
@@ -609,16 +608,16 @@ def _extract_view(field: str, packet: Mapping[str, Any], context: Mapping[str, A
             str(interaction.get("observation") or ""),
         ))
         for interaction in interactions
-    ]
-    tool_names = [str(interaction.get("tool_name") or "") for interaction in interactions]
+    ] if field == "interaction_texts" else []
+    tool_names = [str(interaction.get("tool_name") or "") for interaction in interactions] if field == "tool_names" else []
     tool_arguments = [
         _scalarize(interaction.get("arguments"))
         for interaction in interactions
-    ]
+    ] if field == "tool_arguments" else []
     tool_observations = [
         _scalarize(interaction.get("observation"))
         for interaction in interactions
-    ]
+    ] if field == "tool_observations" else []
     contract_rows = list(context.get("contracts") or ())
     if field == "question_text":
         return question
@@ -823,10 +822,13 @@ def _condition_matches(
     packet: Mapping[str, Any],
     context: Mapping[str, Any],
     program_deadline: float,
+    views: dict[str, Any],
 ) -> bool:
     field = str(condition.get("field") or "")
     field_type = FIELD_TYPES[field]
-    view = _extract_view(field, packet, context)
+    if field not in views:
+        views[field] = _extract_view(field, packet, context)
+    view = views[field]
     operator = str(condition.get("operator") or "")
     value = condition.get("value")
     return (
@@ -848,16 +850,18 @@ def run_predicate_program(
     spec = validate_predicate_program(program)
     context = dict(context or {})
     program_deadline = time.monotonic() + MAX_PROGRAM_SECONDS
+    views: dict[str, Any] = {}
+    features = packet_features(packet)
     for rule in spec["rules"]:
         _check_execution()
-        if not set(rule["when"]["packet_features"]) <= packet_features(packet):
+        if not set(rule["when"]["packet_features"]) <= features:
             continue
         conditions = list(rule.get("conditions") or ())
         if not conditions:
             continue
         try:
             matched = all(
-                _condition_matches(condition, packet, context, program_deadline)
+                _condition_matches(condition, packet, context, program_deadline, views)
                 for condition in conditions
             )
         except PredicateResourceExceeded as exc:

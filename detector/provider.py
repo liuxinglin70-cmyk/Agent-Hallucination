@@ -21,18 +21,29 @@ import time
 from uuid import uuid4
 from http.client import IncompleteRead
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
+from contextvars import ContextVar
 from urllib import error as urlerror
 from urllib import request as urlrequest
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from dataclasses import asdict
 from detector.trajectory_budget import bound_request_route
 from detector.runtime import (
-    CaseDeadlineExceeded, CaseExecutionError, check_request_deadline, current_added_request_budget,
+    CaseDeadlineExceeded, CaseExecutionError, RunStopped, check_request_deadline, current_added_request_budget,
     current_added_budget, current_control, current_deadline, deadline_scope, observe_request, record_request, request_deadline,
 )
 
 _DIRECT_OPENER = urlrequest.build_opener(urlrequest.ProxyHandler({}))
+_VIEW_FALLBACK: ContextVar[str | Callable[[], str] | None] = ContextVar("provider_view_fallback", default=None)
+
+
+@contextmanager
+def provider_fallback_scope(user: str | Callable[[], str] | None):
+    token = _VIEW_FALLBACK.set(user)
+    try:
+        yield
+    finally:
+        _VIEW_FALLBACK.reset(token)
 
 _JSON_RECOVERY_INSTRUCTION = (
     "\n\nJSON_RECOVERY: Your previous response carried no usable JSON body. "
@@ -75,27 +86,39 @@ def _isolated_transport(
         package_root + os.pathsep + existing_pythonpath
         if existing_pythonpath else package_root
     )
-    try:
-        completed = subprocess.run(
+    deadline = time.monotonic() + max(0.001, float(timeout))
+    process = subprocess.Popen(
             [sys.executable, "-m", "detector.provider_worker"],
-            input=request_payload,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=max(0.001, float(timeout)),
-            check=False,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             env=child_env,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise TimeoutError("isolated transport exceeded request deadline") from exc
-    if completed.returncode != 0:
+    )
+    try:
+        while True:
+            control = current_control()
+            if control is not None:
+                control.check()
+            check_request_deadline()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("isolated transport exceeded request deadline")
+            try:
+                stdout, stderr = process.communicate(request_payload, timeout=min(0.1, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                request_payload = None
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.communicate()
+    if process.returncode != 0:
         # Keep the whole traceback: a truncated one hides the real cause and
         # blocked classification of model errors versus service faults.
-        detail = completed.stderr.decode("utf-8", errors="replace").strip()
+        detail = stderr.decode("utf-8", errors="replace").strip()
         raise OSError(
-            f"isolated transport failed: {detail or completed.returncode}"
+            f"isolated transport failed: {detail or process.returncode}"
         )
     try:
-        result = json.loads(completed.stdout.decode("utf-8"))
+        result = json.loads(stdout.decode("utf-8"))
         status = int(result["status"])
         raw = base64.b64decode(str(result["body_b64"]), validate=True)
     except (KeyError, ValueError, UnicodeDecodeError) as exc:
@@ -115,6 +138,7 @@ class ProviderError(CaseExecutionError):
         attempts: int = 0,
         http_status: int | None = None,
         retryable: bool = True,
+        usage_total: Mapping[str, Any] | None = None,
     ) -> None:
         super().__init__(f"route {route_name}: {message}")
         self.route_name = route_name
@@ -123,11 +147,13 @@ class ProviderError(CaseExecutionError):
         self.message = message
         self.http_status = http_status
         self.retryable = retryable
+        self.usage_total = dict(usage_total or {})
 
     def as_dict(self) -> dict[str, Any]:
         return {"route": self.route_name, "message": self.message,
                 "error_type": self.error_type, "http_status": self.http_status,
-                "retryable": self.retryable, "attempts": self.attempts}
+                "retryable": self.retryable, "attempts": self.attempts,
+                **({"usage_total": dict(self.usage_total)} if self.usage_total else {})}
 
 
 FATAL_PROVIDER_ERRORS = frozenset({
@@ -235,6 +261,20 @@ def accumulate_usage(total: dict[str, Any], usage: Mapping[str, Any]) -> None:
             total[key] = total.get(key, 0) + value
 
 
+def merge_provider_meta(previous: Mapping[str, Any], latest: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep the latest sample and the total cost of all calls in one stage."""
+    if not previous:
+        return dict(latest)
+    merged = {**previous, **latest}
+    merged["attempts"] = int(previous.get("attempts") or 0) + int(latest.get("attempts") or 0)
+    usage: dict[str, Any] = {}
+    for meta in (previous, latest):
+        accumulate_usage(usage, meta.get("usage_total") or meta.get("usage") or {})
+    if usage:
+        merged["usage_total"] = usage
+    return merged
+
+
 def majority_vote(values, *, on_tie):
     """Strict-majority vote with a deterministic tie law.
 
@@ -267,8 +307,10 @@ def _endpoint_url(endpoint: str) -> str:
 
 def provider_call(
     *, route: Mapping[str, Any], system: str, user: str,
-    purpose: str, cache_tag: str = "",
+    purpose: str, cache_tag: str = "", fallback_user: str | None = None,
 ) -> tuple[Any, dict[str, Any]]:
+    fallback = fallback_user if fallback_user is not None else _VIEW_FALLBACK.get()
+    original_route = dict(route)
     added_output_tokens = int(route.get("max_tokens") or 1500)
     route, request_budget = bound_request_route(route, system=system, user=user)
     control = current_control()
@@ -278,8 +320,9 @@ def provider_call(
         check_request_deadline()
         budget = current_added_request_budget()
         if budget is not None:
+            output_tokens = min(added_output_tokens, route["max_tokens"]) if route["max_tokens"] is not None else added_output_tokens
             route = {**route, "transport_retries": 0, "max_tokens": budget.reserve(
-                system=system, user=user, output_tokens=min(added_output_tokens, route["max_tokens"]),
+                system=system, user=user, output_tokens=output_tokens,
                 extra_input=route.get("extra_body"),
             )}
         case_budget = current_added_budget()
@@ -297,6 +340,22 @@ def provider_call(
             retryable=False,
         ) from exc
     except ProviderError as exc:
+        if exc.error_type == "context_length_exceeded" and fallback is not None:
+            fallback_text = fallback() if callable(fallback) else fallback
+            if fallback_text == user:
+                raise
+            try:
+                with provider_fallback_scope(None):
+                    parsed, meta = provider_call(route=original_route, system=system, user=fallback_text,
+                                                 purpose=purpose + "_view_fallback", cache_tag=cache_tag)
+            except ProviderError as failure:
+                failure.attempts += exc.attempts
+                total = dict(exc.usage_total)
+                accumulate_usage(total, failure.usage_total)
+                failure.usage_total = total
+                raise
+            return parsed, {**merge_provider_meta({"attempts": exc.attempts, "usage_total": exc.usage_total}, meta),
+                            "evidence_view_fallback": "provider_context_limit"}
         if control is not None and exc.error_type in FATAL_PROVIDER_ERRORS:
             control.stop(exc.as_dict())
         raise
@@ -394,7 +453,13 @@ def _provider_call(
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             return False
-        time.sleep(min(30.0, 2.0 ** attempt, remaining))
+        delay = min(30.0, 2.0 ** attempt, remaining)
+        if control is None:
+            time.sleep(delay)
+        else:
+            control.stopped.wait(delay)
+            control.check()
+        check_request_deadline()
         return deadline - time.monotonic() > 0
 
     for attempt in range(retries + 1):
@@ -441,6 +506,17 @@ def _provider_call(
                     url=url, headers=headers, body=body, timeout=timeout,
                 )
         except CaseDeadlineExceeded:
+            if transport_started:
+                record_request({"request_id": request_id, "purpose": purpose, "attempt": attempts,
+                                "elapsed_seconds": time.perf_counter() - request_started,
+                                "queue_seconds": queue_seconds, "status": "deadline_exceeded", "usage": None})
+            raise
+        except RunStopped as exc:
+            if transport_started:
+                record_request({"request_id": request_id, "purpose": purpose, "attempt": attempts,
+                                "elapsed_seconds": time.perf_counter() - request_started,
+                                "queue_seconds": queue_seconds, "status": "cancelled",
+                                "error_type": exc.reason.get("error_type", "stopped"), "usage": None})
             raise
         except (
             urlerror.URLError,
@@ -476,6 +552,16 @@ def _provider_call(
             accumulate_usage(call_usage, observed_usage)
         last_status = status
         if status in {400, 401, 402, 403, 404, 422}:
+            error = data.get("error")
+            code = error.get("code") if isinstance(error, Mapping) else None
+            message = str(error.get("message") or "") if isinstance(error, Mapping) else str(error or "")
+            context_limit = ((isinstance(code, str) and code in {"context_length_exceeded", "input_too_long"})
+                             or any(term in message.lower() for term in (
+                                 "maximum context length", "max context length", "input is too long", "too many input tokens")))
+            if status in {400, 422} and context_limit:
+                raise ProviderError(route_name, "provider context limit exceeded",
+                                    error_type="context_length_exceeded", attempts=attempts,
+                                    http_status=status, retryable=False, usage_total=call_usage)
             category = {401: "authentication_error", 403: "permission_error",
                         402: "quota_exhausted", 404: "model_unavailable"}.get(status, "invalid_request")
             raise ProviderError(route_name, f"http {status}: {str(data.get('error') or 'request refused')[:200]}",
@@ -496,13 +582,14 @@ def _provider_call(
                 last_error = "total timeout exceeded"
                 break
             continue
-        message = (data.get("choices") or [{}])[0].get("message") or {}
-        content = str(message.get("content") or "")
-        finish_reason = str(
-            (data.get("choices") or [{}])[0].get("finish_reason") or ""
-        )
+        choices = data.get("choices")
+        choice = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], Mapping) else {}
+        message = choice.get("message")
+        content = message.get("content") if isinstance(message, Mapping) else None
+        content = content if isinstance(content, str) else ""
+        finish_reason = str(choice.get("finish_reason") or "")
         parsed = extract_json_object(content)
-        usage = dict(data.get("usage") or {})
+        usage = dict(observed_usage) if isinstance(observed_usage, Mapping) else {}
         meta: dict[str, Any] = {
             "attempts": attempts,
             "usage": usage,
@@ -538,7 +625,7 @@ def _provider_call(
                     f"output truncated at max_tokens "
                     f"({usage.get('completion_tokens')} tokens)",
                     error_type="truncated_output",
-                    attempts=attempts,
+                    attempts=attempts, usage_total=call_usage,
                 )
             if not needs_recovery:
                 needs_recovery = True

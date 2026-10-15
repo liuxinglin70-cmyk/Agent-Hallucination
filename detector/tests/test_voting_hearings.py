@@ -563,7 +563,7 @@ def test_judge_quorum_rejects_a_single_surviving_ballot(wrong_answer_packet, mon
 
 
 def test_defense_quorum_keeps_conviction_and_degrades(wrong_answer_packet, monkeypatch):
-    """An under-quorum defense keeps the conviction instead of clearing it."""
+    """An under-quorum defense is a stage failure, never an overturn."""
     calls = []
 
     def fake_call(*, route, system, user, purpose, cache_tag=""):
@@ -577,8 +577,10 @@ def test_defense_quorum_keeps_conviction_and_degrades(wrong_answer_packet, monke
     result, status = run_defense(
         packet=wrong_answer_packet, positive=_defense_positive(), config=config,
     )
-    assert result["ok"] is True
-    assert result["parsed"]["verdict"] == "inconclusive"
+    assert result["ok"] is False
+    assert result["parsed"] is None
+    assert status["state"] == "no_quorum"
+    assert result["vote_failures"]
     assert result["provider"]["vote"]["quorum_met"] is False
 
 

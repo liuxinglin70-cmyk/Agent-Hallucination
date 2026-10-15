@@ -459,7 +459,8 @@ def ingest_development_run(
             continue
         l1 = (sidecar.get("l1") or {})
         reasons = [
-            str(reason) for reason in version.get("revision_reason") or () if reason
+            str(reason.get("note") or reason) if isinstance(reason, Mapping) else str(reason)
+            for reason in sidecar.get("revision_reason") or () if reason
         ]
         recorded.append(archive_candidate(
             root,

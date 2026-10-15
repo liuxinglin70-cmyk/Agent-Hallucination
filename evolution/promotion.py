@@ -1150,7 +1150,6 @@ class PromotionRun:
         """
         from evolution.backends import LiveDetectorBackend
 
-        active = self.registry.registry if hasattr(self, "registry") else None
         backend = LiveDetectorBackend(
             self.config,
             baseline_results=self.baseline_roll,
@@ -1364,6 +1363,28 @@ class PromotionRun:
         recovered = self._recover_publication()
         if recovered is not None:
             return recovered
+        if any((self.output_dir / name).exists() for name in ("promotion.json", "version.json")):
+            terminal_path = self.output_dir / "promotion.json"
+            if terminal_path.is_file() and not (self.output_dir / "version.json").exists():
+                try:
+                    terminal = json.loads(terminal_path.read_text(encoding="utf-8-sig"))
+                    if (isinstance(terminal, dict)
+                            and terminal.get("attempt_identity") == self._publication_identity()
+                            and terminal.get("report_hash") == digest({key: value for key, value in terminal.items() if key != "report_hash"})
+                            and terminal.get("state") in PROMOTION_TERMINALS
+                            and terminal.get("state") != "promoted"
+                            and terminal.get("admitted") is False):
+                        return deepcopy(terminal)
+                except (OSError, ValueError, TypeError):
+                    pass
+            return {
+                "schema_version": PROMOTION_STATE_SCHEMA,
+                "state": "promotion_blocked_preflight", "admitted": False,
+                "candidate_id": self.candidate.get("candidate_id"),
+                "candidate_content_hash": self.candidate.get("content_hash"),
+                "terminal_reason": "promotion output already exists without a matching verified terminal or committed publication; frozen evidence cannot be measured again",
+                "promotion_diagnosis": alignment.diagnosis("protocol_invalid"),
+            }
         if self.protocol.get("schema_version") == alignment.ALIGNED_PROTOCOL_SCHEMA:
             return self._run_aligned()
         # All four formal gates are mandatory in every promotion, not only in
@@ -2265,6 +2286,7 @@ class PromotionRun:
 
     def _normalize_report(self, report: dict[str, Any]) -> None:
         state = str(report.get("state") or "")
+        report.setdefault("admitted", state == "promoted")
         report["candidate_status"] = {"promoted": "active", "promotion_rejected": "frozen"}.get(
             state, self.candidate.get("status"))
         if "promotion_diagnosis" not in report:
@@ -2370,6 +2392,8 @@ class PromotionRun:
     def _write(self, report: Mapping[str, Any]) -> None:
         self._verify_measured_arms()
         self._normalize_report(report)
+        report["attempt_identity"] = self._publication_identity()
+        report["report_hash"] = digest({key: value for key, value in report.items() if key != "report_hash"})
         save_json(self.output_dir / "promotion.json", report)
         self.ledger.append("promotion_attempt", self._attempt_event(report))
 

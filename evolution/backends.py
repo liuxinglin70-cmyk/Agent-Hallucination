@@ -18,7 +18,7 @@ import os
 import sys
 import time
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Mapping, Sequence
 
 from detector.api import Detector
 from detector.config import (
@@ -757,7 +757,6 @@ class MockDetectorBackend(DetectionBackend):
         plan = _compile_with_component_executors(registry)
         entries = self._active_ids(registry)
         for entry in entries:
-            intervention_id = str(entry.get("intervention_id") or "")
             event = (
                 "guard_fired" if entry.get("type") == "decision_guard"
                 else "text_injected"

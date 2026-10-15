@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from evolution.proposer import HybridProposer
+import pytest
 
 
 def _fn_family():
@@ -49,6 +50,16 @@ def _fp_family():
             "member_summaries": [],
         },
     }
+
+
+@pytest.mark.parametrize("predicate", ["contract_coverage", "evidence_refs_resolve", "required_action_present", "verbatim_fidelity", "delivered_anchor_consistency", "final_delivery_present"])
+def test_fp_template_requires_an_applicable_violation(predicate):
+    family = _fp_family()
+    family["diagnostics"]["predicate_signals"] = {predicate: {"applicable": 2, "violations": 2}}
+    evidence, guard = HybridProposer._fp_candidates(family, 1)
+    assert f"{predicate}=not_applicable" not in guard["trigger"]["facts"]
+    violating = guard["trigger"]["facts"][0]
+    assert violating not in guard["body"]["action_not_when_facts"]
 
 
 def _config():

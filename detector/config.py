@@ -136,7 +136,7 @@ def _validate_route(route: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"detector route {key} must be a non-empty string")
         resolved[key] = resolved[key].strip()
     for key, minimum in _INTEGER_MINIMUMS.items():
-        if key in REQUEST_BUDGET_DEFAULTS and resolved.get(key) is None:
+        if key == "long_input_threshold_characters" and resolved.get(key) is None:
             raise ValueError(f"{key} must be a positive integer")
         if key in resolved and resolved[key] is not None:
             resolved[key] = _integer(resolved[key], key, minimum)
@@ -203,20 +203,16 @@ def resolve_route(
         raise ValueError(f"unknown detector route: {name}")
     provider_block = _object(provider_block if provider_block is not None else {}, "provider", _ROUTE_FIELDS)
     route_block = _object(route_block if route_block is not None else {}, f"{name}_route", _ROUTE_FIELDS)
-    for block in (provider_block, route_block):
-        for key in REQUEST_BUDGET_DEFAULTS:
-            if key in block and block[key] is None:
-                raise ValueError(f"{key} must be a positive integer")
     merged = deepcopy(_PROVIDER_DEFAULTS)
     if provider_block:
         merged.update({
             key: value for key, value in provider_block.items()
-            if value is not None
+            if value is not None or key in REQUEST_BUDGET_DEFAULTS
         })
     if route_block:
         merged.update({
             key: value for key, value in route_block.items()
-            if value is not None
+            if value is not None or key in REQUEST_BUDGET_DEFAULTS
         })
     upper = name.upper()
     env_map = {

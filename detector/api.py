@@ -32,7 +32,7 @@ from detector.predicate_context import judge_predicate_context
 from detector.provider import ProviderError, case_deadline_ctx
 from detector.measurement import request_execution
 from detector.runtime import (
-    AddedBudgetExceeded, CaseDeadlineExceeded, added_budget_scope, added_request_scope, current_added_budget, usage_scope, utc_now,
+    AddedBudgetExceeded, CaseDeadlineExceeded, added_budget_scope, added_request_scope, current_added_budget, usage_scope, utc_now, preparation_scope,
 )
 import time
 from detector.recaller import (
@@ -41,6 +41,8 @@ from detector.recaller import (
 )
 from detector.replay import build_replay_inputs, validate_frozen_stages
 from detector.result import build_detection_output
+from detector.stage_retry import current_stage_retry
+from detector.semantic_trace import build_semantic_trace, referent_provenance
 
 
 @dataclass(frozen=True)
@@ -165,7 +167,7 @@ class Detector:
         """
         started = time.perf_counter()
         started_at = utc_now()
-        with usage_scope() as observations, case_deadline_ctx(self.config.get("case_timeout_seconds")), \
+        with usage_scope() as observations, preparation_scope(), case_deadline_ctx(self.config.get("case_timeout_seconds")), \
                 added_budget_scope(self.config["causal_audit"]):
             try:
                 result = self._detect(
@@ -270,6 +272,13 @@ class Detector:
             packet=packet, config=identity_config, source=current_source, snapshot=snapshot,
             entries=plan.entries,
         )
+        retry_cache = current_stage_retry()
+        if retry_cache is not None:
+            retry_cache.bind({"case_id": case_id, **build_execution_identity(
+                source=current_source, config=identity_config, record=record, packet=packet,
+                evidence=attached_snapshot, registry=effective_interventions, replay=replay_payload,
+                authority=authority_identity(effective_interventions, calibration=plan.conviction_calibration),
+            )})
         review_input_digest = digest({"case_id": case_id, "packet": packet, "config": self.config,
                                      "registry": effective_interventions, "evidence": attached_snapshot})
         if frozen is not None and "judge_result" not in frozen:
@@ -438,16 +447,25 @@ class Detector:
         def hear(positive: Mapping[str, Any]) -> tuple[
             dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any],
         ]:
-            nonlocal causal_diagnostics
-            if causal_diagnostics is None and causal_policy["mode"] == "tracer_context":
-                target_id = event_id_for_step(packet, positive.get("step"))
-                causal_diagnostics = build_causal_diagnostics(
-                    packet=packet, config=self.config, budget=current_added_budget(),
-                    mandatory_event_ids=[target_id] if target_id else [], context=None, snapshot=snapshot,
-                )
+            def after_defense(result, status):
+                if (positive.get("source") == "judge" and result.get("ok") is True
+                        and status.get("state") == "ok"
+                        and (result.get("parsed") or {}).get("verdict") == "refuted"):
+                    run_recall_net()
+
+            def prepare_diagnostics():
+                nonlocal causal_diagnostics
+                if causal_diagnostics is None and causal_policy["mode"] == "tracer_context":
+                    target_id = event_id_for_step(packet, positive.get("step"))
+                    causal_diagnostics = build_causal_diagnostics(
+                        packet=packet, config=self.config, budget=current_added_budget(),
+                        mandatory_event_ids=[target_id] if target_id else [], context=None, snapshot=snapshot,
+                    )
+                return causal_diagnostics
             return run_hearing(
                 packet=packet, positive=positive, config=self.config, plan=plan,
-                frozen=frozen, diagnostics=causal_diagnostics, snapshot=snapshot,
+                frozen=frozen, diagnostics_factory=prepare_diagnostics, snapshot=snapshot,
+                on_defense=after_defense,
             )
 
         judge_overturned = False
@@ -571,6 +589,8 @@ class Detector:
                 replay=replay_payload,
             ),
         }
+        if retry_cache is not None:
+            provenance["stage_retry_reuse"] = deepcopy(retry_cache.reused)
         if attached_snapshot is not None:
             provenance["evidence_snapshot_digest"] = snapshot_digest(
                 attached_snapshot
@@ -640,6 +660,9 @@ class Detector:
         proof["evidence"] = list(plan.evidence)
         proof["deployment"] = plan.deployment_summary()
         proof["external_evidence"] = snapshot
+        proof["referent_provenance"] = [referent_provenance(
+            packet, hearing_target(hearing), snapshot,
+        ) for hearing in hearings]
         output = build_detection_output(
             case_id=case_id, packet=packet, proof=proof, stage_status=stage_status,
             providers=providers, provenance=provenance,
@@ -658,6 +681,8 @@ class Detector:
                     snapshot=snapshot,
                 )
                 causal_diagnostics = output["proof"]["causal_diagnostics"]
+            if causal_diagnostics is not None:
+                causal_diagnostics["semantic_trace"] = build_semantic_trace(packet)
             if (causal_review is None and causal_policy["mode"] == "tracer_context"
                     and output["state"] == "verified_clean" and recall_status.get("state") == "not_needed"):
                 budget = current_added_budget()

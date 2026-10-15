@@ -528,9 +528,9 @@ def stable_localization_families(
             }),
             "mechanism_summary": _mechanism_summary(family, members),
             "mechanism_signature": _mechanism_signature(members[0]),
-            "localization_states": sorted({
+            "localization_states": [
                 localization_state(row, gold_steps) for row in members
-            }),
+            ],
         })
     families.sort(key=lambda item: (-item["count"], item["failure_family"]))
     return families
@@ -698,6 +698,7 @@ ACTIONABILITY = {
 # define a new typed-DSL predicate program inline and pair it with the same
 # evidence + conviction unit as the closed mechanical route.
 TREATMENT_ROUTES = {
+    "judge_directive": "judge.system text boundary that changes the preliminary judgment",
     "recall_directive": "scanner.system text boundary widens recall",
     "upgrade_directive": "upgrade.pre/system intervention reshapes upgrades",
     "restore_guard": "adjudicate.guard restore_judge_conviction",
@@ -770,6 +771,7 @@ def classify_family_actionability(
         }
 
     if family_id.startswith("FAM-fn-"):
+        routes.append("judge_directive")
         defense_verdict = str(signature.get("defense_verdict") or "none")
         recall_path = str(signature.get("recall_path") or "")
         if defense_verdict == "refuted":
@@ -1022,6 +1024,9 @@ def refine_failure_families(
                 f"{family.get('failure_family')}-P{_sha(profile)}"
             )
             item["failure_cases"] = [case_id for case_id, _member in group]
+            if "localization_states" in family:
+                states_by_case = dict(zip(case_ids, family["localization_states"]))
+                item["localization_states"] = [states_by_case.get(case_id, "mislocated") for case_id, _member in group]
             item["count"] = len(group)
             item["diagnostic_complete"] = True
             item["diagnostics"] = {
@@ -1235,6 +1240,8 @@ def mechanism_subgroups(
             sub["failure_family"] = subgroup_id
             sub["coarse_failure_family"] = family_id
             sub["failure_cases"] = cases
+            if "localization_states" in item:
+                sub["localization_states"] = [local_states[index] for index in indices]
             sub["count"] = len(cases)
             sub["sources"] = sorted({source_of(case) for case in cases})
             sub["diagnostics"] = {

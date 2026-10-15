@@ -22,6 +22,25 @@ def _raw(**fields):
                          "api_key_env": "TEST_CONFIG_KEY"}, **fields}
 
 
+def test_resolved_nullable_output_limits_can_enter_detector_and_roundtrip():
+    from detector.api import Detector
+    from detector.config import validate_config
+    resolved = validate_config(_raw())
+    assert validate_config(resolved) == resolved
+    detector = Detector(resolved, require_credentials=False)
+    assert detector.config == resolved
+
+
+def test_route_can_explicitly_remove_an_inherited_optional_ceiling():
+    from detector.config import validate_config
+    resolved = validate_config({"provider": {"max_output_tokens_per_request": 16384},
+                                "judge_route": {"max_output_tokens_per_request": None}})
+    assert resolved["judge_route"]["max_output_tokens_per_request"] is None
+    assert resolved["defense_route"]["max_output_tokens_per_request"] == 16384
+    with pytest.raises(ValueError):
+        validate_config({"provider": {"long_input_threshold_characters": None}})
+
+
 def _load(tmp_path, raw):
     path = tmp_path / "detector.json"
     path.write_text(json.dumps(raw), encoding="utf-8")

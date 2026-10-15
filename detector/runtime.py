@@ -21,6 +21,8 @@ R = TypeVar("R")
 _DEADLINE: ContextVar[float | None] = ContextVar("execution_deadline", default=None)
 _CONTROL: ContextVar["RunControl | None"] = ContextVar("execution_control", default=None)
 _USAGE: ContextVar[list[dict[str, Any]] | None] = ContextVar("request_usage", default=None)
+_USAGE_ORIGIN: ContextVar[float | None] = ContextVar("request_usage_origin", default=None)
+_PREPARATION: ContextVar[tuple[dict[str, Any], Any] | None] = ContextVar("case_preparation", default=None)
 _REQUEST_OBSERVER: ContextVar[Callable[[Mapping[str, Any]], None] | None] = ContextVar("request_observer", default=None)
 _ADDED_BUDGET: ContextVar["AddedBudget | None"] = ContextVar("added_case_budget", default=None)
 _ADDED_REQUESTS: ContextVar["AddedBudget | None"] = ContextVar("added_requests", default=None)
@@ -180,19 +182,49 @@ def current_control() -> RunControl | None:
 
 
 @contextmanager
+def preparation_scope() -> Iterator[None]:
+    effective = _PREPARATION.get() or ({}, threading.RLock())
+    token = _PREPARATION.set(effective)
+    try:
+        yield
+    finally:
+        _PREPARATION.reset(token)
+
+
+def prepare_once(name: str, inputs: Any, producer: Callable):
+    scoped = _PREPARATION.get()
+    if scoped is None:
+        return producer()
+    cache, lock = scoped
+    key = digest({"name": name, "inputs": inputs})
+    with lock:
+        if key not in cache:
+            cache[key] = deepcopy(producer())
+        return deepcopy(cache[key])
+
+
+@contextmanager
 def usage_scope() -> Iterator[list[dict[str, Any]]]:
     parent = _USAGE.get()
     observations: list[dict[str, Any]] = []
     token = _USAGE.set(observations)
+    origin_token = _USAGE_ORIGIN.set(_USAGE_ORIGIN.get() or time.perf_counter())
     try:
         yield observations
     finally:
         _USAGE.reset(token)
+        _USAGE_ORIGIN.reset(origin_token)
         if parent is not None:
             parent.extend(observations)
 
 
 def record_request(observation: Mapping[str, Any]) -> None:
+    observation = dict(observation)
+    origin = _USAGE_ORIGIN.get()
+    elapsed = observation.get("elapsed_seconds")
+    if origin is not None and isinstance(elapsed, (int, float)) and elapsed >= 0:
+        finished = time.perf_counter() - origin
+        observation.update(started_seconds=max(0.0, finished - elapsed), finished_seconds=finished)
     target = _USAGE.get()
     if target is not None:
         target.append(dict(observation))

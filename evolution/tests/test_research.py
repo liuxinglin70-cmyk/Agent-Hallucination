@@ -305,13 +305,25 @@ def test_screening_pass_reaches_selection(tmp_path):
     assert (out / "v001" / "results" / "BFCL__002.json").exists()
     assert (out / "v002" / "candidate.json").exists()
     assert (out / "report.md").exists()
-    # Two drafts evaluated 4 cases each; no revision was needed.
     assert report["budget"]["used"]["screening_case_evaluations"] == 8
     assert report["budget"]["used"]["proposer_calls"] == {"B": 1, "C": 1}
-    # The baseline came from the reference run: every backend call is a
-    # version screening with a candidate attached, never a bare baseline.
     assert backend.calls
     assert all(call["registry"]["interventions"] for call in backend.calls)
+
+
+@pytest.mark.parametrize("manifest_change", ["missing", "different_hash"])
+def test_baseline_requires_verifiable_config_hash(tmp_path, manifest_change):
+    dataset_root = _write_dataset(tmp_path)
+    baseline = _write_baseline_ref(tmp_path, dataset_root)
+    manifest = _write_manifest(tmp_path, dataset_root, baseline_runs=[baseline])
+    if manifest_change == "missing":
+        (baseline / "run.json").unlink()
+    else:
+        (baseline / "run.json").write_text(json.dumps({"config_hash": "different"}), encoding="utf-8")
+    run = ResearchRun(manifest, tmp_path / "run", FakeBackend(), FakeProposer([]))
+    with pytest.raises(ValueError, match="config hash"):
+        run.resolve_baseline()
+    assert not list((tmp_path / "run" / "baseline").glob("*.json"))
 
 
 def test_route_c_receives_full_packet_and_route_b_does_not(tmp_path):

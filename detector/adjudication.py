@@ -312,13 +312,14 @@ def adjudicate(
     if len(guards) > 1:
         # Conflicting guards: all are disabled and the baseline path applies.
         guards = set()
-    reasons: list[dict[str, str]] = []
+    reasons: list[dict[str, Any]] = []
     if judge_status.get("state") != "ok" or not judge_result.get("ok"):
         reasons.append({
             "component": "judge",
             "code": str(judge_status.get("state") or "unknown"),
             "error_type": str(judge_result.get("error_type") or ""),
             "error": str(judge_result.get("error") or ""),
+            "vote_failures": list(judge_result.get("vote_failures") or []),
         })
         return {
             "state": STATE_UNRESOLVED,
@@ -392,13 +393,16 @@ def adjudicate(
     if not judge_positive and not upgrade_positive:
         degraded = not recall_ok
         if degraded:
+            failed_recall = recall_result if recall_result and not recall_result.get("ok") else upgrade_result
             reasons.append({
                 "component": "recall",
                 "code": "recall_unavailable",
                 "error_type": (
-                    str(recall_result.get("error_type") or "") if recall_result else ""
+                    str(failed_recall.get("error_type") or "") if failed_recall else ""
                 ),
-                "error": str(recall_result.get("error") or "") if recall_result else "",
+                "error": str(failed_recall.get("error") or "") if failed_recall else "",
+                "vote_failures": list((failed_recall or {}).get("vote_failures") or []),
+                **({"raw": failed_recall["raw"]} if failed_recall and "raw" in failed_recall else {}),
             })
         authority = (
             AUTHORITY_DEGRADED_JUDGE_ONLY if degraded
@@ -484,17 +488,20 @@ def adjudicate(
         # reads cannot distinguish from a real clearance.
         recall_degraded = not recall_ok
         if recall_degraded:
+            failed_recall = recall_result if recall_result and not recall_result.get("ok") else upgrade_result
             reasons.append({
                 "component": "recall",
                 "code": "recall_unavailable_after_refutation",
                 "error_type": (
-                    str(recall_result.get("error_type") or "")
-                    if recall_result else ""
+                    str(failed_recall.get("error_type") or "")
+                    if failed_recall else ""
                 ),
                 "error": (
-                    str(recall_result.get("error") or "")
-                    if recall_result else ""
+                    str(failed_recall.get("error") or "")
+                    if failed_recall else ""
                 ),
+                "vote_failures": list((failed_recall or {}).get("vote_failures") or []),
+                **({"raw": failed_recall["raw"]} if failed_recall and "raw" in failed_recall else {}),
             })
         if "restore_judge_conviction" in guards and (
             judge_positive or positive.get("source") == "recall_upgrade"
@@ -584,6 +591,7 @@ def adjudicate(
                     "code": str(status.get("state") or "unknown") if status.get("state") != "ok" else "inconclusive",
                     "error_type": str(outcome.get("error_type") or ""),
                     "error": str(outcome.get("error") or ""),
+                    "vote_failures": list(outcome.get("vote_failures") or []),
                 })
         elif defense_state != "ok":
             reasons.append({
@@ -591,6 +599,7 @@ def adjudicate(
                 "code": str(defense_state or "unknown"),
                 "error_type": str((defense_result or {}).get("error_type") or ""),
                 "error": str((defense_result or {}).get("error") or ""),
+                "vote_failures": list((defense_result or {}).get("vote_failures") or []),
             })
         else:
             reasons.append({

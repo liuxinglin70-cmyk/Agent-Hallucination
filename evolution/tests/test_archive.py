@@ -51,6 +51,21 @@ def program(name: str = "evo_missing_search_tool", value: str = "search") -> dic
     }
 
 
+def test_development_archive_preserves_l0_sidecar_reason(tmp_path):
+    from evolution.archive import ingest_development_run
+    from evolution.candidate_versions import CandidateVersionGraph
+
+    run_dir = tmp_path / "run"
+    graph = CandidateVersionGraph(run_dir)
+    graph.record("B", "v001", {"type": "text_boundary", "hook": "judge.system"},
+                 parent=None, diagnosis=None, draft_notes=[], evaluation=None, verdict=None,
+                 status="failed_l0", revision_reason=["hook cannot reach failing stage"])
+    ingest_development_run(tmp_path / "archive", run_dir, cycle=1)
+    rows = load_candidates(tmp_path / "archive")
+    assert rows[0]["status"] == "failed_l0"
+    assert rows[0]["failure_reason"] == "hook cannot reach failing stage"
+
+
 # ----------------------------------------------------------------------
 # Candidate archive
 # ----------------------------------------------------------------------

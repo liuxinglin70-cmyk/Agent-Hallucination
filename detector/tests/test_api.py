@@ -218,7 +218,7 @@ def test_detect_recall_upgrade_path(sample_record, monkeypatch):
         }, {"stage": "causal_upgrade", "state": "ok", "attempts": 0,
             "view": "complete", "warnings": []}
 
-    def fake_tracer(*, packet, delivered_result, correct_result, config, plan, positive):
+    def fake_tracer(*, packet, delivered_result, correct_result, config, plan, positive, intervention_prompt=None):
         assert positive.get("source") in {"judge", "recall_upgrade"}
         return {"ok": True, "parsed": {
             "step": 2, "quote": "5", "referent": "4",
@@ -308,7 +308,7 @@ def test_recall_trigger_forces_recall_net_for_unanimous_clean_judge(
         }, {"stage": "causal_upgrade", "state": "ok", "attempts": 0,
             "view": "complete", "warnings": []}
 
-    def fake_tracer(*, packet, delivered_result, correct_result, config, plan, positive):
+    def fake_tracer(*, packet, delivered_result, correct_result, config, plan, positive, intervention_prompt=None):
         assert positive.get("source") in {"judge", "recall_upgrade"}
         return {"ok": True, "parsed": {
             "step": 2, "quote": "4", "referent": "4",
@@ -428,7 +428,7 @@ def test_detect_judge_conviction_is_authoritative(sample_record, monkeypatch):
     def fake_upgrade(*, packet, candidates, config, plan):
         raise AssertionError("recall net must not run for a conviction")
 
-    def fake_tracer(*, packet, delivered_result, correct_result, config, plan, positive):
+    def fake_tracer(*, packet, delivered_result, correct_result, config, plan, positive, intervention_prompt=None):
         assert positive.get("source") in {"judge", "recall_upgrade"}
         return {"ok": True, "parsed": {
             "step": 2, "quote": "5", "referent": "4",
@@ -500,7 +500,7 @@ def test_detect_judge_refuted_and_recall_empty_is_clean(sample_record, monkeypat
         }, {"stage": "causal_upgrade", "state": "not_needed", "attempts": 0,
             "view": "not_rendered", "warnings": []}
 
-    def fake_tracer(*, packet, delivered_result, correct_result, config, plan, positive):
+    def fake_tracer(*, packet, delivered_result, correct_result, config, plan, positive, intervention_prompt=None):
         assert positive.get("source") in {"judge", "recall_upgrade"}
         return {"ok": True, "parsed": {
             "step": 2, "quote": "5", "referent": "4",

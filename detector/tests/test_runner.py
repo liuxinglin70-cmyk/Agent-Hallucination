@@ -144,6 +144,34 @@ def test_safe_case_id():
     assert safe_case_id("BFCL/001.json") == "BFCL__001.json"
 
 
+def test_provider_capacity_is_independent_and_bound_to_resume(tmp_path, monkeypatch):
+    from detector.runtime import current_control
+    limits = []
+
+    class Observed(_FakeDetector):
+        def detect(self, *args, **kwargs):
+            limits.append(current_control().limit)
+            return super().detect(*args, **kwargs)
+
+    monkeypatch.setattr("detector.runner.Detector", Observed)
+    kwargs = dict(dataset_root=_write_dataset(tmp_path / "data"), cases=["a.json"],
+                  runs_root=tmp_path / "runs", run_id="capacity", config={}, workers=1)
+    run_batch(**kwargs, provider_concurrency=3)
+    assert limits == [3]
+    manifest = json.loads((tmp_path / "runs/capacity/run.json").read_text(encoding="utf-8"))
+    assert manifest["scheduling"] == {"case_workers": 1, "provider_concurrency": 3}
+    with pytest.raises(ValueError, match="different manifest"):
+        run_batch(**kwargs, provider_concurrency=2)
+
+
+@pytest.mark.parametrize("value", [0, -1, True, 1.5])
+def test_invalid_provider_capacity_refused_before_writes(tmp_path, value):
+    with pytest.raises(ValueError, match="positive integer"):
+        run_batch(dataset_root=tmp_path, cases=[], runs_root=tmp_path / "runs", config={},
+                  provider_concurrency=value)
+    assert not (tmp_path / "runs").exists()
+
+
 def test_run_batch_rejects_case_path_collisions(tmp_path, monkeypatch):
     monkeypatch.setattr("detector.runner.Detector", _FakeDetector)
     with pytest.raises(ValueError, match="collide"):

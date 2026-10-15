@@ -227,19 +227,22 @@ def test_isolated_transport_strips_inherited_proxy(monkeypatch):
     monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:7897")
     captured: dict[str, object] = {}
 
-    def _complete(*_args, **kwargs):
-        captured.update(kwargs)
-        return __import__("subprocess").CompletedProcess(
-            args=[],
-            returncode=0,
-            stdout=json.dumps({
+    class Completed:
+        returncode = 0
+
+        def __init__(self, *_args, **kwargs):
+            captured.update(kwargs)
+
+        def poll(self):
+            return self.returncode
+
+        def communicate(self, *_args, **_kwargs):
+            return json.dumps({
                 "status": 200,
                 "body_b64": base64.b64encode(b"{}").decode("ascii"),
-            }).encode("utf-8"),
-            stderr=b"",
-        )
+            }).encode("utf-8"), b""
 
-    monkeypatch.setattr(provider_module.subprocess, "run", _complete)
+    monkeypatch.setattr(provider_module.subprocess, "Popen", Completed)
     status, raw = _isolated_transport(
         url="https://www.autodl.art/api/v1/chat/completions",
         headers={"Content-Type": "application/json"},
@@ -248,6 +251,26 @@ def test_isolated_transport_strips_inherited_proxy(monkeypatch):
     )
     assert (status, raw) == (200, b"{}")
     assert "HTTPS_PROXY" not in captured["env"]
+
+
+@pytest.mark.parametrize("choices", ["invalid", ["invalid"], [{"message": "invalid"}], [{"message": {"content": {"ok": True}}}]])
+def test_invalid_provider_envelope_is_a_structured_failure(monkeypatch, choices):
+    monkeypatch.setenv("DETECTOR_TEST_KEY", "offline")
+    monkeypatch.setattr(provider_module, "_isolated_transport", lambda **kwargs: (200, json.dumps({"choices": choices}).encode()))
+    with pytest.raises(ProviderError) as caught:
+        provider_call(route={"endpoint": "http://127.0.0.1", "model": "fake", "api_key_env": "DETECTOR_TEST_KEY", "transport_retries": 0},
+                      system="s", user="u", purpose="test")
+    assert caught.value.error_type == "invalid_json"
+
+
+def test_invalid_usage_shape_does_not_crash_a_valid_reply(monkeypatch):
+    monkeypatch.setenv("DETECTOR_TEST_KEY", "offline")
+    monkeypatch.setattr(provider_module, "_isolated_transport", lambda **kwargs: (200, json.dumps({
+        "choices": [{"message": {"content": '{"ok": true}'}}], "usage": "invalid",
+    }).encode()))
+    parsed, meta = provider_call(route={"endpoint": "http://127.0.0.1", "model": "fake", "api_key_env": "DETECTOR_TEST_KEY", "transport_retries": 0},
+                                 system="s", user="u", purpose="test")
+    assert parsed == {"ok": True} and meta["usage"] == {}
 
 
 def test_provider_call_passes_route_scoped_extra_body(monkeypatch):

@@ -37,11 +37,11 @@ import ast
 import ctypes
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
 import textwrap
+import threading
 import time
 from typing import Any, Mapping, Sequence
 
@@ -270,23 +270,6 @@ def _HANDLE(value: Any) -> Any:  # noqa: N802 - mirrors the Win32 name
     return wintypes.HANDLE(int(value))
 
 
-def _posix_preexec(limits: Mapping[str, Any]) -> Any:
-    """A ``preexec_fn`` that sets the POSIX rlimits, or None off-POSIX."""
-    try:
-        import resource  # noqa: PLC0415 - absent on Windows by design
-    except ImportError:
-        return None
-
-    def apply() -> None:  # pragma: no cover - exercised only on POSIX
-        cpu = int(float(limits["cpu_seconds"])) or 1
-        resource.setrlimit(resource.RLIMIT_CPU, (cpu, cpu + 1))
-        memory = int(limits["memory_bytes"])
-        resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
-        resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))
-
-    return apply
-
-
 def _declared_capabilities() -> dict[str, Any]:
     """What this platform can enforce, before any probe has run."""
     kernel32 = _windows_job_api()
@@ -431,6 +414,13 @@ def admission_blockers(limits: Mapping[str, Any] | None = None) -> list[str]:
     """
     declared = _declared_capabilities()
     blockers: list[str] = []
+    if declared["mechanism"] == "windows_job_object":
+        kernel32 = _windows_job_api()
+        job = _apply_windows_limits(kernel32, normalize_limits(limits))
+        if job is None:
+            blockers.append("could not create a Windows job object with CPU and memory limits")
+        else:
+            kernel32.CloseHandle(_HANDLE(job))
     if not declared["wall_seconds"]:
         blockers.append("no wall-clock limit available on this platform")
     if not declared["cpu_seconds"]:
@@ -1004,7 +994,21 @@ def _run_child(
     job = None
     if kernel32 is not None:
         job = _apply_windows_limits(kernel32, limits)
-    preexec = None if job is not None else _posix_preexec(limits)
+        if job is None:
+            return {"launched": False, "error": "could not create a job object; CPU and memory limits unavailable"}
+    elif sys.platform == "win32":
+        return {"launched": False, "error": "Windows job objects unavailable"}
+    else:
+        # Set limits after exec so callers may safely launch from a thread pool.
+        cpu = int(float(limits["cpu_seconds"])) or 1
+        memory = int(limits["memory_bytes"])
+        script = (
+            "import resource; "
+            f"resource.setrlimit(resource.RLIMIT_CPU, ({cpu}, {cpu + 1})); "
+            f"resource.setrlimit(resource.RLIMIT_AS, ({memory}, {memory})); "
+            "resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0)); "
+            f"exec({script!r})"
+        )
 
     environment = {"PYTHONIOENCODING": "utf-8", "PYTHONDONTWRITEBYTECODE": "1"}
     started = time.monotonic()
@@ -1015,7 +1019,6 @@ def _run_child(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=environment,
-            preexec_fn=preexec,
         )
     except (OSError, ValueError) as exc:
         if job is not None:
@@ -1045,40 +1048,80 @@ def _run_child(
             }
 
     timed_out = False
-    stdout = b""
-    stderr = b""
+    output_exceeded = threading.Event()
+    output_lock = threading.Lock()
+    output_size = 0
+    buffers = [bytearray(), bytearray()]
+    io_errors: list[str] = []
+
+    def read_output(stream, buffer):
+        nonlocal output_size
+        try:
+            while True:
+                chunk = stream.read1(8192)
+                if not chunk:
+                    break
+                with output_lock:
+                    available = max(0, int(limits["max_output_bytes"]) - output_size)
+                    buffer.extend(chunk[:available])
+                    output_size += len(chunk)
+                    if output_size > limits["max_output_bytes"]:
+                        output_exceeded.set()
+                        process.kill()
+                        break
+        except (OSError, ValueError) as exc:
+            io_errors.append(str(exc))
+        finally:
+            stream.close()
+
+    def write_input():
+        try:
+            process.stdin.write(payload.encode("utf-8"))
+            process.stdin.flush()
+        except BrokenPipeError:
+            pass
+        except (OSError, ValueError) as exc:
+            io_errors.append(str(exc))
+        finally:
+            process.stdin.close()
+
+    workers = [
+        threading.Thread(target=read_output, args=(process.stdout, buffers[0]), daemon=True),
+        threading.Thread(target=read_output, args=(process.stderr, buffers[1]), daemon=True),
+        threading.Thread(target=write_input, daemon=True),
+    ]
+    for worker in workers:
+        worker.start()
     try:
-        stdout, stderr = process.communicate(
-            input=payload.encode("utf-8"), timeout=float(wall_seconds),
-        )
+        process.wait(timeout=max(0.001, float(wall_seconds) - (time.monotonic() - started)))
     except subprocess.TimeoutExpired:
         timed_out = True
         process.kill()
-        try:
-            stdout, stderr = process.communicate(timeout=5)
-        except (subprocess.TimeoutExpired, OSError):
-            stdout, stderr = b"", b""
+        process.wait(timeout=5)
     except (OSError, ValueError) as exc:
         process.kill()
-        if job is not None:
-            kernel32.CloseHandle(_HANDLE(job))
         return {"launched": False, "error": f"child I/O failed: {exc}"}
     finally:
+        for worker in workers:
+            worker.join(timeout=5)
         if job is not None:
             kernel32.CloseHandle(_HANDLE(job))
 
     elapsed = time.monotonic() - started
-    if len(stdout) > limits["max_output_bytes"]:
+    if output_exceeded.is_set():
         return {
             "launched": True,
             "completed": False,
             "timed_out": timed_out,
             "error": (
-                f"output is {len(stdout)} bytes; limit is "
+                f"output exceeded {output_size} bytes; limit is "
                 f"{limits['max_output_bytes']}"
             ),
             "wall_seconds": round(elapsed, 3),
         }
+    if io_errors:
+        return {"launched": True, "completed": False, "error": f"child I/O failed: {io_errors[0]}"}
+    stdout, stderr = (bytes(buffer) for buffer in buffers)
     text = stdout.decode("utf-8", "replace")
     return {
         "launched": True,
@@ -1471,7 +1514,7 @@ def make_component_executor(component: Mapping[str, Any]) -> Any:
                 # "I could not tell", and a failed execution must use it rather
                 # than be reported as a judgment.
                 return {
-                    "verdict": "abstained" if "abstained" in SEMANTIC_VERDICTS else "abstained",
+                    "verdict": "abstained",
                     "detail": (
                         f"component did not complete ({outcome.get('status')}): "
                         f"{outcome.get('error')}"

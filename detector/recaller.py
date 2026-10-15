@@ -30,13 +30,18 @@ from detector.packet import (
     packet_reference_error,
     render_judge_view,
 )
+from detector.stage_retry import memo_stage
+from detector.evidence_view import task_source_block
 from detector.provider import raise_if_terminal
 from detector.provider import (
+    accumulate_usage,
+    merge_provider_meta,
     ProviderError,
     majority_vote,
     provider_call,
     required_quorum,
 )
+from detector.runtime import parallel_ordered
 from detector.semantics import (
     contract_repair_feedback,
     RECALL_CONTRACT_REPAIR,
@@ -136,7 +141,7 @@ def run_recall_scan(
     user = (
         "Scan the trajectory below for candidate deviations. Do not judge "
         "whether the trajectory is hallucinated.\n\n" + view_text
-        + evidence_block
+        + evidence_block + task_source_block(packet)
     )
     if causal_context is not None:
         from detector.causal_contracts import validate_seal
@@ -146,34 +151,12 @@ def run_recall_scan(
             raise ValueError("causal recall context packet identity differs")
         user += "\n\nCAUSAL ANOMALIES: " + json.dumps(causal_context, ensure_ascii=False)
         cache_tag = digest({"snapshot": cache_tag, "causal_context": causal_context["digest"]})
-    try:
-        parsed, meta = provider_call(
-            route=route, system=system, user=user, purpose="recall_scanner",
-            cache_tag=cache_tag,
-        )
-    except ProviderError as exc:
-        raise_if_terminal(exc)
-        return {
-            "ok": False, "candidates": [], "error": exc.message,
-            "error_type": exc.error_type,
-        }, {
-            "stage": "recall_scanner", "state": "provider_error",
-            "attempts": exc.attempts,
-            "view": "complete" if not view_meta.get("degraded") else "degraded",
-            "warnings": [],
-        }
-    candidates, error = _parse_candidates(parsed, packet, snapshot)
-    warnings: list[dict[str, str]] = []
-    if candidates is None:
-        warnings.append({"attempt": "initial", "error": f"contract:{error}"})
+    def evaluate():
         try:
             parsed, meta = provider_call(
-                route=route, system=system,
-                user=user + RECALL_CONTRACT_REPAIR + contract_repair_feedback(parsed, error),
-                purpose="recall_scanner_repair",
+                route=route, system=system, user=user, purpose="recall_scanner",
                 cache_tag=cache_tag,
             )
-            candidates, error = _parse_candidates(parsed, packet, snapshot)
         except ProviderError as exc:
             raise_if_terminal(exc)
             return {
@@ -183,27 +166,56 @@ def run_recall_scan(
                 "stage": "recall_scanner", "state": "provider_error",
                 "attempts": exc.attempts,
                 "view": "complete" if not view_meta.get("degraded") else "degraded",
+                "warnings": [],
+            }
+        candidates, error = _parse_candidates(parsed, packet, snapshot)
+        warnings: list[dict[str, str]] = []
+        if candidates is None:
+            initial_meta = dict(meta)
+            warnings.append({"attempt": "initial", "error": f"contract:{error}"})
+            try:
+                parsed, meta = provider_call(
+                    route=route, system=system,
+                    user=user + RECALL_CONTRACT_REPAIR + contract_repair_feedback(parsed, error),
+                    purpose="recall_scanner_repair",
+                    cache_tag=cache_tag,
+                )
+                meta = merge_provider_meta(initial_meta, meta)
+                candidates, error = _parse_candidates(parsed, packet, snapshot)
+            except ProviderError as exc:
+                raise_if_terminal(exc)
+                return {
+                    "ok": False, "candidates": [], "error": exc.message,
+                    "error_type": exc.error_type,
+                    "provider": merge_provider_meta(initial_meta, {"attempts": exc.attempts}),
+                }, {
+                    "stage": "recall_scanner", "state": "provider_error",
+                    "attempts": int(initial_meta.get("attempts") or 0) + exc.attempts,
+                    "view": "complete" if not view_meta.get("degraded") else "degraded",
+                    "warnings": warnings,
+                }
+        if candidates is None:
+            return {
+                "ok": False, "candidates": [], "error": error,
+                "error_type": "contract_error",
+                "provider": meta, "raw": parsed,
+            }, {
+                "stage": "recall_scanner", "state": "contract_error",
+                "attempts": int(meta.get("attempts") or 0),
+                "view": "complete" if not view_meta.get("degraded") else "degraded",
                 "warnings": warnings,
             }
-    if candidates is None:
         return {
-            "ok": False, "candidates": [], "error": error,
-            "error_type": "contract_error",
+            "ok": True, "candidates": candidates, "provider": meta,
+            "view_meta": view_meta,
         }, {
-            "stage": "recall_scanner", "state": "contract_error",
+            "stage": "recall_scanner", "state": "ok",
             "attempts": int(meta.get("attempts") or 0),
             "view": "complete" if not view_meta.get("degraded") else "degraded",
             "warnings": warnings,
         }
-    return {
-        "ok": True, "candidates": candidates, "provider": meta,
-        "view_meta": view_meta,
-    }, {
-        "stage": "recall_scanner", "state": "ok",
-        "attempts": int(meta.get("attempts") or 0),
-        "view": "complete" if not view_meta.get("degraded") else "degraded",
-        "warnings": warnings,
-    }
+
+    return memo_stage('recall_scanner', {"packet": packet, "route": route, "system": system, "user": user, "snapshot": snapshot, "view_meta": view_meta}, evaluate)
 
 
 def _parse_upgrades(
@@ -376,7 +388,7 @@ def _upgrade_sample(
         )
     except ProviderError as exc:
         raise_if_terminal(exc)
-        return None, {}, warnings, {
+        return None, {"attempts": exc.attempts}, warnings, {
             "state": "provider_error", "error": exc.message,
             "error_type": exc.error_type, "attempts": exc.attempts,
         }, []
@@ -384,6 +396,7 @@ def _upgrade_sample(
         parsed, candidates, packet, snapshot,
     )
     if upgrades is None:
+        initial_meta = dict(meta)
         warnings.append({"attempt": "initial", "error": f"contract:{error}"})
         try:
             parsed, meta = provider_call(
@@ -392,12 +405,13 @@ def _upgrade_sample(
                 purpose="causal_upgrade_repair",
                 cache_tag=cache_tag,
             )
+            meta = merge_provider_meta(initial_meta, meta)
             upgrades, missing, error = _parse_upgrades(
                 parsed, candidates, packet, snapshot,
             )
         except ProviderError as exc:
             raise_if_terminal(exc)
-            return None, {}, warnings, {
+            return None, merge_provider_meta(initial_meta, {"attempts": exc.attempts}), warnings, {
                 "state": "provider_error", "error": exc.message,
                 "error_type": exc.error_type, "attempts": exc.attempts,
             }, []
@@ -407,6 +421,7 @@ def _upgrade_sample(
             "error_type": "contract_error", "attempts": 0,
         }, []
     if missing:
+        initial_meta = dict(meta)
         warnings.append({
             "attempt": "coverage",
             "error": f"upgrade response omitted candidates: {missing}",
@@ -420,12 +435,13 @@ def _upgrade_sample(
                 purpose="causal_upgrade_coverage_repair",
                 cache_tag=cache_tag,
             )
+            meta = merge_provider_meta(initial_meta, meta)
             upgrades, missing, error = _parse_upgrades(
                 parsed, candidates, packet, snapshot,
             )
         except ProviderError as exc:
             raise_if_terminal(exc)
-            return None, dict(meta or {}), warnings, {
+            return None, merge_provider_meta(initial_meta, {"attempts": exc.attempts}), warnings, {
                 "state": "provider_error", "error": exc.message,
                 "error_type": exc.error_type, "attempts": exc.attempts,
             }, []
@@ -498,163 +514,177 @@ def run_causal_upgrade(
         )
         + evidence_block
         + "\n\nTRAJECTORY:\n" + view_text
-        + snapshot_block
+        + snapshot_block + task_source_block(packet)
     )
 
-    votes = max(1, int(route.get("votes", 1) or 1))
-    samples: list[list[dict[str, Any]]] = []
-    sample_meta: dict[str, Any] = {}
-    total_attempts = 0
-    warnings: list[dict[str, str]] = []
-    failure: dict[str, Any] | None = None
-    for _ in range(votes):
-        rows, meta, sample_warnings, sample_failure, sample_missing = _upgrade_sample(
-            packet=packet, candidates=candidates, route=route,
-            system=system, user=user, view_state=view_state,
-            snapshot=snapshot,
-        )
-        total_attempts += int(meta.get("attempts") or 0)
-        warnings.extend(sample_warnings)
-        if sample_failure is not None:
-            failure = sample_failure
-            continue
-        if rows is not None:
-            samples.append(rows)
-            sample_meta = dict(meta)
-    if not samples:
-        error = failure or {}
-        return {
-            "ok": False, "upgrades": [], "error": error.get("error"),
-            "error_type": error.get("error_type") or "provider_error",
-            "provider": sample_meta,
-        }, {
-            "stage": "causal_upgrade",
-            "state": error.get("error_type") or "provider_error",
-            "attempts": total_attempts, "view": view_state,
-            "warnings": warnings,
+    def evaluate():
+        votes = max(1, int(route.get("votes", 1) or 1))
+        samples: list[list[dict[str, Any]]] = []
+        sample_meta: dict[str, Any] = {}
+        total_attempts = 0
+        warnings: list[dict[str, str]] = []
+        failure: dict[str, Any] | None = None
+        failures: list[dict[str, Any]] = []
+        ballots_usage: dict[str, Any] = {}
+
+        def cast_at(_index: int):
+            return _upgrade_sample(
+                packet=packet, candidates=candidates, route=route,
+                system=system, user=user, view_state=view_state,
+                snapshot=snapshot,
+            )
+
+        parallel = max(1, int((route.get("vote_concurrency") or votes) or 1))
+        for rows, meta, sample_warnings, sample_failure, _missing in parallel_ordered(cast_at, votes, workers=parallel):
+            total_attempts += int(meta.get("attempts") or 0)
+            accumulate_usage(ballots_usage, meta.get("usage_total") or meta.get("usage") or {})
+            if meta:
+                sample_meta = dict(meta)
+            if ballots_usage:
+                sample_meta["usage_total"] = dict(ballots_usage)
+            warnings.extend(sample_warnings)
+            if sample_failure is not None:
+                failure = sample_failure
+                failures.append(sample_failure)
+                continue
+            if rows is not None:
+                samples.append(rows)
+        if not samples:
+            error = failure or {}
+            return {
+                "ok": False, "upgrades": [], "error": error.get("error"),
+                "error_type": error.get("error_type") or "provider_error",
+                "provider": sample_meta, "vote_failures": failures,
+            }, {
+                "stage": "causal_upgrade",
+                "state": error.get("error_type") or "provider_error",
+                "attempts": total_attempts, "view": view_state,
+                "warnings": warnings,
+            }
+        quorum = required_quorum(votes)
+        if len(samples) < quorum:
+            # One surviving sample must not upgrade a candidate: per-candidate
+            # majority over a shrunken quorum is not a majority. Report the stage
+            # as undecided so the case degrades instead of convicting on jitter.
+            return {
+                "ok": False, "upgrades": [], "upgraded_candidate": None,
+                "upgraded_candidates": [],
+                "error": (
+                    f"causal upgrade quorum not reached: {len(samples)} usable "
+                    f"sample(s) of {votes} (need {quorum})"
+                ),
+                "error_type": "no_quorum",
+                "provider": sample_meta, "vote_failures": failures,
+            }, {
+                "stage": "causal_upgrade", "state": "no_quorum",
+                "attempts": total_attempts, "view": view_state,
+                "warnings": warnings,
+            }
+        still_missing: set[str] = set()
+        for rows in samples:
+            still_missing.update(
+                str(row.get("candidate_id") or "")
+                for row in rows
+                if row.get("coverage") == "missing"
+            )
+        if still_missing:
+            missing = sorted(still_missing)
+            coverage = {
+                "expected": len(candidates),
+                "answered": len(candidates) - len(missing),
+                "missing": missing,
+            }
+            return {
+                "ok": False,
+                "upgrades": samples[0],
+                "upgraded_candidate": None,
+                "upgraded_candidates": [],
+                "error": (
+                    f"upgrade response still omitted {len(missing)} candidate "
+                    f"row(s) after coverage repair: {missing}"
+                ),
+                "error_type": "degraded_missing_rows",
+                "coverage": coverage,
+                "provider": sample_meta,
+                "view_meta": view_meta,
+            }, {
+                "stage": "causal_upgrade", "state": "degraded_missing_rows",
+                "attempts": total_attempts, "view": view_state,
+                "warnings": warnings,
+            }
+
+        cast = len(samples)
+        by_id: dict[str, list[dict[str, Any]]] = {
+            str(candidate.get("candidate_id") or ""): []
+            for candidate in candidates
         }
-    quorum = required_quorum(votes)
-    if len(samples) < quorum:
-        # One surviving sample must not upgrade a candidate: per-candidate
-        # majority over a shrunken quorum is not a majority. Report the stage
-        # as undecided so the case degrades instead of convicting on jitter.
-        return {
-            "ok": False, "upgrades": [], "upgraded_candidate": None,
-            "upgraded_candidates": [],
-            "error": (
-                f"causal upgrade quorum not reached: {len(samples)} usable "
-                f"sample(s) of {votes} (need {quorum})"
-            ),
-            "error_type": "no_quorum",
-            "provider": sample_meta,
-        }, {
-            "stage": "causal_upgrade", "state": "no_quorum",
-            "attempts": total_attempts, "view": view_state,
-            "warnings": warnings,
-        }
-    still_missing: set[str] = set()
-    for rows in samples:
-        still_missing.update(
-            str(row.get("candidate_id") or "")
-            for row in rows
-            if row.get("coverage") == "missing"
-        )
-    if still_missing:
-        missing = sorted(still_missing)
+        for rows in samples:
+            for row in rows:
+                by_id.setdefault(str(row.get("candidate_id") or ""), []).append(row)
+        merged: list[dict[str, Any]] = []
+        vote_facts: dict[str, dict[str, Any]] = {}
+        for candidate in candidates:
+            candidate_id = str(candidate.get("candidate_id") or "")
+            rows = by_id.get(candidate_id) or []
+            positive_votes = sum(
+                1 for row in rows
+                if row.get("content_error") is True and row.get("causal") is True
+                and row.get("coverage") == "answered"
+            )
+            winner, _ = majority_vote(
+                [
+                    bool(
+                        row.get("content_error") is True
+                        and row.get("causal") is True
+                        and row.get("coverage") == "answered"
+                    )
+                    for row in rows
+                ],
+                on_tie=False,
+            )
+            anchor = next(
+                (row for row in rows
+                 if (row.get("content_error") is True and row.get("causal") is True
+                     and row.get("coverage") == "answered") == winner),
+                next(
+                    (row for row in rows if row.get("coverage") == "answered"),
+                    {"candidate_id": candidate_id, "content_error": False,
+                     "causal": False, "corrected_step": None,
+                     "reason": "no sample answered this candidate"},
+                ),
+            )
+            vote_facts[candidate_id] = {
+                "cast": cast, "positives": positive_votes,
+                "winner": winner, "tie": positive_votes * 2 == cast,
+            }
+            merged.append({**anchor, "coverage": "answered"})
         coverage = {
             "expected": len(candidates),
-            "answered": len(candidates) - len(missing),
-            "missing": missing,
-        }
-        return {
-            "ok": False,
-            "upgrades": samples[0],
-            "upgraded_candidate": None,
-            "upgraded_candidates": [],
-            "error": (
-                f"upgrade response still omitted {len(missing)} candidate "
-                f"row(s) after coverage repair: {missing}"
+            "answered": sum(
+                1 for row in merged if row.get("coverage") == "answered"
             ),
-            "error_type": "degraded_missing_rows",
-            "coverage": coverage,
-            "provider": sample_meta,
-            "view_meta": view_meta,
+            "missing": [],
+        }
+        sample_meta["vote"] = {
+            "votes": votes, "cast": cast, "per_candidate": vote_facts,
+        }
+
+        upgraded_candidates = assemble_upgraded_candidates(candidates, merged)
+        return {
+            "ok": True, "upgrades": merged,
+            "upgraded_candidate": upgraded_candidates[0] if upgraded_candidates else None,
+            "upgraded_candidates": upgraded_candidates,
+            "provider": sample_meta, "view_meta": view_meta, "coverage": coverage,
+            "snapshot_digest": (
+                snapshot_digest(snapshot) if snapshot is not None else None
+            ),
         }, {
-            "stage": "causal_upgrade", "state": "degraded_missing_rows",
+            "stage": "causal_upgrade", "state": "ok",
             "attempts": total_attempts, "view": view_state,
             "warnings": warnings,
         }
 
-    cast = len(samples)
-    by_id: dict[str, list[dict[str, Any]]] = {
-        str(candidate.get("candidate_id") or ""): []
-        for candidate in candidates
-    }
-    for rows in samples:
-        for row in rows:
-            by_id.setdefault(str(row.get("candidate_id") or ""), []).append(row)
-    merged: list[dict[str, Any]] = []
-    vote_facts: dict[str, dict[str, Any]] = {}
-    for candidate in candidates:
-        candidate_id = str(candidate.get("candidate_id") or "")
-        rows = by_id.get(candidate_id) or []
-        positive_votes = sum(
-            1 for row in rows
-            if row.get("content_error") is True and row.get("causal") is True
-            and row.get("coverage") == "answered"
-        )
-        winner, _ = majority_vote(
-            [
-                bool(
-                    row.get("content_error") is True
-                    and row.get("causal") is True
-                    and row.get("coverage") == "answered"
-                )
-                for row in rows
-            ],
-            on_tie=False,
-        )
-        anchor = next(
-            (row for row in rows
-             if (row.get("content_error") is True and row.get("causal") is True
-                 and row.get("coverage") == "answered") == winner),
-            next(
-                (row for row in rows if row.get("coverage") == "answered"),
-                {"candidate_id": candidate_id, "content_error": False,
-                 "causal": False, "corrected_step": None,
-                 "reason": "no sample answered this candidate"},
-            ),
-        )
-        vote_facts[candidate_id] = {
-            "cast": cast, "positives": positive_votes,
-            "winner": winner, "tie": positive_votes * 2 == cast,
-        }
-        merged.append({**anchor, "coverage": "answered"})
-    coverage = {
-        "expected": len(candidates),
-        "answered": sum(
-            1 for row in merged if row.get("coverage") == "answered"
-        ),
-        "missing": [],
-    }
-    sample_meta["vote"] = {
-        "votes": votes, "cast": cast, "per_candidate": vote_facts,
-    }
-
-    upgraded_candidates = assemble_upgraded_candidates(candidates, merged)
-    return {
-        "ok": True, "upgrades": merged,
-        "upgraded_candidate": upgraded_candidates[0] if upgraded_candidates else None,
-        "upgraded_candidates": upgraded_candidates,
-        "provider": sample_meta, "view_meta": view_meta, "coverage": coverage,
-        "snapshot_digest": (
-            snapshot_digest(snapshot) if snapshot is not None else None
-        ),
-    }, {
-        "stage": "causal_upgrade", "state": "ok",
-        "attempts": total_attempts, "view": view_state,
-        "warnings": warnings,
-    }
+    return memo_stage('causal_upgrade', {"packet": packet, "route": route, "system": system, "user": user, "snapshot": snapshot, "candidates": candidates, "view_meta": view_meta}, evaluate)
 
 
 __all__ = ["assemble_upgraded_candidates", "run_causal_upgrade", "run_recall_scan"]

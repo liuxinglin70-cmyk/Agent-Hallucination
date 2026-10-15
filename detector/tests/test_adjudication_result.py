@@ -89,7 +89,7 @@ def _adjudicate(judge_result, judge_status, defense, recall_ok=True):
         upgrade_status = {"stage": "causal_upgrade", "state": "not_needed"}
     tracer_result, tracer_status = NONE_TRACER
     return adjudicate(
-        packet=sample_packet if False else None,
+        packet=None,
         judge_result=judge_result, judge_status=judge_status,
         recall_result=recall_result, recall_status=recall_status,
         upgrade_result=upgrade_result, upgrade_status=upgrade_status,

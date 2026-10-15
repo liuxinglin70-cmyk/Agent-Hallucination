@@ -320,15 +320,16 @@ class ResearchRun:
                 run_manifest_path = (
                     Path(reused["source_run"]) / "run.json"
                 )
-                if run_manifest_path.exists():
-                    run_manifest = json.loads(
-                        run_manifest_path.read_text(encoding="utf-8-sig"),
+                if not run_manifest_path.is_file():
+                    raise ValueError(f"baseline run {reused['source_run']} is missing run.json; detector config hash cannot be verified")
+                run_manifest = json.loads(
+                    run_manifest_path.read_text(encoding="utf-8-sig"),
+                )
+                if str(run_manifest.get("config_hash")) != str(expected_hash):
+                    raise ValueError(
+                        f"baseline run {reused['source_run']} was produced "
+                        "under a different detector config hash",
                     )
-                    if str(run_manifest.get("config_hash")) != str(expected_hash):
-                        raise ValueError(
-                            f"baseline run {reused['source_run']} was produced "
-                            "under a different detector config hash",
-                        )
             save_json(baseline_dir / case_file_name(case_id), reused)
             result = reused["result"]
             rows[case_id] = {

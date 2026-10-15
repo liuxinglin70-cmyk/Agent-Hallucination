@@ -50,7 +50,7 @@ _QUESTION_WORDS = frozenset({
 })
 
 _TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’\u2019]*")
-_QUOTED_RE = re.compile(r"[\"'\u201c\u2018]([^\"'\u201c\u201d\u2018\u2019]{2,80})[\"'\u201d\u2019]")
+_QUOTED_RE = re.compile(r"(?<!\w)[\"'\u201c\u2018]([^\"'\u201c\u201d\u2018\u2019]{2,80})[\"'\u201d\u2019](?!\w)")
 _NUMBER_RE = re.compile(r"\d[\d,]*(?:\.\d+)?")
 _UNITS = frozenset({
     "ton", "tonne", "kilogram", "gram", "pound", "metre", "meter", "mile",
@@ -675,9 +675,7 @@ def extract_verifies(
         attribute = _nearest_question_term(question, passage, banned)
     if not attribute:
         return None, "passage shares no attribute term with the question"
-    if attribute not in set(tokenize(passage)) and attribute != _stem(
-        str(attribute)
-    ):
+    if attribute not in {_stem(token) for token in tokenize(passage)}:
         return None, f"passage does not state the asked property {attribute!r}"
     mode = _value_mode(question)
     if mode == "label":

@@ -330,6 +330,30 @@ def test_agreeing_writers_keep_the_fact_value(sample_packet):
     assert plan.facts["required_action_present"] == "not_applicable"
 
 
+@pytest.mark.parametrize("own,other,expected", [
+    ("covered", "uncovered", []),
+    ("uncovered", "covered", ["restore_judge_conviction"]),
+    (None, "uncovered", []),
+])
+def test_guard_trigger_reads_only_its_family(sample_packet, own, other, expected):
+    evidence = _candidate(
+        intervention_id="IV-E", type="evidence_check", hook="judge.post",
+        body={"predicate": "contract_coverage", "runner": "deterministic",
+              "output_verdicts": sorted(PREDICATE_VERDICTS["contract_coverage"])},
+    )
+    guard = _candidate(
+        intervention_id="IV-G", type="decision_guard", hook="adjudicate.guard",
+        trigger={"packet_features": ["has_tool_calls"], "facts": ["contract_coverage=uncovered"]},
+        body={"action": "restore_judge_conviction", "action_not_when": "When covered",
+              "action_not_when_facts": ["contract_coverage=covered"]},
+    )
+    plan = InterventionPlan.from_registry(build_intervention_registry([evidence, guard]))
+    plan.facts = {"contract_coverage": other, "contract_coverage@FAM-other": other}
+    if own is not None:
+        plan.facts["contract_coverage@FAM-test"] = own
+    assert plan.guard_actions(sample_packet) == expected
+
+
 def test_mechanical_guard_without_evidence_partner_is_rejected_before_runtime():
     guard = _candidate(
         intervention_id="IV-G-M",

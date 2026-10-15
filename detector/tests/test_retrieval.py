@@ -81,9 +81,20 @@ def test_query_derivation_drops_question_words():
 
 def test_case_entity_prefers_the_quoted_name():
     assert case_entity('How many tons was the "Lisette", built in 1873?') == "Lisette"
+    assert case_entity("What's the name of the 'Kashmir' album?") == "Kashmir"
+    assert case_entity("What’s the name of the ‘Kashmir’ album?") == "Kashmir"
     assert case_entity("Who was the first cardiologist in Kashmir?") in (
         "Kashmir", "Cardiologist Kashmir",
     )
+
+
+def test_extract_verifies_refuses_an_unstated_attribute():
+    verifies, reason = extract_verifies(
+        "What is the name of track 12 on the 'Kashmir' album?",
+        "Kashmir: Northern Lights", "Kashmir",
+    )
+    assert verifies is None
+    assert "asked property" in reason
 
 
 def test_best_passage_prefers_the_paragraph_stating_the_asked_number():

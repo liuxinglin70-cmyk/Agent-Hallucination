@@ -430,7 +430,8 @@ def test_patrol_bootstrap_recovers_missed_failure_family(tmp_path, monkeypatch):
     assert report["marginal_selection"]["selected"] == ["IV-1-001"]
 
 
-def test_cycle_blocks_no_family_claim_when_patrol_is_unmeasured(tmp_path, monkeypatch):
+@pytest.mark.parametrize("healthy", [False, True])
+def test_cycle_blocks_no_family_claim_when_patrol_is_unmeasured(tmp_path, monkeypatch, healthy):
     """An outage-only patrol cannot complete as though it found no failures."""
     cases = _make_dataset(tmp_path / "data", n=20)
     config = _config(tmp_path)
@@ -462,16 +463,16 @@ def test_cycle_blocks_no_family_claim_when_patrol_is_unmeasured(tmp_path, monkey
             "gold": engine.gold_map[case],
             "prediction": None,
             "state": "unresolved",
-            "authority": "invalid",
+            "authority": "authoritative" if healthy else "invalid",
             "responsible_step": None,
             "responsible_step_kind": None,
-            "measurement": "infrastructure_failure",
+            "measurement": "semantic_unresolved" if healthy else "infrastructure_failure",
             "failure_reasons": [{"code": "provider_error"}],
             "result": {
                 "schema_version": "detector.detection_result.v1",
                 "state": "unresolved",
-                "decision_authority": "invalid",
-                "runtime_valid": False,
+                "decision_authority": "authoritative" if healthy else "invalid",
+                "runtime_valid": healthy,
                 "authority_failure_reasons": [{"code": "provider_error"}],
                 "stage_status": {},
             },
@@ -482,6 +483,10 @@ def test_cycle_blocks_no_family_claim_when_patrol_is_unmeasured(tmp_path, monkey
     monkeypatch.setattr(engine, "_patrol_arms", outage_patrol)
     report = engine.run_cycle(1)
 
+    if healthy:
+        assert report["state"] == "completed"
+        assert report["patrol"]["measurement_coverage"]["unmeasured"] == 0
+        return
     assert report["state"] == "blocked_patrol_measurement"
     assert report["patrol"]["measurement_coverage"] == {
         "cases": 4,
@@ -571,10 +576,13 @@ def test_joint_l1_l2_candidates_are_only_admitted_together(tmp_path):
     assert gate["behavior"]["passed"] is True
 
 
-def test_two_qualified_units_get_one_combination_arm(tmp_path):
+@pytest.mark.parametrize("mode", ["normal", "outage", "library"])
+def test_two_qualified_units_get_one_combination_arm(tmp_path, monkeypatch, mode):
     """Two individually qualified units trigger exactly one combo arm."""
     cases = _make_dataset(tmp_path / "data", n=20)
     config = _config(tmp_path)
+    if mode == "library":
+        config["library"]["max_width"] = 1
     split = EvolutionSplit(
         name="synthetic",
         pool=cases,
@@ -597,9 +605,19 @@ def test_two_qualified_units_get_one_combination_arm(tmp_path):
             **{case: False for case in gain_fp},
         },
     }
+    class ComboBackend(MockDetectorBackend):
+        combo_stage = False
+
+        def run_case(self, record, *, case_id, registry=None, gold=None):
+            entries = (registry or {}).get("interventions") or []
+            if mode == "outage" and self.combo_stage and len(entries) == 2:
+                from evolution.backends import _unresolved_backend_result
+                return _unresolved_backend_result(case_id, "provider_error", "offline outage", "provider_error")
+            return super().run_case(record, case_id=case_id, registry=registry, gold=gold)
+
     engine = EvolutionEngine(
         config,
-        backend=MockDetectorBackend(
+        backend=ComboBackend(
             base_predictions=base, overrides=overrides,
         ),
         split=split,
@@ -609,7 +627,32 @@ def test_two_qualified_units_get_one_combination_arm(tmp_path):
             _guard_candidate(cycle=1),
         ]),
     )
+    original_check = engine._check_combination
+
+    def check_combination(*args, **kwargs):
+        engine.backend.combo_stage = True
+        return original_check(*args, **kwargs)
+
+    monkeypatch.setattr(engine, "_check_combination", check_combination)
     report = engine.run_cycle(1)
+    if mode == "library":
+        from evolution.memory import episodic_attempts
+        assert report["marginal_selection"]["selected"] == []
+        episodes = episodic_attempts(engine.memory_root)
+        assert len(episodes) == 2
+        assert all(row["outcome"] == "budget_unselected" and not row["falsified"] for row in episodes)
+        assert all(item["not_evaluable"] for item in engine.rejection_feedback if item["gate"] == "LIBRARY")
+        return
+    if mode == "outage":
+        from evolution.memory import episodic_attempts
+        assert report["combination"].get("not_evaluable") is True, report["combination"]
+        assert report["marginal_selection"]["selected"] == ["IV-1-001"]
+        episodes = episodic_attempts(engine.memory_root)
+        late = next(row for row in episodes if row["intervention_id"] == "IV-1-002")
+        assert late["unevaluable"] is True and late["falsified"] is False
+        assert late["gate"] == "COMBINATION_M"
+        assert "unmeasured" in late["reason"]
+        return
     assert report["combination"]["unit_ids"] == ["IV-1-001", "IV-1-002"]
     assert report["combination"]["reason"] == (
         "combination arm met HARMLESSNESS and each member's objective"

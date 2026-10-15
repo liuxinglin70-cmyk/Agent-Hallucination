@@ -159,7 +159,7 @@ Guidance:
   evidence+guard unit for it. A HARMLESSNESS rejection with new_fn/new_fp means that
   exact executable mechanism is forbidden, including renames: choose a
   different predicate/action or a different family.
-- recall_directive maps to scanner.system; upgrade_directive maps to
+- judge_directive maps to judge.system; recall_directive maps to scanner.system; upgrade_directive maps to
   upgrade.system. recall_trigger maps to recall.trigger and is the preferred
   route when recall_path is not_run or not_needed. A text boundary must
   include both a positive directive and an explicit NOT-WHEN boundary
@@ -1417,7 +1417,7 @@ class HybridProposer:
             verdicts = sorted(PREDICATE_VERDICTS.get(predicate) or ())
             violating = [
                 verdict for verdict in verdicts
-                if verdict not in {"satisfied", "consistent", "resolved", "covered", "present"}
+                if verdict not in {"satisfied", "consistent", "resolved", "covered", "present", "not_applicable"}
             ]
             if not violating:
                 continue
