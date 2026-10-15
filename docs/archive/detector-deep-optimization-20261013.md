@@ -1,5 +1,7 @@
 # 检测定位优化：证据、实现与待验收项
 
+> 历史审计记录：按原日期解释实现、测试和计划；当前合同见[技术文档](../technical-solution.md)，当前结果见[实验日志](../experiment-log.md)。文档迁移时只修订路径与失效链接标记。
+
 ## 当前结论
 
 本轮以提交 `a2fa56c` 为代码检查点。原始数据、标签、历史运行和恢复报告保持原字节。当前代码完成模块回归420 passed，最终冻结全量离线验收2449 passed、0 failed/error/skipped，18/18检查通过且源码未变。按用户最新指令取消95例真实回测，本轮收尾不报告准确率恢复或定位增益。
@@ -86,4 +88,4 @@ gold 答案不进入三元组。归档不能将启发式单步偏离冒充已验
 
 2026-10-14用户要求完成修复后收尾、不运行实验，取消95例真实回测。自动编排入口已停止，第二次冻结全量离线验证独立完成。本轮只验收代码、测试与接口；检测准确率、首错命中率及真实耗时改善均未重新测量。历史指标保留，不作为新源码收益。
 
-最终验收：`D:\python\python.exe scripts/verify.py --scope all`，2449 passed，0 failures/errors/skipped，18/18 checks。完整[日志](../artifacts/code_quality/acbc8dea6add0729a44338feb76422908af95f40d07438e2b42aa73eab194d07/650fd71cb2c54880b0fec9b652557de4/pytest.log)、[JUnit](../artifacts/code_quality/acbc8dea6add0729a44338feb76422908af95f40d07438e2b42aa73eab194d07/650fd71cb2c54880b0fec9b652557de4/pytest.xml)及[报告](../artifacts/code_quality/acbc8dea6add0729a44338feb76422908af95f40d07438e2b42aa73eab194d07/650fd71cb2c54880b0fec9b652557de4/summary.json)绑定源码`acbc8dea6add0729a44338feb76422908af95f40d07438e2b42aa73eab194d07`；网络边界为loopback_only。该验收包含detector/tests、evolution/tests以及其余仓库回归，不调用真实provider或运行95例实验。
+最终验收：`D:\python\python.exe scripts/verify.py --scope all`，2449 passed，0 failures/errors/skipped，18/18 checks。完整[日志](../../artifacts/code_quality/acbc8dea6add0729a44338feb76422908af95f40d07438e2b42aa73eab194d07/650fd71cb2c54880b0fec9b652557de4/pytest.log)、[JUnit](../../artifacts/code_quality/acbc8dea6add0729a44338feb76422908af95f40d07438e2b42aa73eab194d07/650fd71cb2c54880b0fec9b652557de4/pytest.xml)及[报告](../../artifacts/code_quality/acbc8dea6add0729a44338feb76422908af95f40d07438e2b42aa73eab194d07/650fd71cb2c54880b0fec9b652557de4/summary.json)绑定源码`acbc8dea6add0729a44338feb76422908af95f40d07438e2b42aa73eab194d07`；网络边界为loopback_only。该验收包含detector/tests、evolution/tests以及其余仓库回归，不调用真实provider或运行95例实验。

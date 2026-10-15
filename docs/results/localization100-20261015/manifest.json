@@ -1,0 +1,57 @@
+{
+  "archived_on": "2026-10-15",
+  "scope": "Completed 100-case baseline, first round, seven-case recovery and final authority-based merge",
+  "files": [
+    {
+      "source": "artifacts/detector/live_checks/live100_20261013_recovered/evaluation.json",
+      "archive": "baseline-evaluation.json",
+      "bytes": 93845,
+      "sha256": "54babc9d1107bde0f59db31c668405c24ac093653272185844634b90c90b9aad"
+    },
+    {
+      "source": "artifacts/detector/live_checks/live100_20261014_full/evaluation.json",
+      "archive": "first-round-evaluation.json",
+      "bytes": 104039,
+      "sha256": "cfa8116001ff726e99e35e0922d754237d3fc2eb80fd19b7735e1892e090fb24"
+    },
+    {
+      "source": "artifacts/detector/live_checks/live7_20261015_recovery/evaluation.json",
+      "archive": "final-evaluation.json",
+      "bytes": 91876,
+      "sha256": "77cb5770245e31f5079a767bdd6b2cb48afc15526042a350211f91ce3dbe9367"
+    },
+    {
+      "source": "artifacts/detector/live_checks/live7_20261015_recovery/recovery_evaluation.json",
+      "archive": "recovery-evaluation.json",
+      "bytes": 10948,
+      "sha256": "ebbd20d48ae625ddeb170a5dca034bfe99312e39e4797d95118d6be3e1e47da2"
+    },
+    {
+      "source": "artifacts/detector/live_checks/live7_20261015_recovery/comparison.json",
+      "archive": "comparison.json",
+      "bytes": 132684,
+      "sha256": "e230dc823b17fc7dffc87c1c60b2d8c7d28592f45ce3deb2a9acd86e2409ef55"
+    },
+    {
+      "source": "artifacts/detector/live_checks/live7_20261015_recovery/call_analysis.json",
+      "archive": "call-analysis.json",
+      "bytes": 13839,
+      "sha256": "ee5125df6e0039becac1f372fb57dc04c557c3bc474835b4d1e92dc3ef3643c1"
+    },
+    {
+      "source": "artifacts/detector/live_checks/live7_20261015_recovery/manifest.json",
+      "archive": "recovery-manifest.json",
+      "bytes": 75656,
+      "sha256": "86e0bd7726bb9dcd95799028facf44799f17bcd8ec09fa25c793b9fb019a7af5"
+    }
+  ],
+  "note": "Byte-preserving copies. Per-case proofs and request journals remain at original artifact paths recorded in provenance; no model or benchmark rerun.",
+  "derived_files": [
+    {
+      "archive": "request-journal-audit.json",
+      "bytes": 41666,
+      "sha256": "e5d4ea68a329536c2bab2845624e87b20cf7dba0c692376bc50d216942202642",
+      "method": "Unique request_id over all queued/started/finished journal records; source journal paths and SHA-256 are in the derived file."
+    }
+  ]
+}

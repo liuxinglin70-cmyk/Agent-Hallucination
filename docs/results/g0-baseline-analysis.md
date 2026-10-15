@@ -3,18 +3,18 @@
 **日期**：2026-09-27
 **我方数据**：`full693-20260924T143024Z` / run-id `full693-g0`，报告生成 2026-09-27T09:37:18+08:00
 **论文数据**：AgentHallu: Benchmarking Automated Hallucination Attribution of LLM-based Agents（arXiv:2601.06818），Table 4 / Table 5
-**权威叙述**：本报告是派生对比，完整实验过程与逐条监控见 [实验日志](experiment-log.md) §34。两者不一致时以日志与原始报告文件为准。
+**阅读范围**：本报告保留2026-09-27的G0与论文数值参照；最新100例结果及其分母见[实验日志](../experiment-log.md)和[结果索引](README.md)。数值不一致时以对应原始报告为准。
 
-**原始报告归档**：[完整基线报告](results/full693-20260927/baseline_report.json)，校验信息见 [证据清单](results/full693-20260927/manifest.json)。
+**原始报告归档**：[完整基线报告](full693-20260927/baseline_report.json)，校验信息见 [证据清单](full693-20260927/manifest.json)。
 
-**长期保存的基线入口**：原始 `artifacts/full693-20260924T143024Z/measurement/g0/baseline_report.json` SHA-256 为 `f90208a68bae2b90ee976c8d91e62bdfa8e7b28a5b3eab10c928e8555d4d75db`；仓库内另存 [653 例逐例精简快照](../datasets/protocols/g0_baseline_snapshot_20260927.json)，包含金标、判定、责任步、权威性与耗时，供后续自进化划分及同口径核对使用。快照不包含原始 proof 和 provider 请求。新的 [693 例自进化划分](evolution-g0-reuse-plan-20260928.md)与本报告的 653 例测量分母不同。
+**长期保存的基线入口**：原始 `artifacts/full693-20260924T143024Z/measurement/g0/baseline_report.json` SHA-256 为 `f90208a68bae2b90ee976c8d91e62bdfa8e7b28a5b3eab10c928e8555d4d75db`；仓库内另存 [653 例逐例精简快照](../../datasets/protocols/g0_baseline_snapshot_20260927.json)，包含金标、判定、责任步、权威性与耗时，供后续自进化划分及同口径核对使用。快照不包含原始 proof 和 provider 请求。新的 [693 例自进化划分](README.md)与本报告的 653 例测量分母不同。
 
 ---
 
 ## 0. 先读：三条限制
 
-1. **底座不同**。论文每行是一个单模型单次提示的结果；我方是 `GLM-5.3-flash` 之上的**多阶段流水线**（judge 三票 + 依据要求 + step tracer + defense + 多票听证裁决）。因此这是"系统 vs 单模型"，不是同模型对比。我方判定项高于 GPT-5，**主要来自流水线结构而非底座模型更强**。
-2. **子集不同**。我方在 653 例子集测量，论文在全部 693 例。被排除的 40 例（预注册的开发池 30 + validation 10）幻觉率 60.0%，测量面 64.2%。类别构成也不同：测量面 Human-Interaction 占 10.9%，被排除面仅 5.0%；而 Human-Interaction 恰是我方最弱项，故**测量面对我方定位读数略偏悲观**，但偏差不足以改变结论。
+1. **底座与推理方式不同**。论文每行是一个单模型单次提示的结果；我方是 `GLM-5.3-flash` 上的多阶段系统，包含Judge多票、Tracer、Defense和听证裁决。该参照不能区分底座、流程、计算量及样本构成的作用，不能据此把数值差异归因于流水线结构或模型能力。
+2. **子集不同**。我方测量653例，论文使用全部693例。被排除的40例为开发池30加validation10，阳性比例60.0%，测量面64.2%；Human-Interaction构成也不同。没有同集复测，无法量化这些差别对总体定位读数的影响。
 3. **不是泛化证据**。`development_exposure.json` 的 `cases` 覆盖全部 693 例，其 `policy` 明确"原始语料无法证明存在新的独立留出集"。本轮是**回顾性内部评估**，任何数字都不主张对未见数据的泛化。
 
 ---
@@ -99,7 +99,7 @@
 
 Human-Interaction 最极端——65 个已检出中 43 个偏差恰为 +1。该类"问题起点"与"问题表现点"的区分在我方因果模型里被系统抹平。
 
-**2026-10-08 派生报告勘误**：原表“其他晚判 37（12.7%）”加总不等于声明的 292 个终局真阳性。按所归档 [`baseline_report.json`](results/full693-20260927/baseline_report.json) 的逐行 `terminal_prediction`、`gold_step`、`responsible_step` 计算，实际为 **31（10.6%）**，六类合计正好 292（114+87+28+26+31+6）；晚判为 87+28+26+31=172。若只看 291 个权威真阳性，其他晚判则为 **30**、合计晚判 **171/291=58.8%**。本修订只校正派生表述，**不改动原始测量文件及其哈希**。偏移差不自动构成因果定罪——多错误轨迹还需独立审查。新 [疑惑度与因果审计优化设计](uncertainty-guided-causal-audit-design-20261008.md) 将“晚判”作为待验证的修复方向。
+**2026-10-08 派生报告勘误**：原表“其他晚判 37（12.7%）”加总不等于声明的 292 个终局真阳性。按所归档 [`baseline_report.json`](full693-20260927/baseline_report.json) 的逐行 `terminal_prediction`、`gold_step`、`responsible_step` 计算，实际为 **31（10.6%）**，六类合计正好 292（114+87+28+26+31+6）；晚判为 87+28+26+31=172。若只看 291 个权威真阳性，其他晚判则为 **30**、合计晚判 **171/291=58.8%**。本修订只校正派生表述，**不改动原始测量文件及其哈希**。偏移差不自动构成因果定罪——多错误轨迹还需独立审查。新 [疑惑度与因果审计优化设计](../research-positioning-and-roadmap.md) 将“晚判”作为待验证的修复方向。
 
 ### 2.3 判定与定位的错位（按类别）
 

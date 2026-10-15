@@ -1,0 +1,832 @@
+{
+  "schema_version": "repository.request_journal_audit.v1",
+  "scope": "All on-disk request journals for completed first100 v2 and recovery7 run, including abandoned outer attempts",
+  "runs": {
+    "live100_20261014_full": {
+      "journals": 100,
+      "unique_queued": 752,
+      "unique_started": 752,
+      "unique_finished": 752,
+      "no_finished_observation": 0,
+      "finished_statuses": {
+        "response": 723,
+        "transport_error": 29
+      },
+      "sources": [
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__090.json/attempts/001_20261014T222555/requests.jsonl",
+          "sha256": "20f9d4b99996ed652283083b9f8ca26012e4eedb83716d04c905d45f2cf54cc4",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__088.json/attempts/001_20261014T231054/requests.jsonl",
+          "sha256": "3f0172a128095187241573a8a9ff6772ec0ec1b880b31fcb9920186d847804c2",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__085.json/attempts/001_20261015T000528/requests.jsonl",
+          "sha256": "c05b16efa295b1db34d3b69ba48ec8653318b137de745529a5c3f3d41342008e",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__066.json/attempts/001_20261014T224701/requests.jsonl",
+          "sha256": "e93596a820c3ed359b0abff01d7d4b9dc05234a686f49673db606814c4fdbdc5",
+          "queued": 8,
+          "started": 8,
+          "finished": 8
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__062.json/attempts/001_20261015T002055/requests.jsonl",
+          "sha256": "ade8e8cf3281122329a6e7d0e20f0dc2eeb33250ed313ba406844ab263620b5b",
+          "queued": 4,
+          "started": 4,
+          "finished": 4
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__051.json/attempts/001_20261014T235726/requests.jsonl",
+          "sha256": "5d14168f0046e4b8a9acd57cdf5ac0159f9c1e9183bd3e60f2b17a871338fb76",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__048.json/attempts/001_20261015T002250/requests.jsonl",
+          "sha256": "c2daf2a79ef00554828c9c56564ab136f3da998f4f59ff4350f0e3cdc7ec8755",
+          "queued": 8,
+          "started": 8,
+          "finished": 8
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__047.json/attempts/001_20261014T231943/requests.jsonl",
+          "sha256": "7205f334c7354603e1abca3b2a2763e044dd6ebf6f5d7fcefd1e38022e7c6d96",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__043.json/attempts/001_20261014T224120/requests.jsonl",
+          "sha256": "f9f6ed97274a12ad3836d4a1421c82be68c68350ec3b74fe6f1ecb8d1ea4b383",
+          "queued": 9,
+          "started": 9,
+          "finished": 9
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__024.json/attempts/001_20261015T000614/requests.jsonl",
+          "sha256": "cc2c62bec63fa07f71ed826306b3b87d4ed5f48a9b15d12ad43687c77faaeb2c",
+          "queued": 21,
+          "started": 21,
+          "finished": 21
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__022.json/attempts/001_20261014T222756/requests.jsonl",
+          "sha256": "cbab941fe89d54302be1cc026d4e0e690cecb4640887298f13adaf8068018287",
+          "queued": 10,
+          "started": 10,
+          "finished": 10
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/SmolAgents__011.json/attempts/001_20261014T215841/requests.jsonl",
+          "sha256": "ecc038d0ae4a8e0195aefdb5642e677437a7a028a63698df556ba442c8f523b1",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__102.json/attempts/001_20261014T230955/requests.jsonl",
+          "sha256": "6a63b886639697d7ed2589fee52f10c63355122d5c207c6ebd42c22f168a30bb",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__097.json/attempts/001_20261014T231847/requests.jsonl",
+          "sha256": "01ee930c8973d0d895d2bfb99c894a4590ac85642cf0828cd5ce2025f3a0cee9",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__095.json/attempts/001_20261014T233726/requests.jsonl",
+          "sha256": "f7113b2831e4d4e863c472b58f7312d1c54ab7d0e4febcece4b6185d1fc9d8e6",
+          "queued": 14,
+          "started": 14,
+          "finished": 14
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__083.json/attempts/001_20261014T232051/requests.jsonl",
+          "sha256": "59005d1126265009767dc279aafb787eb7fe49bbffd8f8b522f6f19d75aa5baf",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__073.json/attempts/001_20261014T231509/requests.jsonl",
+          "sha256": "bd5b6d8957cd139f7f85be307d1e25e1624f8134461e00e84678c710085d6a9d",
+          "queued": 14,
+          "started": 14,
+          "finished": 14
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__068.json/attempts/001_20261015T003445/requests.jsonl",
+          "sha256": "76115b3ca488ca6c1b35c2ed6c115c6f9a5a856f321d367545d6b09d177a57da",
+          "queued": 8,
+          "started": 8,
+          "finished": 8
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__064.json/attempts/001_20261014T232848/requests.jsonl",
+          "sha256": "e7e8a83e4ba7d762eae8f112f416c601ef68fa6039be0e68541ed03fc73cd69b",
+          "queued": 9,
+          "started": 9,
+          "finished": 9
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__055.json/attempts/001_20261014T230044/requests.jsonl",
+          "sha256": "b9a514c2f96025df65c5ee01349ccf5d0708a6dd5a95a2caf0c0396a58a7e44f",
+          "queued": 9,
+          "started": 9,
+          "finished": 9
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__043.json/attempts/001_20261014T231206/requests.jsonl",
+          "sha256": "c2e00338bd26215dba4f2a7aa59fbec377529bafdbcdd4cc2aaf1cdd9151f164",
+          "queued": 8,
+          "started": 8,
+          "finished": 8
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__040.json/attempts/001_20261014T215942/requests.jsonl",
+          "sha256": "d55533e3259506807bb861ed7183fad77b2076b1d93ffbe83be320051350bdc9",
+          "queued": 10,
+          "started": 10,
+          "finished": 10
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__037.json/attempts/001_20261014T233627/requests.jsonl",
+          "sha256": "68b7752e7a51b336d607718f107e628749f28808a1f5935b064b268e621bd577",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__031.json/attempts/001_20261015T001247/requests.jsonl",
+          "sha256": "7a48cb318575d8336a317140d4e07fd1ee186b724b67d281a56b5ca6e356b139",
+          "queued": 12,
+          "started": 12,
+          "finished": 12
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__016.json/attempts/001_20261014T233445/requests.jsonl",
+          "sha256": "cdb912a2e05e27adf7eaa3b1380206faabacb50675ab96fa9565ee1317232f46",
+          "queued": 8,
+          "started": 8,
+          "finished": 8
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenManus__012.json/attempts/001_20261014T215850/requests.jsonl",
+          "sha256": "b8e6e6dddacf5186bc6503e3fbd14452ff0c4f34ec8b77d3efb2967d5637c5c5",
+          "queued": 4,
+          "started": 4,
+          "finished": 4
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__090.json/attempts/001_20261014T235701/requests.jsonl",
+          "sha256": "3b3979862d88f38376a352f992aeaf3ae0cf152ee5b96a49685c0fe886db5530",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__087.json/attempts/001_20261015T004534/requests.jsonl",
+          "sha256": "bd91f6c46f456efc595cf2c453b2c22c62652e11790b1d4b67748f8a2b794d36",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__072.json/attempts/001_20261014T235122/requests.jsonl",
+          "sha256": "5b7a84a59a1139eb145d87739f1744a6be80f921caae912671923de9a1e26523",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__071.json/attempts/001_20261014T224246/requests.jsonl",
+          "sha256": "c5d7ace0c9d03aebda24d8381307e217717d4d44fed68f11e16f32cf41eccf1d",
+          "queued": 4,
+          "started": 4,
+          "finished": 4
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__068.json/attempts/001_20261015T002742/requests.jsonl",
+          "sha256": "0cad4067a8419eef0f999369398e6434743bbc6793f04a2576e035a4c1990353",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__065.json/attempts/001_20261014T231000/requests.jsonl",
+          "sha256": "c61485b6bcccda497501fa82397ec1f14f5f2946db0539290fa54f748c9bc9e6",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__058.json/attempts/001_20261014T215821/requests.jsonl",
+          "sha256": "ca0bc4e896791919d014dfdcf4c4a8f4764d08829ed35969fd2e2c6fbec942a7",
+          "queued": 11,
+          "started": 11,
+          "finished": 11
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__055.json/attempts/001_20261014T223659/requests.jsonl",
+          "sha256": "bbd9499f2f4973b93b46d6e15aef6c49a3f6c4393b90581250f10f5c0d56ae02",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__043.json/attempts/001_20261014T223351/requests.jsonl",
+          "sha256": "08af2417a64b3f67a4ca78961230eb026f52ead7690964e6a9c146a69ae33944",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__042.json/attempts/001_20261014T222810/requests.jsonl",
+          "sha256": "fd1ee563a48e4b3f110e42ef624aacbab73eeeddb64cf31cd70557411f545a80",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__040.json/attempts/001_20261014T233022/requests.jsonl",
+          "sha256": "b9ac5d110ed9be9a97fde9b4d52400d9dd64ca7873a8395b75c0cf238d45c9dd",
+          "queued": 4,
+          "started": 4,
+          "finished": 4
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__036.json/attempts/001_20261015T003159/requests.jsonl",
+          "sha256": "d177689cdc5f9908760cc9e709830d92cd94f8a5c76708b0548c20f151d6c05d",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__034.json/attempts/001_20261014T233615/requests.jsonl",
+          "sha256": "7f4277ab13b6a5498277e86babf45616fcd2138dfe93ea38d5b99f030e4a4db7",
+          "queued": 17,
+          "started": 17,
+          "finished": 17
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__027.json/attempts/001_20261014T221648/requests.jsonl",
+          "sha256": "7948f943bf596e0eac542f74d8b31e1e0500179b9e62466e02c8968cb9f4ceee",
+          "queued": 9,
+          "started": 9,
+          "finished": 9
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__023.json/attempts/001_20261014T215652/requests.jsonl",
+          "sha256": "d83283ad583f247a766a6f3add85375511c59806f91a77fe2ee426339e0bc00e",
+          "queued": 8,
+          "started": 8,
+          "finished": 8
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__022.json/attempts/001_20261014T231553/requests.jsonl",
+          "sha256": "72fd7a2b513519977df1620824c4f79aee43cbd32e2be33aa0922a1d58886ddc",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__014.json/attempts/001_20261015T002139/requests.jsonl",
+          "sha256": "d0c99eb7b2b50815a10ad6c8bfd7fdb2ab4b3c18c6ad97b7a0bf2179dba75a0c",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__011.json/attempts/001_20261014T221529/requests.jsonl",
+          "sha256": "ed27c9088935820b2a66e4dc606d0ad87c29dca40f3e476fbad3c68d6e4f041c",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/OpenDeepSearch__007.json/attempts/001_20261015T001043/requests.jsonl",
+          "sha256": "651428f21af267ccf825f2e007b9b01c1057695a72a49e523b55c9fe1f893398",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Octotools__028.json/attempts/001_20261014T223247/requests.jsonl",
+          "sha256": "aedef872dd78876cea87498ed9ff2fd164c9a35d583e51615cf077d317b40ceb",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Octotools__023.json/attempts/001_20261014T233346/requests.jsonl",
+          "sha256": "6a4148aaaebbeeab2fa2b014cade3b9692dd5247253ea3dc26c9891079a393ee",
+          "queued": 10,
+          "started": 10,
+          "finished": 10
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Octotools__020.json/attempts/001_20261014T222942/requests.jsonl",
+          "sha256": "4be864ca8305f28d0d9694fd60507aa3d0c1e9666392800fc0fe4cb86fd3299d",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__091.json/attempts/001_20261014T222609/requests.jsonl",
+          "sha256": "6bab48e40b6bb4a0cfac2ab022c9576e6dcffda5eb2b5fb983eee8db7f9d503c",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__090.json/attempts/001_20261015T004732/requests.jsonl",
+          "sha256": "dc305238a34c1d7660de7e1b15f20dfd35c055047903d96f26be0d8dafd5d936",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__078.json/attempts/001_20261014T220041/requests.jsonl",
+          "sha256": "6831da9d1d1d5f3274e333b451906f58e3b15529f9179b537d8e6a29ba6ab9a3",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__076.json/attempts/001_20261015T003355/requests.jsonl",
+          "sha256": "7e53f6668be9439852d1b0b3efad502bdfe540ef402e3e177f8ea90bd5794bfb",
+          "queued": 11,
+          "started": 11,
+          "finished": 11
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__074.json/attempts/001_20261014T231320/requests.jsonl",
+          "sha256": "25627909cf09f4ca8b143883f903555b63d3fa53a2fe7bc9a1b6f0efb551461f",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__071.json/attempts/001_20261015T001257/requests.jsonl",
+          "sha256": "ff3e0d452aadc5800050baba738aa92e65da60e78d2cdd2e4ccf2001564dd296",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__065.json/attempts/001_20261014T220952/requests.jsonl",
+          "sha256": "76c43e4d6516381f23b8f202a4b7c9ca37d700f71fdc9082382e4fbd1714ff25",
+          "queued": 8,
+          "started": 8,
+          "finished": 8
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__061.json/attempts/001_20261014T215652/requests.jsonl",
+          "sha256": "53e16f98284d7b64ef472c570b5f6c76766dc9fd6ac1802e022740c78c774d6b",
+          "queued": 10,
+          "started": 10,
+          "finished": 10
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__060.json/attempts/001_20261014T223611/requests.jsonl",
+          "sha256": "b69130c8faa878d5562530655817b937b1f4f62d98a92ef27ddb2fb7b7e1a858",
+          "queued": 27,
+          "started": 27,
+          "finished": 27
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__055.json/attempts/001_20261015T000512/requests.jsonl",
+          "sha256": "92cefff19feb655b63dc31cf0790ecc433b09ab047ca12ebca3b0d558c204c6f",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__031.json/attempts/001_20261015T004253/requests.jsonl",
+          "sha256": "2069cc93e96d3b72940684ce8bdbde594f5565bcd08af403e6ab3c92b31d8f1f",
+          "queued": 13,
+          "started": 13,
+          "finished": 13
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__027.json/attempts/001_20261014T231205/requests.jsonl",
+          "sha256": "0f6dfde422f3afd3aa53f85c3c1dc94969cf37b74cbdac2ba99299f413650ada",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Magentic_One__025.json/attempts/001_20261014T223803/requests.jsonl",
+          "sha256": "2758ba48a06fd3e6f8b5c4f113a18118445998c3b37a322fa6cdaaae42216cab",
+          "queued": 18,
+          "started": 18,
+          "finished": 18
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__086.json/attempts/001_20261014T233206/requests.jsonl",
+          "sha256": "49ce5bf2d744683abcf7802533365c75d1665b22e12d71d84f97eea8d078d992",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__084.json/attempts/001_20261015T004818/requests.jsonl",
+          "sha256": "750f9e4b3870d21f64b1b1ff9c665213411609dfca720c9605574a167bbfbf58",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__077.json/attempts/001_20261014T221642/requests.jsonl",
+          "sha256": "afe8cf71f450aae6411bb9f0d9f812ce8a2c81ba0fa82eb29d56335936df2930",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__076.json/attempts/001_20261014T232050/requests.jsonl",
+          "sha256": "c7b96aaeeba4a36422413fbcf37bdd58ebdb67ddff7800e88332c4eeb6585f0d",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__043.json/attempts/001_20261014T231803/requests.jsonl",
+          "sha256": "7eaa4bee2be8225bd5f570ed0dc4956c7d804fcc1d4a28629f69737f8907c27a",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__032.json/attempts/001_20261014T235001/requests.jsonl",
+          "sha256": "ea0b4e98b34d573bc24fa42938a6e82e21022d32791b76bdddae8e3ce5766b02",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__024.json/attempts/001_20261015T003444/requests.jsonl",
+          "sha256": "e6d34755a460d278b8b8a65a81d799a82e39f4ed96e0fd83f76e1f8acc83a0d1",
+          "queued": 14,
+          "started": 14,
+          "finished": 14
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__022.json/attempts/001_20261014T215652/requests.jsonl",
+          "sha256": "bbaba4214b5d3fad8c7f1f55488012ebeb59e485734fcb91e9614c96af573dd0",
+          "queued": 12,
+          "started": 12,
+          "finished": 12
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__021.json/attempts/001_20261014T222924/requests.jsonl",
+          "sha256": "9c2363d984c7302ddb0c9ef5ff9d18bc28a1468ab62dc7850c8543f50922db99",
+          "queued": 9,
+          "started": 9,
+          "finished": 9
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__016.json/attempts/001_20261014T234640/requests.jsonl",
+          "sha256": "58a752acab55b3703704ce549d80acaef89ee6a1ef74eb4c659034293cf1a86c",
+          "queued": 18,
+          "started": 18,
+          "finished": 18
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__012.json/attempts/001_20261015T005201/requests.jsonl",
+          "sha256": "e67083d8704e871c1e94b9a895d6d761beeda7a6e6249568e326a918a04def65",
+          "queued": 14,
+          "started": 14,
+          "finished": 14
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__010.json/attempts/001_20261014T223227/requests.jsonl",
+          "sha256": "a45248cb631d39fcfea90a00955e0601a682aae88c8df06fb680b776685f0379",
+          "queued": 8,
+          "started": 8,
+          "finished": 8
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__006.json/attempts/001_20261015T003213/requests.jsonl",
+          "sha256": "efa58ce311b439054e6fd1f327435835843b666acb4dfcf267762f37d07962cb",
+          "queued": 9,
+          "started": 9,
+          "finished": 9
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/Camel__001.json/attempts/001_20261014T220718/requests.jsonl",
+          "sha256": "b12d3d61b59c7f9afad43283cf445bf1c829af6a7555bd8f7e3bebbc25ae475c",
+          "queued": 14,
+          "started": 14,
+          "finished": 14
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__155.json/attempts/001_20261014T215652/requests.jsonl",
+          "sha256": "76b0ef1de71382c2d0b046a0b948faaa03f50592b1b14e80666accb501c5dce0",
+          "queued": 9,
+          "started": 9,
+          "finished": 9
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__150.json/attempts/001_20261015T002008/requests.jsonl",
+          "sha256": "1aefd6ef43ad78f591b1eac8b45ad4bd2920630a4e1e226cc8eb84ec4444cd17",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__144.json/attempts/001_20261015T002953/requests.jsonl",
+          "sha256": "c9255f8590b6404fd93c49279fd800302691c512ed48b0bc3491befb019ae664",
+          "queued": 20,
+          "started": 20,
+          "finished": 20
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__130.json/attempts/001_20261015T004933/requests.jsonl",
+          "sha256": "e45305388fc544bfdc7cf2e257b6d2a2f963a719253e65caccfd0c46e0f26047",
+          "queued": 10,
+          "started": 10,
+          "finished": 10
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__129.json/attempts/001_20261014T215652/requests.jsonl",
+          "sha256": "fde6d239971a6d256f61fe0c95d75e58c47dc0bdebabbba0558c0ce6546d3fa7",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__127.json/attempts/001_20261015T004938/requests.jsonl",
+          "sha256": "95122df43c028e249c660ada472f2ebb37eaa8d753c275fe88cf50573464568e",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__125.json/attempts/001_20261015T003239/requests.jsonl",
+          "sha256": "c66da59b4f55e46c09a689cec7c1831fe99f2c98bbc8a23aa7953a927ebf2b9f",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__122.json/attempts/001_20261014T233729/requests.jsonl",
+          "sha256": "8ada9688a69b45644625ce9df5aa82be3ff0c7351790cf5d5ecd515917f0d852",
+          "queued": 11,
+          "started": 11,
+          "finished": 11
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__118.json/attempts/001_20261014T223158/requests.jsonl",
+          "sha256": "9d61f78b34da26fdc7a3972711476723b4c6d6177d61b5fcd81b01f2f0b78f60",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__115.json/attempts/001_20261014T215652/requests.jsonl",
+          "sha256": "19c6a7762fd4f2d2c94dad44103c36b828437bc1e7d31ac6b3959d8d810df577",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__114.json/attempts/001_20261014T221822/requests.jsonl",
+          "sha256": "d39f1ea4492064f2c19692b5bc404e9b985d077f6a8e5839d2b6d3eae8c867d8",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__088.json/attempts/001_20261014T232005/requests.jsonl",
+          "sha256": "7ef6a1fac2c2ff32edee47232e617e67563c8c2cae9d7f82de64b35d074f2103",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__087.json/attempts/001_20261014T215652/requests.jsonl",
+          "sha256": "cdd79760218fc08639c0b4c83aee2e7da9a1822cb5b33a1b4427171b0d4b6df4",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__085.json/attempts/001_20261014T215652/requests.jsonl",
+          "sha256": "ca732e15a751244a4cd317b205419fb9eb970f140358eebe91e7c50edfa00d06",
+          "queued": 12,
+          "started": 12,
+          "finished": 12
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__072.json/attempts/001_20261014T222408/requests.jsonl",
+          "sha256": "fec8b99af8d17f68d6bcf27d5f05370266d65cf9cf9ed55a95c5cf56e3ae4a18",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__071.json/attempts/001_20261014T224729/requests.jsonl",
+          "sha256": "7bb4b2f591d877dbef74a16c987318e034a3f14b3aaf73455a619f9da5987285",
+          "queued": 12,
+          "started": 12,
+          "finished": 12
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__056.json/attempts/001_20261014T224827/requests.jsonl",
+          "sha256": "598aa4fd3273d71be683ed72a04dc38ed2bcbd0cfaf816dd5dd80598698d89d4",
+          "queued": 10,
+          "started": 10,
+          "finished": 10
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__055.json/attempts/001_20261014T233729/requests.jsonl",
+          "sha256": "a9e694aa3c3f6f582e69acb952e8f34f25fdbcb81f1c5e66301888aa82f6facb",
+          "queued": 9,
+          "started": 9,
+          "finished": 9
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__052.json/attempts/001_20261014T232157/requests.jsonl",
+          "sha256": "387e0f694ba8499d0b23cb9a25118fd5bcb5af565b22bdfc602e2507b5c93e4a",
+          "queued": 9,
+          "started": 9,
+          "finished": 9
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__037.json/attempts/001_20261014T235154/requests.jsonl",
+          "sha256": "269e3ceacb99eb464cac9b689b8e5b8a8179da2efcc90e8765e314af8ec7b7df",
+          "queued": 8,
+          "started": 8,
+          "finished": 8
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__031.json/attempts/001_20261014T215652/requests.jsonl",
+          "sha256": "9385d0cebba4cdd7b334126ea5857f0ced4b0a6c797b44f1b6e51796e3fad6ad",
+          "queued": 11,
+          "started": 11,
+          "finished": 11
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__030.json/attempts/001_20261014T215652/requests.jsonl",
+          "sha256": "630ad3012549ce6cca64ac2bd54f3e3d69a34b83f1aa9cdb6edd824923afb744",
+          "queued": 12,
+          "started": 12,
+          "finished": 12
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__021.json/attempts/001_20261014T234234/requests.jsonl",
+          "sha256": "e2ead33b266aa12fa3761f6d8643928e3f4004f34b9aad218708571534c4d5fe",
+          "queued": 13,
+          "started": 13,
+          "finished": 13
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__011.json/attempts/001_20261015T000349/requests.jsonl",
+          "sha256": "9934295b1eccd30fb33ebd00cbc5edb34660bc87318d3f84a632f9f074288fb3",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        },
+        {
+          "path": "artifacts/detector/live_checks/live100_20261014_full/runs/opt100_20261014_v2/cases/BFCL__000.json/attempts/001_20261014T233328/requests.jsonl",
+          "sha256": "76f7a6b2370f71e62d0e2db62d0631fcb0ea593adb0c231bbac19e354e883d87",
+          "queued": 3,
+          "started": 3,
+          "finished": 3
+        }
+      ]
+    },
+    "live7_20261015_recovery": {
+      "journals": 14,
+      "unique_queued": 114,
+      "unique_started": 114,
+      "unique_finished": 107,
+      "no_finished_observation": 7,
+      "finished_statuses": {
+        "response": 105,
+        "transport_error": 2
+      },
+      "sources": [
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/SmolAgents__043.json/attempts/001_20261015T131055/requests.jsonl",
+          "sha256": "315a92d422fd1b1da5ea360be79322e5a0d8682dea1c6cc250c6a6af3b26c54f",
+          "queued": 6,
+          "started": 6,
+          "finished": 5
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/SmolAgents__043.json/attempts/002_20261015T133747/requests.jsonl",
+          "sha256": "9166885cfc86a06db8fdf747343f3ba2549e576c7a6a8686f37b228337820fbd",
+          "queued": 8,
+          "started": 8,
+          "finished": 8
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/SmolAgents__024.json/attempts/001_20261015T131055/requests.jsonl",
+          "sha256": "53104fc05caf61836d101b43d79305354010acb8fd178788c08e79d30238e930",
+          "queued": 7,
+          "started": 7,
+          "finished": 6
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/SmolAgents__024.json/attempts/002_20261015T133747/requests.jsonl",
+          "sha256": "c4a09fbec7053cf8c6667cdc91476f82f7b6100865ef7d86b8ec9da8c9d12b4e",
+          "queued": 11,
+          "started": 11,
+          "finished": 11
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/OpenManus__064.json/attempts/001_20261015T131055/requests.jsonl",
+          "sha256": "1698a22129341dba28d4284e24970e9edbb5429019be64adff24de6175e54380",
+          "queued": 7,
+          "started": 7,
+          "finished": 6
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/OpenManus__064.json/attempts/002_20261015T133747/requests.jsonl",
+          "sha256": "4ff4cf23eae573a509a4a78eb51eeeda7784cb877bd2aea36cad11b72a8aa96e",
+          "queued": 7,
+          "started": 7,
+          "finished": 7
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/Magentic_One__031.json/attempts/001_20261015T131055/requests.jsonl",
+          "sha256": "64863f25459ba49a6dd1a4a354259be8c21a991121268d49a0e543c47ee62705",
+          "queued": 1,
+          "started": 1,
+          "finished": 0
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/Magentic_One__031.json/attempts/002_20261015T133747/requests.jsonl",
+          "sha256": "47182f69e8e59eba3b394510bc0a097446b3500def114f1b9f5e68bb9657678b",
+          "queued": 8,
+          "started": 8,
+          "finished": 8
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/Camel__012.json/attempts/001_20261015T131055/requests.jsonl",
+          "sha256": "764cb6092b053efbe312b5100c31d151b9ab291eddd1acdeaafcab4932e6940b",
+          "queued": 3,
+          "started": 3,
+          "finished": 2
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/Camel__012.json/attempts/002_20261015T133747/requests.jsonl",
+          "sha256": "acb6b6ee024918ef9c1c231b91a6b53c42457a014ba7604021ebed036a48c11f",
+          "queued": 11,
+          "started": 11,
+          "finished": 11
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/BFCL__122.json/attempts/001_20261015T131055/requests.jsonl",
+          "sha256": "e545c9a33b204a5736e4c329466b7daacdcd8ad028a36ffc7aa25f1a88da5eb3",
+          "queued": 8,
+          "started": 8,
+          "finished": 6
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/BFCL__122.json/attempts/002_20261015T133747/requests.jsonl",
+          "sha256": "08cc0c5ad8fdad0f4521c3ef181769ddbfdb6c35a6bfa19b7a36c2386ad3fea9",
+          "queued": 10,
+          "started": 10,
+          "finished": 10
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/BFCL__052.json/attempts/001_20261015T131055/requests.jsonl",
+          "sha256": "794c25cc20e240b82186b04d77a9c60e160cf15a7035b63b93a05a8cd1eeabe6",
+          "queued": 9,
+          "started": 9,
+          "finished": 9
+        },
+        {
+          "path": "artifacts/detector/live_checks/live7_20261015_recovery/runs/opt7_20261015_recovery/cases/BFCL__052.json/attempts/002_20261015T135927/requests.jsonl",
+          "sha256": "47b07744bc111479f143a15cd053c996dd6478902b4651690575890e9fa555cb",
+          "queued": 18,
+          "started": 18,
+          "finished": 18
+        }
+      ]
+    }
+  },
+  "total_unique_queued": 866,
+  "note": "Queued/started/finished are local observations. Missing finished records do not prove a remote failure and their usage remains unknown. The earlier interrupted 18-case run is excluded."
+}

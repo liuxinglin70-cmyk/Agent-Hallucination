@@ -1,5 +1,7 @@
 # 真实运行前代码排查（检测器 + 自进化框架）
 
+> 历史审计记录：按原日期解释实现、测试和计划；当前合同见[技术文档](../technical-solution.md)，当前结果见[实验日志](../experiment-log.md)。文档迁移时只修订路径与失效链接标记。
+
 - 排查日期：2026-10-12
 - 初次排查基线：`main` @ `6cec2d2`（当时工作区干净）；当前为该 HEAD 加用户修复和本次续修的未提交工作区，源码身份见附八。
 - 排查范围：`detector/` + `evolution/` 的重点运行路径；原轮未完成逐文件深审，实际覆盖见附三。续审另覆盖实验入口、冻结恢复、开发预算、组合准入、治理和真实运行预检。
@@ -1060,7 +1062,7 @@ python scripts/verify.py --scope all
 | Mock smoke / capability-smoke | PASS；准入与 audit 断言、single_shot 路径均通过 |
 | 验证前后源码/配置/测试/协议清单 | PASS；source_unchanged_during_checks 的 exit_code=0，SHA-256 始终为 `039f705adb825d2b7e178b7072060beae72ee35b6f7c54eb400e21174eb41b43` |
 
-证据：[全量 summary](../artifacts/code_quality/039f705adb825d2b7e178b7072060beae72ee35b6f7c54eb400e21174eb41b43/43cca25847de4e2fbafee8672e53d52f/summary.json)、[原始 pytest 日志](../artifacts/code_quality/039f705adb825d2b7e178b7072060beae72ee35b6f7c54eb400e21174eb41b43/43cca25847de4e2fbafee8672e53d52f/pytest.log)、[只读 preflight](../artifacts/code_quality/039f705adb825d2b7e178b7072060beae72ee35b6f7c54eb400e21174eb41b43/43cca25847de4e2fbafee8672e53d52f/review_preflight.json)。这些均为本轮新工件，不覆盖既有验证结果。
+证据：[全量 summary](../../artifacts/code_quality/039f705adb825d2b7e178b7072060beae72ee35b6f7c54eb400e21174eb41b43/43cca25847de4e2fbafee8672e53d52f/summary.json)、[原始 pytest 日志](../../artifacts/code_quality/039f705adb825d2b7e178b7072060beae72ee35b6f7c54eb400e21174eb41b43/43cca25847de4e2fbafee8672e53d52f/pytest.log)、[只读 preflight](../../artifacts/code_quality/039f705adb825d2b7e178b7072060beae72ee35b6f7c54eb400e21174eb41b43/43cca25847de4e2fbafee8672e53d52f/review_preflight.json)。这些均为本轮新工件，不覆盖既有验证结果。
 
 额外执行的确定性反例/反证：A1 引擎健康/不可测两组及排除后覆盖足够的加强反例；A2 真实 Defense 投票→裁决；A3 完整 Fake research 版本超限；A5 健康未决 arm；B2 冲突 note 两组；B3 frozen mismatch；B4 gap 重现；B8 baseline 预算无报告；B9 registry 依赖退休；B10 词法反例和 693 例只读任务普查；C11 合法多点 ID；C14 commit=False；C18 受控协议竞争；另直接执行三项 A4 正常可选预算反证测试；D1 组合目标；D2 repair 计数；D3 持久候选漂移；D4 治理额外 arm；D5 resolution 机会。复现代码通过 stdin 在内存执行，临时案例和工件位于系统临时目录，不新增仓库测试文件。其中第一次 A1 探针未关闭 engine 就清理目录，触发 Windows 文件锁错误；后续正确关闭 engine 的重跑才作为 A1 证据。遗留临时目录 `C:/Users/NUAA/AppData/Local/Temp/tmp82nxerqz` 的删除被工具自动审批拒绝（blocked by policy，未返回具体原因），已保留；其内容不作为审查证据。
 
@@ -1075,7 +1077,7 @@ D1/D2/D4 使用显式 fixture 隔离边界，D3/C18 使用临时工件内容漂�
 
 ### 6.3 两个失败项的归因与局部重跑
 
-两个失败节点局部重跑仍为 **2 failed**（2.55s），不是全量执行顺序导致的一次性失败。重跑 JUnit：[review_failure_recheck.xml](../artifacts/code_quality/039f705adb825d2b7e178b7072060beae72ee35b6f7c54eb400e21174eb41b43/43cca25847de4e2fbafee8672e53d52f/review_failure_recheck.xml)。本轮没有为了通过测试改动源码或夹具。
+两个失败节点局部重跑仍为 **2 failed**（2.55s），不是全量执行顺序导致的一次性失败。重跑 JUnit：[review_failure_recheck.xml](../../artifacts/code_quality/039f705adb825d2b7e178b7072060beae72ee35b6f7c54eb400e21174eb41b43/43cca25847de4e2fbafee8672e53d52f/review_failure_recheck.xml)。本轮没有为了通过测试改动源码或夹具。
 
 | 失败节点 | 实际行为 | 归因与优化 |
 |---|---|---|
@@ -1134,11 +1136,11 @@ P1 内先明确合同再修改消费者，避免只改一处判断后暴露相�
 
 完整离线命令 `python scripts/verify.py --scope all` 已结束，总状态 **PASS**；2026-10-12 18:02:11–18:43:50（Asia/Shanghai）。**2321 passed、0 failed、0 error、0 skipped**，code_only/local_data/platform 全部执行，网络护栏为 loopback_only。18 项检查全部通过，包括源码/依赖审计、693 例数据完整性、三 CLI 注册、能力准入、metamorphic、sandbox、Mock smoke 的审计/准入及 single_shot 断言。验证前后源码/配置/测试/协议清单一致，SHA-256 为 `42e41a9444ae771427c2e371e7d756f857cc8a57bb6895190e99f7a053a270cc`。
 
-证据：[全量 summary](../artifacts/code_quality/42e41a9444ae771427c2e371e7d756f857cc8a57bb6895190e99f7a053a270cc/3783f48fbc6248bd8698a2c6469d2549/summary.json)、[pytest 日志](../artifacts/code_quality/42e41a9444ae771427c2e371e7d756f857cc8a57bb6895190e99f7a053a270cc/3783f48fbc6248bd8698a2c6469d2549/pytest.log)、[JUnit](../artifacts/code_quality/42e41a9444ae771427c2e371e7d756f857cc8a57bb6895190e99f7a053a270cc/3783f48fbc6248bd8698a2c6469d2549/pytest.xml)、[源码清单](../artifacts/code_quality/42e41a9444ae771427c2e371e7d756f857cc8a57bb6895190e99f7a053a270cc/3783f48fbc6248bd8698a2c6469d2549/source_manifest.json)。此前因新增反例中断的验证已标为 interrupted_for_source_update，不计入验收。本轮 R1–R4 的已复现遗漏经修复、相关回归及全量检查通过，关闭；修复前附六的两项失败未在当前源码重现。
+证据：[全量 summary](../../artifacts/code_quality/42e41a9444ae771427c2e371e7d756f857cc8a57bb6895190e99f7a053a270cc/3783f48fbc6248bd8698a2c6469d2549/summary.json)、[pytest 日志](../../artifacts/code_quality/42e41a9444ae771427c2e371e7d756f857cc8a57bb6895190e99f7a053a270cc/3783f48fbc6248bd8698a2c6469d2549/pytest.log)、[JUnit](../../artifacts/code_quality/42e41a9444ae771427c2e371e7d756f857cc8a57bb6895190e99f7a053a270cc/3783f48fbc6248bd8698a2c6469d2549/pytest.xml)、[源码清单](../../artifacts/code_quality/42e41a9444ae771427c2e371e7d756f857cc8a57bb6895190e99f7a053a270cc/3783f48fbc6248bd8698a2c6469d2549/source_manifest.json)。此前因新增反例中断的验证已标为 interrupted_for_source_update，不计入验收。本轮 R1–R4 的已复现遗漏经修复、相关回归及全量检查通过，关闭；修复前附六的两项失败未在当前源码重现。
 
-冻结源码的 baseline/evolution 两阶段只读预检均 **READY，0 blocker、各 1 cost warning**：[baseline](../artifacts/code_quality/review-followup-20261012-e3470609/verified_preflight_baseline.json)、[evolution](../artifacts/code_quality/review-followup-20261012-e3470609/verified_preflight_evolution.json)。预检生产源码摘要为 `b095d1fb028a31cc2ee65ebb9621219bde57535760eef1e2c5130f506fa48ecd`；它与全量验证清单的文件范围不同，两者分别绑定本次相同工作区。693 例标签及 split、超时/周期预算、凭证存在性、无 DETECTOR 环境覆盖、干净工作目录、路径余量、三个定罪谓词校准和四 runner 准入均通过。
+冻结源码的 baseline/evolution 两阶段只读预检均 **READY，0 blocker、各 1 cost warning**：[baseline](../../artifacts/code_quality/review-followup-20261012-e3470609/verified_preflight_baseline.json)、[evolution](../../artifacts/code_quality/review-followup-20261012-e3470609/verified_preflight_evolution.json)。预检生产源码摘要为 `b095d1fb028a31cc2ee65ebb9621219bde57535760eef1e2c5130f506fa48ecd`；它与全量验证清单的文件范围不同，两者分别绑定本次相同工作区。693 例标签及 split、超时/周期预算、凭证存在性、无 DETECTOR 环境覆盖、干净工作目录、路径余量、三个定罪谓词校准和四 runner 准入均通过。
 
-唯一警告来自历史 cost model：workers=8 时，全量一遍工作下限 21.3h、模拟 p50 22.2h、效率调整 28.0h、长尾下限 12.5h，约 18,628,941 tokens。这是历史模型估算，不是本次真实测量。READY 表示本地启动资格满足，不证明远端 endpoint、模型、实时配额或真实吞吐。续修范围与证据汇总见 [完成核验](../artifacts/code_quality/review-followup-20261012-e3470609/followup_completion_audit.json)。
+唯一警告来自历史 cost model：workers=8 时，全量一遍工作下限 21.3h、模拟 p50 22.2h、效率调整 28.0h、长尾下限 12.5h，约 18,628,941 tokens。这是历史模型估算，不是本次真实测量。READY 表示本地启动资格满足，不证明远端 endpoint、模型、实时配额或真实吞吐。续修范围与证据汇总见 [完成核验](../../artifacts/code_quality/review-followup-20261012-e3470609/followup_completion_audit.json)。
 
 本轮未修改原始案例/标签、既有冻结协议或历史 ledger；没有替用户发起真实基准或进化轮次。所有最终结果均绑定当前工作区源码。
 
@@ -1175,14 +1177,14 @@ P1 内先明确合同再修改消费者，避免只改一处判断后暴露相�
 
 本地 evaluate：检测 4/5 与标签一致，TP=2、TN=2、FP=0、FN=1；正例召回 2/3，精确率 2/2。严格责任步号命中 0/3，需分别看 content/action 目标；这五例不能代表全量准确率。OpenManus/085 的 Judge 记录引用来源位置不匹配的合同警告，最终状态 ok 且权威，原始警告已保留。漏检与两例步号差异是需后续复核的效果观察，尚未归因为实现缺陷；本轮未改代码/提示词、未重跑。
 
-证据：[五例报告](../artifacts/detector/live_checks/live5_20261012_185056/report.md)、[完整 evaluate](../artifacts/detector/live_checks/live5_20261012_185056/runs/live5_20261012_185056/evaluation.json)、[运行 summary](../artifacts/detector/live_checks/live5_20261012_185056/runs/live5_20261012_185056/summary.json)、[请求清单](../artifacts/detector/live_checks/live5_20261012_185056/request_manifest.json)、[日志](../artifacts/detector/live_checks/live5_20261012_185056/batch.log)。运行前后源码清单及五个 raw 案例摘要均一致。未执行自进化。
+证据：[五例报告](../../artifacts/detector/live_checks/live5_20261012_185056/report.md)、[完整 evaluate](../../artifacts/detector/live_checks/live5_20261012_185056/runs/live5_20261012_185056/evaluation.json)、[运行 summary](../../artifacts/detector/live_checks/live5_20261012_185056/runs/live5_20261012_185056/summary.json)、[请求清单](../../artifacts/detector/live_checks/live5_20261012_185056/request_manifest.json)、[日志](../../artifacts/detector/live_checks/live5_20261012_185056/batch.log)。运行前后源码清单及五个 raw 案例摘要均一致。未执行自进化。
 
 
 ---
 
 ## 附十：定位差异与疑惑度机制复核
 
-针对本轮两条正例和一个 FN 的详细分析见 [定位分析](../artifacts/detector/live_checks/live5_20261012_185056/localization_analysis.md)。Octotools gold=2/pred=3、OpenManus gold=1/pred=2 都是外部错误来源位置与助手首次采纳位置不同：当前 LOCALIZATION_LAW 明确排除 tool observation，本轮 Judge/Tracer/Defense 一致采用助手位置，没有编号平移或裁决覆盖。SmolAgents 未执行 Tracer；三票高置信 clean 使召回 not_needed，且 gold 的几何说明存在需要独立复核的内部矛盾，不能据此直接认证模型答案 27。
+针对本轮两条正例和一个 FN 的详细分析见 [定位分析](../../artifacts/detector/live_checks/live5_20261012_185056/localization_analysis.md)。Octotools gold=2/pred=3、OpenManus gold=1/pred=2 都是外部错误来源位置与助手首次采纳位置不同：当前 LOCALIZATION_LAW 明确排除 tool observation，本轮 Judge/Tracer/Defense 一致采用助手位置，没有编号平移或裁决覆盖。SmolAgents 未执行 Tracer；三票高置信 clean 使召回 not_needed，且 gold 的几何说明存在需要独立复核的内部矛盾，不能据此直接认证模型答案 27。
 
 本轮 causal_audit.mode=off、negative_feedback=false；五例无 causal_diagnostics，两个正例 causal_context=null，25 次请求没有因果审计调用。因此疑惑度机制未参与这次真实检测。当前 semantic_proxy 是离散证据风险排序，真实 teacher-forced PPL 后端仍 unsupported。另在网络护栏下零 provider 调用重建画像/正式诊断，发现 Octotools/SmolAgents 缺 role 导致信号跳过，SmolAgents 代码事件还超过 6000 字符预算；OpenManus 无可用局部算术证书。两条正例即使使用现有 tracer_context 诊断函数仍 context=None，单开开关不能证明收益。
 
@@ -1213,9 +1215,9 @@ P1 内先明确合同再修改消费者，避免只改一处判断后暴露相�
 
 最终完整验收 **PASS**，源码 SHA-256 `45fa48b37fee0dc9ced12b761985ce78d05f9b45f89646c9f6fa6d5064fb484e`。2026-10-12 20:30:24–20:46:46（Asia/Shanghai），**2343 passed、0 failed、0 error、0 skipped**，18 项检查全部通过，source_unchanged_during_checks=0。通过标准库调度器按测试文件划分四组，调用原 scripts.verify 的全部检查；完整收集/执行数量一致，实际命令与分组证据保留，不声称是单一 pytest 进程。
 
-证据：[最终 summary](../artifacts/code_quality/45fa48b37fee0dc9ced12b761985ce78d05f9b45f89646c9f6fa6d5064fb484e/f657f1cab7bd44e68116e2a81859714d/summary.json)、[实际分组命令/数量](../artifacts/code_quality/45fa48b37fee0dc9ced12b761985ce78d05f9b45f89646c9f6fa6d5064fb484e/f657f1cab7bd44e68116e2a81859714d/pytest_execution.json)、[收集清单](../artifacts/code_quality/45fa48b37fee0dc9ced12b761985ce78d05f9b45f89646c9f6fa6d5064fb484e/f657f1cab7bd44e68116e2a81859714d/collection.log)、[合并 JUnit](../artifacts/code_quality/45fa48b37fee0dc9ced12b761985ce78d05f9b45f89646c9f6fa6d5064fb484e/f657f1cab7bd44e68116e2a81859714d/pytest.xml)、[调度脚本](../artifacts/code_quality/localization-risk-20261012/parallel_verification.py)。初次串行验收为 2339 passed/3 failed：新 localization_record 对不含 position 的公开简化 packet 读取过严已修复；实验测试改为明确的 off fixture 与 shadow 差异，51 项复核通过，新增简化 packet 的未知位置反例。初次并行尝试因为 basetemp 父目录不存在产生 fixture setup 错误，其 FAIL 工件和环境归因保留，不作为通过证据；最终使用独立系统临时目录四组全部通过。
+证据：[最终 summary](../../artifacts/code_quality/45fa48b37fee0dc9ced12b761985ce78d05f9b45f89646c9f6fa6d5064fb484e/f657f1cab7bd44e68116e2a81859714d/summary.json)、[实际分组命令/数量](../../artifacts/code_quality/45fa48b37fee0dc9ced12b761985ce78d05f9b45f89646c9f6fa6d5064fb484e/f657f1cab7bd44e68116e2a81859714d/pytest_execution.json)、[收集清单](../../artifacts/code_quality/45fa48b37fee0dc9ced12b761985ce78d05f9b45f89646c9f6fa6d5064fb484e/f657f1cab7bd44e68116e2a81859714d/collection.log)、[合并 JUnit](../../artifacts/code_quality/45fa48b37fee0dc9ced12b761985ce78d05f9b45f89646c9f6fa6d5064fb484e/f657f1cab7bd44e68116e2a81859714d/pytest.xml)、[调度脚本](../../artifacts/code_quality/localization-risk-20261012/parallel_verification.py)。初次串行验收为 2339 passed/3 failed：新 localization_record 对不含 position 的公开简化 packet 读取过严已修复；实验测试改为明确的 off fixture 与 shadow 差异，51 项复核通过，新增简化 packet 的未知位置反例。初次并行尝试因为 basetemp 父目录不存在产生 fixture setup 错误，其 FAIL 工件和环境归因保留，不作为通过证据；最终使用独立系统临时目录四组全部通过。
 
-最终 [baseline 预检](../artifacts/code_quality/localization-risk-20261012/preflight_final_baseline.json)、[evolution 预检](../artifacts/code_quality/localization-risk-20261012/preflight_final_evolution.json) 均 READY，0 blocker、各 1 历史成本 warning。真实十例已于验收通过后启动，run_id=live10_20261012_riskv2，workers=10；用户已中止两条长尾，八条完整结果及后续修复见下节。
+最终 [baseline 预检](../../artifacts/code_quality/localization-risk-20261012/preflight_final_baseline.json)、[evolution 预检](../../artifacts/code_quality/localization-risk-20261012/preflight_final_evolution.json) 均 READY，0 blocker、各 1 历史成本 warning。真实十例已于验收通过后启动，run_id=live10_20261012_riskv2，workers=10；用户已中止两条长尾，八条完整结果及后续修复见下节。
 
 ### 11.3 十例真实检测中止统计与长尾复核
 
@@ -1294,5 +1296,5 @@ BFCL/002、BFCL/091 两个漏检都没有阳性 hearing。当前风险上下文�
 
 十例运行前的全量验收 2343 项/18 检查通过，对应当时源码；本轮修复后未重新执行全套，不能把前次结果冒充当前全量验收。真实运行 manifest 的 detector source_identity 为 `de5965704277b73979c9db015b05fd5debfc2083c0aa0a635034c5550c8ce50c`；当前修复后的 detector source_identity 为 `1ad3326b109297fccb02cb57913af085f8be0cd1d187f7966a80a19f23a8c1f8`。新修复不会改变八条已测结果，也未做真实重跑证明长尾已消失。
 
-证据：[中止记录](../artifacts/detector/live_checks/live10_20261012_riskv2/stop_record.json)、[已完成八例评分](../artifacts/detector/live_checks/live10_20261012_riskv2/completed_evaluation.json)、[原十例覆盖评分](../artifacts/detector/live_checks/live10_20261012_riskv2/requested_evaluation.json)、[请求清单](../artifacts/detector/live_checks/live10_20261012_riskv2/request_manifest.json)、[中止汇总](../artifacts/detector/live_checks/live10_20261012_riskv2/interrupted_summary.json)、[详细执行/诊断记录](../artifacts/detector/live_checks/live10_20261012_riskv2/interrupted_details.json)、[长尾回归 JUnit](../artifacts/detector/live_checks/live10_20261012_riskv2/long_tail_regression.xml)、[修复验收身份](../artifacts/detector/live_checks/live10_20261012_riskv2/long_tail_verification.json)、[原批处理日志](../artifacts/detector/live_checks/live10_20261012_riskv2/batch.log)。
+证据：[中止记录](../../artifacts/detector/live_checks/live10_20261012_riskv2/stop_record.json)、[已完成八例评分](../../artifacts/detector/live_checks/live10_20261012_riskv2/completed_evaluation.json)、[原十例覆盖评分](../../artifacts/detector/live_checks/live10_20261012_riskv2/requested_evaluation.json)、[请求清单](../../artifacts/detector/live_checks/live10_20261012_riskv2/request_manifest.json)、[中止汇总](../../artifacts/detector/live_checks/live10_20261012_riskv2/interrupted_summary.json)、[详细执行/诊断记录](../../artifacts/detector/live_checks/live10_20261012_riskv2/interrupted_details.json)、[长尾回归 JUnit](../../artifacts/detector/live_checks/live10_20261012_riskv2/long_tail_regression.xml)、[修复验收身份](../../artifacts/detector/live_checks/live10_20261012_riskv2/long_tail_verification.json)、[原批处理日志](../../artifacts/detector/live_checks/live10_20261012_riskv2/batch.log)。
 

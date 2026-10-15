@@ -1,0 +1,2724 @@
+{
+  "run_id": "opt100_20261014_v2",
+  "metrics": {
+    "decisive": 93,
+    "unresolved": 7,
+    "completion": 0.93,
+    "decisive_accuracy": 0.7741935483870968,
+    "all_case_accuracy": 0.72,
+    "tp": 38,
+    "fp": 4,
+    "fn": 17,
+    "tn": 34,
+    "positive_precision": 0.9047619047619048,
+    "positive_recall": 0.6909090909090909,
+    "positive_f1": 0.7835051546391754,
+    "macro_precision": 0.7857142857142857,
+    "macro_recall": 0.7928229665071771,
+    "macro_f1": 0.7737750492297,
+    "authoritative": 93,
+    "degraded": 6,
+    "degraded_disagreeing": 2,
+    "terminal_metrics": {
+      "decisive": 99,
+      "unresolved": 1,
+      "completion": 0.99,
+      "decisive_accuracy": 0.7676767676767676,
+      "all_case_accuracy": 0.76,
+      "tp": 42,
+      "fp": 4,
+      "fn": 19,
+      "tn": 34,
+      "positive_precision": 0.9130434782608695,
+      "positive_recall": 0.6885245901639344,
+      "positive_f1": 0.7850467289719626,
+      "macro_precision": 0.7772764561115668,
+      "macro_recall": 0.7916307161345988,
+      "macro_f1": 0.766149738112355
+    },
+    "provider_unresolved": 1,
+    "no_terminal_decision": 1,
+    "requested_cases": 100,
+    "found_results": 100,
+    "missing_cases": 0,
+    "step_localization": {
+      "target": "dataset_first_error_event.v1",
+      "step_unit": "trajectory_event_position",
+      "unmapped_annotations": 0,
+      "target_mismatch_rows": 0,
+      "n": 62,
+      "hits": 23,
+      "accuracy": 0.3709677419354839,
+      "by_step_kind": {
+        "content_step": {
+          "n": 22,
+          "hits": 15,
+          "accuracy": 0.6818181818181818
+        },
+        "action_step": {
+          "n": 20,
+          "hits": 8,
+          "accuracy": 0.4
+        },
+        "unclassified": {
+          "n": 20,
+          "hits": 0,
+          "accuracy": 0.0
+        }
+      },
+      "note": "action-step and content-step accuracy answer different questions; read them apart, never as one rate"
+    }
+  },
+  "rows": [
+    {
+      "case": "Magentic_One/061.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 43,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/023.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/085.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 5,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 5,
+        "position": 5,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/115.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 8,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 8,
+        "position": 8,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/087.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 12,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 12,
+        "position": 12,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/031.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/129.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/022.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 7,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/030.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 12,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 12,
+        "position": 12,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 12,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/155.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 6,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 6,
+        "position": 6,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 9,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/058.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/011.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/012.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/040.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/078.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/001.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/065.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/011.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/077.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/027.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/114.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 7,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/072.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/090.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/091.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/022.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/042.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/021.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/020.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/118.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 5,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 5,
+        "position": 5,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/010.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/028.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/043.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/060.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 9,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/055.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/025.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 6,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 6,
+        "position": 6,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/043.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "OpenDeepSearch/071.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/066.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/071.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/056.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/055.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/102.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/065.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/088.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/027.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/043.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/074.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/073.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/022.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/043.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/097.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/047.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 6,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/088.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/076.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/083.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/052.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "OpenManus/064.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "OpenDeepSearch/040.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/086.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/000.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/023.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/016.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/034.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/037.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/095.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/122.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": false,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "BFCL/055.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/021.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 9,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 9,
+        "position": 9,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 9,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/016.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/032.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/072.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/037.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/090.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/051.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/011.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/055.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/085.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/024.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 6,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 6,
+        "position": 6,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 7,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "OpenDeepSearch/007.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/031.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 8,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 8,
+        "position": 8,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 8,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/071.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/150.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/062.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/014.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/048.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/068.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/144.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/036.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/006.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/125.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/076.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/024.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 6,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/068.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/031.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": null,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "unresolved",
+      "authority": "invalid"
+    },
+    {
+      "case": "OpenDeepSearch/087.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/090.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/084.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/130.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 7,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 7,
+        "position": 7,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 10,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/127.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/012.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 18,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 18,
+        "position": 18,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 28,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only"
+    }
+  ],
+  "errors": [
+    {
+      "case": "BFCL/115.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "ZETA added to watchlist; both orders' details retrieved and shown (12345 Buy AAPL completed, 12446 Sell GOOG pending); pending order 12446 cancelled; account overview (ID 12345, balance $10000, card 1974202140965533) reported; logged in as USR001 and message sent to USR003 stating strategy shift and current balance $10000.",
+        "correct_result": "Same as delivered: watchlist addition of Zeta Corp (ZETA), review of the substantial pending order, cancellation of order 12446, account overview with balance and card number, login as USR001, and notification to USR003 with the template-like message including the $10000 balance.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Turn 1: add Zeta Corp stock to the watchlist (done: symbol ZETA added, observation shows ZETA in watchlist)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 2: retrieve details of the substantial order (done: order history fetched and details of 12345 and 12446 shown; 12446 Sell GOOG $14,202.80 pending is the substantial order)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 3: cancel the reviewed order with uncertain outcome (done: cancel_order 12446 returned status Cancelled)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 4: share account overview including balances and card numbers (done: account_id 12345, balance 10000.0, binding_card 1974202140965533 reported)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 4: log in as USR001 (done: message_login USR001 succeeded)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 4: send message to USR003 with content like the given template including the $10000 balance (done: message sent with 'Current balance is $10000', matching the 'should be like' approximate template and the observed balance)"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "BFCL/087.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "OMEG added to watchlist (watchlist: [NVDA, OMEG]); watchlist contents reported; buy order for 150 OMEG shares at $457.23 placed (order 12446, status Pending/Open); comprehensive order breakdown given (total $68,584.50, status Open); note sent to Jane (USR002) containing the required verbatim message plus accurate order details and signed USR001.",
+        "correct_result": "Add Omega Industries to the watchlist, report the watchlist, execute a 150-share order for OMEG at the present market price ($457.23), provide a full order breakdown, and send Jane (USR002) a note containing verbatim 'Dear Customer Service, please confirm the successful execution of my order for 150 shares of Omega Industries at the current market price, and verify the order details under reference ID USR002. Thank you.' with all relevant order information, referencing USR002 and the user's id USR001.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Add stock 'Omega Industries' to the user's watchlist (symbol lookup then add)."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Furnish the current watchlist contents after the addition."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Execute an order for 150 shares of OMEG at the present market value ($457.23 per get_stock_info)."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Provide a comprehensive breakdown of the new order."
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "The note must contain the message 'Dear Customer Service, please confirm the successful execution of my order for 150 shares of Omega Industries at the current market price, and verify the order details under reference ID USR002. Thank you.'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Send the note to Jane (user id USR002 per get_user_id), including reference ID USR002, the user's id USR001, and all relevant order information."
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "BFCL/129.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Authentication succeeded with read_write scope; balance for card_4455 reported as $1500.75; average of the five purchases reported as $71.52.",
+        "correct_result": "Authentication with client_520/rise_to_sky/token990125 granting read_write; current balance of card_4455 retrieved; mean of 45.99, 78.25, 102.50, 38.75, 92.10 = 71.518 (≈ $71.52).",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Authenticate travel account using client_id 'client_520', secret 'rise_to_sky', refresh token 'token990125', grant_type read_write, first name Michael, last name Thompson"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Retrieve the current balance for credit card 'card_4455'"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Compute the mean of purchases 45.99, 78.25, 102.50, 38.75, 92.10 (= 71.518)"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "Magentic_One/078.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Photon momentum p ≈ 3.07×10⁻³¹ kg·m/s for the pure rotational J=0→1 transition within v=0 (transition wavenumber ≈ 4.6358 cm⁻¹, λ ≈ 2.16 mm, ν ≈ 139 GHz), with the non-rigid rotor centrifugal distortion correction included and recoil shown negligible",
+        "correct_result": "The lowest-energy allowed excitation from the ground state (v=0, J=0) of a heteronuclear diatomic is the pure rotational J=0→1 transition within v=0; with μ = 40/22 amu = 3.019162e-27 kg, I = 1.207665e-46 kg·m², B̃ = h/(8π²cI) = 2.317924 cm⁻¹, D̃ ≈ 4B̃³/ω̃² = 1.104686e-05 cm⁻¹, ΔẼ = 2B̃ − 4D̃ = 4.635804 cm⁻¹, giving p = ΔE/c = h·ΔẼ[m⁻¹] ≈ 3.07×10⁻³¹ kg·m/s",
+        "basis": "derivation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The photon momentum required to promote the molecule from its fundamental state to the next state with the lowest possible energy, using Mx=20 amu, My=2 amu, R=2 Å, ω=4e14 rad/s under the non-rigid rotor model"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Identify the lowest-energy dipole-allowed transition from the ground rovibrational state (pure rotational J=0→1 within v=0 for a heteronuclear diatomic, ΔẼ = 2B̃ − 4D̃) and compute the corresponding photon momentum"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "Camel/001.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Normalized eigenvector of P·n for eigenvalue +ħ/2 at θ=1.0 rad, delivered as the 2-element complex array [0.87758256+0.j, 0.47942554+0.j], together with parametrized code that computes the eigenvector for any θ.",
+        "correct_result": "The normalized eigenvector of (ħ/2)[[cosθ, sinθ],[sinθ, -cosθ]] for eigenvalue +ħ/2 is (cos(θ/2), sin(θ/2)); at θ=1.0 rad this evaluates to (0.87758256, 0.47942554), exactly matching the delivered values (unit norm verified: 0.87758256² + 0.47942554² = 1).",
+        "basis": "derivation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Define the operators as the given Pauli matrices scaled by ħ/2 and construct P·n = Px sinθ + Pz cosθ for n = (sinθ, 0, cosθ) in the x-z plane"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Find the normalized eigenvector of P·n corresponding to the eigenvalue +ħ/2"
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "Output the elements of the normalized eigenvector as a 2-element complex-valued numpy array (or similar format)"
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 3,
+        "evidence_refs": [
+          "event_001",
+          "event_003",
+          "event_005",
+          "event_006"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: event_003's tool arguments fix the delivered computation to a single case — '# Example: generic theta (symbolic for all theta impossible with numpy, so let\\'s pick theta=1.0 rad)' followed by 'v = compute_eigenvector(1.0)' — whereas the task contract (event_001) requires the eigenvector of P·n with n=(sinθ,0,cosθ) 'for an arbitrary angle θ' and the question asks for 'an arbitrary direction n lying in the x-z plane'. From the task\\'s own matrices, P·n=(ℏ/2)[[cosθ,sinθ],[sinθ,-cosθ]], whose +ℏ/2 eigenvector is (cos(θ/2), sin(θ/2)); the executed output (event_005) and delivered answer (event_006) give only [0.87758256+0.j, 0.47942554+0.j], which is exactly that formula evaluated at θ=1.0 (cos 0.5, sin 0.5). The general θ-dependent elements are never stated anywhere in the trajectory, and event_006 re-scopes the answer to 'θ = 1.0 rad', deferring other angles to manual code reuse. RELEVANCE TEST: the scoping decision introduced in event_003\\'s code propagates unchanged through the successful run (event_005) into the delivered answer (event_006); no later event corrects it. Correcting event_003 to compute and deliver the general arbitrary-θ eigenvector would satisfy the contract — the task\\'s 'or similar format' clause permits stating the formula, and the agent\\'s own prose channel was available for it — making the delivered result correct. The deviation is therefore real and causally material, not a harmless instance label or a corrected intermediate error."
+      }
+    },
+    {
+      "case": "OpenDeepSearch/011.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "There are 4 wallpaper groups with a point group of order 2: p2, pm, pg, and cm.",
+        "correct_result": "4 wallpaper groups have a point group of order 2: p2 (point group 2), and pm, pg, cm (point group m); all other wallpaper groups have point groups of order 1, 3, 4, 6, 8, or 12.",
+        "basis": "world_knowledge",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The count of wallpaper groups whose point group has order 2 (correct value: 4, namely p2, pm, pg, cm)"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenDeepSearch/027.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "B. It didn't have any production funding from FINAS (National Film Development Corporation Malaysia), but it becomes internationally renowned.",
+        "correct_result": "B. It didn't have any production funding from FINAS (National Film Development Corporation Malaysia), but it becomes internationally renowned.",
+        "basis": "observation",
+        "confidence": "low",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The final answer must select the correct choice (A-E) identifying the most important reason Snow In Midsummer is significant for Malaysians."
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "BFCL/114.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 7,
+        "hallucination_reason": "The delivered answer for turn 3 claims ZETA is 'currently trading just above its 20-day MA', but the trajectory's own observation (event_006) shows price 150.0 is below MA(20) 150.2, making the delivered statement a factual result error.",
+        "delivered_result": "Stock details for ZETA (price $150.00, +0.05%, volume 1.5M shares, MA(5) $149.50, MA(20) $150.20) summarized with the claim that the stock is trading just above its 20-day MA with a minor upward trend.",
+        "correct_result": "The same observed stock details, but with the correct summary that the price of $150.00 is trading just below its 20-day MA of $150.20.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [
+          "event_006",
+          "event_007"
+        ],
+        "root_cause": {
+          "step": 7,
+          "quote": "The stock is currently trading just above its 20-day MA",
+          "referent": "The stock is trading just below its 20-day MA (observed price 150.0 vs MA(20) 150.2)"
+        },
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Turn 1: add Zeta Corp to the user's watchlist"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 2: report the stocks currently on the watchlist"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 3: fetch and report fresh details for ZETA"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 4: place a buy order for 50 shares of ZETA at the current market price"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Turn 5: top up the trading account with $5,000"
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 7,
+        "evidence_refs": [
+          "event_006",
+          "event_007"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: event_007 delivers for turn 3 the summary 'The stock is currently trading just above its 20-day MA, with a minor upward trend.' The trajectory's own tool observation at event_006 (get_stock_info for ZETA) returned {'price': 150.0, ..., 'MA(20)': 150.2}. Both values come from the same tool response for the same stock, so 150.0 < 150.2 means the price is just BELOW the 20-day MA, not above. The delivered claim contradicts the observed data the agent itself had — a RESULT ERROR in the turn-3 deliverable, not a formatting or process issue. The comparison requires no external fact or unit inference; it is direct arithmetic on the recorded observation, and no conflicting observation exists. RELEVANCE TEST: event_007 is itself the required deliverable for turn 3, and no later event corrects the 'just above' claim (event_009 addresses only the buy order). The error did not propagate to other deliverables — the order at event_008 used the observed price 150.0, consistent with the data — so correcting the summary at event_007 renders the turn-3 deliverable correct while leaving the other shown deliverables (watchlist listing at event_005, order placement at event_008/009) intact. Both tests pass."
+      }
+    },
+    {
+      "case": "BFCL/072.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Fuel tank filled with 30 gallons (fuelLevel 35.0 observed), all four doors locked (0 remaining unlocked), parking brake engaged before engine start, engine started with ignitionMode 'START' after pressing the brake pedal (engineState running), brake pedal and parking brake then released, tire pressure verified post-engine start (all tires 28.0 psi, insufficient), and navigation set to 456 Oakwood Avenue, Rivermist, 83214.",
+        "correct_result": "Refuel with 30 gallons, secure all doors, set the parking brake, start the engine with ignition mode 'START' (preconditions satisfied to avoid errors), then post-engine start verify tire pressure and, since 28.0 psi < 30.0 psi, proceed to the tire shop at 456 Oakwood Avenue, Rivermist, 83214.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Refuel the vehicle with 30 gallons (fillFuelTank fuelAmount=30)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Secure all doors before engine start"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Set (engage) the parking brake before engine start to avoid errors"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Start the engine with ignitionMode 'START'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Post-engine start, verify tire pressure"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Tire pressure insufficiency threshold: less than 30.0 psi"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "If tire pressure < 30.0 psi, navigate to the tire shop at 456 Oakwood Avenue, Rivermist, 83214"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenDeepSearch/042.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "According to the 2011 Census of India, Bure Nangal village in Batala had a total of 1,084 houses.",
+        "correct_result": "The number of houses in Bure Nangal village, Batala, according to the 2011 Census of India; the trajectory's sole search observation reports 1,084 houses, and the final answer faithfully restates that figure with no conflicting observation in the record.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The number of houses in the village of Bure Nangal in Batala according to the 2011 Census of India"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Look up the 2011 Census of India house count for Bure Nangal, Batala (matching location and source) before delivering the answer"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "BFCL/118.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Price of Omega Industries found as $457.23 via get_symbol_by_name (OMEG) and get_stock_info; tweet posted (ID 1) with exact content 'Omega Industries is skyrocketing at $457.23 per share! The tech industry evolution is electrifying, and we are just getting started.', tag #TechBoom, and mention @industryexperts; then @technewsworld added via mention tool on tweet 1 with 'Users mentioned successfully' observed.",
+        "correct_result": "Find the price, post the tweet with the exact template content filled with the price, include #TechBoom and @industryexperts, and then tag @technewsworld on the tweet per turn 2.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Find the price of Omega Industries"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Tweet content 'Omega Industries is skyrocketing at ${price} per share! The tech industry evolution is electrifying, and we are just getting started.' with price filled in"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Include #TechBoom as a tag and @industryexperts as a mention in the tweet"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Tag @technewsworld on the existing tweet (turn 2)"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenDeepSearch/043.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "In 2014, Reza Aslan received the \"Great Immigrants\" award from the Carnegie Corporation of New York; he was also nominated for the Andrew Carnegie Medal for Excellence in Nonfiction that same year.",
+        "correct_result": "The award Reza Aslan received in 2014: the \"Great Immigrants\" award from the Carnegie Corporation of New York.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Identify the award Reza Aslan received in 2014"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Submit a final answer naming that award"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "Magentic_One/060.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Stanza number 2 — the second stanza of Audre Lorde's 'Father Son and Holy Ghost' is the stanza in which some lines are indented.",
+        "correct_result": "Stanza number 2 — the trajectory retrieved the poem's full formatted text from the Poetry Foundation (events 005/007 cover every line of the poem), and the only formatting analysis in the record (event_009, based on the page screenshots) attributes the indented lines to the second stanza; the extracted poem text neither contradicts this (the text extraction normalizes whitespace and does not preserve indentation or stanza breaks) nor does any observation or establishable knowledge in the record support a different stanza number, so the delivered answer stands as the required result.",
+        "basis": "observation",
+        "confidence": "low",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The number of the stanza in Audre Lorde's poem 'Father Son and Holy Ghost' in which some lines are indented (a single stanza number, derived from the poem's actual formatted text)."
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 9,
+        "evidence_refs": [
+          "event_009",
+          "event_005",
+          "event_007"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "No external evidence snapshot is provided; the single-stanza reading rests on the trajectory's own Poetry Foundation text extractions, which the Coder's quoted formatting contradicts. The screenshots the Coder appeals to are not textually verifiable, but the full poem is covered by the two overlapping viewports and their recorded text does not show the structure the Coder asserts.",
+        "reason": "CONTENT TEST: At event_009 the Coder states 'the poem is visually broken into distinct stanzas, each separated by a blank line', quotes stepped indentation ('one half turn each night / and he would come / drabbled with the world's business' at increasing indents), claims indentation is 'clearly present in the second stanza only', and answers 'Stanza number 2'. The shown observations contradict this: events 005 and 007 together cover the entire poem (the lines 'Each week a different woman / regular as his one quick glass' overlap across the two viewports, through the copyright line), and the recorded text is one continuous run of lines with an identical single leading space on every line after the first — including exactly at the Coder's claimed stanza boundaries ('as we pass.'→'Each week a different woman', 'but one.'→'My father died in silence', '...that year me.'→'Lest I go into dust') — with no blank lines, no flush stanza-initial lines after line 1, and the same leading-space indentation present in the Coder's 'stanzas' 3, 4 and 5 (' pulls up the grass his stillness grows', ' loving creation', ' Lest I go into dust'). The Coder's stepped-indentation quotation appears nowhere in the extraction, and its 'fifth stanza' merges two separate recorded lines ('Lest I go into dust' / 'I have not ever seen my father's grave.'). The record therefore supports a single continuously indented stanza, making the correct referent stanza 1, so the five-stanza division and stanza-2 localization are fabricated and the delivered answer at event_010 ('the second stanza') is wrong. RELEVANCE TEST: event_010 merely repeats the Coder's conclusion ('the stanza that contains indented lines is the second stanza'); correcting event_009 to the single-stanza/stanza-1 reading propagates directly to the sole deliverable, making it correct, and no later correction exists."
+      }
+    },
+    {
+      "case": "Magentic_One/025.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Anugrah Narayan Sinha became the Deputy Premier (Deputy Chief Minister) cum Finance Minister of Bihar province on April 2, 1946.",
+        "correct_result": "2 April 1946 — the date shown in the Wikipedia infobox observed in the trajectory ('1st Deputy Chief Minister of Bihar and Finance Minister of Bihar, In office 2 April 1946 – 5 July 1957'), which also matches real-world historical fact.",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Answer the specific day, month, and year when Anugrah Narayan Sinha became Deputy Premier cum Finance Minister of Bihar province."
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "refuted",
+        "confirmed_step": null,
+        "evidence_refs": [
+          "event_005",
+          "event_006"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "No external evidence snapshot is provided; the verdict's claimed referent (20 July 1937) is recorded as unestablished (referent index: basis=unestablished, decision_authority=none) and cannot ground a conviction.",
+        "reason": "CONTENT TEST: event_006 states 'he became the Deputy Premier (Deputy Chief Minister) cum Finance Minister of Bihar province on April 2, 1946', explicitly citing the infobox. The shown viewport (event_005) establishes that referent: the infobox reads '1st Deputy Chief Minister of Bihar and Finance Minister of Bihar — In office 2 April 1946 – 5 July 1957' and the lead says he was elected 'to assume office as the first Deputy Chief Minister cum Finance Minister of independent Bihar'. The verdict's claimed correct referent (20 July 1937) appears nowhere in the shown trajectory — the viewport shows only the top 16% of the page — and no snapshot establishes it; under the grounding rules an unestablished recollection cannot prove a delivered fact false (rule 5) nor serve as a referent (rule 6). Real-world knowledge checked per the conflict rules also fails to rescue the conviction: 20 July 1937 is the formation of the first Congress ministry, where Sinha took the Finance portfolio, whereas the 'Deputy Premier/Deputy Chief Minister cum Finance Minister' office began 2 April 1946 — before independence (15 Aug 1947), i.e., while Bihar was still a province — so the question's 'Bihar province' phrasing is consistent with the delivered date, and the verdict's own premise (that 2 April 1946 belongs only to the 'independent Bihar' tenure) ignores that the tenure began in the province era. RELEVANCE TEST: the alleged deviation (2 April 1946 vs 20 July 1937) is not established as real; the delivered answer is the value the shown source states for the named office, and replacing it with the verdict's unestablished date would not make the deliverable correct. The conviction fails both tests."
+      }
+    },
+    {
+      "case": "Magentic_One/074.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The ratio of silicon atoms in the photosphere of Star_1 to Star_2 is 3.98.",
+        "correct_result": "nSi_1/nSi_2 = 10^0.6 ≈ 3.98 (Star_1: [Si/H]_1 = [Si/Fe]_1 + [Fe/H]_1 = +0.3 dex; Star_2: [Si/H]_2 = [Mg/H]_2 − [Mg/Si]_2 = −0.3 dex; the solar Si abundance cancels in the ratio, so the answer is 10^(0.3−(−0.3)) = 10^0.6 ≈ 3.98 regardless of the assumed solar Si value).",
+        "basis": "derivation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The ratio of silicon atoms in the photospheres of Star_1 and Star_2 (nSi_1/nSi_2), computed from [Si/Fe]_1=0.3, [Fe/H]_1=0, [Mg/Si]_2=0.3, [Mg/H]_2=0 with solar Fe=7.5 and Mg=7; correct value is 10^0.6 ≈ 3.98."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Apply standard bracket notation [X/Y] = log10((nX/nY)_star/(nX/nY)_Sun) to derive per-star silicon abundances and take their ratio."
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenManus/097.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "x = 46° (the unique solution in 0° < x < 180°), with the 136° candidate from the human's 0/0-denominator suggestion explicitly checked and rejected because it does not satisfy the original equation (product − sum ≈ −14.766 ≠ 0)",
+        "correct_result": "x = 46°, the unique value in (0°, 180°) satisfying tan 53° tan 81° tan x° = tan 53° + tan 81° + tan x°",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Find the value of x with 0 < x < 180 satisfying tan 53° tan 81° tan x° = tan 53° + tan 81° + tan x°; correct value is x = 46"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "BFCL/000.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "final_report.pdf moved to document/temp (created via mkdir in document), grep found the 'budget analysis' line, the file was sorted, previous_report.pdf was moved to temp, and diff reported the year and budget-analysis differences between the two files",
+        "correct_result": "Create 'temp' inside document, move 'final_report.pdf' there, grep it for 'budget analysis', sort it by line, move 'previous_report.pdf' to temp, and diff the two files to detect critical alterations",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Create 'temp' directory inside document and move 'final_report.pdf' from document into it"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Use grep on final_report.pdf to identify sections pertaining to 'budget analysis'"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Sort 'final_report.pdf' by line after identifying the budget analysis content"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Move 'previous_report.pdf' from document to temp and diff it with 'final_report.pdf' to detect critical alterations"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenManus/095.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The fourth vertex is D = (8, 9), which satisfies x > 7, forming a parallelogram in the ABDC arrangement (AB = DC = 5.0990, BD = CA = 2.2361); therefore x + y = 8 + 9 = 17.",
+        "correct_result": "The only candidate fourth vertex with x > 7 is D = B + C - A = (8, 9) (the other candidates (4,7) and (6,-1) fail x > 7), so x + y = 17.",
+        "basis": "derivation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The value of x + y for the parallelogram with vertices (5,3), (6,8), (7,4), (x,y) where x > 7, which is 17."
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 4,
+        "evidence_refs": [
+          "event_004",
+          "event_003",
+          "event_007",
+          "event_010"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: event_004's code computes D1 = B + C - A = (8,9) and labels it 'Case 1 (A opposite to C)' (output: 'Case 1 (A opposite to C): D = [8 9], x + y = 17'). This label is mathematically false: if A were opposite C (diagonal AC), the parallelogram condition A + C = B + D forces D = A + C - B = (6,-1), exactly what the trajectory's own event_003 run establishes ('A + C = B + D (the sum of opposite vertices is equal)' → D = (6,-1), 'Midpoints are equal: True'). For D=(8,9), A + D = B + C = (13,12), so the correct pairing is A opposite D / B opposite C — which event_004's own Case 3 correctly states ('Case 3 (A opposite to D): D = [8 9]'), and event_004's own output refutes the Case 1 label ('Midpoint of AC = [6. 3.5], Midpoint of BD = [7. 8.5], Midpoints are equal: False'). RELEVANCE TEST: the mislabel is never corrected; it propagates (event_007 repeats it: 'D = B + C - A (if we're forming parallelogram ABCD where A and C are opposite vertices)') and is delivered in the final answer at event_010: 'A(5,3) and C(7,4) are opposite vertices; B(6,8) and D(8,9) are opposite vertices; The diagonals AC and BD have the same length' — false claims asserting a configuration the trajectory's own observations disprove (AC/BD midpoints unequal for D=(8,9)). Correcting the pairing at its introduction in event_004 would make the delivered verification true while the core answer x + y = 17 stands, so the error is real and materially connected to the delivered result."
+      }
+    },
+    {
+      "case": "Camel/016.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Martin Haspelmath's affiliation as stated in the article: Max Planck Institute for Evolutionary Anthropology (event_007); Michael Cysouw's affiliation as stated in the article: Philipps-Universität Marburg (event_009).",
+        "correct_result": "Haspelmath: Max Planck Institute for Evolutionary Anthropology; Cysouw: Philipps-Universität Marburg — the affiliations as stated in the 2014 Studies in Language article by Hartmann, Haspelmath and Cysouw.",
+        "basis": "world_knowledge",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Search authoritative sources such as the published article to determine Martin Haspelmath's institutional affiliation as stated in the article."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Search authoritative sources such as the published article to determine Michael Cysouw's institutional affiliation as stated in the article."
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "Provide each affiliation in a single sentence as it appears in the publication or official records."
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Haspelmath = Max Planck Institute for Evolutionary Anthropology; Cysouw = Philipps-Universität Marburg, per the article's author affiliation notes (superscripts 1 and 2 on the author line returned by both searches)."
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "refuted",
+        "confirmed_step": null,
+        "evidence_refs": [
+          "event_003_tool_01",
+          "event_004_tool_01",
+          "event_005_tool_01"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "An internal observation conflict exists on Haspelmath's superscript mapping (cysouw.de PDF and ResearchGate mark him 1=Max Planck Institute for Evolutionary Anthropology; the jbe-platform page marks him 2=Philipps-Universität Marburg), but this conflict does not support the alleged fabrication and cannot convict a delivered value that agrees with an observed source.",
+        "reason": "CONTENT TEST fails: the note at event_005 asserts Haspelmath's affiliation is 'Max Planck Institute for Evolutionary Anthropology' and quotes the author list 'Iren Hartmann1, Martin Haspelmath1 and Michael Cysouw2 / 1 Max Planck Institute for Evolutionary Anthropology ...'. The verdict's premise that the search excerpts 'never displayed any affiliation lines' is contradicted by the shown observations: the event_003 cysouw.de PDF text contains 'Iren Hartmann1, Martin Haspelmath1 and Michael Cysouw2\n1Max Planck Institute for Evolutionary Anthropology / 2Philipps-Universität Marburg' (the affiliation line also appears verbatim in the event_003 ResearchGate result), and the event_004 jbe-platform result explicitly displays 'Affiliations: 1 Max Planck Institute for Evolutionary Anthropology / 2 Philipps-Universität Marburg'. The quoted author list with its affiliation line is therefore grounded in actual tool observations, so the alleged fabrication of an unobserved affiliation line is not real. RELEVANCE TEST: the delivered Haspelmath value agrees with the observed PDF/ResearchGate sources; correcting step 5 would not change any deliverable, and the internal jbe superscript discrepancy is a conflicted point that under the conflict rule cannot convict a result agreeing with one of the observations. The conviction is wrong on both tests."
+      }
+    },
+    {
+      "case": "Magentic_One/071.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The exhibit displayed in the TD Gallery at the Toronto Reference Library from February 11 to April 30, 2017 was \"Toronto Revealed\", showcasing modern and contemporary highlights from the library's Canadian Documentary Art Collection.",
+        "correct_result": "The exhibit displayed in the TD Gallery at the Toronto Reference Library from February 11 to April 30, 2017 was \"Toronto Revealed\" (documentary art from the library's Canadian Documentary Art Collection).",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Identify the exhibit shown in the TD Gallery at the Toronto Reference Library from February 11 to April 30, 2017 (title and, if available, theme)."
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenManus/068.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "University of Cape Town (UCT).",
+        "correct_result": "University of Cape Town (UCT), which is what the tool-observed Wikipedia extract states was awarded to El Anatsui in 2016.",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The answer must name the university that awarded El Anatsui an honorary doctorate in 2016."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "The trajectory must research the question and ground the answer in retrieved evidence before reporting it."
+          }
+        ]
+      },
+      "defense": {}
+    }
+  ],
+  "degraded_disagreements": [
+    {
+      "case": "BFCL/052.json",
+      "gold": true,
+      "terminal_prediction": false,
+      "state": "verified_clean",
+      "authority": "degraded_judge_only",
+      "kind": "fn"
+    },
+    {
+      "case": "BFCL/122.json",
+      "gold": true,
+      "terminal_prediction": false,
+      "state": "verified_clean",
+      "authority": "degraded_judge_only",
+      "kind": "fn"
+    }
+  ],
+  "missing_cases": []
+}

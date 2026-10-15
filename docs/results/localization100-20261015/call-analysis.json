@@ -1,0 +1,432 @@
+{
+  "adopted100": {
+    "schema_version": "detector.call_analysis.v1",
+    "cases": 100,
+    "cases_without_request_observations": 0,
+    "duplicate_request_ids": 0,
+    "requests": 740,
+    "repair_requests": 77,
+    "case_seconds_sum": 118683.589,
+    "case_latency_median_seconds": 787.597,
+    "case_latency_p95_seconds": 4154.768,
+    "by_purpose": {
+      "causal_upgrade": {
+        "requests": 78,
+        "timed_requests": 78,
+        "request_seconds_sum": 26012.875,
+        "queue_seconds_sum": 270.211,
+        "queue_observations": 78,
+        "latency_median_seconds": 237.509,
+        "latency_p95_seconds": 900.058,
+        "transport_retry_requests": 6,
+        "status_counts": {
+          "response": 71,
+          "transport_error": 7
+        },
+        "usage_missing": 7,
+        "completion_tokens": 1499524.0
+      },
+      "defense": {
+        "requests": 190,
+        "timed_requests": 190,
+        "request_seconds_sum": 33068.594,
+        "queue_seconds_sum": 1514.61,
+        "queue_observations": 190,
+        "latency_median_seconds": 154.231,
+        "latency_p95_seconds": 362.46,
+        "transport_retry_requests": 6,
+        "status_counts": {
+          "response": 190
+        },
+        "usage_missing": 0,
+        "completion_tokens": 2595512.0
+      },
+      "judge": {
+        "requests": 309,
+        "timed_requests": 309,
+        "request_seconds_sum": 48912.218,
+        "queue_seconds_sum": 1449.627,
+        "queue_observations": 309,
+        "latency_median_seconds": 77.485,
+        "latency_p95_seconds": 665.447,
+        "transport_retry_requests": 8,
+        "status_counts": {
+          "response": 301,
+          "transport_error": 8
+        },
+        "usage_missing": 8,
+        "completion_tokens": 3233196.0
+      },
+      "judge_repair": {
+        "requests": 36,
+        "timed_requests": 36,
+        "request_seconds_sum": 4619.385,
+        "queue_seconds_sum": 78.676,
+        "queue_observations": 36,
+        "latency_median_seconds": 87.441,
+        "latency_p95_seconds": 321.876,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 36
+        },
+        "usage_missing": 0,
+        "completion_tokens": 329056.0
+      },
+      "recall_scanner": {
+        "requests": 28,
+        "timed_requests": 28,
+        "request_seconds_sum": 3725.157,
+        "queue_seconds_sum": 170.669,
+        "queue_observations": 28,
+        "latency_median_seconds": 88.175,
+        "latency_p95_seconds": 324.766,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 28
+        },
+        "usage_missing": 0,
+        "completion_tokens": 295532.0
+      },
+      "recall_scanner_repair": {
+        "requests": 18,
+        "timed_requests": 18,
+        "request_seconds_sum": 2228.971,
+        "queue_seconds_sum": 73.861,
+        "queue_observations": 18,
+        "latency_median_seconds": 84.418,
+        "latency_p95_seconds": 523.213,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 18
+        },
+        "usage_missing": 0,
+        "completion_tokens": 191145.0
+      },
+      "step_tracer": {
+        "requests": 58,
+        "timed_requests": 58,
+        "request_seconds_sum": 4393.051,
+        "queue_seconds_sum": 1200.996,
+        "queue_observations": 58,
+        "latency_median_seconds": 47.734,
+        "latency_p95_seconds": 235.772,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 58
+        },
+        "usage_missing": 0,
+        "completion_tokens": 263412.0
+      },
+      "step_tracer_repair": {
+        "requests": 23,
+        "timed_requests": 23,
+        "request_seconds_sum": 1527.683,
+        "queue_seconds_sum": 314.98,
+        "queue_observations": 23,
+        "latency_median_seconds": 46.482,
+        "latency_p95_seconds": 189.373,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 23
+        },
+        "usage_missing": 0,
+        "completion_tokens": 103255.0
+      }
+    },
+    "timeline": {
+      "timed_requests": 740,
+      "untimed_requests": 0,
+      "request_interval_union_seconds_sum": 118593.723,
+      "overlap_work_seconds_sum": 5894.214,
+      "peak_per_case_request_intervals": 2
+    },
+    "interpretation": "Request seconds and case seconds are work sums, not batch wall time. Timeline unions are per case attempt and include queue waits; they are neither provider occupancy nor the full DAG critical path. Historical observations without complete interval timestamps remain untimed."
+  },
+  "recovery7_all_attempts": {
+    "schema_version": "detector.call_analysis.v1",
+    "cases": 7,
+    "cases_without_request_observations": 0,
+    "duplicate_request_ids": 0,
+    "requests": 73,
+    "repair_requests": 9,
+    "case_seconds_sum": 16769.44,
+    "case_latency_median_seconds": 1940.77,
+    "case_latency_p95_seconds": 4212.34,
+    "by_purpose": {
+      "causal_upgrade": {
+        "requests": 9,
+        "timed_requests": 9,
+        "request_seconds_sum": 2008.139,
+        "queue_seconds_sum": 0.225,
+        "queue_observations": 9,
+        "latency_median_seconds": 234.217,
+        "latency_p95_seconds": 534.064,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 9
+        },
+        "usage_missing": 0,
+        "completion_tokens": 147217.0
+      },
+      "defense": {
+        "requests": 21,
+        "timed_requests": 21,
+        "request_seconds_sum": 5326.515,
+        "queue_seconds_sum": 0.517,
+        "queue_observations": 21,
+        "latency_median_seconds": 203.025,
+        "latency_p95_seconds": 513.55,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 21
+        },
+        "usage_missing": 0,
+        "completion_tokens": 399173.0
+      },
+      "judge": {
+        "requests": 23,
+        "timed_requests": 23,
+        "request_seconds_sum": 7356.541,
+        "queue_seconds_sum": 0.776,
+        "queue_observations": 23,
+        "latency_median_seconds": 199.04,
+        "latency_p95_seconds": 900.068,
+        "transport_retry_requests": 2,
+        "status_counts": {
+          "response": 21,
+          "transport_error": 2
+        },
+        "usage_missing": 2,
+        "completion_tokens": 498006.0
+      },
+      "judge_repair": {
+        "requests": 4,
+        "timed_requests": 4,
+        "request_seconds_sum": 406.433,
+        "queue_seconds_sum": 0.076,
+        "queue_observations": 4,
+        "latency_median_seconds": 88.763,
+        "latency_p95_seconds": 173.07,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 4
+        },
+        "usage_missing": 0,
+        "completion_tokens": 29445.0
+      },
+      "recall_scanner": {
+        "requests": 4,
+        "timed_requests": 4,
+        "request_seconds_sum": 818.898,
+        "queue_seconds_sum": 0.069,
+        "queue_observations": 4,
+        "latency_median_seconds": 223.436,
+        "latency_p95_seconds": 336.733,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 4
+        },
+        "usage_missing": 0,
+        "completion_tokens": 54174.0
+      },
+      "recall_scanner_repair": {
+        "requests": 3,
+        "timed_requests": 3,
+        "request_seconds_sum": 824.799,
+        "queue_seconds_sum": 0.066,
+        "queue_observations": 3,
+        "latency_median_seconds": 251.502,
+        "latency_p95_seconds": 523.213,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 3
+        },
+        "usage_missing": 0,
+        "completion_tokens": 63998.0
+      },
+      "step_tracer": {
+        "requests": 7,
+        "timed_requests": 7,
+        "request_seconds_sum": 253.096,
+        "queue_seconds_sum": 0.248,
+        "queue_observations": 7,
+        "latency_median_seconds": 37.692,
+        "latency_p95_seconds": 67.0,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 7
+        },
+        "usage_missing": 0,
+        "completion_tokens": 21243.0
+      },
+      "step_tracer_repair": {
+        "requests": 2,
+        "timed_requests": 2,
+        "request_seconds_sum": 128.821,
+        "queue_seconds_sum": 0.03,
+        "queue_observations": 2,
+        "latency_median_seconds": 64.411,
+        "latency_p95_seconds": 107.168,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 2
+        },
+        "usage_missing": 0,
+        "completion_tokens": 12191.0
+      }
+    },
+    "timeline": {
+      "timed_requests": 73,
+      "untimed_requests": 0,
+      "request_interval_union_seconds_sum": 16741.327,
+      "overlap_work_seconds_sum": 381.916,
+      "peak_per_case_request_intervals": 2
+    },
+    "interpretation": "Request seconds and case seconds are work sums, not batch wall time. Timeline unions are per case attempt and include queue waits; they are neither provider occupancy nor the full DAG critical path. Historical observations without complete interval timestamps remain untimed."
+  },
+  "first100_all_attempts": {
+    "schema_version": "detector.call_analysis.v1",
+    "cases": 100,
+    "cases_without_request_observations": 0,
+    "duplicate_request_ids": 0,
+    "requests": 752,
+    "repair_requests": 77,
+    "case_seconds_sum": 131167.853,
+    "case_latency_median_seconds": 787.597,
+    "case_latency_p95_seconds": 4579.776,
+    "by_purpose": {
+      "causal_upgrade": {
+        "requests": 75,
+        "timed_requests": 75,
+        "request_seconds_sum": 26367.926,
+        "queue_seconds_sum": 307.484,
+        "queue_observations": 75,
+        "latency_median_seconds": 280.836,
+        "latency_p95_seconds": 900.058,
+        "transport_retry_requests": 6,
+        "status_counts": {
+          "response": 68,
+          "transport_error": 7
+        },
+        "usage_missing": 7,
+        "completion_tokens": 1572015.0
+      },
+      "defense": {
+        "requests": 193,
+        "timed_requests": 193,
+        "request_seconds_sum": 36096.991,
+        "queue_seconds_sum": 1538.429,
+        "queue_observations": 193,
+        "latency_median_seconds": 171.999,
+        "latency_p95_seconds": 362.46,
+        "transport_retry_requests": 7,
+        "status_counts": {
+          "response": 192,
+          "transport_error": 1
+        },
+        "usage_missing": 1,
+        "completion_tokens": 2900056.0
+      },
+      "judge": {
+        "requests": 320,
+        "timed_requests": 320,
+        "request_seconds_sum": 58783.388,
+        "queue_seconds_sum": 1566.963,
+        "queue_observations": 320,
+        "latency_median_seconds": 84.147,
+        "latency_p95_seconds": 900.04,
+        "transport_retry_requests": 17,
+        "status_counts": {
+          "response": 299,
+          "transport_error": 21
+        },
+        "usage_missing": 21,
+        "completion_tokens": 3149515.0
+      },
+      "judge_repair": {
+        "requests": 33,
+        "timed_requests": 33,
+        "request_seconds_sum": 4322.329,
+        "queue_seconds_sum": 78.615,
+        "queue_observations": 33,
+        "latency_median_seconds": 87.987,
+        "latency_p95_seconds": 321.876,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 33
+        },
+        "usage_missing": 0,
+        "completion_tokens": 307149.0
+      },
+      "recall_scanner": {
+        "requests": 32,
+        "timed_requests": 32,
+        "request_seconds_sum": 3707.777,
+        "queue_seconds_sum": 214.527,
+        "queue_observations": 32,
+        "latency_median_seconds": 72.568,
+        "latency_p95_seconds": 324.766,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 32
+        },
+        "usage_missing": 0,
+        "completion_tokens": 302067.0
+      },
+      "recall_scanner_repair": {
+        "requests": 22,
+        "timed_requests": 22,
+        "request_seconds_sum": 1769.937,
+        "queue_seconds_sum": 139.923,
+        "queue_observations": 22,
+        "latency_median_seconds": 68.458,
+        "latency_p95_seconds": 158.86,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 22
+        },
+        "usage_missing": 0,
+        "completion_tokens": 160311.0
+      },
+      "step_tracer": {
+        "requests": 55,
+        "timed_requests": 55,
+        "request_seconds_sum": 4291.679,
+        "queue_seconds_sum": 1210.572,
+        "queue_observations": 55,
+        "latency_median_seconds": 50.284,
+        "latency_p95_seconds": 235.772,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 55
+        },
+        "usage_missing": 0,
+        "completion_tokens": 255391.0
+      },
+      "step_tracer_repair": {
+        "requests": 22,
+        "timed_requests": 22,
+        "request_seconds_sum": 1539.373,
+        "queue_seconds_sum": 368.448,
+        "queue_observations": 22,
+        "latency_median_seconds": 47.129,
+        "latency_p95_seconds": 189.373,
+        "transport_retry_requests": 0,
+        "status_counts": {
+          "response": 22
+        },
+        "usage_missing": 0,
+        "completion_tokens": 99326.0
+      }
+    },
+    "timeline": {
+      "timed_requests": 752,
+      "untimed_requests": 0,
+      "request_interval_union_seconds_sum": 131074.867,
+      "overlap_work_seconds_sum": 5804.532,
+      "peak_per_case_request_intervals": 2
+    },
+    "interpretation": "Request seconds and case seconds are work sums, not batch wall time. Timeline unions are per case attempt and include queue waits; they are neither provider occupancy nor the full DAG critical path. Historical observations without complete interval timestamps remain untimed."
+  },
+  "expense_note": "Total new experiment expense includes all first100 and all recovery7 requests, even when replaced or not adopted; missing usage is unknown."
+}

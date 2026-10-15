@@ -1,0 +1,273 @@
+{
+  "run_id": "opt7_20261015_recovery",
+  "metrics": {
+    "decisive": 6,
+    "unresolved": 1,
+    "completion": 0.8571428571428571,
+    "decisive_accuracy": 0.6666666666666666,
+    "all_case_accuracy": 0.5714285714285714,
+    "tp": 4,
+    "fp": 0,
+    "fn": 2,
+    "tn": 0,
+    "positive_precision": 1.0,
+    "positive_recall": 0.6666666666666666,
+    "positive_f1": 0.8,
+    "macro_precision": 0.5,
+    "macro_recall": 0.3333333333333333,
+    "macro_f1": 0.4,
+    "authoritative": 6,
+    "degraded": 1,
+    "degraded_disagreeing": 0,
+    "terminal_metrics": {
+      "decisive": 7,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.7142857142857143,
+      "all_case_accuracy": 0.7142857142857143,
+      "tp": 5,
+      "fp": 0,
+      "fn": 2,
+      "tn": 0,
+      "positive_precision": 1.0,
+      "positive_recall": 0.7142857142857143,
+      "positive_f1": 0.8333333333333333,
+      "macro_precision": 0.5,
+      "macro_recall": 0.35714285714285715,
+      "macro_f1": 0.41666666666666663
+    },
+    "provider_unresolved": 0,
+    "no_terminal_decision": 0,
+    "requested_cases": 7,
+    "found_results": 7,
+    "missing_cases": 0,
+    "step_localization": {
+      "target": "dataset_first_error_event.v1",
+      "step_unit": "trajectory_event_position",
+      "unmapped_annotations": 0,
+      "target_mismatch_rows": 0,
+      "n": 7,
+      "hits": 4,
+      "accuracy": 0.5714285714285714,
+      "by_step_kind": {
+        "action_step": {
+          "n": 4,
+          "hits": 3,
+          "accuracy": 0.75
+        },
+        "unclassified": {
+          "n": 2,
+          "hits": 0,
+          "accuracy": 0.0
+        },
+        "content_step": {
+          "n": 1,
+          "hits": 1,
+          "accuracy": 1.0
+        }
+      },
+      "note": "action-step and content-step accuracy answer different questions; read them apart, never as one rate"
+    }
+  },
+  "rows": [
+    {
+      "case": "SmolAgents/043.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "BFCL/052.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/064.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "BFCL/122.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/024.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 6,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 6,
+        "position": 6,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/031.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/012.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 18,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 18,
+        "position": 18,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    }
+  ],
+  "errors": [
+    {
+      "case": "SmolAgents/024.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The five judges of the Balaji Raghavan v. Union of India (1996) 1 SCC 361 bench: Chief Justice A.M. Ahmadi, Justice Kuldip Singh, Justice B.P. Jeevan Reddy, Justice N.P. Singh, and Justice S. Sahagir Ahmed",
+        "correct_result": "The Constitution Bench of five in Balaji Raghavan v. Union of India (1996) 1 SCC 361: A.M. Ahmadi (CJI), Kuldip Singh, B.P. Jeevan Reddy, N.P. Singh and S. Saghir Ahmed — the bench that upheld/restored the Bharat Ratna and Padma awards and held they are not 'titles' under Article 18",
+        "basis": "world_knowledge",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Identify the five Supreme Court judges who constituted the bench in the judgment (Balaji Raghavan v. Union of India) that restored/upheld the Bharat Ratna and Padma awards and declared they are not titles under Article 18 of the Constitution of India"
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "refuted",
+        "confirmed_step": null,
+        "evidence_refs": [
+          "event_006",
+          "event_007"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "No unresolved in-record conflict: the trajectory's only bench listing (event_006, The Legal Lock page) agrees with the delivered answer. The asserted real-world referent (Justice S.C. Sen) appears in no shown evidence and no external snapshot is provided, so that referent is unestablished and cannot ground the conviction.",
+        "reason": "CONTENT TEST fails for the conviction. At the alleged step (event_007) the answer lists '5. Justice S. Sahagir Ahmed'. The verdict's supporting premise — that 'no observation in the trajectory ever lists the bench' and the name 'appears nowhere in the search results or page contents' — is affirmatively false: event_006's observation lists the bench verbatim ('Hon'ble Chief Justice A.M. Ahmadi, Hon'ble Justice Kuldip Singh, Hon'ble Justice B.P. Jeevan Reddy, Hon'ble Justice N.P. Singh Hon'ble Justice S. Sahagir Ahmed'), and the delivered answer reproduces that listing judge-for-judge, so the name is grounded in the trajectory's only bench source rather than fabricated. The alleged correct referent ('the correct fifth member Justice S.C. Sen') appears nowhere in the shown trajectory; no external evidence snapshot is provided and the referent index records basis 'unestablished' — under the grounding rules a model's asserted correct referent is not an observed source, and missing corroboration alone does not prove a delivered fact false. RELEVANCE: the sole deliverable is the final answer itself, which already matches the trajectory's established referent; the conviction supplies no established referent to the contrary, so no material deviation under the MATERIALITY LAW is established and the alleged hallucination (a name absent from all sources) is disproven by the shown evidence."
+      }
+    },
+    {
+      "case": "Camel/012.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "The deleted word was 'interrogation' and the date of the amendment was December 1, 2011 (the 2011 restyling amendment to FRE Rule 611, 'Mode and Order of Examining Witnesses and Presenting Evidence').",
+        "correct_result": "The deleted word was 'interrogation' (replaced by 'examination' when 'interrogating'/'interrogation' became 'examining'/'examination') in the last amendment to Rule 611 — the first rule in Article VI (Witnesses), the FRE article with 'witnesses' in the most rule titles — effective December 1, 2011.",
+        "basis": "world_knowledge",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Navigate the Cornell LII federal rules; take the fifth section alphabetically (Federal Rules of Evidence); identify the article with 'witnesses' in the most rule titles (Article VI. Witnesses) and its first rule with 'witnesses' in the title (Rule 611); then find the word deleted in that rule's last amendment as of 2021."
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Deliver the deleted word and the date of the amendment: deleted word 'interrogation' and amendment date December 1, 2011."
+          }
+        ]
+      },
+      "defense": {}
+    }
+  ],
+  "degraded_disagreements": [],
+  "missing_cases": []
+}

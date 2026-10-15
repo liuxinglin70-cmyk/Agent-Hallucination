@@ -1,10 +1,12 @@
 # 全量运行三轮自进化：失效链路、代码机制与改进路线
 
+> 历史审计记录：按原日期解释实现、测试和计划；当前合同见[技术文档](../technical-solution.md)，当前结果见[实验日志](../experiment-log.md)。文档迁移时只修订路径与失效链接标记。
+
 分析更新：2026-09-28；对象：`artifacts/full693-20260924T143024Z`。本文只分析工作区已有产物与当前源码，并将近期一手研究作为设计参照；没有修改实验代码、配置、checkpoint 或原始评估结果，也没有重新调用模型。文中“历史事实”“当前实现”“推测/待验证”分别指运行产物、当前 checkout 与尚需对照实验的因果解释，三者不得互相替代。
 
 ## 摘要：先回答三个核心怀疑
 
-本次结果应表述为：**三轮都完成了，但 7 个开发版本中只有 4 个通过局部 L1 并冻结；正式门控对这 4 个版本给出 3 个 `not_evaluated`、1 个 `rejected`，准入数为 0。** C3 只生成一个 L1 失败版本，没有正式候选。空 registry 使 g1 不启动；`--mini` 的效果条件失败使进程退出码为 2。这里既有已观察到的局部改进，也有不可测结果，不能概括成“模型没有提出任何有用东西”。见 [实验总报告](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/reports/experiment.json>)、[7 个归档版本](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/candidates/archive_summary.json>)、[退出码](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/evolution.exitcode.txt>)。
+本次结果应表述为：**三轮都完成了，但 7 个开发版本中只有 4 个通过局部 L1 并冻结；正式门控对这 4 个版本给出 3 个 `not_evaluated`、1 个 `rejected`，准入数为 0。** C3 只生成一个 L1 失败版本，没有正式候选。空 registry 使 g1 不启动；`--mini` 的效果条件失败使进程退出码为 2。这里既有已观察到的局部改进，也有不可测结果，不能概括成“模型没有提出任何有用东西”。见 [实验总报告](../../artifacts/full693-20260924T143024Z/work/evolution/reports/experiment.json)、[7 个归档版本](../../artifacts/full693-20260924T143024Z/work/evolution/candidates/archive_summary.json)、[退出码](../../artifacts/full693-20260924T143024Z/evolution.exitcode.txt)。
 
 | 用户的怀疑 | 本次证据支持的判断 | 首先该做什么 |
 |---|---|---|
@@ -246,7 +248,7 @@ C3 逐臂 `checkpoints/cycle003/arms/a476e26ed85b/7f232f63ee61.json` 将该例�
 
 ### 4.1 RSI 的可进化对象、观测与动作空间
 
-本次 harness 的 G 是固定检测工作流 `validate → packet → judge → recall → upgrade → tracer → defense → adjudicate`，明确记录 `execution_graph_rewrite=false`；T 是 intervention registry；M 是经验库；C 和 R 记录上下文配置与运行策略。三轮 T 均为空，G/C/R 没有显示出成功进化，后续 harness 摘要变化主要来自 M 的新增记录。参见 C1–C3 的 `#/harness/manifest/components`，及 [harness.py:117](<E:/agent hallucination/agent hallucination/evolution/harness.py:117>)。
+本次 harness 的 G 是固定检测工作流 `validate → packet → judge → recall → upgrade → tracer → defense → adjudicate`，明确记录 `execution_graph_rewrite=false`；T 是 intervention registry；M 是经验库；C 和 R 记录上下文配置与运行策略。三轮 T 均为空，G/C/R 没有显示出成功进化，后续 harness 摘要变化主要来自 M 的新增记录。参见 C1–C3 的 `#/harness/manifest/components`，及 harness.py:117（历史路径：`E:/agent hallucination/agent hallucination/evolution/harness.py:117`；本地原件不可用）。
 
 因此，这次运行实际验证的是：**在固定检测框架中，用有限类型的 intervention 搜索可部署改进，并借助记忆指导下次搜索**。它尚未验证“搜索器会根据失败自动改善自己的诊断、测量、预算与学习方法”。harness 版本更新只说明状态变化，不能充当检测能力提高的证据。
 
@@ -256,32 +258,32 @@ C3 逐臂 `checkpoints/cycle003/arms/a476e26ed85b/7f232f63ee61.json` 将该例�
 
 **案例 A：`OpenDeepSearch/086`。** 数据集标注的 `true_answer` 为 `116`，轨迹内的搜索工具响应却明确说 `76 tons`，最终回答也为 `76 tons`。完整 history 中没有字面值 `116`。基线 judge 的 `delivered_result` 与 `correct_result` 都为 `76 tons`，`basis=observation`、`confidence=high`。记录与源码共同说明：该 judge 按可见工具观察判一致，并非读到了正确事实后拒绝使用。
 
-- 原始记录：[OpenDeepSearch/086.json](<E:/agent hallucination/agent hallucination/datasets/raw/agenthallu/AgentHallu/OpenDeepSearch/086.json>) 的 `history`、`true_answer`、`hallucination_reason`。
-- 基线：[C1 基线 ODS086](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/arms/508acdf65658/b12a82572954.json>) 的 `#/row/result/proof/judge`。
+- 原始记录：[OpenDeepSearch/086.json](../../datasets/raw/agenthallu/AgentHallu/OpenDeepSearch/086.json) 的 `history`、`true_answer`、`hallucination_reason`。
+- 基线：[C1 基线 ODS086](../../artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/arms/508acdf65658/b12a82572954.json) 的 `#/row/result/proof/judge`。
 - 标注把它解释为搜索摘要遗漏语境更相关的吨位；本文只确认这是**数据集的解释**，没有访问外部网页复核船舶史实。
 
 **案例 B：`OpenManus/073`。** 标注答案为 `Grigor Sargsyan`，history 中提取出的获奖名单写的是 `2009: Tigran Hakobyan`，随后 terminate。完整 history 中没有 `Grigor Sargsyan`。基线 judge 明确以提取内容认定后一个名字是已交付结果。原始标签将错误定位为 step 3 的 `Retrieval Hallucination / Summarize Misalign`。
 
-- 原始记录：[OpenManus/073.json](<E:/agent hallucination/agent hallucination/datasets/raw/agenthallu/AgentHallu/OpenManus/073.json>)。
-- 基线：[C1 基线 OpenManus073](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/arms/508acdf65658/614f3077f894.json>)。
+- 原始记录：[OpenManus/073.json](../../datasets/raw/agenthallu/AgentHallu/OpenManus/073.json)。
+- 基线：[C1 基线 OpenManus073](../../artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/arms/508acdf65658/614f3077f894.json)。
 
-三个 cycle 均有 `#/evidence = {"active": false}`，上述基线 proof 的 `external_evidence=null`。输入投影 [dataset.py:16](<E:/agent hallucination/agent hallucination/detector/dataset.py:16>) 仅保留 question/history；[judge.py:225](<E:/agent hallucination/agent hallucination/detector/judge.py:225>) 要求 `Do not use any information that is not in the question or the trajectory`。这形成明确的**任务—观测错配**：评测要求识别现实事实错误，而当前观测只支持判断轨迹内是否自洽。
+三个 cycle 均有 `#/evidence = {"active": false}`，上述基线 proof 的 `external_evidence=null`。输入投影 dataset.py:16（历史路径：`E:/agent hallucination/agent hallucination/detector/dataset.py:16`；本地原件不可用） 仅保留 question/history；judge.py:225（历史路径：`E:/agent hallucination/agent hallucination/detector/judge.py:225`；本地原件不可用） 要求 `Do not use any information that is not in the question or the trajectory`。这形成明确的**任务—观测错配**：评测要求识别现实事实错误，而当前观测只支持判断轨迹内是否自洽。
 
 **反证与边界**：不能由正确答案字面缺失证明所有方法都无法判别；模型可能利用其他异常线索，外部知识也可能恰好覆盖该事实。`OpenManus/073` 的局部预测确实被几个候选改成 true。但这些现象不能证明它获得了独立事实依据，更不能证明规则可泛化。对于只有“工具说 X、最后答 X”的证据，广泛怀疑工具即可增加某些 TP，也可能增加正常轨迹 FP；现有回放没有识别两者的稳定边界。
 
-**解决方向**：为每个失败增加可观察性分类：轨迹内可核验、需要独立来源、标注/任务解释待复核。第二类应生成“补充证据”的研究任务，先取得来源快照再评价修复，不能把 gold 答案送入线上 predicate。当前仓库已存在 [evidence.py](<E:/agent hallucination/agent hallucination/detector/evidence.py>)、[retrieval.py](<E:/agent hallucination/agent hallucination/detector/retrieval.py>)，且 [api.py:339](<E:/agent hallucination/agent hallucination/detector/api.py:339>) 支持独立 evidence snapshot 向 recall/upgrade/defense 传递。因此建议核查并接通已有能力，而非断言仓库没有外部证据机制。验证时两臂必须共享同一来源、时间与 digest，避免把多拿到的信息误计为候选逻辑收益。
+**解决方向**：为每个失败增加可观察性分类：轨迹内可核验、需要独立来源、标注/任务解释待复核。第二类应生成“补充证据”的研究任务，先取得来源快照再评价修复，不能把 gold 答案送入线上 predicate。当前仓库已存在 [evidence.py](../../detector/evidence.py)、[retrieval.py](../../detector/retrieval.py)，且 api.py:339（历史路径：`E:/agent hallucination/agent hallucination/detector/api.py:339`；本地原件不可用） 支持独立 evidence snapshot 向 recall/upgrade/defense 传递。因此建议核查并接通已有能力，而非断言仓库没有外部证据机制。验证时两臂必须共享同一来源、时间与 digest，避免把多拿到的信息误计为候选逻辑收益。
 
 #### 4.1.2 机制归纳把“有义务”提升成“已观察到违规”
 
 归纳链路是 `stable_failure_families → diagnose_failure_families → refine/mechanism_subgroups → infer_mechanism`。其中阶段路径用于发现共同失败位置，typed predicate 与 judge contract 用于给任务义务分类。这些是有用线索，但当前实现存在从**线索**直接跃迁到**已观察偏差**的问题：
 
-1. [mechanisms.py:386](<E:/agent hallucination/agent hallucination/evolution/mechanisms.py:386>) 的 `obligation_for` 优先读机械违规；没有违规时，从 `judge.contracts` 按固定优先级取第一个义务。`required_action` 排在 `exact_value` 之前。
-2. [mechanisms.py:429](<E:/agent hallucination/agent hallucination/evolution/mechanisms.py:429>) 的 `_deviation_for` 对已知义务直接查映射，例如 required_action → omission；这一步不要求 `required_action_present=violated`。
-3. [mechanisms.py:739](<E:/agent hallucination/agent hallucination/evolution/mechanisms.py:739>) 对两个以上相同 reading 标 `confirmed / multi_case`。一致的是映射结果，未必是已证实的同一因果故障。
+1. mechanisms.py:386（历史路径：`E:/agent hallucination/agent hallucination/evolution/mechanisms.py:386`；本地原件不可用） 的 `obligation_for` 优先读机械违规；没有违规时，从 `judge.contracts` 按固定优先级取第一个义务。`required_action` 排在 `exact_value` 之前。
+2. mechanisms.py:429（历史路径：`E:/agent hallucination/agent hallucination/evolution/mechanisms.py:429`；本地原件不可用） 的 `_deviation_for` 对已知义务直接查映射，例如 required_action → omission；这一步不要求 `required_action_present=violated`。
+3. mechanisms.py:739（历史路径：`E:/agent hallucination/agent hallucination/evolution/mechanisms.py:739`；本地原件不可用） 对两个以上相同 reading 标 `confirmed / multi_case`。一致的是映射结果，未必是已证实的同一因果故障。
 
 实际 M-B 就满足这种情况：两个 member 的 `required_action_present` 都是 `not_applicable`，mechanism 的 obligation binding 是 `judge.contracts`，却输出 `observed_deviation.actual=required_action_absent`、`status=confirmed`。证据在 C1 `#/patrol/detection_families/1/diagnostics/member_summaries` 与 `/mechanism`；C2/C3 保留相同机制。
 
-两个成员的真实任务也显示该抽象太粗：`BFCL/017` 的标注认为应 diff 比较文件，实际执行 echo 覆盖；`OpenManus/073` 的标注认为获奖者事实错误。后者确实执行了检索与提取，不能只因 judge 合同含“determine the winner using available means”就把错误归为工具动作遗漏。对 BFCL，用户“ensure identical”的解释与数据集期望的具体工具序列也需要单独审查，不能把 gold 工具名硬编码成检测规则。参见 [BFCL/017.json](<E:/agent hallucination/agent hallucination/datasets/raw/agenthallu/AgentHallu/BFCL/017.json>)。
+两个成员的真实任务也显示该抽象太粗：`BFCL/017` 的标注认为应 diff 比较文件，实际执行 echo 覆盖；`OpenManus/073` 的标注认为获奖者事实错误。后者确实执行了检索与提取，不能只因 judge 合同含“determine the winner using available means”就把错误归为工具动作遗漏。对 BFCL，用户“ensure identical”的解释与数据集期望的具体工具序列也需要单独审查，不能把 gold 工具名硬编码成检测规则。参见 [BFCL/017.json](../../datasets/raw/agenthallu/AgentHallu/BFCL/017.json)。
 
 **根因判断**：当前归纳混用了“任务具有某义务”“轨迹违反该义务”“检测器因某原因漏检”三个不同命题。修复规划随后依据该合成标签指定 required_inputs 和 repair_operation，错误抽象会继续传播。此判断由代码和实际 M-B 字段共同支持；“因此所有候选必败”仍无证据。
 
@@ -289,7 +291,7 @@ C3 逐臂 `checkpoints/cycle003/arms/a476e26ed85b/7f232f63ee61.json` 将该例�
 
 #### 4.1.3 混合族的身份依赖第一位成员
 
-M-A 明确为 `ambiguous / mixed`，observed readings 包含 required_action/omission 与 exact_value/mismatch。当前 [infer_mechanism:723](<E:/agent hallucination/agent hallucination/evolution/mechanisms.py:723>) 使用 `signatures[0]` 和 `readings[0]` 构造机制与 ID；[engine.py:1406](<E:/agent hallucination/agent hallucination/evolution/engine.py:1406>) 的开发入口只要求 ID 和至少两个成员，没有将 ambiguous 转到消歧任务。
+M-A 明确为 `ambiguous / mixed`，observed readings 包含 required_action/omission 与 exact_value/mismatch。当前 infer_mechanism:723（历史路径：`E:/agent hallucination/agent hallucination/evolution/mechanisms.py:723`；本地原件不可用） 使用 `signatures[0]` 和 `readings[0]` 构造机制与 ID；engine.py:1406（历史路径：`E:/agent hallucination/agent hallucination/evolution/engine.py:1406`；本地原件不可用） 的开发入口只要求 ID 和至少两个成员，没有将 ambiguous 转到消歧任务。
 
 以 C1 原始 member summaries 做纯函数探针，仅反转成员顺序，得到：
 
@@ -302,7 +304,7 @@ M-A 明确为 `ambiguous / mixed`，observed readings 包含 required_action/omi
 
 这是**当前代码的身份稳定性缺陷**：同一成员集合可改变机制 ID 与修复所需字段，影响记忆和组件检索。历史三轮没有证据显示顺序发生改变，因此它是已证实的结构风险，不是本次历史 ID 漂移的解释。
 
-[worksheet.py:1057](<E:/agent hallucination/agent hallucination/evolution/worksheet.py:1057>) 的 subgroup 逻辑在不能组成至少两例的子组时允许保留混合族。此处存在约束冲突：一边要求至少两例 provenance，一边又希望机制同质，样本不足时以混合族维持可起草性。解决方案应允许单例作为研究假说，补找第二例或反例；用规范化的 reading 集合表示“待消歧问题”，避免让第一例冒充全族机制。单例研究仍不能直接当成正式泛化证据。
+worksheet.py:1057（历史路径：`E:/agent hallucination/agent hallucination/evolution/worksheet.py:1057`；本地原件不可用） 的 subgroup 逻辑在不能组成至少两例的子组时允许保留混合族。此处存在约束冲突：一边要求至少两例 provenance，一边又希望机制同质，样本不足时以混合族维持可起草性。解决方案应允许单例作为研究假说，补找第二例或反例；用规范化的 reading 集合表示“待消歧问题”，避免让第一例冒充全族机制。单例研究仍不能直接当成正式泛化证据。
 
 #### 4.1.4 计划写着 sufficient，候选却走了其他 hook
 
@@ -311,7 +313,7 @@ M-A 明确为 `ambiguous / mixed`，observed readings 包含 required_action/omi
 - C2 M-A v001 实际为 `text_boundary@scanner.system`。两个目标原本 recall `not_needed`；该版本没有修好任何目标，只使 `Camel/048` 误报，局部正确数 8 → 7。
 - M-B 的开发记录 `action_class=evolved_predicate`，C1/C2 实际候选却是 `text_boundary@upgrade.system`；C3 是 scanner.system。
 
-原因可以定位到接口：[CandidateDeveloper._route:660](<E:/agent hallucination/agent hallucination/evolution/development.py:660>) 取 sufficient_routes[0] 作为 route；[engine._development_drafter:1903](<E:/agent hallucination/agent hallucination/evolution/engine.py:1903>) 收到 `_plan` 但不使用它，proposer 仍看到 family 的全部 treatment_routes；[check_l0:248](<E:/agent hallucination/agent hallucination/evolution/development.py:248>) 只检查 hook 能否到达失败 stage，而未证明该动作能改变目标控制流。
+原因可以定位到接口：CandidateDeveloper._route:660（历史路径：`E:/agent hallucination/agent hallucination/evolution/development.py:660`；本地原件不可用） 取 sufficient_routes[0] 作为 route；engine._development_drafter:1903（历史路径：`E:/agent hallucination/agent hallucination/evolution/engine.py:1903`；本地原件不可用） 收到 `_plan` 但不使用它，proposer 仍看到 family 的全部 treatment_routes；check_l0:248（历史路径：`E:/agent hallucination/agent hallucination/evolution/development.py:248`；本地原件不可用） 只检查 hook 能否到达失败 stage，而未证明该动作能改变目标控制流。
 
 “修改 scanner 的提示”与“让原本不启动的 scanner 启动”是两种能力。名义 hook 对得上，不等于目标轨迹会经过它。同样，规划表标 sufficient 是静态能力分类，不是执行验证通过。
 
@@ -321,10 +323,10 @@ M-A 明确为 `ambiguous / mixed`，observed readings 包含 required_action/omi
 
 这是当前实现中另一个具体的表达能力缺口：
 
-- [proposer.py:158](<E:/agent hallucination/agent hallucination/evolution/proposer.py:158>) 明确规定 evidence_check 本身不改变终局，通常需要同族、消费其 fact 的 decision_guard；FP 路径也明确要求成对起草。
-- development drafter 两处调用都固定 `max_proposals=1`；[proposer.py:658](<E:/agent hallucination/agent hallucination/evolution/proposer.py:658>) 在验证及配对前截断 `raw[:max_proposals]`。
-- [development.py:781](<E:/agent hallucination/agent hallucination/evolution/development.py:781>) 只取 `batch[0]`；drafter 的 renamed 还会把返回的每条 entry 设为同一个 ID。
-- [proposer.py:959](<E:/agent hallucination/agent hallucination/evolution/proposer.py:959>) 删除孤立 evidence_check。
+- proposer.py:158（历史路径：`E:/agent hallucination/agent hallucination/evolution/proposer.py:158`；本地原件不可用） 明确规定 evidence_check 本身不改变终局，通常需要同族、消费其 fact 的 decision_guard；FP 路径也明确要求成对起草。
+- development drafter 两处调用都固定 `max_proposals=1`；proposer.py:658（历史路径：`E:/agent hallucination/agent hallucination/evolution/proposer.py:658`；本地原件不可用） 在验证及配对前截断 `raw[:max_proposals]`。
+- development.py:781（历史路径：`E:/agent hallucination/agent hallucination/evolution/development.py:781`；本地原件不可用） 只取 `batch[0]`；drafter 的 renamed 还会把返回的每条 entry 设为同一个 ID。
+- proposer.py:959（历史路径：`E:/agent hallucination/agent hallucination/evolution/proposer.py:959`；本地原件不可用） 删除孤立 evidence_check。
 
 内存中用最小 evidence E + guard G 检查配对函数，完整两条被识别为 `[['E','G']]`，保留数 2；只传 E 保留数 0，原因 `missing_terminal_partner`。这只验证配对与删除逻辑，不声称这两个最小字典已经通过所有 intervention schema 校验。
 
@@ -336,10 +338,10 @@ M-A 明确为 `ambiguous / mixed`，observed readings 包含 required_action/omi
 
 #### 4.2.1 最明确的数据流缺陷：父候选和反例在提示边界丢失
 
-开发器内部并非没有反思资料：[development.py:927](<E:/agent hallucination/agent hallucination/evolution/development.py:927>) 生成包含完整 L0、L1 与 reasons 的 diagnosis；C1/C2 M-A v002 均保存 `parent.json` 和 `diagnosis.json`。问题发生在传递过程中：
+开发器内部并非没有反思资料：development.py:927（历史路径：`E:/agent hallucination/agent hallucination/evolution/development.py:927`；本地原件不可用） 生成包含完整 L0、L1 与 reasons 的 diagnosis；C1/C2 M-A v002 均保存 `parent.json` 和 `diagnosis.json`。问题发生在传递过程中：
 
 1. drafter 的 feedback 只保留 parent 在 `candidate` 字段，并把详细诊断压成 reasons 字符串，`delta` 直接设为 null。
-2. [proposer.py:532](<E:/agent hallucination/agent hallucination/evolution/proposer.py:532>) 序列化反馈时**不读取 candidate 字段**，只读取顶层 predicate/action/facts；drafter 没有填这些字段，最终均为 null。
+2. proposer.py:532（历史路径：`E:/agent hallucination/agent hallucination/evolution/proposer.py:532`；本地原件不可用） 序列化反馈时**不读取 candidate 字段**，只读取顶层 predicate/action/facts；drafter 没有填这些字段，最终均为 null。
 3. reasons 中案例 ID 被替换成 `[case]`，但没有增加可对应的反例别名与轨迹。因此保留了“两个邻居坏了”，没有保留“哪种正常行为被哪条规则误伤”。
 
 对实际 C1 M-A v001 parent 和 v002 diagnosis，用当前 drafter/proposer 构造提示，并把 `provider_call` 替换为只捕获参数、返回空列表的本地函数，得到：
@@ -364,27 +366,27 @@ M-A 明确为 `ambiguous / mixed`，observed readings 包含 required_action/omi
 
 完整生成提示中不包含 parent 的 predicate 名 `evo_high_conf_clean_tool_case`，也不包含 `Camel/048` 的 Great Hall 反例内容；`research_packet` 为空。这证明当前接口在丢失修订所需输入，而不是证明某个模型不具备反思能力。
 
-更不对称的是：[set_rejection_feedback:372](<E:/agent hallucination/agent hallucination/evolution/proposer.py:372>) 能读取完整 candidate 来计算禁止重提的指纹；**筛选器知道被禁的父版本是什么，起草模型却只看到缺失内容的摘要**。反思在这里接近“收到失败通知后重新生成”，而非针对可观察反例修补父程序。
+更不对称的是：set_rejection_feedback:372（历史路径：`E:/agent hallucination/agent hallucination/evolution/proposer.py:372`；本地原件不可用） 能读取完整 candidate 来计算禁止重提的指纹；**筛选器知道被禁的父版本是什么，起草模型却只看到缺失内容的摘要**。反思在这里接近“收到失败通知后重新生成”，而非针对可观察反例修补父程序。
 
 **反证**：C1/C2 的 v002 仍把局部正确数提升到 9/10，说明压缩反馈并非绝对无法学习；family 正例摘要、既有组件等也仍提供信息。但无法由局部成功证明 parent/反例缺失无害。其影响大小需要在相同模型、预算和开发划分下对照验证。
 
 #### 4.2.2 初始归纳也只得到短摘要，缺乏正反例对照
 
-普通 experiment 的 proposer 接收 `member_summaries/typed_samples`，不是完整训练轨迹。[predicate_dsl.py:640](<E:/agent hallucination/agent hallucination/detector/predicate_dsl.py:640>) 设置 scalar 240 字符、list 最多 6 条、每条 160 字符；C1 的 OpenManus073 提取页面工具观察因此只显示名单前导，奖项具体条目已被截断。其他字段仍能提供部分结果信息，但完整证据关系不可由这些短片段自动恢复。
+普通 experiment 的 proposer 接收 `member_summaries/typed_samples`，不是完整训练轨迹。predicate_dsl.py:640（历史路径：`E:/agent hallucination/agent hallucination/detector/predicate_dsl.py:640`；本地原件不可用） 设置 scalar 240 字符、list 最多 6 条、每条 160 字符；C1 的 OpenManus073 提取页面工具观察因此只显示名单前导，奖项具体条目已被截断。其他字段仍能提供部分结果信息，但完整证据关系不可由这些短片段自动恢复。
 
-普通 proposer 的 `research_packet` 初始化为空，experiment 调用链没有给它设置完整研究包。**当前仓库另有更完整的路径**：[research.py:380](<E:/agent hallucination/agent hallucination/evolution/research.py:380>) 组装完整 label-free training/neighbor record、baseline 和 target_error，并在 `:430` 调用 `set_research_packet`。因此需要解决的是入口能力未统一，不能笼统说“代码从未实现深度研究”。
+普通 proposer 的 `research_packet` 初始化为空，experiment 调用链没有给它设置完整研究包。**当前仓库另有更完整的路径**：research.py:380（历史路径：`E:/agent hallucination/agent hallucination/evolution/research.py:380`；本地原件不可用） 组装完整 label-free training/neighbor record、baseline 和 target_error，并在 `:430` 调用 `set_research_packet`。因此需要解决的是入口能力未统一，不能笼统说“代码从未实现深度研究”。
 
-正常邻居的选择也不是按语义相似性：`attach_normal_neighbors` 收集正确、健康 patrol 行，按 case ID 排序取前 8；每个机制得到几乎相同的列表。它提供的是共享回归保护集，不能自动承担“只差一个关键条件”的机制反例。参见 [worksheet.py:1228](<E:/agent hallucination/agent hallucination/evolution/worksheet.py:1228>)。
+正常邻居的选择也不是按语义相似性：`attach_normal_neighbors` 收集正确、健康 patrol 行，按 case ID 排序取前 8；每个机制得到几乎相同的列表。它提供的是共享回归保护集，不能自动承担“只差一个关键条件”的机制反例。参见 worksheet.py:1228（历史路径：`E:/agent hallucination/agent hallucination/evolution/worksheet.py:1228`；本地原件不可用）。
 
 建议保留共享回归集，同时增加机制匹配的对照：例如“明确未完成必需动作”与“如实报告环境阻塞”，或“源内容与总结冲突”与“来源本身缺乏独立核验”。给模型完整的相关事件窗口、稳定别名和前后预测，长轨迹按证据引用取片段，而非固定只取每个字段开头。既要避免 case ID 记忆，也要保留跨版本可追踪的反例身份。
 
 #### 4.2.3 记忆记录失败，不等于归纳出了能改变搜索策略的经验
 
-本次存在 7 条 episodic、2 个 parser component，procedural 与 improvement 的记录数为 0。不要把 `proposal_memory` 的 `procedures` 数字理解为成功 procedure 数：当前 [engine.py:785](<E:/agent hallucination/agent hallucination/evolution/engine.py:785>) 把 `recall_experience(...).entries` 统一放到 procedures，而 retrieval 同时包含 episodic、procedural 等类型。记录 schema 能区分来源，但字段命名与 prompt 文案会弱化这个区别。
+本次存在 7 条 episodic、2 个 parser component，procedural 与 improvement 的记录数为 0。不要把 `proposal_memory` 的 `procedures` 数字理解为成功 procedure 数：当前 engine.py:785（历史路径：`E:/agent hallucination/agent hallucination/evolution/engine.py:785`；本地原件不可用） 把 `recall_experience(...).entries` 统一放到 procedures，而 retrieval 同时包含 episodic、procedural 等类型。记录 schema 能区分来源，但字段命名与 prompt 文案会弱化这个区别。
 
-[memory.record_episode:99](<E:/agent hallucination/agent hallucination/evolution/memory.py:99>) 主要保存 family、polarity、gate、reason、intervention_id、type/hook 等元数据，没有把候选内容 hash、证据引用、反例机制和局部前后差异作为经验的核心载荷。检索按 family +4、polarity +2、route 重合 +3，随后限量；它衡量的是类别相似，而不是哪条经验最能解释当前冲突。文件仍可经 intervention_id 等进一步追查，问题在于起草链路没有自动完成这一步。
+memory.record_episode:99（历史路径：`E:/agent hallucination/agent hallucination/evolution/memory.py:99`；本地原件不可用） 主要保存 family、polarity、gate、reason、intervention_id、type/hook 等元数据，没有把候选内容 hash、证据引用、反例机制和局部前后差异作为经验的核心载荷。检索按 family +4、polarity +2、route 重合 +3，随后限量；它衡量的是类别相似，而不是哪条经验最能解释当前冲突。文件仍可经 intervention_id 等进一步追查，问题在于起草链路没有自动完成这一步。
 
-路线失败库更窄：[route_failures.insufficiency_evidence:184](<E:/agent hallucination/agent hallucination/evolution/route_failures.py:184>) 要求候选已触发、有行为事件、机会存在、测量成功、无收益也无损害；其他情况不记为 route insufficiency。这个谨慎规则有理由——一次误报或 provider 故障不应永久封杀整条路线。但当前系统缺少**与这些非 insufficiency 结果对应的其他规划动作**：
+路线失败库更窄：route_failures.insufficiency_evidence:184（历史路径：`E:/agent hallucination/agent hallucination/evolution/route_failures.py:184`；本地原件不可用） 要求候选已触发、有行为事件、机会存在、测量成功、无收益也无损害；其他情况不记为 route insufficiency。这个谨慎规则有理由——一次误报或 provider 故障不应永久封杀整条路线。但当前系统缺少**与这些非 insufficiency 结果对应的其他规划动作**：
 
 | 本次反馈 | 现有反应 | 所缺的下一步决策 |
 |---|---|---|
@@ -419,7 +421,7 @@ M-A 明确为 `ambiguous / mixed`，observed readings 包含 required_action/omi
 | M | G 边际收益、新错误及健康 | 4/4 null，未到达 | 如执行，也是同一批行的 G 子集 |
 | combination | 多个合格 unit 的组合效果 | 无合格 unit，未运行 | 多 unit 时才可能新增臂 |
 
-[engine.py:2678](<E:/agent hallucination/agent hallucination/evolution/engine.py:2678>) 对 S∪G 生成一批 candidate_rows，后面切片并调用 gates；[engine.py:4232](<E:/agent hallucination/agent hallucination/evolution/engine.py:4232>) 的 combination 对单一合格 unit 不新增组合臂。因而不能将多个 gate 名称乘以同一回放成本。
+engine.py:2678（历史路径：`E:/agent hallucination/agent hallucination/evolution/engine.py:2678`；本地原件不可用） 对 S∪G 生成一批 candidate_rows，后面切片并调用 gates；engine.py:4232（历史路径：`E:/agent hallucination/agent hallucination/evolution/engine.py:4232`；本地原件不可用） 的 combination 对单一合格 unit 不新增组合臂。因而不能将多个 gate 名称乘以同一回放成本。
 
 确有可整理的重复：L0 与 STRUCTURAL 都检查部分契约；BEHAVIOR、HARMLESSNESS 与 M 都涉及不同范围的回归/健康判定。但开发与正式集不同，L1 与正式检验的重复属于泛化验证，不应全部删除。可以复用以 artifact/config/source hash 为键的静态校验证书，并统一生成一次测量报告，让多个判定读取同一事实。
 
@@ -433,7 +435,7 @@ C1-D002 是本次唯一测量完整的正式候选：12 例中正确数 8 → 9�
 target polarity mismatch: recall claim but no TP gain or precision was harmed
 ```
 
-其中实际是“没有 TP 增益”，不是已观察到 precision 受损。[gates.py:819](<E:/agent hallucination/agent hallucination/evolution/gates.py:819>) 将 recall 的成功定义为新增 TP 且无 TP 损失、无 FP 新增；[structural_gate:343](<E:/agent hallucination/agent hallucination/evolution/gates.py:343>) 又要求 FN family 必须声明 recall。所以简单把该候选改标 precision/boundary 并不能合法穿过现有协议。
+其中实际是“没有 TP 增益”，不是已观察到 precision 受损。gates.py:819（历史路径：`E:/agent hallucination/agent hallucination/evolution/gates.py:819`；本地原件不可用） 将 recall 的成功定义为新增 TP 且无 TP 损失、无 FP 新增；structural_gate:343（历史路径：`E:/agent hallucination/agent hallucination/evolution/gates.py:343`；本地原件不可用） 又要求 FN family 必须声明 recall。所以简单把该候选改标 precision/boundary 并不能合法穿过现有协议。
 
 本次补充审计从冻结 checkpoint 读取原基线 arm `508acdf65658` 与 C1-D002 arm `cfcbd6a587c6`，只取原 G 的六例，调用当前 paired_delta 与配置等价的 meets_m，结果为：
 
@@ -453,7 +455,7 @@ meets_m(config: min_marginal=1, new_errors_allowed=0) -> (True, [])
 
 本次正式 G 有一个 FN，预检据此允许 recall family。它没有给出该 FN（OpenDeepSearch063）与 M-A/M-B 的义务、偏差、可修复操作一致的证据。两个 recall_trigger 在开发目标 BFCL062 上有效，却在正式 12 例 fired=0，正好暴露“局部可触发”和“评估集可验证”之间的距离；这些正式行又含测量失败，因此不能据 fired=0 单独给整个候选定无效。
 
-当前 [engine._mechanism_opportunity:1111](<E:/agent hallucination/agent hallucination/evolution/engine.py:1111>) 在没有 mechanism+membership 绑定时返回 None，继续历史 polarity 语义。另一套 [promotion_alignment.py:95](<E:/agent hallucination/agent hallucination/evolution/promotion_alignment.py:95>) 已要求 confirmed mechanism，并验证 benefit cases 的机制 membership 与 repairable。已有代码说明仓库意识到了这一问题，但本次 experiment 的落盘 opportunity 仍是 recall/precision 计数；不能拿另一入口的能力反推本次已做到机制对齐。
+当前 engine._mechanism_opportunity:1111（历史路径：`E:/agent hallucination/agent hallucination/evolution/engine.py:1111`；本地原件不可用） 在没有 mechanism+membership 绑定时返回 None，继续历史 polarity 语义。另一套 promotion_alignment.py:95（历史路径：`E:/agent hallucination/agent hallucination/evolution/promotion_alignment.py:95`；本地原件不可用） 已要求 confirmed mechanism，并验证 benefit cases 的机制 membership 与 repairable。已有代码说明仓库意识到了这一问题，但本次 experiment 的落盘 opportunity 仍是 recall/precision 计数；不能拿另一入口的能力反推本次已做到机制对齐。
 
 建议在消耗完整开发预算前检查“评估设计是否能检验这个机制”。缺同机制样本应记为评价覆盖不足，继续补样或只做局部研究；不能迫使候选扩大触发到无关案例来满足 fired 门。独立评估器可建立 membership，proposer 不应反复看到封存 gain 的具体失败细节。反复用同一 G 决策也应记录 exposure，避免后续把它称作未见测试集。
 
@@ -466,7 +468,7 @@ status=deterministic_replay; applicable=false; rolls=1
 every arm ... is a frozen replay ... jitter is zero by construction
 ```
 
-但冻结的是上游 stage，scanner/upgrade 等后缀仍调用 provider；049 的真实输出截断与 no_quorum 已证实后缀不是静态纯函数。`fresh_control=null`。当前 [requires_fresh_evaluation](<E:/agent hallucination/agent hallucination/detector/replay.py:39>) 在 judge.system、require_full_view_defense 或未知 hook 情况下返回 true，其他 hook 可以复用 judge 后重跑后缀。**无需全流程重跑，不意味着后缀没有采样或运行波动。**
+但冻结的是上游 stage，scanner/upgrade 等后缀仍调用 provider；049 的真实输出截断与 no_quorum 已证实后缀不是静态纯函数。`fresh_control=null`。当前 requires_fresh_evaluation（历史路径：`E:/agent hallucination/agent hallucination/detector/replay.py:39`；本地原件不可用） 在 judge.system、require_full_view_defense 或未知 hook 情况下返回 true，其他 hook 可以复用 judge 后重跑后缀。**无需全流程重跑，不意味着后缀没有采样或运行波动。**
 
 它造成两个评估缺口：无关049的 provider 故障让候选不可评估；049的单次 FP 修复也不能排除自然后缀波动。对 C1-D002 必须同时保留“观察到收益”与“未建立稳定因果归因”，不能只挑对某个论点有利的一面。
 
@@ -624,7 +626,7 @@ flowchart TD
 
 ### 7.5 最小状态模型：减少重复 gate，同时保留必要的保护
 
-建议对每个冻结 `CandidateUnit` 只生产一次带 identity/hash 的逐例 `EvaluationRecord`，再从该记录派生四个互不混淆的结论：`measurable`（权威结果是否齐全）、`mechanism_supported`（声明机制是否被触发并改善）、`utility_delta`（TP/FP/定位及成本变化）、`protected`（正常邻居与关键指标是否不退化）。若 `measurable=false`，状态为 `measurement_pending`，不进入收益计算；若无同机制验证机会，状态为 `coverage_missing`；若只改进 FP 而声明 recall，状态为 `secondary_hypothesis`，不追认原声明。这样可复用同一 12 行正式结果并保留 M 对 G 的独立判定语义，同时避免一个 `passed` 混合测量故障、机制真假和部署收益。当前代码 [behavior_gate](<E:/agent hallucination/agent hallucination/evolution/gates.py:708>)、[meets_m](<E:/agent hallucination/agent hallucination/evolution/gates.py:1208>) 与 [engine._run_unit](<E:/agent hallucination/agent hallucination/evolution/engine.py:2678>) 是改造责任点，不是已经采用新模型的证据。
+建议对每个冻结 `CandidateUnit` 只生产一次带 identity/hash 的逐例 `EvaluationRecord`，再从该记录派生四个互不混淆的结论：`measurable`（权威结果是否齐全）、`mechanism_supported`（声明机制是否被触发并改善）、`utility_delta`（TP/FP/定位及成本变化）、`protected`（正常邻居与关键指标是否不退化）。若 `measurable=false`，状态为 `measurement_pending`，不进入收益计算；若无同机制验证机会，状态为 `coverage_missing`；若只改进 FP 而声明 recall，状态为 `secondary_hypothesis`，不追认原声明。这样可复用同一 12 行正式结果并保留 M 对 G 的独立判定语义，同时避免一个 `passed` 混合测量故障、机制真假和部署收益。当前代码 behavior_gate（历史路径：`E:/agent hallucination/agent hallucination/evolution/gates.py:708`；本地原件不可用）、meets_m（历史路径：`E:/agent hallucination/agent hallucination/evolution/gates.py:1208`；本地原件不可用） 与 engine._run_unit（历史路径：`E:/agent hallucination/agent hallucination/evolution/engine.py:2678`；本地原件不可用） 是改造责任点，不是已经采用新模型的证据。
 
 在实施前应先运行不调用 provider 的契约检查：给同一 M-A 成员换序，机制身份应稳定；把 M-B 的 `required_action_present=not_applicable` 输入归纳器，不得得到已证实的“遗漏”；C1-A 的 parent+diagnosis 进入修订提示后，必须能定位原谓词、两个邻居差分及证据引用；完整 evidence+guard unit 不得被截成单条。再做同边界的 049 空干预重复对照和固定候选回放；这些都通过后，才重跑小规模搜索与全量测量。每项通过与否应直接写入新的审计报告，不能用“修了代码”代替效果验证。
 
@@ -642,7 +644,7 @@ flowchart TD
 
 对进化引擎，应在 `worksheet.py`/机制诊断中区分 `late_attribution`、`missed_detection`、`evidence_missing`、`ambiguous_multi_error`、`runtime_unmeasurable`；把可核实的首次错误、后续传播、正常反例、父候选及逐例差分传给已有 Proposer/L1。测量故障应重测同一冻结候选，不能被记为算法失败；定位标注有歧义时不得为了迎合 gold 强迫改步。
 
-**下一步验证约束**：冻结底座、Top-K、因果窗口、证据快照、总 token 预算与开发/正式数据角色；先 shadow 运行，后做定位、检测反哺、跨轮自进化三组独立配对消融，并跟踪权威性、FN/FP、精确步命中与成本。详见 [技术优化设计](uncertainty-guided-causal-audit-design-20261008.md) 和 [组会一页版](../doc/group-meetings/group-meeting-hallucination-localization-results-20261013.md)。
+**下一步验证约束**：冻结底座、Top-K、因果窗口、证据快照、总 token 预算与开发/正式数据角色；先 shadow 运行，后做定位、检测反哺、跨轮自进化三组独立配对消融，并跟踪权威性、FN/FP、精确步命中与成本。详见 [技术优化设计](../research-positioning-and-roadmap.md) 和 [组会一页版](../group-meetings/20261015-results-and-research.md)。
 
 ## 9. 附录：本地证据、复核方法与文件清单
 
@@ -652,59 +654,59 @@ flowchart TD
 
 | 编号 | 文件 | 关键定位/证明内容 |
 |---|---|---|
-| E01 | [artifacts\full693-20260924T143024Z\run_plan.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/run_plan.json>) | dataset、execution、stages、authorization_note |
-| E02 | [artifacts\full693-20260924T143024Z\evolution_config.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/evolution_config.json>) | budget/development/gates/mini_effect/proposer |
-| E03 | [artifacts\full693-20260924T143024Z\inputs\development.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/inputs/development.json>) | 30+10 例成员 |
-| E04 | [artifacts\full693-20260924T143024Z\inputs\measurement_v1.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/inputs/measurement_v1.json>) | 653 例、excluded_mini_split、cases_digest |
-| E05 | [artifacts\full693-20260924T143024Z\inputs\development_exposure.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/inputs/development_exposure.json>) | 历史曝光范围及用途声明 |
-| E06 | [artifacts\full693-20260924T143024Z\preflight-evolution.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/preflight-evolution.json>) | checks[split] blocker 与技术就绪项 |
-| E07 | [artifacts\full693-20260924T143024Z\preflight-baseline.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/preflight-baseline.json>) | baseline 预检通过 |
-| E08 | [artifacts\full693-20260924T143024Z\launch_evolution.ps1](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/launch_evolution.ps1>) | 真实启动命令 --mini |
-| E09 | [artifacts\full693-20260924T143024Z\evolution.exitcode.txt](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/evolution.exitcode.txt>) | 退出码 2 |
-| E10 | [artifacts\full693-20260924T143024Z\evolution.stdout.log](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/evolution.stdout.log>) | 与最终 experiment.json 等价的 JSON |
-| E11 | [artifacts\full693-20260924T143024Z\work\evolution\ledger.jsonl](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/ledger.jsonl>) | 37 条带 UTC 时间的事件与哈希链 |
-| E12 | [artifacts\full693-20260924T143024Z\work\evolution\reports\experiment.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/reports/experiment.json>) | cycles_completed、active、mini_effect、registry_state |
-| E13 | [artifacts\full693-20260924T143024Z\work\evolution\reports\defect_audit_verdict.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/reports/defect_audit_verdict.json>) | 缺陷审计 passed；不计入真实候选 |
-| E14 | [artifacts\full693-20260924T143024Z\work\evolution\registry\active.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/registry/active.json>) | 空 interventions 与不变 hash |
-| E15 | [artifacts\full693-20260924T143024Z\work\evolution\candidates\archive_summary.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/candidates/archive_summary.json>) | 7 版本、4 ready、3 failed、2 parser |
-| E16 | [artifacts\full693-20260924T143024Z\work\evolution\candidates\candidates.jsonl](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/candidates/candidates.jsonl>) | 逐版本归档 |
-| E17 | [artifacts\full693-20260924T143024Z\work\evolution\components\components.jsonl](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/components/components.jsonl>) | 两个诊断性可复用 parser |
-| E18 | [artifacts\full693-20260924T143024Z\work\evolution\memory\episodic.jsonl](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/memory/episodic.jsonl>) | 7 条：正式不可评估为第 2、5、6 行 |
-| E19 | [artifacts\full693-20260924T143024Z\work\evolution\harness\harness_history.jsonl](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/harness/harness_history.jsonl>) | 三轮 manifest 与 M 更新 |
-| E20 | [artifacts\full693-20260924T143024Z\monitor.jsonl](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/monitor.jsonl>) | 665 行；末行 runner_stopped |
-| E21 | [artifacts\full693-20260924T143024Z\live_status.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/live_status.json>) | 旧 running 文本与新 completed 混存 |
-| E22 | [artifacts\full693-20260924T143024Z\measurement\g0\baseline_report.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/measurement/g0/baseline_report.json>) | coverage、metrics、terminal_metrics、step_localization |
-| E23 | [artifacts\full693-20260924T143024Z\measurement\g0\runs\full693-g0\run.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/measurement/g0/runs/full693-g0/run.json>) | measurement run manifest；started_at 为当前 attempt，不当原始启动时刻 |
-| E24 | [artifacts\full693-20260924T143024Z\measurement\g0\runs\full693-g0\summary.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/measurement/g0/runs/full693-g0/summary.json>) | measurement 批次汇总 |
-| E25 | [artifacts\full693-20260924T143024Z\measurement\g0\monitor.jsonl](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/measurement/g0/monitor.jsonl>) | 3584 行的独立 g0 进度 |
-| E26 | [artifacts\full693-20260924T143024Z\experiment_journal.md](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/experiment_journal.md>) | 后补实验叙述，仅辅助，不覆盖原始结果 |
+| E01 | [artifacts\full693-20260924T143024Z\run_plan.json](../../artifacts/full693-20260924T143024Z/run_plan.json) | dataset、execution、stages、authorization_note |
+| E02 | [artifacts\full693-20260924T143024Z\evolution_config.json](../../artifacts/full693-20260924T143024Z/evolution_config.json) | budget/development/gates/mini_effect/proposer |
+| E03 | [artifacts\full693-20260924T143024Z\inputs\development.json](../../artifacts/full693-20260924T143024Z/inputs/development.json) | 30+10 例成员 |
+| E04 | [artifacts\full693-20260924T143024Z\inputs\measurement_v1.json](../../artifacts/full693-20260924T143024Z/inputs/measurement_v1.json) | 653 例、excluded_mini_split、cases_digest |
+| E05 | [artifacts\full693-20260924T143024Z\inputs\development_exposure.json](../../artifacts/full693-20260924T143024Z/inputs/development_exposure.json) | 历史曝光范围及用途声明 |
+| E06 | [artifacts\full693-20260924T143024Z\preflight-evolution.json](../../artifacts/full693-20260924T143024Z/preflight-evolution.json) | checks[split] blocker 与技术就绪项 |
+| E07 | [artifacts\full693-20260924T143024Z\preflight-baseline.json](../../artifacts/full693-20260924T143024Z/preflight-baseline.json) | baseline 预检通过 |
+| E08 | [artifacts\full693-20260924T143024Z\launch_evolution.ps1](../../artifacts/full693-20260924T143024Z/launch_evolution.ps1) | 真实启动命令 --mini |
+| E09 | [artifacts\full693-20260924T143024Z\evolution.exitcode.txt](../../artifacts/full693-20260924T143024Z/evolution.exitcode.txt) | 退出码 2 |
+| E10 | [artifacts\full693-20260924T143024Z\evolution.stdout.log](../../artifacts/full693-20260924T143024Z/evolution.stdout.log) | 与最终 experiment.json 等价的 JSON |
+| E11 | [artifacts\full693-20260924T143024Z\work\evolution\ledger.jsonl](../../artifacts/full693-20260924T143024Z/work/evolution/ledger.jsonl) | 37 条带 UTC 时间的事件与哈希链 |
+| E12 | [artifacts\full693-20260924T143024Z\work\evolution\reports\experiment.json](../../artifacts/full693-20260924T143024Z/work/evolution/reports/experiment.json) | cycles_completed、active、mini_effect、registry_state |
+| E13 | [artifacts\full693-20260924T143024Z\work\evolution\reports\defect_audit_verdict.json](../../artifacts/full693-20260924T143024Z/work/evolution/reports/defect_audit_verdict.json) | 缺陷审计 passed；不计入真实候选 |
+| E14 | [artifacts\full693-20260924T143024Z\work\evolution\registry\active.json](../../artifacts/full693-20260924T143024Z/work/evolution/registry/active.json) | 空 interventions 与不变 hash |
+| E15 | [artifacts\full693-20260924T143024Z\work\evolution\candidates\archive_summary.json](../../artifacts/full693-20260924T143024Z/work/evolution/candidates/archive_summary.json) | 7 版本、4 ready、3 failed、2 parser |
+| E16 | [artifacts\full693-20260924T143024Z\work\evolution\candidates\candidates.jsonl](../../artifacts/full693-20260924T143024Z/work/evolution/candidates/candidates.jsonl) | 逐版本归档 |
+| E17 | [artifacts\full693-20260924T143024Z\work\evolution\components\components.jsonl](../../artifacts/full693-20260924T143024Z/work/evolution/components/components.jsonl) | 两个诊断性可复用 parser |
+| E18 | [artifacts\full693-20260924T143024Z\work\evolution\memory\episodic.jsonl](../../artifacts/full693-20260924T143024Z/work/evolution/memory/episodic.jsonl) | 7 条：正式不可评估为第 2、5、6 行 |
+| E19 | [artifacts\full693-20260924T143024Z\work\evolution\harness\harness_history.jsonl](../../artifacts/full693-20260924T143024Z/work/evolution/harness/harness_history.jsonl) | 三轮 manifest 与 M 更新 |
+| E20 | [artifacts\full693-20260924T143024Z\monitor.jsonl](../../artifacts/full693-20260924T143024Z/monitor.jsonl) | 665 行；末行 runner_stopped |
+| E21 | [artifacts\full693-20260924T143024Z\live_status.json](../../artifacts/full693-20260924T143024Z/live_status.json) | 旧 running 文本与新 completed 混存 |
+| E22 | [artifacts\full693-20260924T143024Z\measurement\g0\baseline_report.json](../../artifacts/full693-20260924T143024Z/measurement/g0/baseline_report.json) | coverage、metrics、terminal_metrics、step_localization |
+| E23 | [artifacts\full693-20260924T143024Z\measurement\g0\runs\full693-g0\run.json](../../artifacts/full693-20260924T143024Z/measurement/g0/runs/full693-g0/run.json) | measurement run manifest；started_at 为当前 attempt，不当原始启动时刻 |
+| E24 | [artifacts\full693-20260924T143024Z\measurement\g0\runs\full693-g0\summary.json](../../artifacts/full693-20260924T143024Z/measurement/g0/runs/full693-g0/summary.json) | measurement 批次汇总 |
+| E25 | [artifacts\full693-20260924T143024Z\measurement\g0\monitor.jsonl](../../artifacts/full693-20260924T143024Z/measurement/g0/monitor.jsonl) | 3584 行的独立 g0 进度 |
+| E26 | [artifacts\full693-20260924T143024Z\experiment_journal.md](../../artifacts/full693-20260924T143024Z/experiment_journal.md) | 后补实验叙述，仅辅助，不覆盖原始结果 |
 
 ### 9.2 每轮与每版本文件
 
-- C1：[cycle001.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle001.json>)；[checkpoint.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/checkpoint.json>)。关键键为 `development.runs`、`gates`、`instrument`、`combination`、`harness.diff`。
-- C2：[cycle002.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle002.json>)；[checkpoint.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle002/checkpoint.json>)。关键键为 `development.runs`、`gates`、`instrument`、`combination`、`harness.diff`。
-- C3：[cycle003.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle003.json>)；[checkpoint.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle003/checkpoint.json>)。关键键为 `development.runs`、`gates`、`instrument`、`combination`、`harness.diff`。
-- [development\cycle001\M-17084a0707a4\v001\development.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v001/development.json>)；[candidate.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v001/candidate.json>)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
-- [development\cycle001\M-17084a0707a4\v002\development.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v002/development.json>)；[candidate.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v002/candidate.json>)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
-- [development\cycle001\M-dcd34940c9d8\v001\development.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-dcd34940c9d8/v001/development.json>)；[candidate.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-dcd34940c9d8/v001/candidate.json>)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
-- [development\cycle002\M-17084a0707a4\v001\development.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-17084a0707a4/v001/development.json>)；[candidate.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-17084a0707a4/v001/candidate.json>)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
-- [development\cycle002\M-17084a0707a4\v002\development.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-17084a0707a4/v002/development.json>)；[candidate.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-17084a0707a4/v002/candidate.json>)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
-- [development\cycle002\M-dcd34940c9d8\v001\development.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-dcd34940c9d8/v001/development.json>)；[candidate.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-dcd34940c9d8/v001/candidate.json>)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
-- [development\cycle003\M-dcd34940c9d8\v001\development.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle003/M-dcd34940c9d8/v001/development.json>)；[candidate.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle003/M-dcd34940c9d8/v001/candidate.json>)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
+- C1：[cycle001.json](../../artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle001.json)；[checkpoint.json](../../artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/checkpoint.json)。关键键为 `development.runs`、`gates`、`instrument`、`combination`、`harness.diff`。
+- C2：[cycle002.json](../../artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle002.json)；[checkpoint.json](../../artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle002/checkpoint.json)。关键键为 `development.runs`、`gates`、`instrument`、`combination`、`harness.diff`。
+- C3：[cycle003.json](../../artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle003.json)；[checkpoint.json](../../artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle003/checkpoint.json)。关键键为 `development.runs`、`gates`、`instrument`、`combination`、`harness.diff`。
+- [development\cycle001\M-17084a0707a4\v001\development.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v001/development.json)；[candidate.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v001/candidate.json)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
+- [development\cycle001\M-17084a0707a4\v002\development.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v002/development.json)；[candidate.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v002/candidate.json)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
+- [development\cycle001\M-dcd34940c9d8\v001\development.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-dcd34940c9d8/v001/development.json)；[candidate.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-dcd34940c9d8/v001/candidate.json)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
+- [development\cycle002\M-17084a0707a4\v001\development.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-17084a0707a4/v001/development.json)；[candidate.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-17084a0707a4/v001/candidate.json)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
+- [development\cycle002\M-17084a0707a4\v002\development.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-17084a0707a4/v002/development.json)；[candidate.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-17084a0707a4/v002/candidate.json)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
+- [development\cycle002\M-dcd34940c9d8\v001\development.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-dcd34940c9d8/v001/development.json)；[candidate.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle002/M-dcd34940c9d8/v001/candidate.json)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
+- [development\cycle003\M-dcd34940c9d8\v001\development.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle003/M-dcd34940c9d8/v001/development.json)；[candidate.json](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle003/M-dcd34940c9d8/v001/candidate.json)。候选定义看 `candidate.type/hook/body/claim`；验证看 `l0`、`l1.delta.rows`、`l1.target_improved/neighbor_regressed`。
 
 ### 9.3 关键逐臂与原始案例
 
-- [checkpoints/cycle001/arms/508acdf65658/078a43f81b05.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/arms/508acdf65658/078a43f81b05.json>)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
-- [checkpoints/cycle001/arms/78dc3c5de734/078a43f81b05.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/arms/78dc3c5de734/078a43f81b05.json>)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
-- [checkpoints/cycle001/arms/cfcbd6a587c6/078a43f81b05.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/arms/cfcbd6a587c6/078a43f81b05.json>)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
-- [checkpoints/cycle002/arms/de64995761c7/078a43f81b05.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle002/arms/de64995761c7/078a43f81b05.json>)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
-- [checkpoints/cycle002/arms/229ebec61264/078a43f81b05.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle002/arms/229ebec61264/078a43f81b05.json>)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
-- [checkpoints/cycle003/arms/a476e26ed85b/7f232f63ee61.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle003/arms/a476e26ed85b/7f232f63ee61.json>)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
-- [D/BFCL/062.json](<E:/agent hallucination/agent hallucination/datasets/raw/agenthallu/AgentHallu/BFCL/062.json>)：题目、gold、轨迹与最终回答；只按工作区标签评分。
-- [D/OpenDeepSearch/086.json](<E:/agent hallucination/agent hallucination/datasets/raw/agenthallu/AgentHallu/OpenDeepSearch/086.json>)：题目、gold、轨迹与最终回答；只按工作区标签评分。
-- [D/OpenManus/073.json](<E:/agent hallucination/agent hallucination/datasets/raw/agenthallu/AgentHallu/OpenManus/073.json>)：题目、gold、轨迹与最终回答；只按工作区标签评分。
-- [D/Magentic_One/049.json](<E:/agent hallucination/agent hallucination/datasets/raw/agenthallu/AgentHallu/Magentic_One/049.json>)：题目、gold、轨迹与最终回答；只按工作区标签评分。
-- [D/Camel/048.json](<E:/agent hallucination/agent hallucination/datasets/raw/agenthallu/AgentHallu/Camel/048.json>)：题目、gold、轨迹与最终回答；只按工作区标签评分。
+- [checkpoints/cycle001/arms/508acdf65658/078a43f81b05.json](../../artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/arms/508acdf65658/078a43f81b05.json)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
+- [checkpoints/cycle001/arms/78dc3c5de734/078a43f81b05.json](../../artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/arms/78dc3c5de734/078a43f81b05.json)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
+- [checkpoints/cycle001/arms/cfcbd6a587c6/078a43f81b05.json](../../artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle001/arms/cfcbd6a587c6/078a43f81b05.json)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
+- [checkpoints/cycle002/arms/de64995761c7/078a43f81b05.json](../../artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle002/arms/de64995761c7/078a43f81b05.json)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
+- [checkpoints/cycle002/arms/229ebec61264/078a43f81b05.json](../../artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle002/arms/229ebec61264/078a43f81b05.json)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
+- [checkpoints/cycle003/arms/a476e26ed85b/7f232f63ee61.json](../../artifacts/full693-20260924T143024Z/work/evolution/checkpoints/cycle003/arms/a476e26ed85b/7f232f63ee61.json)：`row.case/gold/prediction/authority`、`row.result.stage_status/provenance/execution/proof`。
+- [D/BFCL/062.json](../../datasets/raw/agenthallu/AgentHallu/BFCL/062.json)：题目、gold、轨迹与最终回答；只按工作区标签评分。
+- [D/OpenDeepSearch/086.json](../../datasets/raw/agenthallu/AgentHallu/OpenDeepSearch/086.json)：题目、gold、轨迹与最终回答；只按工作区标签评分。
+- [D/OpenManus/073.json](../../datasets/raw/agenthallu/AgentHallu/OpenManus/073.json)：题目、gold、轨迹与最终回答；只按工作区标签评分。
+- [D/Magentic_One/049.json](../../datasets/raw/agenthallu/AgentHallu/Magentic_One/049.json)：题目、gold、轨迹与最终回答；只按工作区标签评分。
+- [D/Camel/048.json](../../datasets/raw/agenthallu/AgentHallu/Camel/048.json)：题目、gold、轨迹与最终回答；只按工作区标签评分。
 
 ### 9.4 完整 ledger 事件时间表
 
@@ -760,20 +762,20 @@ flowchart TD
 
 当前源码解释位置（源码摘要不等于原运行；不能单独用于证明历史执行）：
 
-- [evolution/cli.py:96](<E:/agent hallucination/agent hallucination/evolution/cli.py:96>)：mini 效果失败返回 2。
-- [evolution/gates.py:707](<E:/agent hallucination/agent hallucination/evolution/gates.py:707>)：行为触发、健康性、recall/precision 极性检查。
-- [evolution/engine.py:2700](<E:/agent hallucination/agent hallucination/evolution/engine.py:2700>)：行为通过才计算 M；不可测 verdict 标记。
-- [evolution/engine.py:1588](<E:/agent hallucination/agent hallucination/evolution/engine.py:1588>)：开发目标截断与失败版本不送正式门控。
-- [evolution/engine.py:2991](<E:/agent hallucination/agent hallucination/evolution/engine.py:2991>)：detection 后接 localization 的族顺序。
-- [evolution/backends.py:519](<E:/agent hallucination/agent hallucination/evolution/backends.py:519>)：冻结 stage 与 hook 对应的下游重跑。
-- [evolution/backends.py:1267](<E:/agent hallucination/agent hallucination/evolution/backends.py:1267>)：hook 依赖和 replay boundary。
-- [evolution/development.py:736](<E:/agent hallucination/agent hallucination/evolution/development.py:736>)：起草计数、空候选停止。
-- [evolution/proposer.py:470](<E:/agent hallucination/agent hallucination/evolution/proposer.py:470>)：全局 llm_calls 拒绝。
-- [evolution/proposer.py:846](<E:/agent hallucination/agent hallucination/evolution/proposer.py:846>)：内部 repair 也受调用预算约束。
-- [evolution/proposer.py:372](<E:/agent hallucination/agent hallucination/evolution/proposer.py:372>)：不可评估不作为永久证伪。
-- [evolution/proposer.py:987](<E:/agent hallucination/agent hallucination/evolution/proposer.py:987>)：文本候选指纹。
-- [detector/recaller.py:487](<E:/agent hallucination/agent hallucination/detector/recaller.py:487>)：可用票少于 quorum 时不能升级。
-- [evolution/ledger.py:139](<E:/agent hallucination/agent hallucination/evolution/ledger.py:139>)：账本 SHA-256 校验。
+- evolution/cli.py:96（历史路径：`E:/agent hallucination/agent hallucination/evolution/cli.py:96`；本地原件不可用）：mini 效果失败返回 2。
+- evolution/gates.py:707（历史路径：`E:/agent hallucination/agent hallucination/evolution/gates.py:707`；本地原件不可用）：行为触发、健康性、recall/precision 极性检查。
+- evolution/engine.py:2700（历史路径：`E:/agent hallucination/agent hallucination/evolution/engine.py:2700`；本地原件不可用）：行为通过才计算 M；不可测 verdict 标记。
+- evolution/engine.py:1588（历史路径：`E:/agent hallucination/agent hallucination/evolution/engine.py:1588`；本地原件不可用）：开发目标截断与失败版本不送正式门控。
+- evolution/engine.py:2991（历史路径：`E:/agent hallucination/agent hallucination/evolution/engine.py:2991`；本地原件不可用）：detection 后接 localization 的族顺序。
+- evolution/backends.py:519（历史路径：`E:/agent hallucination/agent hallucination/evolution/backends.py:519`；本地原件不可用）：冻结 stage 与 hook 对应的下游重跑。
+- evolution/backends.py:1267（历史路径：`E:/agent hallucination/agent hallucination/evolution/backends.py:1267`；本地原件不可用）：hook 依赖和 replay boundary。
+- evolution/development.py:736（历史路径：`E:/agent hallucination/agent hallucination/evolution/development.py:736`；本地原件不可用）：起草计数、空候选停止。
+- evolution/proposer.py:470（历史路径：`E:/agent hallucination/agent hallucination/evolution/proposer.py:470`；本地原件不可用）：全局 llm_calls 拒绝。
+- evolution/proposer.py:846（历史路径：`E:/agent hallucination/agent hallucination/evolution/proposer.py:846`；本地原件不可用）：内部 repair 也受调用预算约束。
+- evolution/proposer.py:372（历史路径：`E:/agent hallucination/agent hallucination/evolution/proposer.py:372`；本地原件不可用）：不可评估不作为永久证伪。
+- evolution/proposer.py:987（历史路径：`E:/agent hallucination/agent hallucination/evolution/proposer.py:987`；本地原件不可用）：文本候选指纹。
+- detector/recaller.py:487（历史路径：`E:/agent hallucination/agent hallucination/detector/recaller.py:487`；本地原件不可用）：可用票少于 quorum 时不能升级。
+- evolution/ledger.py:139（历史路径：`E:/agent hallucination/agent hallucination/evolution/ledger.py:139`；本地原件不可用）：账本 SHA-256 校验。
 
 成本限制：checkpoint、cache、cycles、report/stdout 复制了同一结果；不能逐文件相加 total_tokens 作为实验总成本。本文仅引用具体单次 execution 的 request/usage 与 C3 停止记录，不给出未去重的自进化总 token 数。
 
@@ -785,22 +787,22 @@ flowchart TD
 
 | 文件 | 关键定位及用途 |
 |---|---|
-| [cycle001.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle001.json>) | `patrol.detection_families` 的机制、短摘要与 predicate；`capability_plan`；`gates[1]`；`evidence.active`；`instrument.noise_floor` |
-| [cycle002.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle002.json>) | 路线与开发状态、正式不可测、route_failures=0 |
-| [cycle003.json](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle003.json>) | 零正式候选、预算停止、定位跳过、route_failures=0 |
-| [C1-A parent 候选](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v001/candidate.json>) | `candidate.body.predicate=evo_high_conf_clean_tool_case`；提示探针输入 |
-| [C1-A 修订诊断](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v002/diagnosis.json>) | 完整 L1/reasons；对照提示最终丢失字段 |
-| [C1-B development](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-dcd34940c9d8/v001/development.json>) | action_class=evolved_predicate 与真实候选类型对照 |
-| [C1-B candidate](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-dcd34940c9d8/v001/candidate.json>) | candidate.type=text_boundary、hook=upgrade.system |
-| [episodic.jsonl](<E:/agent hallucination/agent hallucination/artifacts/full693-20260924T143024Z/work/evolution/memory/episodic.jsonl>) | 7 条记录的类型、内容粒度与 unevaluable |
-| [mechanisms.py](<E:/agent hallucination/agent hallucination/evolution/mechanisms.py>) | 义务优先级、偏差映射、first-reading 身份、confirmed 条件 |
-| [development.py](<E:/agent hallucination/agent hallucination/evolution/development.py>) | L0 可达性、邻居 runner 条件、单条 candidate、完整 diagnosis |
-| [proposer.py](<E:/agent hallucination/agent hallucination/evolution/proposer.py>) | 联合动作要求、feedback 序列化、raw 截断、orphan 删除 |
-| [research.py](<E:/agent hallucination/agent hallucination/evolution/research.py>) | 已有完整研究包与多 entry 研究入口，供统一方案复用 |
-| [promotion_alignment.py](<E:/agent hallucination/agent hallucination/evolution/promotion_alignment.py>) | 已有机制 membership、repairable 与 confirmed 校验 |
-| [route_failures.py](<E:/agent hallucination/agent hallucination/evolution/route_failures.py>) | insufficiency 记录为何不覆盖本次主要失败类型 |
-| [predicate_dsl.py](<E:/agent hallucination/agent hallucination/detector/predicate_dsl.py>) | typed profile 的 240/6/160 摘要限制 |
-| [dataset.py](<E:/agent hallucination/agent hallucination/detector/dataset.py>)、[judge.py](<E:/agent hallucination/agent hallucination/detector/judge.py>) | 输入投影与可用证据限制 |
+| [cycle001.json](../../artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle001.json) | `patrol.detection_families` 的机制、短摘要与 predicate；`capability_plan`；`gates[1]`；`evidence.active`；`instrument.noise_floor` |
+| [cycle002.json](../../artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle002.json) | 路线与开发状态、正式不可测、route_failures=0 |
+| [cycle003.json](../../artifacts/full693-20260924T143024Z/work/evolution/cycles/cycle003.json) | 零正式候选、预算停止、定位跳过、route_failures=0 |
+| [C1-A parent 候选](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v001/candidate.json) | `candidate.body.predicate=evo_high_conf_clean_tool_case`；提示探针输入 |
+| [C1-A 修订诊断](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-17084a0707a4/v002/diagnosis.json) | 完整 L1/reasons；对照提示最终丢失字段 |
+| [C1-B development](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-dcd34940c9d8/v001/development.json) | action_class=evolved_predicate 与真实候选类型对照 |
+| [C1-B candidate](../../artifacts/full693-20260924T143024Z/work/evolution/development/cycle001/M-dcd34940c9d8/v001/candidate.json) | candidate.type=text_boundary、hook=upgrade.system |
+| [episodic.jsonl](../../artifacts/full693-20260924T143024Z/work/evolution/memory/episodic.jsonl) | 7 条记录的类型、内容粒度与 unevaluable |
+| [mechanisms.py](../../evolution/mechanisms.py) | 义务优先级、偏差映射、first-reading 身份、confirmed 条件 |
+| [development.py](../../evolution/development.py) | L0 可达性、邻居 runner 条件、单条 candidate、完整 diagnosis |
+| [proposer.py](../../evolution/proposer.py) | 联合动作要求、feedback 序列化、raw 截断、orphan 删除 |
+| [research.py](../../evolution/research.py) | 已有完整研究包与多 entry 研究入口，供统一方案复用 |
+| [promotion_alignment.py](../../evolution/promotion_alignment.py) | 已有机制 membership、repairable 与 confirmed 校验 |
+| [route_failures.py](../../evolution/route_failures.py) | insufficiency 记录为何不覆盖本次主要失败类型 |
+| [predicate_dsl.py](../../detector/predicate_dsl.py) | typed profile 的 240/6/160 摘要限制 |
+| [dataset.py](../../detector/dataset.py)、[judge.py](../../detector/judge.py) | 输入投影与可用证据限制 |
 
 #### 9.6.2 本次已经运行的补充检查
 
