@@ -78,7 +78,7 @@ _CAUSAL_DEFAULTS = {
     "max_added_prompt_tokens_per_case": 6000, "max_added_output_tokens_per_case": 1500,
     "max_added_seconds_per_case": 30, "counterfactual_mode": "deterministic_only",
     "negative_feedback_enabled": False, "negative_feedback_policy": None,
-    "scorer_artifact": None,
+    "scorer_artifact": None, "next_action_mode": "off",
 }
 
 
@@ -167,6 +167,7 @@ def validate_causal_config(raw: Any, *, base_dir: str | Path) -> dict[str, Any]:
         "mode": {"off", "shadow", "tracer_context"},
         "score_source": {"semantic_proxy", "teacher_forced_ppl"},
         "counterfactual_mode": {"deterministic_only", "model_hypothesis"},
+        "next_action_mode": {"off", "shadow", "judge_context"},
     }.items():
         if not isinstance(policy[key], str) or policy[key] not in choices:
             raise ValueError(f"causal_audit.{key} is unsupported")

@@ -76,6 +76,8 @@ def build_replay_inputs(
             payload["audit"] = audit
         if stage == "judge":
             payload["review_policy"] = review_policy
+            if (config.get("causal_audit") or {}).get("next_action_mode", "off") != "off":
+                payload["action_forecast_policy"] = audit
         stages[stage] = digest(payload)
     payload = {"schema_version": REPLAY_INPUTS_SCHEMA, "stage_digests": stages}
     return {**payload, "digest": digest(payload)}

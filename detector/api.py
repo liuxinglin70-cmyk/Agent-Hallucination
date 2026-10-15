@@ -623,6 +623,14 @@ class Detector:
             "defense": defense_result.get("provider") if defense_result else None,
         }
         proof["judge"] = judge_result.get("parsed")
+        if judge_result.get("action_forecast") is not None:
+            proof["action_forecast"] = judge_result["action_forecast"]
+            proof["action_forecast_used"] = judge_result.get("action_forecast_used", False)
+            ballots = judge_result.get("raw")
+            ballots = ballots if isinstance(ballots, list) else [ballots]
+            proof["next_action_vote_comparisons"] = [
+                ballot.get("next_action_comparisons", []) for ballot in ballots if isinstance(ballot, Mapping)
+            ]
         proof["recall_candidates"] = (
             recall_result.get("candidates") if recall_result else None
         )

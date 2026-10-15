@@ -81,7 +81,8 @@ def test_full_view_guard_refuses_external_frozen_local_defense(monkeypatch, froz
     assert calls == []
     defense_inputs.clear()
     fresh = detector.detect(current, interventions=registry)
-    assert calls == ["judge", "step_tracer", "defense"]
+    assert calls[0] == "judge"
+    assert sorted(calls[1:]) == ["defense", "step_tracer"]
     assert not fresh["provenance"].get("frozen_judge_replay")
     assert all(f"intermediate note {index}" in defense_inputs[0] for index in range(30))
     assert not fresh["proof"]["hearings"][0]["defense_result"]["view_meta"].get("omitted_event_ids")

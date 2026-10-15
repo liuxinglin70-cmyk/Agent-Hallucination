@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from copy import deepcopy
 from typing import Any, Mapping
+from detector.action_forecast import (
+    FORECAST_JUDGE_EXTENSION, action_comparisons, build_action_forecast, comparison_prompt,
+)
 
 from detector.interventions import InterventionPlan, empty_plan
 from detector.packet import (
@@ -25,7 +28,7 @@ from detector.provider import (
     raise_if_terminal,
     required_quorum,
 )
-from detector.runtime import parallel_ordered
+from detector.runtime import AddedBudgetExceeded, current_added_budget, parallel_ordered
 from detector.semantics import (
     contract_repair_feedback,
     CONTRACT_KINDS,
@@ -141,6 +144,7 @@ def _cast_vote(
     route: Mapping[str, Any],
     system: str,
     user: str,
+    forecast: Mapping[str, Any] | None = None,
 ) -> tuple[dict | None, dict[str, Any] | None, list[dict[str, str]], dict | None]:
     """A recoverable failed ballot abstains; terminal errors propagate."""
     warnings: list[dict[str, str]] = []
@@ -178,6 +182,8 @@ def _cast_vote(
         return None, meta, list(warnings), {
             "error_type": "contract_error", "message": error, "raw": parsed,
         }
+    if forecast is not None:
+        result["next_action_comparisons"] = action_comparisons(parsed, forecast, packet)
     return result, meta, list(warnings), None
 
 
@@ -210,9 +216,16 @@ def run_judge(
         "Judge the trajectory below. Do not use any information that is not "
         "in the question or the trajectory.\n\n" + view_text + task_source_block(packet)
     )
+    forecast = build_action_forecast(packet, config=config)
+    forecast_block = comparison_prompt(forecast)
+    base_user = user
+    base_system = system
+    user += forecast_block
+    if forecast_block:
+        system += FORECAST_JUDGE_EXTENSION
     view_state = "complete" if not view_meta.get("degraded") else "degraded"
 
-    def evaluate():
+    def evaluate_votes(active_user, active_forecast, active_system):
         votes = max(1, int(route.get("votes", 1) or 1))
         topup_budget = max(0, int(route.get("vote_topup", 0) or 0))
         ballots: list[dict[str, Any]] = []
@@ -229,7 +242,8 @@ def run_judge(
         # depend on which ballot happened to finish first.
         def cast_at(_index: int) -> tuple:
             return _cast_vote(
-                packet=packet, route=route, system=system, user=user,
+                packet=packet, route=route, system=active_system, user=active_user,
+                **({"forecast": active_forecast} if active_forecast is not None else {}),
             )
 
         def absorb(result: tuple) -> None:
@@ -349,7 +363,25 @@ def run_judge(
             "warnings": warnings,
         }
 
-    return memo_stage('judge', {"packet": packet, "route": route, "system": system, "user": user, "view_meta": view_meta}, evaluate)
+    def evaluate():
+        used = bool(forecast_block)
+        budget = current_added_budget()
+        if used and budget is not None:
+            try:
+                copies = 2 * (max(1, int(route.get("votes", 1))) + max(0, int(route.get("vote_topup", 0))))
+                budget.reserve_context((forecast_block + FORECAST_JUDGE_EXTENSION) * copies)
+            except AddedBudgetExceeded:
+                used = False
+        result, status = evaluate_votes(user if used else base_user, forecast if used else None,
+                                        system if used else base_system)
+        if forecast is not None:
+            result["action_forecast_used"] = used
+        return result, status
+
+    result, status = memo_stage('judge', {"packet": packet, "route": route, "system": system, "user": user, "view_meta": view_meta}, evaluate)
+    if forecast is not None:
+        result = {**result, "action_forecast": forecast}
+    return result, status
 
 
 __all__ = ["run_judge"]
