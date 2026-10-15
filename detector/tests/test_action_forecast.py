@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from detector.action_forecast import action_comparisons, build_action_forecast, prefix_view
+from detector.action_forecast import action_comparisons, build_action_forecast, comparison_prompt, prefix_view
 from detector.api import Detector
 from detector.config import validate_config
 from detector.judge import run_judge
@@ -90,6 +90,8 @@ def test_forecast_rejects_future_or_fabricated_references(monkeypatch, bad):
     forecast = build_action_forecast(build_packet(record()), config=config())
     assert forecast["health"] == "contract_error"
     assert forecast["predictions"] == []
+    assert "rejected_prediction" in forecast
+    assert comparison_prompt(forecast) == ""
 
 
 def test_successful_forecast_is_reused_within_case_retry(monkeypatch):
@@ -241,3 +243,27 @@ def test_comparison_cannot_use_future_references(monkeypatch):
     actual = {"source_event_id": "event_001", "next_event_id": "event_002", "state": "divergent",
               "reason": "Uses later evidence", "evidence_refs": ["event_002", "event_003"], "quote": "5"}
     assert action_comparisons({"next_action_comparisons": [actual]}, forecast, packet)[0]["state"] == "unknown"
+
+
+@pytest.mark.parametrize("observation", ['The result is "ABCD".', "First line\nSecond line", r"C:\Users\example"])
+def test_literal_quote_is_checked_in_channels_before_json_escaping(monkeypatch, observation):
+    value = record()
+    value["history"][0]["tool_responses"] = [observation]
+    parsed = constraints()
+    parsed["constraints"][0]["quote"] = observation
+    install_transport(monkeypatch, bad_prediction=parsed)
+    forecast = build_action_forecast(build_packet(value), config=config())
+    assert forecast["health"] == "ok"
+    assert forecast["predictions"][0]["constraints"][0]["quote"] == observation
+
+
+def test_structured_channels_use_the_same_quote_representation_as_packet_verifier(monkeypatch):
+    value = record()
+    arguments = {"symbol": "ABCD", "confirmed": True}
+    value["history"][0]["tool_calls"][0]["arguments"] = arguments
+    parsed = constraints()
+    parsed["constraints"][0]["quote"] = str(arguments)
+    install_transport(monkeypatch, bad_prediction=parsed)
+    forecast = build_action_forecast(build_packet(value), config=config())
+    assert forecast["health"] == "ok"
+    assert forecast["predictions"][0]["constraints"][0]["quote"] == str(arguments)

@@ -27,8 +27,8 @@ from scripts.verify import source_manifest
 OUT = ROOT / "artifacts/detector/live_checks/next_action100_20261015"
 DATA = ROOT / "datasets/raw/agenthallu/AgentHallu"
 HISTORY = ROOT / "docs/results/localization100-20261015"
-FIRST = "next_action100"
-RECOVERY = "next_action100_recovery"
+FIRST = "next_action100_quote_fixed"
+RECOVERY = "next_action100_quote_fixed_recovery"
 
 
 def read(path):
@@ -119,7 +119,7 @@ def journal_cost():
             row = json.loads(line)
             key = row.get("request_id")
             if key:
-                requests.setdefault(key, {}).update({row["event"]: row})
+                requests.setdefault(key, {"run_id": path.relative_to(OUT / "runs").parts[0]}).update({row["event"]: row})
     starts = [r["request_started"] for r in requests.values() if "request_started" in r]
     finishes = [r["request_finished"] for r in requests.values() if "request_finished" in r]
     usage = Counter()
@@ -129,6 +129,7 @@ def journal_cost():
     return {"started_requests": len(starts), "finished_requests": len(finishes),
             "started_without_finish": sum("request_started" in r and "request_finished" not in r for r in requests.values()),
             "by_purpose": dict(Counter(row.get("purpose") for row in starts)),
+            "started_by_run": dict(Counter(row["run_id"] for row in requests.values() if "request_started" in row)),
             "status_counts": dict(Counter(str(row.get("status")) for row in finishes)),
             "usage": dict(usage), "usage_missing": sum(row.get("usage") is None for row in finishes),
             "pricing": "未取得服务实际账单单价，不估造货币费用。", "journals": journals}
@@ -249,6 +250,7 @@ def status():
     print(json.dumps({"state": manifest["state"], "completed_first": sum(states.values()), "target": 100,
                       "states": dict(states), "authority": dict(authorities),
                       "started_requests": cost["started_requests"], "finished_requests": cost["finished_requests"],
+                      "current_run_started_requests": cost["started_by_run"].get(FIRST, 0),
                       "forecast_requests": cost["by_purpose"].get("action_forecast", 0)}, ensure_ascii=False))
 
 

@@ -46,7 +46,7 @@ matched/divergent 必须引用真实下一事件的动作或声明原文，不�
 
 
 def _text(value: Any, limit: int = 900) -> str:
-    text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+    text = str(value)
     if len(text) <= limit:
         return text
     return text[:limit // 2] + "\n[内容省略]\n" + text[-limit // 2:]
@@ -70,6 +70,17 @@ def prefix_view(packet: Mapping[str, Any], position: int) -> dict[str, Any]:
     return {"question": _text(packet["question"], 1800), "events": events,
             "omitted_event_count": max(0, len(prefix["events"]) - len(events)),
             "channels_may_be_excerpted": True, "prefix_digest": digest(prefix)}
+
+
+def _visible_quote(view: Mapping[str, Any], ref: str, quote: str) -> bool:
+    for event in view["events"]:
+        channels = [event["content"]] if event["event_id"] == ref else []
+        for tool in event["tool_interactions"]:
+            if event["event_id"] == ref or tool["interaction_id"] == ref:
+                channels.extend(tool.get(key) for key in ("tool_name", "arguments", "observation"))
+        if any(isinstance(channel, str) and quote in channel for channel in channels):
+            return True
+    return False
 
 
 def _constraints(parsed: Any, prefix: Mapping[str, Any], view: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -98,9 +109,7 @@ def _constraints(parsed: Any, prefix: Mapping[str, Any], view: Mapping[str, Any]
             error = quote not in prefix["question"] or quote not in view["question"]
         else:
             error = packet_quote_error(prefix, quote, locus=ref, evidence_refs=[ref])
-            visible = next((event for event in view["events"] if event["event_id"] == ref
-                            or any(tool["interaction_id"] == ref for tool in event["tool_interactions"])), None)
-            error = error or visible is None or quote not in json.dumps(visible, ensure_ascii=False)
+            error = error or not _visible_quote(view, ref, quote)
         if error:
             raise ValueError("预测引用不属于可见前缀原文")
         rows.append(row)
@@ -141,14 +150,17 @@ def build_action_forecast(packet: Mapping[str, Any], *, config: Mapping[str, Any
     user = json.dumps(view, ensure_ascii=False)
     route = {**config["judge_route"], "_route_name": "action_forecast", "transport_retries": 0,
              "max_tokens": max(1, policy["max_added_output_tokens_per_case"])}
+    raw_response = None
 
     def predict():
+        nonlocal raw_response
         with added_budget_scope(policy) as budget:
             if budget is None:
                 raise ValueError("预测缺少案例预算")
             with added_request_scope(budget):
                 parsed, meta = provider_call(route=route, system=FORECAST_SYSTEM, user=user,
                                               purpose="action_forecast", cache_tag=view["prefix_digest"])
+            raw_response = parsed
             rows = _constraints(parsed, prefix, view)
         return {"ok": True, "constraints": rows, "provider": meta}, {"state": "ok"}
 
@@ -168,6 +180,9 @@ def build_action_forecast(packet: Mapping[str, Any], *, config: Mapping[str, Any
         result.update(health="provider_error", warnings=[exc.as_dict()])
     except ValueError as exc:
         result.update(health="contract_error", warnings=[str(exc)])
+        if raw_response is not None:
+            result["rejected_prediction"] = {"text": _text(raw_response, 12000),
+                                              "truncated": len(str(raw_response)) > 12000}
     return seal(result)
 
 
