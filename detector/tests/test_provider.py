@@ -392,3 +392,44 @@ def test_case_deadline_raises_when_already_exceeded(monkeypatch):
                 system="s", user="u", purpose="p",
             )
     assert exc.value.error_type == "case_deadline_exceeded"
+
+
+@pytest.mark.parametrize("dispatched", [False, True])
+def test_added_budget_stop_preserves_dispatched_request(dispatched):
+    from contextlib import contextmanager
+    from unittest.mock import patch
+    from detector.runtime import (
+        AddedBudgetExceeded, RunControl, run_scope, usage_scope, request_observer_scope,
+    )
+
+    control = RunControl(1)
+
+    @contextmanager
+    def expired_capacity(**kwargs):
+        raise AddedBudgetExceeded("time")
+        yield
+
+    observations = []
+    with patch.dict("os.environ", {"OFFLINE_BUDGET_KEY": "offline-dummy"}), patch(
+        "detector.provider._isolated_transport", side_effect=AddedBudgetExceeded("time")
+    ) as transport:
+        capacity = (
+            patch.object(control, "request_slot", wraps=control.request_slot) if dispatched
+            else patch.object(control, "request_slot", expired_capacity)
+        )
+        with capacity, run_scope(control), usage_scope() as requests, request_observer_scope(observations.append):
+            with pytest.raises(AddedBudgetExceeded):
+                provider_call(
+                    route={"endpoint": "http://127.0.0.1:1/v1", "model": "fake",
+                           "api_key_env": "OFFLINE_BUDGET_KEY", "transport_retries": 2},
+                    system="s", user="u", purpose="action_forecast",
+                )
+            assert transport.call_count == int(dispatched)
+            assert len(requests) == int(dispatched)
+            expected = ["request_queued", "request_started", "request_finished"] if dispatched else ["request_queued"]
+            assert [row["event"] for row in observations] == expected
+            if dispatched:
+                assert requests[0]["status"] == "added_budget_exceeded"
+                assert requests[0]["resource"] == "time"
+                assert requests[0]["usage"] is None
+    control.check()

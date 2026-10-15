@@ -29,7 +29,7 @@ from contextlib import contextmanager, nullcontext
 from dataclasses import asdict
 from detector.trajectory_budget import bound_request_route
 from detector.runtime import (
-    CaseDeadlineExceeded, CaseExecutionError, RunStopped, check_request_deadline, current_added_request_budget,
+    AddedBudgetExceeded, CaseDeadlineExceeded, CaseExecutionError, RunStopped, check_request_deadline, current_added_request_budget,
     current_added_budget, current_control, current_deadline, deadline_scope, observe_request, record_request, request_deadline,
 )
 
@@ -505,6 +505,13 @@ def _provider_call(
                 status, raw = _isolated_transport(
                     url=url, headers=headers, body=body, timeout=timeout,
                 )
+        except AddedBudgetExceeded as exc:
+            if transport_started:
+                record_request({"request_id": request_id, "purpose": purpose, "attempt": attempts,
+                                "elapsed_seconds": time.perf_counter() - request_started,
+                                "queue_seconds": queue_seconds, "status": "added_budget_exceeded",
+                                "resource": exc.resource, "usage": None})
+            raise
         except CaseDeadlineExceeded:
             if transport_started:
                 record_request({"request_id": request_id, "purpose": purpose, "attempt": attempts,
