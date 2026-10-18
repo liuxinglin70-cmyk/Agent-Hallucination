@@ -153,3 +153,16 @@
 - **未定事项**：按启动前标准判定未通过——检测持平、定位大幅提升，但 FP 7 高于基线 6。新增 FP 中仅 Camel/042 与本机制相关（重开复查后被 scanner 自行发现的候选定罪），SmolAgents/013 无行动候选、走原有路径。是否接受“定位 +18 换 FP +1”的权衡、是否保留“FP 不劣”硬门槛需用户决策；本轮不宣称验收通过。同批样本已两次用于内部测评，未做同源码 off/on 消融，不能把差值全部归因为单模块因果。
 
 - **补充披露**：样本冻结后、正式批次前，曾用样本前 6 例（Camel/002、007、017、019、030、031）跑机制冒烟。冒烟不读金标、不做训练或参数更新，检测器逐次无状态，故不构成标签泄漏；但该 6 例已非“从未被请求”，抽查记录在 next_action_smoke6_20261017，报告第 7 节同步披露。
+
+## 13. 基座加固与排序层实测（2026-10-18）
+
+- **当前任务**：用户要求先完成三项收尾（源码入历史、FP 判据、P0 报告更正），再完成框架优化与 `OptionalBudget` 加固，使检测器基座可作为自进化框架的固定下层。全部完成，未启动真实实验、未改变判定与定位语义。
+- **进度**：
+  - 源码入历史：`ae29425` 原样固定两轮验证所跑的树（含此前未跟踪的 `detector/action_evidence.py`、`action_context.py`）。核对结果：296 文件清单逐文件匹配，0 变更 0 缺失；`f04571a3…` 与 `0fd9bcf0…` 是两个不同摘要口径（全工作区清单 vs. detector 非测试源码），不是源码漂移。
+  - FP 判据：`experiments/reading.py:false_positive_parity` 改为成对精确检验，复用 `evolution/metrics.py:mcnemar_improvement_p`；原始计数保留。判据文本写入 `experiments/plan.py:DEFAULT_CRITERIA["effect"]["false_positive_rule"]`。**非回溯**：第二轮仍按当时冻结标准记为未通过，新判据不重裁历史结果。
+  - P0 报告：根目录与 `docs/analysis/` 两处已标注 `clipping_map` 未实现、候选阈值未放宽（仍为严格多数）；原字节保留。
+  - 排序层：新增 `detector/candidate_scorer.py` 并接线 `causal_audit.scorer_artifact`。仅在同优先级档内排序，权重用 `Decimal` 精确求和，非法 artifact 抛错不降级；无 artifact 时排序键与历史逐项相同（有断言）。
+  - 预算加固：`OptionalBudget` 17 项不变量；`AddedBudgetExceeded.origin` 区分 `case_budget` / `diagnostic_reservation`，`health` 与 `warnings` 形态不变，新增 `exhaustion` 字段。
+  - 验收：2684 项测试通过（1814.45 秒，零失败/错误/跳过）；`scripts/source_audit.py` 通过；探针两次运行结果逐字段一致。
+- **下一步**：按 §12 的结论与本次实测，基座判定语义可定型；读取层（`top_k` 宽度）作为 RSI 框架第一项可测改动，不在本次擅改默认值。
+- **未定事项**：**排序层学习权重实测为负**——留一家庭交叉验证下 top-1 −0.90pp、top-3 −0.45pp（443 例），无一族变好。接线保留但不宣称收益。宽度是当前唯一有量级证据的杠杆（top_k 3→6 覆盖 65.2%→88.9%），是否调整需决策，因为它改变请求成本与上下文。FP 配对判据需 8:1 才判失败，这是 38 阴性样本的真实分辨力；更大阴性样本出现前不应放宽至伪显著。
