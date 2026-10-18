@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import json
+import re
 
 import pytest
 
@@ -59,6 +60,12 @@ def install_transport(monkeypatch, *, bad_prediction=None):
                                                    "evidence_refs": ["event_002"], "quote": "5"}]}
             if "next_action_comparisons" not in kwargs["system"]:
                 parsed.pop("next_action_comparisons")
+        elif purpose == "recall_scanner":
+            parsed = {"candidates": []}
+        elif purpose == "causal_upgrade":
+            parsed = {"upgrades": [{"candidate_id": cid, "content_error": False, "causal": False,
+                                    "corrected_step": None, "reason": "Local divergence does not alone prove materiality.",
+                                    "evidence_refs": []} for cid in re.findall(r"^- ([^: ]+):", kwargs["user"], re.M)]}
         else:
             raise AssertionError(purpose)
         return deepcopy(parsed), {"attempts": 1, "usage": {"total_tokens": 10}}
@@ -91,7 +98,7 @@ def test_forecast_rejects_future_or_fabricated_references(monkeypatch, bad):
     assert forecast["health"] == "contract_error"
     assert forecast["predictions"] == []
     assert "rejected_prediction" in forecast
-    assert comparison_prompt(forecast) == ""
+    assert comparison_prompt(forecast, build_packet(record())) == ""
 
 
 def test_successful_forecast_is_reused_within_case_retry(monkeypatch):
@@ -208,11 +215,12 @@ def test_explicit_failure_reuses_zero_request_boundary(monkeypatch):
     assert not calls
 
 
-def test_comparison_context_budget_is_reserved_before_ballots(monkeypatch):
+def test_optional_request_preflight_preserves_diagnostic_input_allowance(monkeypatch):
     calls = install_transport(monkeypatch)
     cfg = config(max_added_prompt_tokens_per_case=4000)
     result = Detector(cfg, require_credentials=False).detect(record())
-    assert any(call["purpose"] == "action_forecast" for call in calls)
+    assert not any(call["purpose"] == "action_forecast" for call in calls)
+    assert result["proof"]["action_forecast"]["warnings"] == ["input"]
     assert result["proof"]["action_forecast_used"] is False
     assert result["state"] == "verified_clean"
 
@@ -266,4 +274,103 @@ def test_structured_channels_use_the_same_quote_representation_as_packet_verifie
     install_transport(monkeypatch, bad_prediction=parsed)
     forecast = build_action_forecast(build_packet(value), config=config())
     assert forecast["health"] == "ok"
-    assert forecast["predictions"][0]["constraints"][0]["quote"] == str(arguments)
+
+
+def test_comparison_failure_detail_when_missing(monkeypatch):
+    """测试比较缺失时的详细失败原因"""
+    install_transport(monkeypatch)
+    packet = build_packet(record())
+    forecast = build_action_forecast(packet, config=config())
+    # 没有提供任何比较
+    result = action_comparisons({}, forecast, packet)
+    assert len(result) == 1
+    assert result[0]["validation_state"] == "missing"
+    assert result[0]["failure_detail"] == "model_did_not_provide_comparison"
+
+
+def test_comparison_failure_detail_when_duplicate(monkeypatch):
+    """测试重复比较时的详细失败原因"""
+    install_transport(monkeypatch)
+    packet = build_packet(record())
+    forecast = build_action_forecast(packet, config=config())
+    # 提供重复的比较
+    duplicate = {"source_event_id": "event_001", "next_event_id": "event_002",
+                 "state": "matched", "reason": "OK", "evidence_refs": ["event_002"], "quote": "5"}
+    result = action_comparisons({"next_action_comparisons": [duplicate, duplicate]}, forecast, packet)
+    assert result[0]["validation_state"] == "duplicate"
+    assert result[0]["failure_detail"] == "multiple_comparisons_for_same_constraint"
+
+
+def test_comparison_failure_detail_when_quote_missing(monkeypatch):
+    """测试引用缺失时的详细失败原因"""
+    install_transport(monkeypatch)
+    packet = build_packet(record())
+    forecast = build_action_forecast(packet, config=config())
+    comparison = {"source_event_id": "event_001", "next_event_id": "event_002",
+                  "state": "divergent", "reason": "Bad", "evidence_refs": ["event_002"], "quote": ""}
+    result = action_comparisons({"next_action_comparisons": [comparison]}, forecast, packet)
+    assert result[0]["validation_state"] == "quote_missing"
+    assert result[0]["failure_detail"] == "quote_field_empty_or_missing"
+
+
+def test_comparison_failure_detail_when_quote_not_in_action(monkeypatch):
+    """测试引用文本不在动作中时的详细失败原因"""
+    install_transport(monkeypatch)
+    packet = build_packet(record())
+    forecast = build_action_forecast(packet, config=config())
+    comparison = {"source_event_id": "event_001", "next_event_id": "event_002",
+                  "state": "divergent", "reason": "Bad", "evidence_refs": ["event_002"], "quote": "nonexistent"}
+    result = action_comparisons({"next_action_comparisons": [comparison]}, forecast, packet)
+    assert result[0]["validation_state"] == "quote_not_in_action"
+    assert result[0]["failure_detail"] == "quote_text_not_found_in_any_action_channel"
+
+
+def test_comparison_failure_detail_when_refs_out_of_scope(monkeypatch):
+    """测试引用超出范围时的详细失败原因"""
+    install_transport(monkeypatch)
+    packet = build_packet(record())
+    forecast = build_action_forecast(packet, config=config())
+    comparison = {"source_event_id": "event_001", "next_event_id": "event_002",
+                  "state": "divergent", "reason": "Bad", "evidence_refs": ["event_999"], "quote": "5"}
+    result = action_comparisons({"next_action_comparisons": [comparison]}, forecast, packet)
+    assert result[0]["validation_state"] == "invalid_refs"
+    assert result[0]["failure_detail"] == "evidence_refs_out_of_scope_or_malformed"
+
+
+def test_comparison_failure_detail_when_future_reference(monkeypatch):
+    """测试理由引用未来事件时的详细失败原因"""
+    install_transport(monkeypatch)
+    value = record()
+    value["history"].append({"role": "assistant", "content": "Later"})
+    packet = build_packet(value)
+    forecast = build_action_forecast(packet, config=config())
+    comparison = {"source_event_id": "event_001", "next_event_id": "event_002",
+                  "state": "divergent", "reason": "See event_003", "evidence_refs": ["event_002"], "quote": "5"}
+    result = action_comparisons({"next_action_comparisons": [comparison]}, forecast, packet)
+    assert result[0]["validation_state"] == "future_reason_reference"
+    assert result[0]["failure_detail"] == "reason_references_future_events"
+
+
+def test_comparison_failure_detail_when_state_invalid(monkeypatch):
+    """测试状态字段无效时的详细失败原因"""
+    install_transport(monkeypatch)
+    packet = build_packet(record())
+    forecast = build_action_forecast(packet, config=config())
+    comparison = {"source_event_id": "event_001", "next_event_id": "event_002",
+                  "state": "invalid_state", "reason": "Bad", "evidence_refs": ["event_002"], "quote": "5"}
+    result = action_comparisons({"next_action_comparisons": [comparison]}, forecast, packet)
+    assert result[0]["validation_state"] == "invalid_state"
+    assert result[0]["failure_detail"] == "state_field_invalid_or_missing"
+
+
+def test_valid_comparison_has_no_failure_detail(monkeypatch):
+    """测试有效比较没有失败原因"""
+    install_transport(monkeypatch)
+    packet = build_packet(record())
+    forecast = build_action_forecast(packet, config=config())
+    comparison = {"source_event_id": "event_001", "next_event_id": "event_002",
+                  "state": "divergent", "reason": "Adopted wrong result",
+                  "evidence_refs": ["event_002"], "quote": "5"}
+    result = action_comparisons({"next_action_comparisons": [comparison]}, forecast, packet)
+    assert result[0]["validation_state"] == "valid"
+    assert result[0]["failure_detail"] is None

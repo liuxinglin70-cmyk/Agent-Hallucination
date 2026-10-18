@@ -65,8 +65,8 @@ def build_replay_inputs(
     stages = {}
     for stage, route in routes.items():
         stage_entries = [entry for entry in entries
-                         if (policy := HOOK_POLICIES.get(str(entry.get("hook") or "")))
-                         and policy.stage == stage and policy.frozen_key is not None]
+                         if (hook_policy := HOOK_POLICIES.get(str(entry.get("hook") or "")))
+                         and hook_policy.stage == stage and hook_policy.frozen_key is not None]
         payload = {"source": source, "packet": digest(packet),
                    "route": config[route], "prompts": prompts[stage],
                    "interventions": stage_entries}
@@ -76,8 +76,10 @@ def build_replay_inputs(
             payload["audit"] = audit
         if stage == "judge":
             payload["review_policy"] = review_policy
-            if (config.get("causal_audit") or {}).get("next_action_mode", "off") != "off":
+            if policy.get("next_action_mode", "off") != "off":
                 payload["action_forecast_policy"] = audit
+        if stage in {"recall_scanner", "causal_upgrade", "step_tracer", "defense"} and policy.get("next_action_mode") == "judge_context":
+            payload["action_evidence_policy"] = audit
         stages[stage] = digest(payload)
     payload = {"schema_version": REPLAY_INPUTS_SCHEMA, "stage_digests": stages}
     return {**payload, "digest": digest(payload)}

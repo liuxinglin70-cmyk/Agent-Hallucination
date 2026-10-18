@@ -18,6 +18,7 @@ from detector.evidence_view import expand_view, referent_source_block
 from detector.provider import ProviderError, merge_provider_meta, provider_call, provider_fallback_scope, raise_if_terminal
 from detector.semantics import TRACER_CONTRACT_REPAIR, TRACER_SYSTEM, contract_repair_feedback
 from detector.runtime import AddedBudgetExceeded, current_added_budget, current_added_request_budget
+from detector.action_evidence import action_evidence_block
 
 
 def _parse_tracer(parsed: Any, packet: Mapping[str, Any]):
@@ -96,7 +97,7 @@ def run_step_tracer(
     context_block = ""
     if causal_context is not None:
         validate_hearing_context(causal_context, packet=packet, positive=positive,
-                                 policy=config["causal_audit"])
+                                 policy=config.get("causal_audit") or {})
         diagnostic = causal_context.get("schema_version") == RISK_CONTEXT_SCHEMA
         matches = ((delivered_result == str(positive.get("delivered_result") or "")
                     and correct_result == str(positive.get("correct_result") or "")) if diagnostic else
@@ -133,6 +134,8 @@ def run_step_tracer(
         used_context_digest = None
 
         meta: dict[str, Any] = {}
+        action_block, action_admission = action_evidence_block(
+            packet, (positive or {}).get("action_evidence") or [], config.get("causal_audit"), copies=3)
 
         def call(repair_feedback: str = ""):
             nonlocal used_context_digest, meta
@@ -166,10 +169,10 @@ def run_step_tracer(
                             fallback_block = ""
                             used_context_digest = None
                             warnings.append({"attempt": "view_fallback", "error": "causal_context_budget:" + exc.resource})
-                    return base_user + fallback_block + repair_block
+                    return base_user + fallback_block + action_block + repair_block
                 with provider_fallback_scope(fallback_text):
                     parsed, latest = provider_call(route=effective_route, system=system,
-                                                  user=user + block + repair_block,
+                                                  user=user + block + action_block + repair_block,
                                                   purpose="step_tracer_repair" if repair else "step_tracer")
             except ProviderError as exc:
                 meta = merge_provider_meta(meta, {"attempts": exc.attempts})
@@ -227,6 +230,7 @@ def run_step_tracer(
             "hearing_target": dict(positive) if positive is not None else None,
             "causal_context_digest": used_context_digest,
             "causal_context": deepcopy(causal_context),
+            "action_evidence_admission": action_admission,
             "view_meta": view_meta,
         }, {
             "stage": "step_tracer", "state": "ok",

@@ -11,7 +11,15 @@ from detector.causal_contracts import (
     bound_fields, field_binding, numeric_literal, seal, validate_seal,
 )
 from detector.identity import digest
-from detector.packet import answer_tool_is_delivery, delivered_result, validate_packet
+from detector.packet import (
+    ROLE_CHANNEL_OBSERVATION,
+    ROLE_CHANNEL_UNKNOWN,
+    answer_tool_is_delivery,
+    delivered_result,
+    is_agent_event,
+    role_channel,
+    validate_packet,
+)
 
 
 def build_observed_dependencies(packet: Mapping[str, Any], *, policy: Mapping[str, Any]) -> dict[str, Any]:
@@ -58,9 +66,11 @@ def build_observed_dependencies(packet: Mapping[str, Any], *, policy: Mapping[st
 
     for event in packet["events"]:
         role = event.get("role")
-        add_node(event, event["event_id"], "observation" if role == "tool" else "content",
+        channel = role_channel(role)
+        add_node(event, event["event_id"],
+                 "observation" if channel == ROLE_CHANNEL_OBSERVATION else "content",
                  event["event_id"], event.get("content"), 0)
-        if role not in {"assistant", "tool", "user", "system"}:
+        if channel == ROLE_CHANNEL_UNKNOWN:
             unresolved.append({"node_id": event["event_id"], "reason": "unknown_role"})
         for interaction in event.get("tool_interactions") or ():
             iid = interaction["interaction_id"]
@@ -185,7 +195,7 @@ def build_observed_claim_lineage(
         reasons.append("lineage_depth_budget")
     ordered = sorted({nodes[node_id]["event_id"] for node_id in reachable},
                      key=lambda eid: events[eid]["position"])
-    assistant_events = [eid for eid in ordered if events[eid].get("role") == "assistant"
+    assistant_events = [eid for eid in ordered if is_agent_event(events[eid])
                         and any(node_id in reachable and nodes[node_id]["event_id"] == eid
                                 and nodes[node_id]["kind"] != "observation" for node_id in reachable)]
     anchors = delivered_result(packet)

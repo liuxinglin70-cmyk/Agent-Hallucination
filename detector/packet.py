@@ -43,6 +43,51 @@ STEP_KIND_CONTENT = "content_step"
 STEP_KIND_ACTION = "action_step"
 STEP_KIND_EMPTY = "empty_step"
 
+#: The channel a recorded ``role`` names, for the two channels that change how
+#: an event may be *read*: a tool observation is something the environment
+#: said, and a user/system message is an instruction or an assertion. Every
+#: other role -- ``assistant``, a missing role, or one of the corpus agent names
+#: (``Coder``, ``WebSurfer``, ``Developer Agent``, ``MagenticOneOrchestrator``
+#: ...) -- is agent output. The field is free-form in the recorded corpora, so
+#: it is deliberately *not* treated as a closed vocabulary: an unrecognised
+#: name must not silently drop an event out of every diagnostic that reads it.
+ROLE_CHANNEL_AGENT = "agent"
+ROLE_CHANNEL_OBSERVATION = "observation"
+ROLE_CHANNEL_INSTRUCTION = "instruction"
+ROLE_CHANNEL_UNKNOWN = "unknown"
+
+_OBSERVATION_ROLES = frozenset({
+    "tool", "tools", "observation", "observations", "function", "environment",
+    "tool_result", "tool_response", "result", "execution",
+})
+_INSTRUCTION_ROLES = frozenset({"user", "human", "system", "instructions"})
+
+
+def role_channel(role: Any) -> str:
+    """Classify one recorded event role without assuming a closed vocabulary.
+
+    ``unknown`` is reserved for a role that is not a string at all: that is the
+    only case where the record cannot say who spoke, and only that case should
+    make a diagnostic report the event as unreadable.
+    """
+    if role is None:
+        return ROLE_CHANNEL_AGENT
+    if not isinstance(role, str):
+        return ROLE_CHANNEL_UNKNOWN
+    text = role.strip().casefold()
+    if not text:
+        return ROLE_CHANNEL_AGENT
+    if text in _OBSERVATION_ROLES:
+        return ROLE_CHANNEL_OBSERVATION
+    if text in _INSTRUCTION_ROLES:
+        return ROLE_CHANNEL_INSTRUCTION
+    return ROLE_CHANNEL_AGENT
+
+
+def is_agent_event(event: Mapping[str, Any]) -> bool:
+    """Whether an event is (read as) the agent's own output, not a report."""
+    return role_channel(event.get("role")) == ROLE_CHANNEL_AGENT
+
 PACKET_FEATURE_NAMES = frozenset({
     "has_tool_calls",
     "has_retrieval_tool",
@@ -206,6 +251,8 @@ def build_packet(record: Mapping[str, Any]) -> dict[str, Any]:
         raise PacketError("question must be a non-empty string")
 
     events: list[dict[str, Any]] = []
+    turn_count = len(record["question"]) if isinstance(record["question"], list) else 1
+    last_turn = 0
     for ordinal, raw in enumerate(history, start=1):
         row = raw if isinstance(raw, dict) else {"content": raw}
         event_id = f"event_{ordinal:03d}"
@@ -230,6 +277,12 @@ def build_packet(record: Mapping[str, Any]) -> dict[str, Any]:
             "content": _text(row),
             "tool_interactions": interactions,
         })
+        if "task_turn" in row:
+            turn = row["task_turn"]
+            if type(turn) is not int or not last_turn <= turn <= turn_count or turn < 1:
+                raise PacketError("task_turn must identify a nondecreasing question turn")
+            events[-1]["task_turn"] = turn
+            last_turn = turn
 
     packet = {
         "schema_version": PACKET_SCHEMA,
@@ -246,6 +299,8 @@ def validate_packet(packet: Mapping[str, Any]) -> None:
         raise PacketError("packet events must be a non-empty list")
     ids: list[str] = []
     positions: list[int] = []
+    last_turn = 0
+    turn_count = max(1, len(re.findall(r"(?m)^\[turn \d+\] ", str(packet.get("question") or ""))))
     for event in events:
         if not isinstance(event, dict):
             raise PacketError("packet events must be objects")
@@ -257,6 +312,11 @@ def validate_packet(packet: Mapping[str, Any]) -> None:
             raise PacketError("packet positions must be integers")
         ids.append(event_id)
         positions.append(position)
+        if "task_turn" in event:
+            turn = event["task_turn"]
+            if type(turn) is not int or not 1 <= turn <= turn_count or turn < last_turn:
+                raise PacketError("packet task_turn must identify a nondecreasing question turn")
+            last_turn = turn
         parent = str(event.get("event_id") or "")
         interactions = event.get("tool_interactions") or []
         if not isinstance(interactions, list):
@@ -917,6 +977,10 @@ __all__ = [
     "PACKET_FEATURE_NAMES",
     "PACKET_SCHEMA",
     "PacketError",
+    "ROLE_CHANNEL_AGENT",
+    "ROLE_CHANNEL_INSTRUCTION",
+    "ROLE_CHANNEL_OBSERVATION",
+    "ROLE_CHANNEL_UNKNOWN",
     "STEP_KIND_ACTION",
     "STEP_KIND_CONTENT",
     "STEP_KIND_EMPTY",
@@ -925,6 +989,7 @@ __all__ = [
     "event_id_for_step",
     "evidence_refs_support_event",
     "evidence_refs_support_step",
+    "is_agent_event",
     "packet_features",
     "packet_reference_index",
     "packet_reference_error",

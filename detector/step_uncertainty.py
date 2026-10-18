@@ -10,9 +10,28 @@ from detector.causal_contracts import (
     bound_fields, field_binding, seal, validate_seal,
 )
 from detector.identity import artifact_digest, digest
-from detector.packet import step_kind, validate_packet
+from detector.packet import (
+    ROLE_CHANNEL_AGENT,
+    ROLE_CHANNEL_OBSERVATION,
+    ROLE_CHANNEL_UNKNOWN,
+    role_channel,
+    step_kind,
+    validate_packet,
+)
 from detector.predicates import run_predicate
 from detector.next_action import observation_failed, scan_static_action_risks
+
+
+def _human_guidance_channel(tool_name: Any) -> bool:
+    """Whether a tool call is the agent asking a human, under the names corpora use.
+
+    The recorded names are free-form ("ask_human", "ask_human_via_console",
+    "ask_human_for_help", ...), so an exact name match classified the Camel
+    family's console ask as an ordinary observation and lost the stronger
+    "this came from a human" signal.
+    """
+    name = str(tool_name or "").strip().casefold().replace("-", "_").replace(" ", "_")
+    return "ask_human" in name or name in {"ask", "askuser", "ask_user"}
 
 
 def build_step_risk_profile(
@@ -28,7 +47,11 @@ def build_step_risk_profile(
     for event in packet["events"][:event_limit]:
         eid = event["event_id"]
         signals = []
-        recognized = event.get("role") in {None, "assistant", "tool", "user", "system"}
+        channel = role_channel(event.get("role"))
+        # A role that is not a string is the only unreadable case; a corpus that
+        # names its agents ("Coder", "WebSurfer", "Planner", ...) is still agent
+        # output and must be scored like "assistant".
+        recognized = channel != ROLE_CHANNEL_UNKNOWN
         truncated = len(json.dumps(event, ensure_ascii=False)) > char_limit
         if not unsupported and recognized:
             components = [(event.get("content"), eid)]
@@ -52,7 +75,8 @@ def build_step_risk_profile(
                 for value, signal in (
                     (interaction.get("arguments"), "unverified_action"),
                     (interaction.get("observation"), "external_guidance"
-                     if interaction.get("tool_name") == "ask_human" else "unverified_observation"),
+                     if _human_guidance_channel(interaction.get("tool_name"))
+                     else "unverified_observation"),
                 ):
                     if value not in (None, "", {}):
                         signals.append({"signal": signal, "producer": "visible_channel.v1",
@@ -79,7 +103,7 @@ def build_step_risk_profile(
                     if len(signals) >= 64:
                         truncated = True
                         break
-            if event.get("role") in {None, "assistant"} and event.get("content") not in (None, ""):
+            if channel == ROLE_CHANNEL_AGENT and event.get("content") not in (None, ""):
                 signals.append({
                     "signal": "unsupported_claim", "producer": "unverified_content.v1",
                     "verification_status": "unknown", "evidence_refs": [eid],
@@ -89,7 +113,8 @@ def build_step_risk_profile(
             "scored" if recognized and signals else "unknown")
         rows.append({
             "event_id": eid, "position": event["position"],
-            "step_kind": "tool_observation" if event.get("role") == "tool" else step_kind(packet, event["position"]),
+            "step_kind": ("tool_observation" if channel == ROLE_CHANNEL_OBSERVATION
+                          else step_kind(packet, event["position"])),
             "producer": policy["score_source"], "score_status": status,
             "risk_signals": signals,
             "priority": min((SIGNAL_PRIORITY[s["signal"]] for s in signals), default=None),

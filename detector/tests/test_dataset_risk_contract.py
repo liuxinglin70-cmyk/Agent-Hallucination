@@ -220,6 +220,7 @@ def test_frozen_tracer_does_not_reuse_a_different_risk_policy(monkeypatch):
     from evolution.backends import LiveDetectorBackend
     calls = install_provider(monkeypatch)
     cfg = load_config(require_credentials=False)
+    cfg["causal_audit"]["next_action_mode"] = "off"
     baseline = Detector(cfg, require_credentials=False).detect(data())
     frozen = LiveDetectorBackend._frozen_stages(baseline, set())
     replayed = Detector(cfg, require_credentials=False).detect(data(), frozen_stages=frozen)

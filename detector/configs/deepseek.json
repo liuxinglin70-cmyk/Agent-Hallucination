@@ -1,5 +1,12 @@
 {
   "schema_version": "detector.config.v1",
+  "causal_audit": {
+    "next_action_mode": "judge_context",
+    "max_added_provider_requests_per_case": 2,
+    "max_added_prompt_tokens_per_case": 60000,
+    "max_added_output_tokens_per_case": 8192,
+    "max_added_seconds_per_case": 180
+  },
   "provider": {
     "endpoint": "https://api.deepseek.com",
     "model": "deepseek-v4-pro",

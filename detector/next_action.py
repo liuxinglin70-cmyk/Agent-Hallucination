@@ -30,6 +30,17 @@ def _claims_success(text: str) -> bool:
     return False
 
 
+def content_claim_signal(text: Any) -> bool:
+    """Whether prose asserts success or reports failure.
+
+    Those are the claim kinds a local next-action check can confront with the
+    recorded observations.  Unrelated narration ("Thinking", "Done") carries
+    no checkable claim about an action and should not buy a model request.
+    """
+    value = str(text or "")
+    return _claims_success(value) or bool(_FAILURE_REPORT.search(value))
+
+
 def _observed_success(value: Any) -> bool:
     if isinstance(value, str):
         try:

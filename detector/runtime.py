@@ -25,7 +25,7 @@ _USAGE_ORIGIN: ContextVar[float | None] = ContextVar("request_usage_origin", def
 _PREPARATION: ContextVar[tuple[dict[str, Any], Any] | None] = ContextVar("case_preparation", default=None)
 _REQUEST_OBSERVER: ContextVar[Callable[[Mapping[str, Any]], None] | None] = ContextVar("request_observer", default=None)
 _ADDED_BUDGET: ContextVar["AddedBudget | None"] = ContextVar("added_case_budget", default=None)
-_ADDED_REQUESTS: ContextVar["AddedBudget | None"] = ContextVar("added_requests", default=None)
+_ADDED_REQUESTS: ContextVar["AddedBudget | OptionalBudget | None"] = ContextVar("added_requests", default=None)
 _WRITER_LEASES: ContextVar[Mapping[str, object] | None] = ContextVar("writer_leases", default=None)
 _OWNERS: dict[str, tuple[object, int, Any]] = {}
 _OWNER_LOCK = threading.RLock()
@@ -270,6 +270,7 @@ class AddedBudget:
         self._baseline_waiters = 0
         self._baseline_started: float | None = None
         self._baseline_seconds = 0.0
+        self._optional_reserve: dict[str, int] | None = None
 
     def begin(self) -> None:
         with self._lock:
@@ -364,7 +365,77 @@ class AddedBudget:
                 "baseline_wait_seconds": self._excluded_seconds(),
                 "elapsed_seconds": max(0.0, time.monotonic() - self.started - self._excluded_seconds())
                 if self.started is not None else 0.0,
+                "diagnostic_reservation": deepcopy(self._optional_reserve),
             }
+
+
+class OptionalBudget:
+    """A shared-budget view that cannot consume the reserved diagnostic allowance."""
+
+    def __init__(self, parent: AddedBudget, reserve: Mapping[str, int]):
+        self.parent = parent
+        self.policy_digest = parent.policy_digest
+        self.reserve_limits = deepcopy(dict(reserve))
+        keys = {"max_added_seconds_per_case", "max_added_prompt_tokens_per_case",
+                "max_added_provider_requests_per_case", "max_added_output_tokens_per_case"}
+        if set(self.reserve_limits) != keys:
+            raise ValueError("incomplete diagnostic reservation")
+        for key, value in self.reserve_limits.items():
+            if (key not in parent._policy or isinstance(value, bool)
+                    or not isinstance(value, int) or value < 0 or value > parent._policy[key]):
+                raise ValueError("invalid diagnostic reservation")
+        with parent._lock:
+            if parent._optional_reserve is not None and parent._optional_reserve != self.reserve_limits:
+                raise ValueError("diagnostic reservation changed within one case")
+            parent._optional_reserve = deepcopy(self.reserve_limits)
+
+    @property
+    def deadline(self) -> float | None:
+        if self.parent.started is None:
+            return current_deadline()
+        added = (self.parent.started + self.parent._excluded_seconds()
+                 + self.parent._policy["max_added_seconds_per_case"]
+                 - self.reserve_limits["max_added_seconds_per_case"])
+        case = current_deadline()
+        return min(added, case - self.reserve_limits["max_added_seconds_per_case"]) if case is not None else added
+
+    def check(self) -> None:
+        self.parent.check()
+        deadline = self.deadline
+        if deadline is not None and time.monotonic() >= deadline:
+            raise AddedBudgetExceeded("time")
+
+    def _admit_input(self, size: int) -> None:
+        available = (self.parent._policy["max_added_prompt_tokens_per_case"]
+                     - self.reserve_limits["max_added_prompt_tokens_per_case"])
+        if self.parent.input_bytes + size > available:
+            raise AddedBudgetExceeded("input")
+
+    def reserve(self, *, system: str, user: str, output_tokens: int,
+                extra_input: Mapping[str, Any] | None = None) -> int:
+        with self.parent._lock:
+            self.parent.begin()
+            self.check()
+            size = len(system.encode("utf-8")) + len(user.encode("utf-8"))
+            if extra_input is not None:
+                size += len(json.dumps(extra_input, ensure_ascii=False, allow_nan=False).encode("utf-8"))
+            if self.parent.requests >= (self.parent._policy["max_added_provider_requests_per_case"]
+                                        - self.reserve_limits["max_added_provider_requests_per_case"]):
+                raise AddedBudgetExceeded("requests")
+            self._admit_input(size)
+            available = (self.parent._policy["max_added_output_tokens_per_case"]
+                         - self.reserve_limits["max_added_output_tokens_per_case"] - self.parent.output_tokens)
+            if available <= 0:
+                raise AddedBudgetExceeded("output")
+            return self.parent.reserve(system=system, user=user, output_tokens=min(output_tokens, available),
+                                       extra_input=extra_input)
+
+    def reserve_context(self, text: str) -> None:
+        with self.parent._lock:
+            self.parent.begin()
+            self.check()
+            self._admit_input(len(text.encode("utf-8")))
+            self.parent.reserve_context(text)
 
 
 @contextmanager
@@ -388,9 +459,10 @@ def current_added_budget() -> AddedBudget | None:
 
 
 @contextmanager
-def added_request_scope(budget: AddedBudget) -> Iterator[None]:
+def added_request_scope(budget: AddedBudget | OptionalBudget) -> Iterator[None]:
     parent = current_added_budget()
-    if parent is not None and budget is not parent:
+    owner = budget.parent if isinstance(budget, OptionalBudget) else budget
+    if parent is not None and owner is not parent:
         raise ValueError("added requests require the current case budget")
     token = _ADDED_REQUESTS.set(budget)
     try:
@@ -399,7 +471,7 @@ def added_request_scope(budget: AddedBudget) -> Iterator[None]:
         _ADDED_REQUESTS.reset(token)
 
 
-def current_added_request_budget() -> AddedBudget | None:
+def current_added_request_budget() -> AddedBudget | OptionalBudget | None:
     return _ADDED_REQUESTS.get()
 
 

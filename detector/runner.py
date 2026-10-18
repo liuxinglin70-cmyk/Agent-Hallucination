@@ -380,7 +380,13 @@ def run_batch(
     detector = Detector(config)
     config = detector.config
     if interventions is None and config.get("intervention_registry"):
-        interventions = load_intervention_registry(config["intervention_registry"])
+        # Same strictness the detector itself applies when it compiles the plan
+        # (``compile_runtime_plan``). A registry that only *looks* executable
+        # must be refused before the run tree is created, not once per case
+        # after the manifest already claims these inputs produced the run.
+        interventions = load_intervention_registry(
+            config["intervention_registry"], require_executable_bounds=True,
+        )
     source = source_identity("detector")
     execution_identities = {}
     for case in cases:

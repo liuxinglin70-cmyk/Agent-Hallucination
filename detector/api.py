@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from detector.adjudication import adjudicate
+from detector.action_evidence import collect_action_candidates, linked_action_evidence
 from detector.config import load_config, validate_config
 from detector.causal_audit import (
     OfflineFeedbackPolicy, build_causal_diagnostics, causal_recall_decision,
@@ -323,6 +324,14 @@ class Detector:
         judge_parsed = judge_result.get("parsed") or {}
         judge_positive = bool(judge_parsed.get("is_hallucination"))
         causal_policy = self.config["causal_audit"]
+        # 修复API-001: action_candidates 现在直接从 judge_result 获取
+        # 但需要区分"没有候选项"和"生成失败"两种情况
+        # judge_status["warnings"] 中会包含失败诊断
+        action_candidates = judge_result.get("action_candidates", [])
+        action_candidates_degraded = any(
+            w.get("component") == "action_candidates"
+            for w in judge_status.get("warnings", [])
+        )
         causal_diagnostics = causal_review.diagnostics if causal_review is not None else None
         plan.evidence_for(
             "judge.post",
@@ -363,6 +372,7 @@ class Detector:
                     packet=packet, config=self.config, plan=plan,
                     **(stage_kwargs),
                     **({"causal_context": causal_review.context} if causal_review is not None else {}),
+                    **({"seed_candidates": action_candidates} if action_candidates else {}),
                 )
             if recall_result.get("ok") and recall_result.get("candidates"):
                 if frozen is not None and "upgrade_result" in frozen:
@@ -402,6 +412,11 @@ class Detector:
                 # tests). Without this, a unanimous clean judge would leave
                 # the snapshot unread on exactly the cases it exists for.
                 or snapshot is not None
+                # A candidate is a hypothesis without verdict authority. It is
+                # what reopens the review for a judge-negative case, and the
+                # scanner and upgrade still have to convict on their own.
+                or bool(action_candidates)
+                or action_candidates_degraded
             )
         )
         negative_needs_recall = (
@@ -442,7 +457,10 @@ class Detector:
 
         hearings: list[dict[str, Any]] = []
         if judge_status.get("state") == "ok" and judge_positive:
-            hearings.append(judge_target(judge_parsed))
+            target = judge_target(judge_parsed)
+            if action_candidates:
+                target["action_evidence"] = linked_action_evidence(packet, action_candidates, target)
+            hearings.append(target)
 
         def hear(positive: Mapping[str, Any]) -> tuple[
             dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any],
@@ -623,6 +641,10 @@ class Detector:
             "defense": defense_result.get("provider") if defense_result else None,
         }
         proof["judge"] = judge_result.get("parsed")
+        if action_candidates:
+            proof["action_candidates"] = action_candidates
+        if action_candidates_degraded:
+            proof["action_candidates_degraded"] = True
         if judge_result.get("action_forecast") is not None:
             proof["action_forecast"] = judge_result["action_forecast"]
             proof["action_forecast_used"] = judge_result.get("action_forecast_used", False)
@@ -630,6 +652,9 @@ class Detector:
             ballots = ballots if isinstance(ballots, list) else [ballots]
             proof["next_action_vote_comparisons"] = [
                 ballot.get("next_action_comparisons", []) for ballot in ballots if isinstance(ballot, Mapping)
+            ]
+            proof["next_action_vote_health"] = [
+                ballot.get("next_action_comparison_health") for ballot in ballots if isinstance(ballot, Mapping)
             ]
         proof["recall_candidates"] = (
             recall_result.get("candidates") if recall_result else None
@@ -692,7 +717,8 @@ class Detector:
             if causal_diagnostics is not None:
                 causal_diagnostics["semantic_trace"] = build_semantic_trace(packet)
             if (causal_review is None and causal_policy["mode"] == "tracer_context"
-                    and output["state"] == "verified_clean" and recall_status.get("state") == "not_needed"):
+                    and output["state"] == "verified_clean"
+                    and (recall_status or {}).get("state") == "not_needed"):
                 budget = current_added_budget()
                 decision = causal_recall_decision(
                     (causal_diagnostics or {}).get("audit"), judge_result=judge_result,

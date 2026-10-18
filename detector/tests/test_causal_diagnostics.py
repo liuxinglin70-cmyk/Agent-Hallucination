@@ -75,12 +75,21 @@ def test_missing_action_is_task_signal_without_step_blame():
                for signal in row["risk_signals"])
 
 
-def test_unknown_role_missing_content_and_ppl_remain_unknown():
-    p = packet({"role": "unrecognized", "content": "4"}, {"role": "assistant"},
+def test_named_agent_role_is_scored_and_malformed_role_stays_unknown():
+    # The recorded role field is free-form: corpora name their agents
+    # ("Coder", "WebSurfer", "Developer Agent", ...). A named agent role is
+    # agent output and must score exactly like "assistant"; only a role the
+    # record cannot interpret at all is unreadable.
+    p = packet({"role": "Developer Agent", "content": "4"},
+               {"role": "assistant"},
+               {"role": 7},
                {"role": "tool", "content": "4"})
     profile = build_step_risk_profile(p, policy=policy())
-    assert [row["score_status"] for row in profile["by_event"]] == ["unknown"] * 3
-    assert profile["by_event"][2]["step_kind"] == "tool_observation"
+    assert [row["score_status"] for row in profile["by_event"]] == [
+        "scored", "unknown", "unknown", "unknown",
+    ]
+    assert profile["by_event"][0]["risk_signals"][0]["signal"] == "unsupported_claim"
+    assert profile["by_event"][3]["step_kind"] == "tool_observation"
     profile = build_step_risk_profile(p, policy=policy(score_source="teacher_forced_ppl"))
     assert profile["health"]["state"] == "unsupported"
     assert all(row["score_status"] == "unsupported" for row in profile["by_event"])

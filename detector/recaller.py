@@ -42,6 +42,8 @@ from detector.provider import (
     required_quorum,
 )
 from detector.runtime import parallel_ordered
+from detector.action_evidence import action_evidence_block, validate_action_evidence
+from detector.identity import digest
 from detector.semantics import (
     contract_repair_feedback,
     RECALL_CONTRACT_REPAIR,
@@ -126,6 +128,7 @@ def run_recall_scan(
     plan: InterventionPlan | None = None,
     snapshot: Mapping[str, Any] | None = None,
     causal_context: Mapping[str, Any] | None = None,
+    seed_candidates: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     plan = plan or empty_plan()
     route = dict(config["recall_route"])
@@ -145,16 +148,43 @@ def run_recall_scan(
     )
     if causal_context is not None:
         from detector.causal_contracts import validate_seal
-        from detector.identity import digest
         validate_seal(causal_context, schema="detector.causal_recall_context.v1")
         if causal_context["packet_digest"] != digest(packet):
             raise ValueError("causal recall context packet identity differs")
         user += "\n\nCAUSAL ANOMALIES: " + json.dumps(causal_context, ensure_ascii=False)
         cache_tag = digest({"snapshot": cache_tag, "causal_context": causal_context["digest"]})
+    # 修复 P0-2: 安全处理 seed_candidates，避免验证失败导致整个流程中断
+    validated_seeds = []
+    seed_validation_errors = []
+    for idx, candidate in enumerate(seed_candidates):
+        try:
+            cleaned, error = _parse_candidates({"candidates": [candidate]}, packet, snapshot)
+            if error:
+                seed_validation_errors.append({"index": idx, "error": error, "phase": "structure"})
+                continue
+            if not candidate.get("action_evidence"):
+                seed_validation_errors.append({"index": idx, "error": "missing action_evidence", "phase": "content"})
+                continue
+            for witness in candidate["action_evidence"]:
+                validate_action_evidence(packet, witness)
+            validated_seeds.append({**cleaned[0], "action_evidence": deepcopy(candidate["action_evidence"])})
+        except Exception as exc:
+            # 单个候选失败不应阻止其他候选
+            seed_validation_errors.append({"index": idx, "error": str(exc), "phase": "validation"})
+
+    # 如果所有seed都失败了，记录警告但继续执行（允许scanner自行发现候选）
+    if seed_candidates and not validated_seeds:
+        # 不抛异常，只记录诊断信息
+        pass
+    seed_evidence = [w for c in validated_seeds for w in c["action_evidence"]]
+    if validated_seeds:
+        cache_tag = digest({"previous": cache_tag, "action_seeds": validated_seeds})
     def evaluate():
+        action_block, action_admission = action_evidence_block(packet, seed_evidence, config.get("causal_audit"), copies=2)
+        active_user = user + action_block
         try:
             parsed, meta = provider_call(
-                route=route, system=system, user=user, purpose="recall_scanner",
+                route=route, system=system, user=active_user, purpose="recall_scanner",
                 cache_tag=cache_tag,
             )
         except ProviderError as exc:
@@ -176,7 +206,7 @@ def run_recall_scan(
             try:
                 parsed, meta = provider_call(
                     route=route, system=system,
-                    user=user + RECALL_CONTRACT_REPAIR + contract_repair_feedback(parsed, error),
+                    user=active_user + RECALL_CONTRACT_REPAIR + contract_repair_feedback(parsed, error),
                     purpose="recall_scanner_repair",
                     cache_tag=cache_tag,
                 )
@@ -187,7 +217,7 @@ def run_recall_scan(
                 return {
                     "ok": False, "candidates": [], "error": exc.message,
                     "error_type": exc.error_type,
-                    "provider": merge_provider_meta(initial_meta, {"attempts": exc.attempts}),
+                    "provider": merge_provider_meta(initial_meta, {"attempts": exc.attempts, "usage_total": dict(exc.usage_total)}),
                 }, {
                     "stage": "recall_scanner", "state": "provider_error",
                     "attempts": int(initial_meta.get("attempts") or 0) + exc.attempts,
@@ -205,17 +235,40 @@ def run_recall_scan(
                 "view": "complete" if not view_meta.get("degraded") else "degraded",
                 "warnings": warnings,
             }
-        return {
-            "ok": True, "candidates": candidates, "provider": meta,
+        # 修复 P0-2: 返回seed验证诊断信息
+        result = {
+            "ok": True, "candidates": _merge_action_candidates(validated_seeds, candidates), "provider": meta,
+            "action_evidence_admission": action_admission,
             "view_meta": view_meta,
-        }, {
+        }
+        if seed_validation_errors:
+            result["seed_validation_errors"] = seed_validation_errors
+        return result, {
             "stage": "recall_scanner", "state": "ok",
             "attempts": int(meta.get("attempts") or 0),
             "view": "complete" if not view_meta.get("degraded") else "degraded",
             "warnings": warnings,
         }
 
-    return memo_stage('recall_scanner', {"packet": packet, "route": route, "system": system, "user": user, "snapshot": snapshot, "view_meta": view_meta}, evaluate)
+    return memo_stage('recall_scanner', {"packet": packet, "route": route, "system": system, "user": user,
+                                       "snapshot": snapshot, "view_meta": view_meta, "action_seeds": validated_seeds}, evaluate)
+
+
+def _merge_action_candidates(seeds, candidates):
+    merged = deepcopy(list(seeds))
+    seen = {(row["locus_event_id"], row["claim"], row["quote"]) for row in merged}
+    ids = {row["candidate_id"] for row in merged}
+    for candidate in candidates:
+        key = (candidate["locus_event_id"], candidate["claim"], candidate["quote"])
+        if key in seen:
+            continue
+        row = deepcopy(candidate)
+        while row["candidate_id"] in ids:
+            row["candidate_id"] = "scan_" + row["candidate_id"]
+        ids.add(row["candidate_id"])
+        seen.add(key)
+        merged.append(row)
+    return merged
 
 
 def _parse_upgrades(
@@ -355,6 +408,7 @@ def assemble_upgraded_candidates(
             "conflict_note": str(row.get("conflict_note") or ""),
             "claim": candidate["claim"],
             "quote": candidate["quote"],
+            **({"action_evidence": deepcopy(candidate["action_evidence"])} if candidate.get("action_evidence") else {}),
         }))
     return assembled
 
@@ -388,7 +442,10 @@ def _upgrade_sample(
         )
     except ProviderError as exc:
         raise_if_terminal(exc)
-        return None, {"attempts": exc.attempts}, warnings, {
+        # Keep the failed call's token usage: a truncated or refused sample was
+        # still paid for, and dropping it here made the upgrade stage the only
+        # one whose failures vanished from the case's cost total.
+        return None, {"attempts": exc.attempts, "usage_total": dict(exc.usage_total)}, warnings, {
             "state": "provider_error", "error": exc.message,
             "error_type": exc.error_type, "attempts": exc.attempts,
         }, []
@@ -411,7 +468,7 @@ def _upgrade_sample(
             )
         except ProviderError as exc:
             raise_if_terminal(exc)
-            return None, merge_provider_meta(initial_meta, {"attempts": exc.attempts}), warnings, {
+            return None, merge_provider_meta(initial_meta, {"attempts": exc.attempts, "usage_total": dict(exc.usage_total)}), warnings, {
                 "state": "provider_error", "error": exc.message,
                 "error_type": exc.error_type, "attempts": exc.attempts,
             }, []
@@ -441,7 +498,7 @@ def _upgrade_sample(
             )
         except ProviderError as exc:
             raise_if_terminal(exc)
-            return None, merge_provider_meta(initial_meta, {"attempts": exc.attempts}), warnings, {
+            return None, merge_provider_meta(initial_meta, {"attempts": exc.attempts, "usage_total": dict(exc.usage_total)}), warnings, {
                 "state": "provider_error", "error": exc.message,
                 "error_type": exc.error_type, "attempts": exc.attempts,
             }, []
@@ -516,8 +573,12 @@ def run_causal_upgrade(
         + "\n\nTRAJECTORY:\n" + view_text
         + snapshot_block + task_source_block(packet)
     )
+    action_evidence = [w for candidate in candidates for w in candidate.get("action_evidence", [])]
 
     def evaluate():
+        action_block, action_admission = action_evidence_block(
+            packet, action_evidence, config.get("causal_audit"), copies=3 * max(1, int(route.get("votes", 1))))
+        active_user = user + action_block
         votes = max(1, int(route.get("votes", 1) or 1))
         samples: list[list[dict[str, Any]]] = []
         sample_meta: dict[str, Any] = {}
@@ -530,7 +591,7 @@ def run_causal_upgrade(
         def cast_at(_index: int):
             return _upgrade_sample(
                 packet=packet, candidates=candidates, route=route,
-                system=system, user=user, view_state=view_state,
+                system=system, user=active_user, view_state=view_state,
                 snapshot=snapshot,
             )
 
@@ -657,7 +718,45 @@ def run_causal_upgrade(
                 "cast": cast, "positives": positive_votes,
                 "winner": winner, "tie": positive_votes * 2 == cast,
             }
-            merged.append({**anchor, "coverage": "answered"})
+
+            # 为未升级的候选添加详细拒绝诊断
+            result_row = {**anchor, "coverage": "answered"}
+            if not winner:
+                # 分析拒绝原因
+                content_error_votes = sum(1 for row in rows if row.get("content_error") is True and row.get("coverage") == "answered")
+                causal_votes = sum(1 for row in rows if row.get("causal") is True and row.get("coverage") == "answered")
+
+                rejection_detail = {}
+                if content_error_votes == 0:
+                    rejection_detail["primary_reason"] = "content_error_not_established"
+                    rejection_detail["explanation"] = "no votes confirmed content error"
+                elif content_error_votes < cast / 2:
+                    rejection_detail["primary_reason"] = "content_error_no_majority"
+                    rejection_detail["explanation"] = f"{content_error_votes}/{cast} votes for content error (need >{cast/2})"
+                elif causal_votes == 0:
+                    rejection_detail["primary_reason"] = "causal_not_established"
+                    rejection_detail["explanation"] = "no votes confirmed material impact to task"
+                elif causal_votes < cast / 2:
+                    rejection_detail["primary_reason"] = "causal_no_majority"
+                    rejection_detail["explanation"] = f"{causal_votes}/{cast} votes for task impact (need >{cast/2})"
+                else:
+                    rejection_detail["primary_reason"] = "insufficient_votes"
+                    rejection_detail["explanation"] = f"positive votes {positive_votes}/{cast} did not reach strict majority"
+
+                # 收集投票中的理由样本
+                rejection_detail["vote_reasons"] = [
+                    {
+                        "content_error": row.get("content_error"),
+                        "causal": row.get("causal"),
+                        "reason": row.get("reason", "")[:200] if isinstance(row.get("reason"), str) else ""
+                    }
+                    for row in rows[:3]  # 最多保留3个样本
+                    if row.get("coverage") == "answered"
+                ]
+
+                result_row["upgrade_rejection"] = rejection_detail
+
+            merged.append(result_row)
         coverage = {
             "expected": len(candidates),
             "answered": sum(
@@ -675,6 +774,7 @@ def run_causal_upgrade(
             "upgraded_candidate": upgraded_candidates[0] if upgraded_candidates else None,
             "upgraded_candidates": upgraded_candidates,
             "provider": sample_meta, "view_meta": view_meta, "coverage": coverage,
+            "action_evidence_admission": action_admission,
             "snapshot_digest": (
                 snapshot_digest(snapshot) if snapshot is not None else None
             ),

@@ -12,6 +12,7 @@ from detector.interventions import InterventionPlan
 from detector.replay import match_frozen_hearing
 from detector.step_tracer import run_step_tracer
 from detector.packet import packet_features
+from detector.action_evidence import validate_action_evidence
 from detector.runtime import parallel_ordered
 
 
@@ -20,6 +21,7 @@ _TARGET_DEFAULTS = {
     "quote": "", "referent": "", "evidence_refs": [], "evidence_citations": [],
     "delivered_result": "", "correct_result": "", "contracts": [], "confidence": "",
     "basis": "unestablished",
+    "action_evidence": [],
 }
 
 
@@ -49,6 +51,7 @@ def recall_target(candidate: Mapping[str, Any], contracts: Sequence[Mapping[str,
         "evidence_refs": candidate.get("evidence_refs") or [],
         "evidence_citations": candidate.get("evidence_citations") or [],
         "quote": candidate.get("quote") or "", "contracts": list(contracts),
+        "action_evidence": candidate.get("action_evidence") or [],
     })
 
 
@@ -61,15 +64,17 @@ def run_hearing(
     snapshot: Mapping[str, Any] | None = None,
     on_defense: Callable[[Mapping[str, Any], Mapping[str, Any]], None] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    for witness in positive.get("action_evidence") or []:
+        validate_action_evidence(packet, witness)
     entry = match_frozen_hearing(frozen, hearing_target(positive))
     def prepare_context():
         prepared = diagnostics_factory() if diagnostics_factory is not None else diagnostics
         context = None
         if prepared is not None and prepared.get("audit") is not None:
             context = context_for_hearing(prepared["audit"], positive=positive, packet=packet,
-                                          policy=config["causal_audit"])
+                                          policy=config.get("causal_audit") or {})
             if context is None and prepared["audit"]["health"]["state"] == "ok":
-                context = build_risk_context(packet, positive=positive, policy=config["causal_audit"])
+                context = build_risk_context(packet, positive=positive, policy=config.get("causal_audit") or {})
         return context
 
     # Frozen reuse must be decided before touching the intervention trace.

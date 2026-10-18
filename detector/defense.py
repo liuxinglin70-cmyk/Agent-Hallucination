@@ -11,6 +11,7 @@ from typing import Any, Mapping, Sequence
 from detector.stage_retry import memo_stage
 from detector.provider import provider_fallback_scope
 from detector.evidence_view import expand_view, referent_source_block, task_source_block
+from detector.action_evidence import action_evidence_block
 
 from detector.evidence import (
     citation_error,
@@ -456,12 +457,21 @@ def run_defense(
 
     def vote(view_text: str, fallback_text: str | None = None):
         user = user_for(view_text)
+        def evaluate():
+            action_block, action_admission = action_evidence_block(
+                packet, positive.get("action_evidence") or [], config.get("causal_audit"),
+                copies=2 * (max(1, int(route.get("votes", 1))) + max(0, int(route.get("vote_topup", 0)))))
+            result, status = _vote_defense(
+                packet=packet, route=route, system=system, user=user + action_block,
+                positive=positive, snapshot=snapshot,
+                fallback_user=user_for(fallback_text if fallback_text is not None else view_text, auxiliary=False) + action_block)
+            if positive.get("action_evidence"):
+                result["action_evidence_admission"] = action_admission
+            return result, status
         return memo_stage("defense", {"packet": packet, "route": route, "system": system,
                                      "user": user, "positive": positive, "snapshot": snapshot,
                                      "fallback_text": fallback_text},
-                          lambda: _vote_defense(packet=packet, route=route, system=system,
-                                               user=user, positive=positive, snapshot=snapshot,
-                                               fallback_user=user_for(fallback_text if fallback_text is not None else view_text, auxiliary=False)))
+                          evaluate)
 
     if force_full_view:
         view_text, view_meta = render_judge_view(packet)

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from contextlib import nullcontext
 from typing import Any, Mapping
 from detector.action_forecast import (
-    FORECAST_JUDGE_EXTENSION, action_comparisons, build_action_forecast, comparison_prompt,
+    FORECAST_JUDGE_EXTENSION, action_comparisons, build_action_forecast, comparison_prompt, comparison_health, repair_comparisons,
 )
 
 from detector.interventions import InterventionPlan, empty_plan
@@ -28,7 +29,8 @@ from detector.provider import (
     raise_if_terminal,
     required_quorum,
 )
-from detector.runtime import AddedBudgetExceeded, current_added_budget, parallel_ordered
+from detector.runtime import AddedBudgetExceeded, OptionalBudget, added_budget_scope, current_added_budget, parallel_ordered
+from detector.config import diagnostic_budget_reserve
 from detector.semantics import (
     contract_repair_feedback,
     CONTRACT_KINDS,
@@ -183,11 +185,13 @@ def _cast_vote(
             "error_type": "contract_error", "message": error, "raw": parsed,
         }
     if forecast is not None:
-        result["next_action_comparisons"] = action_comparisons(parsed, forecast, packet)
+        rows = action_comparisons(parsed, forecast, packet)
+        result["next_action_comparisons"] = rows
+        result["next_action_comparison_health"] = comparison_health(rows)
     return result, meta, list(warnings), None
 
 
-def run_judge(
+def _run_judge(
     *,
     packet: Mapping[str, Any],
     config: Mapping[str, Any],
@@ -217,7 +221,7 @@ def run_judge(
         "in the question or the trajectory.\n\n" + view_text + task_source_block(packet)
     )
     forecast = build_action_forecast(packet, config=config)
-    forecast_block = comparison_prompt(forecast)
+    forecast_block = comparison_prompt(forecast, packet)
     base_user = user
     base_system = system
     user += forecast_block
@@ -368,19 +372,110 @@ def run_judge(
         budget = current_added_budget()
         if used and budget is not None:
             try:
-                copies = 2 * (max(1, int(route.get("votes", 1))) + max(0, int(route.get("vote_topup", 0))))
-                budget.reserve_context((forecast_block + FORECAST_JUDGE_EXTENSION) * copies)
+                # 修复 P0-1: forecast_block 在所有投票间复用（通过 memo_stage 缓存）
+                # 预算预检应该只预留 1× 成本，而非 votes× 成本
+                # 参考: next-action-prediction-audit-report.md 第5.2节
+                OptionalBudget(budget, diagnostic_budget_reserve(config.get("causal_audit") or {})).reserve_context(
+                    forecast_block + FORECAST_JUDGE_EXTENSION)
             except AddedBudgetExceeded:
                 used = False
         result, status = evaluate_votes(user if used else base_user, forecast if used else None,
                                         system if used else base_system)
         if forecast is not None:
             result["action_forecast_used"] = used
+            repair = {"state": "not_requested"}
+            if used and result.get("ok"):
+                # One repair per case, not one per ballot: the comparison is a
+                # property of the recorded next action and the shared forecast,
+                # so re-asking it three times only triples the cost.  A repaired
+                # row replaces only the rows that failed structural validation in
+                # each ballot; a ballot's own valid comparison is never
+                # overwritten, so the ensemble's divergence count is preserved.
+                policy = config.get("causal_audit") or {}
+                votes = result.get("raw")
+                votes = votes if isinstance(votes, list) else [votes]
+                invalid: dict[str, dict[str, Any]] = {}
+                for ballot in votes:
+                    if not isinstance(ballot, Mapping):
+                        continue
+                    for row in ballot.get("next_action_comparisons") or []:
+                        if row.get("validation_state") != "valid":
+                            invalid.setdefault(row["constraint_id"], row)
+                representative = list(invalid.values()) or (result["parsed"].get("next_action_comparisons") or [])
+                repaired, repair = repair_comparisons(
+                    representative, forecast=forecast, packet=packet, route=route, policy=policy)
+                by_id = {row["constraint_id"]: row for row in repaired
+                         if row["validation_state"] == "valid"}
+                merged = []
+                for ballot in votes:
+                    if not isinstance(ballot, Mapping):
+                        merged.append(ballot)
+                        continue
+                    rows = [by_id.get(row.get("constraint_id"), row)
+                            if row.get("validation_state") != "valid" else row
+                            for row in ballot.get("next_action_comparisons") or []]
+                    merged.append({**ballot, "next_action_comparisons": rows,
+                                   "next_action_comparison_health": {
+                                       **comparison_health(rows), "repair": repair}})
+                result["raw"] = merged
+                result["parsed"] = {**result["parsed"],
+                                    "next_action_comparisons": merged[0]["next_action_comparisons"]
+                                    if merged and isinstance(merged[0], Mapping) else representative,
+                                    "next_action_comparison_health": {
+                                        **comparison_health(
+                                            merged[0]["next_action_comparisons"]
+                                            if merged and isinstance(merged[0], Mapping) else representative),
+                                        "repair": repair}}
         return result, status
 
     result, status = memo_stage('judge', {"packet": packet, "route": route, "system": system, "user": user, "view_meta": view_meta}, evaluate)
     if forecast is not None:
         result = {**result, "action_forecast": forecast}
+    return result, status
+
+
+def run_judge(*, packet: Mapping[str, Any], config: Mapping[str, Any],
+              plan: InterventionPlan | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+    """运行 judge 阶段并直接构建 action_candidates。
+
+    修复 P0-1: 在 judge 投票完成后立即构建 action_candidates，
+    使用已验证的 ballot 数据，避免重复验证导致的不一致。
+    """
+    policy = config.get("causal_audit")
+    with added_budget_scope(policy) if policy is not None else nullcontext():
+        result, status = _run_judge(packet=packet, config=config, plan=plan)
+
+    # 修复 P0-1: 在投票完成后立即构建 action_candidates
+    # 此时 result["raw"] 包含所有 ballot 的原始数据（含 next_action_comparisons）
+    # 确保使用的是同一份已验证的数据，避免重复调用 action_comparisons 导致不一致
+    if result.get("ok") and result.get("action_forecast") is not None:
+        try:
+            from detector.action_evidence import collect_action_candidates_from_ballots
+            # 传入已验证的 ballots，而不是让 collect 函数重新提取和验证
+            result["action_candidates"] = collect_action_candidates_from_ballots(
+                packet, result, policy or {})
+        except ValueError as exc:
+            # 修复JUDGE-001: ValueError通常表示契约/身份检查失败，这是系统错误
+            # 应该记录并诊断，但不应该silently设置为空列表
+            result["action_candidates"] = []
+            status["warnings"] = status.get("warnings", [])
+            status["warnings"].append({
+                "component": "action_candidates",
+                "error": str(exc),
+                "severity": "contract_error"  # 清晰标记为契约错误
+            })
+        except Exception as exc:
+            # 其他异常（如网络、超时等）也要标记为degraded
+            result["action_candidates"] = []
+            status["warnings"] = status.get("warnings", [])
+            status["warnings"].append({
+                "component": "action_candidates",
+                "error": str(exc),
+                "severity": "degraded"
+            })
+    else:
+        result["action_candidates"] = []
+
     return result, status
 
 

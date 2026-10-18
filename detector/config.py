@@ -79,7 +79,33 @@ _CAUSAL_DEFAULTS = {
     "max_added_seconds_per_case": 30, "counterfactual_mode": "deterministic_only",
     "negative_feedback_enabled": False, "negative_feedback_policy": None,
     "scorer_artifact": None, "next_action_mode": "off",
+    "max_forecast_output_tokens_per_request": 4096,
+    "max_comparison_repair_output_tokens_per_request": 4096,
 }
+
+
+def diagnostic_budget_reserve(policy: Mapping[str, Any]) -> dict[str, int]:
+    """Keep the existing diagnostic allowance before admitting optional forecasts.
+
+    The reservation is the historical diagnostic allowance (the built-in causal
+    defaults), capped by the policy's own admission so the reservation can never
+    exceed it. Optional work -- the forecast prompt block, action evidence,
+    comparison repair, model hypotheses -- may not consume the diagnostic
+    allowance; when a policy's total is smaller than that allowance there is
+    therefore no optional capacity left, and the optional request is refused and
+    recorded (``warnings=[...]`` in the forecast proof, ``budget_exhausted``
+    health) rather than quietly spent. A deployment that wants the optional
+    forecast work must budget for it: the shipped configs raise the added
+    allowance to 180s / 60000 input bytes / 8192 output tokens / 2 requests.
+    """
+    model_work = policy.get("counterfactual_mode") == "model_hypothesis" or policy.get("negative_feedback_enabled")
+    # The first two are consumed by the deterministic diagnostic context even
+    # when no diagnostic model call is enabled; the last two only exist when
+    # the diagnostic features that issue requests are switched on.
+    keys = ("max_added_seconds_per_case", "max_added_prompt_tokens_per_case",
+            "max_added_provider_requests_per_case", "max_added_output_tokens_per_case")
+    return {key: min(policy[key], _CAUSAL_DEFAULTS[key])
+            if model_work or key in keys[:2] else 0 for key in keys}
 
 
 def default_config_path() -> Path:
