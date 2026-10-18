@@ -204,6 +204,17 @@ DEFAULT_CRITERIA: dict[str, Any] = {
     "effect": {
         "rule": "decisive_fixed > decisive_broken on stable cases and one-sided p < significance_level",
         "significance_level": 0.05,
+        # False positives are read as a paired movement, not as two counts. On a
+        # batch with 38 clean cases the standard error of the raw difference is
+        # over two cases, so "fp must not exceed baseline" rejects at about the
+        # rate of a coin flip and hides a 3-for-1 regression behind a tie. The
+        # gate fails only when clean-case additions significantly exceed
+        # removals; both counts stay in the reading.
+        "false_positive_rule": (
+            "clean cases that turn positive (fp_added) must not significantly "
+            "exceed clean cases that stop being positive (fp_removed), one-sided "
+            "p < significance_level; a tie or a net removal always passes"
+        ),
         "minimum_detectable": {
             "fixed": 5, "broken": 0, "one_sided_p": 0.0312,
             "note": (

@@ -1,0 +1,2614 @@
+{
+  "baseline": {
+    "decisive": 100,
+    "unresolved": 0,
+    "completion": 1.0,
+    "decisive_accuracy": 0.82,
+    "all_case_accuracy": 0.82,
+    "tp": 50,
+    "fp": 6,
+    "fn": 12,
+    "tn": 32,
+    "positive_precision": 0.8928571428571429,
+    "positive_recall": 0.8064516129032258,
+    "positive_f1": 0.8474576271186439,
+    "macro_precision": 0.8100649350649352,
+    "macro_recall": 0.8242784380305602,
+    "macro_f1": 0.8139727159983463,
+    "authoritative": 100,
+    "requested_cases": 100,
+    "step_localization": {
+      "n": 62,
+      "hits": 18,
+      "accuracy": 0.2903225806451613
+    }
+  },
+  "current": {
+    "decisive": 100,
+    "unresolved": 0,
+    "completion": 1.0,
+    "decisive_accuracy": 0.82,
+    "all_case_accuracy": 0.82,
+    "tp": 51,
+    "fp": 7,
+    "fn": 11,
+    "tn": 31,
+    "positive_precision": 0.8793103448275862,
+    "positive_recall": 0.8225806451612904,
+    "positive_f1": 0.8500000000000001,
+    "macro_precision": 0.8087027914614122,
+    "macro_recall": 0.8191850594227504,
+    "macro_f1": 0.8125,
+    "authoritative": 100,
+    "requested_cases": 100,
+    "step_localization": {
+      "n": 62,
+      "hits": 36,
+      "accuracy": 0.5806451612903226
+    }
+  },
+  "comparison": {
+    "baseline": {
+      "decisive": 100,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.82,
+      "all_case_accuracy": 0.82,
+      "tp": 50,
+      "fp": 6,
+      "fn": 12,
+      "tn": 32,
+      "positive_precision": 0.8928571428571429,
+      "positive_recall": 0.8064516129032258,
+      "positive_f1": 0.8474576271186439,
+      "macro_precision": 0.8100649350649352,
+      "macro_recall": 0.8242784380305602,
+      "macro_f1": 0.8139727159983463,
+      "authoritative": 100,
+      "requested_cases": 100,
+      "step_localization": {
+        "n": 62,
+        "hits": 18,
+        "accuracy": 0.2903225806451613
+      }
+    },
+    "current": {
+      "decisive": 100,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.82,
+      "all_case_accuracy": 0.82,
+      "tp": 51,
+      "fp": 7,
+      "fn": 11,
+      "tn": 31,
+      "positive_precision": 0.8793103448275862,
+      "positive_recall": 0.8225806451612904,
+      "positive_f1": 0.8500000000000001,
+      "macro_precision": 0.8087027914614122,
+      "macro_recall": 0.8191850594227504,
+      "macro_f1": 0.8125,
+      "authoritative": 100,
+      "requested_cases": 100,
+      "step_localization": {
+        "n": 62,
+        "hits": 36,
+        "accuracy": 0.5806451612903226
+      }
+    },
+    "paired": {
+      "detection_fixed": [
+        "Octotools/042.json",
+        "OpenManus/011.json",
+        "SmolAgents/015.json"
+      ],
+      "detection_regressed": [
+        "Camel/042.json",
+        "Octotools/019.json",
+        "SmolAgents/013.json"
+      ],
+      "localization_fixed": [
+        "Camel/059.json",
+        "Camel/060.json",
+        "Camel/063.json",
+        "Camel/070.json",
+        "Camel/071.json",
+        "Camel/090.json",
+        "Magentic_One/013.json",
+        "Magentic_One/032.json",
+        "OpenDeepSearch/019.json",
+        "OpenDeepSearch/020.json",
+        "OpenManus/011.json",
+        "OpenManus/029.json",
+        "OpenManus/066.json",
+        "OpenManus/076.json",
+        "OpenManus/077.json",
+        "OpenManus/084.json",
+        "OpenManus/088.json",
+        "OpenManus/094.json",
+        "OpenManus/103.json"
+      ],
+      "localization_regressed": [
+        "OpenDeepSearch/070.json"
+      ]
+    }
+  },
+  "mechanisms": [
+    {
+      "case": "Camel/002.json",
+      "run": "validation100_recovery",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 5
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/007.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/017.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": true,
+      "responsible_step": 4,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 5
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/019.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "divergent": 5,
+        "matched": 1
+      },
+      "action_candidates": 2
+    },
+    {
+      "case": "Camel/030.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "divergent": 4,
+        "matched": 2
+      },
+      "action_candidates": 1
+    },
+    {
+      "case": "Camel/031.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/042.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": true,
+      "responsible_step": 6,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "divergent": 3,
+        "matched": 3
+      },
+      "action_candidates": 1
+    },
+    {
+      "case": "Camel/049.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": 5,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 4
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/059.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/060.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/063.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 4,
+        "unknown": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/070.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/071.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 5,
+        "divergent": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/075.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "unknown": 4
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/078.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "unknown": 2,
+        "divergent": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/082.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_004"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/085.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "unknown": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Camel/090.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/000.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/001.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 9,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_005"
+      },
+      "comparison_states": {
+        "matched": 4,
+        "divergent": 2
+      },
+      "action_candidates": 1
+    },
+    {
+      "case": "Magentic_One/009.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_005"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 2,
+        "divergent": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/012.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_009"
+      },
+      "comparison_states": {
+        "matched": 5,
+        "unknown": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/013.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 5
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/015.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/017.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/019.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 5,
+      "gold_step": 5,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/026.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 5
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/032.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 1,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_005"
+      },
+      "comparison_states": {
+        "matched": 5
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/040.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 3
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/046.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 1,
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/051.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 6,
+      "gold_step": 6,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 3
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/053.json",
+      "run": "validation100_recovery",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 3
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/059.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": 6,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 5
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/072.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_009"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 3
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/086.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_007"
+      },
+      "comparison_states": {
+        "matched": 5,
+        "divergent": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Magentic_One/088.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 4,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Octotools/012.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 2,
+      "gold_step": 2,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "divergent": 3,
+        "matched": 3
+      },
+      "action_candidates": 1
+    },
+    {
+      "case": "Octotools/014.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 2,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "divergent": 3,
+        "matched": 3
+      },
+      "action_candidates": 1
+    },
+    {
+      "case": "Octotools/018.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 4,
+      "gold_step": 4,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 4,
+        "unknown": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Octotools/019.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": 2,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "divergent": 2,
+        "unknown": 2,
+        "matched": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Octotools/022.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 4,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Octotools/032.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": true,
+      "responsible_step": 2,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 5,
+        "unknown": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Octotools/034.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "divergent": 1,
+        "matched": 3,
+        "unknown": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Octotools/038.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 5,
+        "unknown": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Octotools/041.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": true,
+      "responsible_step": 4,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "Octotools/042.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/005.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/015.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 5,
+      "gold_step": 4,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/019.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 2,
+      "gold_step": 2,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/020.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 7,
+      "gold_step": 7,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "unknown": 4,
+        "matched": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/021.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/024.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 3
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/028.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 4,
+        "unknown": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/032.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 5,
+      "gold_step": 5,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/041.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 5,
+        "unknown": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/059.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/060.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 3
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/064.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/070.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 10,
+      "gold_step": 9,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/082.json",
+      "run": "validation100_recovery",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 3
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/083.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 5,
+        "unknown": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/085.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 4,
+        "unknown": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenDeepSearch/099.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 4,
+        "unknown": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/000.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/003.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 1,
+      "gold_step": 1,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/011.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 2,
+      "gold_step": 2,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/015.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": 2,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 5,
+        "unknown": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/017.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 7,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 4,
+        "unknown": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/022.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 6,
+      "gold_step": 6,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_007"
+      },
+      "comparison_states": {
+        "divergent": 5
+      },
+      "action_candidates": 2
+    },
+    {
+      "case": "OpenManus/024.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 5
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/029.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 5,
+      "gold_step": 5,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/038.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 3,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/039.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_004"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/042.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/049.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_005"
+      },
+      "comparison_states": {
+        "matched": 9
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/066.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 1,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 5,
+        "unknown": 1
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/076.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 1,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "divergent": 4,
+        "matched": 1
+      },
+      "action_candidates": 2
+    },
+    {
+      "case": "OpenManus/077.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 1,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/084.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 1,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 4,
+        "divergent": 2
+      },
+      "action_candidates": 1
+    },
+    {
+      "case": "OpenManus/088.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 1,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/090.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "OpenManus/094.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 1,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_004"
+      },
+      "comparison_states": {
+        "divergent": 6
+      },
+      "action_candidates": 2
+    },
+    {
+      "case": "OpenManus/103.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 1,
+      "gold_step": 1,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/003.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 1,
+      "gold_step": 1,
+      "health": "budget_exhausted",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {
+        "matched": 3
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/008.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 2,
+      "gold_step": 2,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/013.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": true,
+      "responsible_step": 7,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 8
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/015.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 12,
+      "gold_step": 11,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_003"
+      },
+      "comparison_states": {
+        "matched": 6,
+        "unknown": 2
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/016.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/017.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": 2,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/018.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 9,
+      "gold_step": 9,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/029.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "no_model_prediction"
+      },
+      "comparison_states": {},
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/044.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 3
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/055.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 6,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/056.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 5
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/059.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 4,
+      "gold_step": 3,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 3,
+        "unknown": 3
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/063.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/064.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/078.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 3,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/081.json",
+      "run": "validation100",
+      "gold": true,
+      "prediction": true,
+      "responsible_step": 5,
+      "gold_step": 1,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 5
+      },
+      "action_candidates": 0
+    },
+    {
+      "case": "SmolAgents/087.json",
+      "run": "validation100",
+      "gold": false,
+      "prediction": false,
+      "responsible_step": null,
+      "gold_step": null,
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "prediction_state": {
+        "state": "present",
+        "next_event_id": "event_002"
+      },
+      "comparison_states": {
+        "matched": 6
+      },
+      "action_candidates": 0
+    }
+  ],
+  "cost_all_attempts": {
+    "started_requests": 915,
+    "finished_requests": 917,
+    "started_without_finish": 0,
+    "by_purpose": {
+      "action_forecast": 101,
+      "judge": 345,
+      "defense": 232,
+      "step_tracer": 74,
+      "step_tracer_repair": 25,
+      "recall_scanner": 29,
+      "recall_scanner_repair": 15,
+      "causal_upgrade": 71,
+      "causal_upgrade_repair": 2,
+      "judge_repair": 21
+    },
+    "started_by_run": {
+      "validation100": 874,
+      "validation100_recovery": 41
+    },
+    "status_counts": {
+      "response": 856,
+      "transport_error": 59,
+      "deadline_exceeded": 2
+    },
+    "usage": {
+      "prompt_tokens": 8275152,
+      "completion_tokens": 13800631,
+      "total_tokens": 22075783,
+      "input_tokens": 8275152,
+      "output_tokens": 13800631
+    },
+    "usage_missing": 61,
+    "pricing": "未取得服务实际账单单价，不估造货币费用。",
+    "journals": [
+      {
+        "path": "runs\\validation100\\cases\\Camel__002.json\\attempts\\001_20261018T080206\\requests.jsonl",
+        "sha256": "d517b409b0695305af0e431c9625f5581958f8bb4df2ff6060da6185e177e6d6"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__007.json\\attempts\\001_20261018T080206\\requests.jsonl",
+        "sha256": "3154e77e00fbe03db07e2494caea26d8cf693bc6bddf239b372e7b9c3864d811"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__017.json\\attempts\\001_20261018T080206\\requests.jsonl",
+        "sha256": "942ee1b9e61b5f57053904c97b82e3295513914a4a054a6cefb6cb223a143c01"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__019.json\\attempts\\001_20261018T080206\\requests.jsonl",
+        "sha256": "9fa65fda388a9eeecd3bc04397f3fd5ce7c507d30bc1cdedfc930cd855543ace"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__030.json\\attempts\\001_20261018T080206\\requests.jsonl",
+        "sha256": "e0ab073075b0a06c1117d58b26d4ec32faf09715c42b0306353ec7211a246513"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__031.json\\attempts\\001_20261018T080206\\requests.jsonl",
+        "sha256": "41762d86dfa97c7f8db467b472e8457aaba48c787d961bd87fe7dea53ce858ab"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__042.json\\attempts\\001_20261018T080206\\requests.jsonl",
+        "sha256": "bd8abe0dae5d5cbdf7325ebf1f479048eb1f1fa2d1de7bed5227da7d1c8f12ae"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__049.json\\attempts\\001_20261018T080206\\requests.jsonl",
+        "sha256": "a8614f210a39a05beb38e8d5d6050151d6b9684c72f06bddfb66f14dff4e36cf"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__059.json\\attempts\\001_20261018T080206\\requests.jsonl",
+        "sha256": "8afebf70c06d669100ba1c68f58701d2cbfe2679c7e6da09895224d3db790c04"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__060.json\\attempts\\001_20261018T080206\\requests.jsonl",
+        "sha256": "040b79c76dea749c0baebb4536377049a553fd05b2ff09e0fbd9109def5b53bf"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__063.json\\attempts\\001_20261018T081559\\requests.jsonl",
+        "sha256": "61cd620e5b3dbabbaa1d268f8bf75efb0187503fd98199d4d4781a1c758f0e33"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__070.json\\attempts\\001_20261018T081827\\requests.jsonl",
+        "sha256": "ae254c09b2b601c99583d195c73f34b9e0912a38da09d60b62b539f4a490c095"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__071.json\\attempts\\001_20261018T082539\\requests.jsonl",
+        "sha256": "da00dfde4971e705f93d41edce4f1f7bd03125078bb232ca5ad306123d0474e7"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__075.json\\attempts\\001_20261018T082628\\requests.jsonl",
+        "sha256": "1e6586dca3b4f7026f6a54c5ea4e6bb4d0937bae71fb180c9471c0bdb3c2a7b1"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__078.json\\attempts\\001_20261018T083317\\requests.jsonl",
+        "sha256": "4a10683c9056f2eec0574c065f8cbf423aa216dfb3ca0804cb986adb838c8fb2"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__082.json\\attempts\\001_20261018T083816\\requests.jsonl",
+        "sha256": "1aa88ed5918f51e7c9634a9900f61ced8a7f3529150f92d1e655a49674536fe6"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__085.json\\attempts\\001_20261018T083841\\requests.jsonl",
+        "sha256": "39bcf75331c4e44bf4116ce4c7d3bbd88a415587c8ec9541711fc3be00e568a1"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Camel__090.json\\attempts\\001_20261018T083859\\requests.jsonl",
+        "sha256": "3bc5c520a76007e76d8e640c00a68fd056dcbcdf9cedc1caf9aa2f3bd3cb3b8d"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__000.json\\attempts\\001_20261018T083928\\requests.jsonl",
+        "sha256": "02ea20ea9e07d54728711a9c2a19954670fa70a1a68c1dbc6e91ae5af779bf7d"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__001.json\\attempts\\001_20261018T084155\\requests.jsonl",
+        "sha256": "7eba7b086158f59fe0d853d5db2994fc164c6f2557b4d20263f65e3c63a7aee5"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__009.json\\attempts\\001_20261018T084242\\requests.jsonl",
+        "sha256": "222f54cc6f0e54c4144400b5ec596352e2984915bea7373517d4f69cfd92712b"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__012.json\\attempts\\001_20261018T084618\\requests.jsonl",
+        "sha256": "b50ad4445017e84548da654cafac8cd167d0e6763c4a2dd300e21b1ab6b4adcb"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__013.json\\attempts\\001_20261018T084659\\requests.jsonl",
+        "sha256": "67dcbc5e35a78ba1bd156470ea6b16f29b3f79e90ce2c7fbfebcec1ce8e7a02f"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__015.json\\attempts\\001_20261018T085313\\requests.jsonl",
+        "sha256": "3d3a98fbe837d5fdbe39e64dd35080e470df8255b82128181f6e9116ce856559"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__017.json\\attempts\\001_20261018T085407\\requests.jsonl",
+        "sha256": "d599bf08be6b3b677ea1d29139600ffdf39ed75ee373d5b8c1ef90db2dfa3288"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__019.json\\attempts\\001_20261018T085432\\requests.jsonl",
+        "sha256": "2a91062b988478b6fc0709306fc0e8fa99a7df72c298160615eaced66c012d85"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__026.json\\attempts\\001_20261018T085541\\requests.jsonl",
+        "sha256": "5e00933a9cf81186ab19c3e8dc30d89bbcf41b65797d72b495fdfd11fbcfb852"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__032.json\\attempts\\001_20261018T085921\\requests.jsonl",
+        "sha256": "9dceb535c798a7193d7eaf5d7597d1d117f52ff33557237b9b1f13d17badfe37"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__040.json\\attempts\\001_20261018T090205\\requests.jsonl",
+        "sha256": "1a3c550579ead2a38ff2a4e0e4f0dd1b23846082997f7c0fe243f60b75512fb8"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__046.json\\attempts\\001_20261018T090522\\requests.jsonl",
+        "sha256": "9fb48d319c78e9684452ba5c9c34f3d34d2ac3d8c945e86df4c455998acec379"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__051.json\\attempts\\001_20261018T090650\\requests.jsonl",
+        "sha256": "4a289a687410f39b4a58e223032c25006ff2c291efca82b9097e37250df76e09"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__053.json\\attempts\\001_20261018T090820\\requests.jsonl",
+        "sha256": "d252cbef5e10fac5e9d785eb0a74f637c1655c6e342f7925251b420437027ed7"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__059.json\\attempts\\001_20261018T091007\\requests.jsonl",
+        "sha256": "38dd6493c2463f16513aabe4c8b55c6affc5c172bb5eb53497d67ec5ba56e75e"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__072.json\\attempts\\001_20261018T091742\\requests.jsonl",
+        "sha256": "a3f28a391a224b0dd809377d81e18d1fe0aea4670fdd6f2d912cd2958db3de33"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__086.json\\attempts\\001_20261018T091956\\requests.jsonl",
+        "sha256": "10fe3ca3cf2623e8a90bf8dbf8828df923bc31e9661c0eaf42cc157c23501740"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Magentic_One__088.json\\attempts\\001_20261018T092415\\requests.jsonl",
+        "sha256": "5eaed044af7b79ce0cb2ab7b12012166752830ab1bd2f60b8f85e407b22554bc"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Octotools__012.json\\attempts\\001_20261018T092625\\requests.jsonl",
+        "sha256": "2a891e1b1eac0561d06a17dc4fbdd0541215c30f9c66442c4642e36bb9bfb4b4"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Octotools__014.json\\attempts\\001_20261018T092629\\requests.jsonl",
+        "sha256": "bd632250346b715e1fd39eec1f070d970367114584f659e317286aef290d6fb6"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Octotools__018.json\\attempts\\001_20261018T093955\\requests.jsonl",
+        "sha256": "acfaff081d2b884a2e07111257d1fdf71b7458f69c1a9674d3943440d153a258"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Octotools__019.json\\attempts\\001_20261018T094306\\requests.jsonl",
+        "sha256": "22fe9f72ac5e4774e81463f98f3a493f2a73fc625522d4004c493db1f5ddaced"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Octotools__022.json\\attempts\\001_20261018T094414\\requests.jsonl",
+        "sha256": "d2b5f11ad404d24e47d40671ba979399493191f4e51f871373653026b73159fd"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Octotools__032.json\\attempts\\001_20261018T095119\\requests.jsonl",
+        "sha256": "c1b8517b8b2ec053daf0a0520656f38fe096e8dd73546f8b60857889d9fd02af"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Octotools__034.json\\attempts\\001_20261018T100304\\requests.jsonl",
+        "sha256": "b537de9fe738f463b276cf6684d7e4e22b8697a315de979f0e772bd8db436e23"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Octotools__038.json\\attempts\\001_20261018T102714\\requests.jsonl",
+        "sha256": "752cd072ef2192f6167bfe5f85c897fcb5aa95d06e4845edb4ec9bdf49f28e20"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Octotools__041.json\\attempts\\001_20261018T102846\\requests.jsonl",
+        "sha256": "4b19851fa0374c34b24657d07d766f4801b5294bce092350f97dc9a48179738b"
+      },
+      {
+        "path": "runs\\validation100\\cases\\Octotools__042.json\\attempts\\001_20261018T102855\\requests.jsonl",
+        "sha256": "15704982a79adafbe20336c4f51ef2899c3cf01fe3903b3ab4309db01e7433bc"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__005.json\\attempts\\001_20261018T103031\\requests.jsonl",
+        "sha256": "5eb010557792ebefb121d1948c0efe1aa7282fd981a4442bbb23f3aac9f1007c"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__015.json\\attempts\\001_20261018T103705\\requests.jsonl",
+        "sha256": "bdd37e1c976ea764068664690ac41906df358832a95625424621a297d3725a2b"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__019.json\\attempts\\001_20261018T103802\\requests.jsonl",
+        "sha256": "d23c5f66ac541b7aa8eefb0761deb297d46dbd9bec3c85cb20f907524661a16d"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__020.json\\attempts\\001_20261018T104422\\requests.jsonl",
+        "sha256": "e9d2fdd8a1811666e4dd4b847177641393862d49cd6f2c4cfbc6be679bbed1cd"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__021.json\\attempts\\001_20261018T104627\\requests.jsonl",
+        "sha256": "a56ae1253768a4d31aa060cddf719acab3bd42a0279263ed98b521a8caa518a6"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__024.json\\attempts\\001_20261018T104644\\requests.jsonl",
+        "sha256": "2c03e61208b16f956d6c195c5fd30f016daa67cdd2b616c61d02c0652cdad748"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__028.json\\attempts\\001_20261018T105032\\requests.jsonl",
+        "sha256": "9fce4c5a5e47eca1c64e24162fa0c43657c0d60876ee3fb1620cfd9890a5116f"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__032.json\\attempts\\001_20261018T110037\\requests.jsonl",
+        "sha256": "9802faf78b60751c1353dca15f7fc96586dad7b930cb5b2351c9a9d14a5450b9"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__041.json\\attempts\\001_20261018T110207\\requests.jsonl",
+        "sha256": "e7457e6d3b322fc7221fdfb06ddfa76560af99546c39182b205231737c7a09c5"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__059.json\\attempts\\001_20261018T111055\\requests.jsonl",
+        "sha256": "53285d99e25c494153a67c399f4ed11963cf573bbf09ef52936d09059d766b41"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__060.json\\attempts\\001_20261018T111457\\requests.jsonl",
+        "sha256": "142c682d94b84193fecf4b2b91beb63b19f7ab4da79682a0e266f71ad7cd7a6c"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__064.json\\attempts\\001_20261018T111521\\requests.jsonl",
+        "sha256": "e4122695396f8cc0273bf6b3725fc9d807c053b553a101b4db15316de6f2fe99"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__070.json\\attempts\\001_20261018T111650\\requests.jsonl",
+        "sha256": "924b7a1460d3db159ebfe8b1a28523bf338a9525793a6d97aa859c804614bcf7"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__082.json\\attempts\\001_20261018T111657\\requests.jsonl",
+        "sha256": "9eddda2515baaf9aba6eb8cdb9ad775085caeaf954634e030ba75bfa9fa0945a"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__083.json\\attempts\\001_20261018T112538\\requests.jsonl",
+        "sha256": "86ee12faf6c95f576afa9188d6dd39009b44c82a8f7dcbbfca65b4a74ac4739c"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__085.json\\attempts\\001_20261018T112625\\requests.jsonl",
+        "sha256": "0d0c20058c9f1f48b904baea9274ebe55a7c7b11a4070dca5a977def86ea2c4b"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenDeepSearch__099.json\\attempts\\001_20261018T112752\\requests.jsonl",
+        "sha256": "1faab57d9a19bef92a9bcf0f0219a39d6d0cd57d2f4ded4dab5407adba46c3fd"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__000.json\\attempts\\001_20261018T112905\\requests.jsonl",
+        "sha256": "cc60441908be3756ff65798cc4c452cd8144463b0102d9a67bf9d8a376ee4a3e"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__003.json\\attempts\\001_20261018T112927\\requests.jsonl",
+        "sha256": "9941d1e99d08e205edc9a06c58349c55f7f13c36b67764a0097ca2f791eaffc8"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__011.json\\attempts\\001_20261018T113013\\requests.jsonl",
+        "sha256": "bbab7636e119774c0a58c2b2b8f082ac3e0e5c13089e63815fcaa275a6f2dace"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__015.json\\attempts\\001_20261018T113147\\requests.jsonl",
+        "sha256": "d80059f8b195eeef495d2611a734bccc81a52c9793304a88ccb6d0303fc0675d"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__017.json\\attempts\\001_20261018T113531\\requests.jsonl",
+        "sha256": "f53fc8821523d1767fa02f649db913ebbd90e6bfd121dfc1ed1e51f853fcc274"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__022.json\\attempts\\001_20261018T114150\\requests.jsonl",
+        "sha256": "dc9dccfa4fd122bfa03e45f11e5baf392f62b4caa9ea7289ca4a1e8d984eb2f9"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__024.json\\attempts\\001_20261018T114521\\requests.jsonl",
+        "sha256": "f76afa1a73c404581c092c53fe4488365e45b36416405a16704e28cd3dff6fa9"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__029.json\\attempts\\001_20261018T114613\\requests.jsonl",
+        "sha256": "bf54c7d12f2552e3f1363e6a42d9b63336c5f5cb3a8415e12196571703d49a61"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__038.json\\attempts\\001_20261018T114650\\requests.jsonl",
+        "sha256": "3209d768d799b9ec25bc87457a71477090dfbef064263b110905880574610560"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__039.json\\attempts\\001_20261018T114810\\requests.jsonl",
+        "sha256": "f64016996f8d65f19a83b977f729e4d6f013e95708fc8c7f142277e7ea5eae64"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__042.json\\attempts\\001_20261018T114827\\requests.jsonl",
+        "sha256": "a58569cea3e9b25aae9c9b0bdd3b93eed24ee1008380b2fe74ac946df0ed1667"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__049.json\\attempts\\001_20261018T115000\\requests.jsonl",
+        "sha256": "dd00368f44eaa98283857fd581a8c6e2acd8897149ba84cf1dabcb0644e3c957"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__066.json\\attempts\\001_20261018T115114\\requests.jsonl",
+        "sha256": "5e6c507151cadcba3a64cf9a1396644ec31b6ed6efec05d8f70a9ee6d1cee984"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__076.json\\attempts\\001_20261018T115127\\requests.jsonl",
+        "sha256": "820ed9f8958aaefd1039b04e32b9a9190a15a90b95f725dccbdb1b4a66f1d767"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__077.json\\attempts\\001_20261018T115301\\requests.jsonl",
+        "sha256": "ba4e80d2178747192abc75f22713efd53cbee4901772460c3890e4328d34cac7"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__084.json\\attempts\\001_20261018T115331\\requests.jsonl",
+        "sha256": "0b1a8308d2d825b6c2d35b9316acf337ab1ba82a2ef6eef7d2b9ed06a0e9e6a6"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__088.json\\attempts\\001_20261018T115535\\requests.jsonl",
+        "sha256": "7be8803af72dfaa99fcc5c80b8bfc4f5d72dbfaec602a20f8f21517ca7f2927d"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__090.json\\attempts\\001_20261018T115655\\requests.jsonl",
+        "sha256": "ed2d42ab4b655f3adf05925bf1db548f948bf41ba621e2c0ef8c255e0cda44d5"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__094.json\\attempts\\001_20261018T120121\\requests.jsonl",
+        "sha256": "c1d44082949a3136a3951fd0b54e4f6d276ae761d8098f207bc54163303edd73"
+      },
+      {
+        "path": "runs\\validation100\\cases\\OpenManus__103.json\\attempts\\001_20261018T120126\\requests.jsonl",
+        "sha256": "6a04fce8dc59e125b38acdd1205859f44a15df64b4d2f2a51b1c34b6adce938e"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__003.json\\attempts\\001_20261018T120217\\requests.jsonl",
+        "sha256": "43683608ef72ece34ef57918c3ca0aa3ec70eb0760b1e6e29dc49ce8f0c2ab3c"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__008.json\\attempts\\001_20261018T120938\\requests.jsonl",
+        "sha256": "fae5a55044bcbb08455880213a0fc553989014556021caf840105a445959aa2e"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__013.json\\attempts\\001_20261018T121422\\requests.jsonl",
+        "sha256": "ca3c6e04585e97fcbb82d16b1b6706bf2ed3049805cb5c85ca6ae2a6141c81e8"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__015.json\\attempts\\001_20261018T121525\\requests.jsonl",
+        "sha256": "92a9cb5f5b93db8ea63fa8408754bb4b0aacb8a9ec3583853ecc814272d6fcfb"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__016.json\\attempts\\001_20261018T121641\\requests.jsonl",
+        "sha256": "0ecde9500cb3e8f9753f661abd297b76da594c7cfa3bfc3064dcac2cf1a9df81"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__017.json\\attempts\\001_20261018T121653\\requests.jsonl",
+        "sha256": "255b46e45ce3f6c38e8bd6476eed64be190796a5888344069e31214d93b63986"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__018.json\\attempts\\001_20261018T121808\\requests.jsonl",
+        "sha256": "fd2252d1dd1fcdf837f452f251790aabead731a0404ad5cc2a422136fb8de4f1"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__029.json\\attempts\\001_20261018T122330\\requests.jsonl",
+        "sha256": "85e0f74238a0f35e31ffb6a8f13370aeb164dd13608ec64dad0e89efe45bf0c0"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__044.json\\attempts\\001_20261018T122336\\requests.jsonl",
+        "sha256": "a353681e49b7e300d2870e3bd34cb4a8d0f19fcf98677a6a6f9eb5bb7c30e9de"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__055.json\\attempts\\001_20261018T122431\\requests.jsonl",
+        "sha256": "09b88759f56e23c82ff31114e45f7a82b494b0e634e323ed5c1479736cb20062"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__056.json\\attempts\\001_20261018T122911\\requests.jsonl",
+        "sha256": "6f6461f9833d5c5baa5e4c4ac1fa7226326c6a8dc4bad2dc9c119f7b19649ca7"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__059.json\\attempts\\001_20261018T122935\\requests.jsonl",
+        "sha256": "d83ab03b2faffa83ca49b910ff429eb95f6fb1d2638c1d669c5affa55deb82c4"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__063.json\\attempts\\001_20261018T123037\\requests.jsonl",
+        "sha256": "177818f91a0383d3614045e1e65adb07d712b792cb7d9f350f4ae51c22692a11"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__064.json\\attempts\\001_20261018T123152\\requests.jsonl",
+        "sha256": "a31d76c34b687ddaeaa9f0e7580c5862556a6528ac86ab5e0f54d1e6f98a86c3"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__078.json\\attempts\\001_20261018T124028\\requests.jsonl",
+        "sha256": "bdfd84393e4c3cba9e1825c735ed841095a3f69178c6a69f80fafde538953e9e"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__081.json\\attempts\\001_20261018T124033\\requests.jsonl",
+        "sha256": "921553a01ed561af3634e99cc0ec8c6e6b79b015bd12c1527b138a915c345b13"
+      },
+      {
+        "path": "runs\\validation100\\cases\\SmolAgents__087.json\\attempts\\001_20261018T124118\\requests.jsonl",
+        "sha256": "2e1b91adb84c2575c1d6d00fe6b1c1775f322cd519950e57c7f6d952f759f62b"
+      },
+      {
+        "path": "runs\\validation100_recovery\\cases\\Camel__002.json\\attempts\\001_20261018T131914\\requests.jsonl",
+        "sha256": "9d02a5113b8baa7bebf7f67a3bed46caf3da330abeed833c46337c99c38aea4e"
+      },
+      {
+        "path": "runs\\validation100_recovery\\cases\\Magentic_One__053.json\\attempts\\001_20261018T131914\\requests.jsonl",
+        "sha256": "4dadd85179b376788b5de1a6e1585721d05f70e07243ceace31f48a14d28ba8e"
+      },
+      {
+        "path": "runs\\validation100_recovery\\cases\\OpenDeepSearch__082.json\\attempts\\001_20261018T131914\\requests.jsonl",
+        "sha256": "f865cf2e7eb15826a9b189b57a9272b89e8e780f28a3d4eb4bce005fd08e9e74"
+      }
+    ]
+  },
+  "mechanism_used_cases": 86,
+  "model_prediction_cases": 85,
+  "action_candidate_cases": 10,
+  "health_counts": {
+    "ok": 87,
+    "budget_exhausted": 13
+  },
+  "case_elapsed_seconds_median": 1188.759437950037,
+  "case_elapsed_seconds_p95": 4928.873475200031,
+  "criteria": {
+    "authoritative": true,
+    "forecast_used": true,
+    "valid_non_unknown_comparisons": true,
+    "detection_not_worse": true,
+    "localization_not_worse": true,
+    "fp_not_worse": false,
+    "strict_improvement": true,
+    "passed": false
+  },
+  "criteria_definition": {
+    "min_authoritative": 97,
+    "min_forecast_used": 60,
+    "min_valid_non_unknown_comparisons": 5,
+    "rule": "strict improvement in detection or localization versus the archived G0 baseline on the same cases; the other metric not worse; FP not above baseline. Action candidates are reported as a mechanism diagnostic, not a pass gate: admission also requires a strict majority of ballots to diverge."
+  },
+  "scope": "对照为同批100例在归档G0基线（引入下一步预测前）中的结果；源码与预算不同，属于内部回顾性同案比较，不归因为单模块因果。"
+}

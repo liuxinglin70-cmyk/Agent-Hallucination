@@ -1,0 +1,83 @@
+{
+  "schema_version": "research.next_action_validation100_archive.v1",
+  "rounds": {
+    "round1": {
+      "source_sha256": "badb2e35630f7ffee34c4bd1e4306714b4fcdde69f3684e5b0dad44e79dce9a4",
+      "verification": "code_quality/badb2e35.../daab1668",
+      "artifact_root": "artifacts/detector/live_checks/next_action_validation100_20261017"
+    },
+    "round2": {
+      "source_sha256": "f04571a3c4257200d05cf84b15ad931c073f4761f3498df1bb805a5315d996be",
+      "verification": "code_quality/f04571a3.../68a8eba9",
+      "artifact_root": "artifacts/detector/live_checks/next_action_validation100_round2_20261018"
+    }
+  },
+  "files": [
+    {
+      "file": "comparison-across-100-case-runs.md",
+      "bytes": 8135,
+      "sha256": "f8f50a27fd1d69492bec89742b0e1d5649a180962ab430341b59b7a3b2c8600e"
+    },
+    {
+      "file": "report.md",
+      "bytes": 7597,
+      "sha256": "2ef77887d49cbbe25af1cefeaca781b6a9d1b85fec594d2b39927fc75dba0f12"
+    },
+    {
+      "file": "round1-comparison.json",
+      "bytes": 76010,
+      "sha256": "2f6601d4f66c8426ada71e9325f3f65c6d22069f536263a2abf10e31d199a0a2"
+    },
+    {
+      "file": "round1-config.json",
+      "bytes": 2414,
+      "sha256": "6a4f623982d0113aeeb8ef0e697dfa39117847072db9d7ee106c1aee8dfaec46"
+    },
+    {
+      "file": "round1-final-evaluation.json",
+      "bytes": 94620,
+      "sha256": "5db424bc6d713726e2c5913ff14b481e62a83a602e2e80429bf046b1aee8e6d2"
+    },
+    {
+      "file": "round1-first-evaluation.json",
+      "bytes": 162944,
+      "sha256": "94ac36951ea3162c7e96d452ce17f0d59b90a40acbb2e66a04347e592c5a6a76"
+    },
+    {
+      "file": "round1-manifest.json",
+      "bytes": 56503,
+      "sha256": "2ac45c876791bd42907762f832d5babde26a69fcd8db1c7f189c1591ff826905"
+    },
+    {
+      "file": "round2-comparison.json",
+      "bytes": 76407,
+      "sha256": "c84da11e5339a8ada98878aa0ddafb44773e185929c6d2c60a29684145c4e07b"
+    },
+    {
+      "file": "round2-config.json",
+      "bytes": 2414,
+      "sha256": "6a4f623982d0113aeeb8ef0e697dfa39117847072db9d7ee106c1aee8dfaec46"
+    },
+    {
+      "file": "round2-final-evaluation.json",
+      "bytes": 95402,
+      "sha256": "7ba9c3c55cdd59179c41763b56d30f8850b838a800fbe0dc206aa55e57682b69"
+    },
+    {
+      "file": "round2-first-evaluation.json",
+      "bytes": 174833,
+      "sha256": "f655f13823d01c6c45827e54f0f2e5b24c19b879fe0dc391be76913aba4a8c11"
+    },
+    {
+      "file": "round2-manifest.json",
+      "bytes": 56497,
+      "sha256": "bbcc4944d6babb1a6fb9bdd4a82231526c25d4ee5afe7ce85f0744ff395fa4b8"
+    },
+    {
+      "file": "sample.json",
+      "bytes": 44638,
+      "sha256": "2732a208dbdf6df0faddb2ea859fd7027ddb6750945b0c8e92bce57d0da57f1a"
+    }
+  ],
+  "note": "archived copies plus report.md and cross-run comparison; SHA-256 per file."
+}

@@ -53,7 +53,7 @@ python scripts/verify.py --scope code_only
 python -m detector detect --record datasets/raw/agenthallu/AgentHallu/BFCL/001.json --case-id BFCL/001.json --output-dir artifacts/detector/single
 ```
 
-当前诊断默认为 `tracer_context` / `semantic_proxy`。新增 `causal_audit.next_action_mode` 支持 `off`（默认）、`shadow`、`judge_context`；复现实验使用[完整冻结配置](docs/results/next-action100-20261015/config.json)，其中新增工作额度不同于默认值。风险与动作审计无独立定罪或定位权限；真实 teacher-forced PPL 仍 unsupported，阴性反馈默认关闭。完整命令、回放与预算见[技术合同](docs/technical-solution.md)。
+当前诊断默认为 `tracer_context` / `semantic_proxy`。默认部署配置（AutoDL及DeepSeek）以 `causal_audit.next_action_mode=judge_context` 开启下一步预测与行动比较；`off` 显式关闭，`shadow` 为旁路。默认新增额度为180秒、60000输入字节、8192输出token及2次可选请求，仍保留原诊断预留；显式自定义配置不继承部署文件，未声明该字段时保持off。复现实验使用[完整冻结配置](docs/results/next-action100-20261015/config.json)，其中新增工作额度不同于默认值。风险与动作审计无独立定罪或定位权限；真实 teacher-forced PPL 仍 unsupported，阴性反馈默认关闭。完整命令、回放与预算见[技术合同](docs/technical-solution.md)。
 
 ## 目录与维护
 

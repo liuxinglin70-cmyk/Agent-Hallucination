@@ -1,0 +1,3757 @@
+{
+  "run_id": "validation100",
+  "metrics": {
+    "decisive": 98,
+    "unresolved": 2,
+    "completion": 0.98,
+    "decisive_accuracy": 0.8163265306122449,
+    "all_case_accuracy": 0.8,
+    "tp": 50,
+    "fp": 7,
+    "fn": 11,
+    "tn": 30,
+    "positive_precision": 0.8771929824561403,
+    "positive_recall": 0.819672131147541,
+    "positive_f1": 0.8474576271186439,
+    "macro_precision": 0.8044501497646555,
+    "macro_recall": 0.815241470979176,
+    "macro_f1": 0.8083441981747066,
+    "authoritative": 98,
+    "degraded": 1,
+    "degraded_disagreeing": 0,
+    "terminal_metrics": {
+      "decisive": 99,
+      "unresolved": 1,
+      "completion": 0.99,
+      "decisive_accuracy": 0.8181818181818182,
+      "all_case_accuracy": 0.81,
+      "tp": 51,
+      "fp": 7,
+      "fn": 11,
+      "tn": 30,
+      "positive_precision": 0.8793103448275862,
+      "positive_recall": 0.8225806451612904,
+      "positive_f1": 0.8500000000000001,
+      "macro_precision": 0.8055088309503784,
+      "macro_recall": 0.8166957279860506,
+      "macro_f1": 0.8096153846153847
+    },
+    "provider_unresolved": 1,
+    "no_terminal_decision": 1,
+    "requested_cases": 100,
+    "found_results": 100,
+    "missing_cases": 0,
+    "step_localization": {
+      "target": "dataset_first_error_event.v1",
+      "step_unit": "trajectory_event_position",
+      "unmapped_annotations": 0,
+      "target_mismatch_rows": 0,
+      "n": 62,
+      "hits": 34,
+      "accuracy": 0.5483870967741935,
+      "by_step_kind": {
+        "action_step": {
+          "n": 25,
+          "hits": 17,
+          "accuracy": 0.68
+        },
+        "content_step": {
+          "n": 26,
+          "hits": 17,
+          "accuracy": 0.6538461538461539
+        },
+        "unclassified": {
+          "n": 11,
+          "hits": 0,
+          "accuracy": 0.0
+        }
+      },
+      "note": "action-step and content-step accuracy answer different questions; read them apart, never as one rate"
+    }
+  },
+  "rows": [
+    {
+      "case": "Camel/002.json",
+      "gold": false,
+      "prediction": null,
+      "terminal_prediction": null,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": null,
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "unresolved",
+      "authority": "invalid"
+    },
+    {
+      "case": "Camel/007.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/017.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/019.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/030.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/031.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/042.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 6,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/049.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 5,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 5,
+        "position": 5,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/059.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/060.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/063.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/070.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/071.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/075.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/078.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/082.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/085.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Camel/090.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/000.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/001.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 9,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/009.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/012.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/013.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/015.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/017.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/019.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 5,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 5,
+        "position": 5,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/026.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/032.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 7,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/040.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/046.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/051.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 6,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 6,
+        "position": 6,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 6,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/053.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/059.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 6,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 6,
+        "position": 6,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 6,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/072.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/086.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/088.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/012.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/014.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/018.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/019.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "Octotools/022.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/032.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/034.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/038.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/041.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Octotools/042.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/005.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/015.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/019.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/020.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 7,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 7,
+        "position": 7,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 7,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/021.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/024.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/028.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/032.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 5,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 5,
+        "position": 5,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/041.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/059.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/060.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/064.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/070.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 9,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 9,
+        "position": 9,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 10,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/082.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/083.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/085.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenDeepSearch/099.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/000.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/003.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/011.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/015.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/017.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 7,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/022.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 6,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 6,
+        "position": 6,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 6,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/024.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/029.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 5,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 5,
+        "position": 5,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/038.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/039.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/042.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/049.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/066.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/076.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/077.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/084.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/088.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/090.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/094.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/103.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/003.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/008.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/013.json",
+      "gold": false,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 7,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/015.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 11,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 11,
+        "position": 11,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 10,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/016.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/017.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 2,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 2,
+        "position": 2,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/018.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 9,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 9,
+        "position": 9,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 10,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/029.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/044.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/055.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 6,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/056.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/059.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/063.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/064.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/078.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 3,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/081.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 5,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "SmolAgents/087.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    }
+  ],
+  "errors": [
+    {
+      "case": "Camel/007.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 3,
+        "hallucination_reason": "In event_003 the developer mis-evaluated 10^0.476 as ≈2.996 parsecs (true value ≈2.992 parsecs) and then divided 1000/2.996 as ≈333.9 (true ≈333.8), so the delivered parallax of 333.9 mas is a wrong result; the correct rounded parallax is ≈334.2 mas.",
+        "delivered_result": "The parallax of the star is approximately 333.9 milliarcseconds (mas), via E(B-V)=0.2 mag, A_V=0.62 mag, distance_modulus=2.38, distance 10^0.476 ≈ 2.996 pc, p = 1000/2.996 ≈ 333.9 mas.",
+        "correct_result": "E(B-V)=0.7−0.5=0.2 mag; A_V=3.1×0.2=0.62 mag; 5·log10(d)=3−5+5−0.62=2.38 → log10(d)=0.476 → d=10^0.476≈2.992 parsecs; parallax p=1000/2.992≈334.2 mas (rounded to one decimal place).",
+        "basis": "derivation",
+        "confidence": "high",
+        "evidence_refs": [
+          "event_003"
+        ],
+        "root_cause": {
+          "step": 3,
+          "quote": "distance = 10^0.476 ≈ 2.996 parsecs",
+          "referent": "distance = 10^0.476 ≈ 2.992 parsecs, giving parallax 1000/2.992 ≈ 334.2 mas (one decimal place)"
+        },
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Compute E(B-V) as measured minus intrinsic color: 0.7 − 0.5 = 0.2 mag"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Compute A_V = 3.1 × E(B-V) = 0.62 mag"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Apply the given distance-modulus-with-absorption formula (5·log10(d) = 3 − 5 + 5 − 0.62 = 2.38) and solve for distance in parsecs"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Final parallax in mas rounded to one decimal place: 1000/10^0.476 ≈ 334.2 mas"
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "Return the parallax as a rounded number (one decimal place) with an explanation of the calculation steps"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_268c3aabdc3eb714a1d9",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "matched",
+            "reason": "event_003 performs the prescribed sequence in order: E(B-V)=0.7−0.5=0.2, A_V=3.1×0.2=0.62, and applies the given distance-modulus formula 3−5+5−0.62=2.38 with 5·log10(d)=DM; extinction is not skipped, the coefficient 3.1 and formula form are unchanged. The arithmetic slip in evaluating 10^0.476 is a result-accuracy error judged under the main verdict, not a deviation from the prescribed steps.",
+            "evidence_refs": [
+              "event_003"
+            ],
+            "quote": "distance_modulus = apparent V mag - absolute V mag + 5 - A_V = 3 - 5 + 5 - 0.62 = 2.38",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003",
+                "channel": "content"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_d0becd56435e0f17c05a",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "matched",
+            "reason": "event_003 delivers a final answer in milliarcseconds rounded to one decimal place (333.9 mas) together with a step-by-step explanation (Steps 1–5), satisfying this presentation constraint; the numeric inaccuracy of the value is assessed under the main result-error verdict, not by this format constraint.",
+            "evidence_refs": [
+              "event_003"
+            ],
+            "quote": "The parallax of the star is approximately 333.9 milliarcseconds (mas).",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003",
+                "channel": "content"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 2,
+          "valid": 2,
+          "failures": {},
+          "repair": {
+            "state": "not_needed"
+          }
+        }
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 3,
+        "evidence_refs": [
+          "event_003"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: event_003 states 'distance = 10^0.476 ≈ 2.996 parsecs' and 'p(mas) = 1000 / distance = 1000 / 2.996 ≈ 333.9 mas', delivering 'The parallax of the star is approximately 333.9 milliarcseconds (mas).' Direct evaluation shows 10^0.476 ≈ 2.9923 pc (ln-based: e^(0.476·ln10) = e^1.09603 ≈ 2.9923), not 2.996, and p = 1000/2.9923 ≈ 334.196 → 334.2 mas to one decimal as the task requires. The error is twofold and internally inconsistent: even with the agent's own distance, 1000/2.996 ≈ 333.78 → 333.8, not 333.9. The delivered 333.9 mas is therefore a genuine RESULT ERROR, not a rounding artifact (2.9923 cannot round to 2.996). All preceding quantities (E(B-V)=0.2, A_V=0.62, distance_modulus=2.38, log10(d)=0.476) follow the task's stated formulas and are correct. RELEVANCE TEST: correcting the arithmetic inside event_003 (d≈2.992 pc, p≈334.2 mas) makes every required deliverable — color excess, absorption, distance, and the one-decimal parallax with explanation — correct; event_003 is both the first event containing the computation and the delivered final answer (last_prose_event_id=event_003), so there is no later correction and the error is causally connected to the delivered result. Localization at step 3 (event_003, position 3) is correct."
+      }
+    },
+    {
+      "case": "Camel/017.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 4,
+        "hallucination_reason": "The Search Agent's note and the final answer fabricate a nonexistent 'head-to-tail' constitutional dimer of the monoene 3-methylpent-1-ene and misassign stereochemistry ((R,S)/(S,R) called an 'enantiomeric pair', the real dimer's E/Z forms labeled all-meso), so the required 'explaining why' deliverable is materially wrong even though the final count of 6 coincidentally equals the true number of stereoisomers of the single dimer.",
+        "delivered_result": "6 distinct products: 2 achiral/meso 'head-to-head' E/Z dimers plus 4 chiral products of a claimed 'head-to-tail' constitutional isomer ((R,S)-E, (S,R)-E, (R,S)-Z, (S,R)-Z).",
+        "correct_result": "6 distinct products, all stereoisomers of the single self-metathesis dimer 4,5-dimethyloct-4-ene (CH3CH2CH(CH3)CH=CHCH(CH3)CH2CH3): the E and the Z form each comprising the chiral (3R,6R)/(3S,6S) enantiomeric pair plus one meso (3R,6S) form; no head-to-tail constitutional isomer exists, since metathesis of the terminal monoene yields only RCH=CHR plus ethene.",
+        "basis": "world_knowledge",
+        "confidence": "high",
+        "evidence_refs": [
+          "event_004",
+          "event_008"
+        ],
+        "root_cause": {
+          "step": 4,
+          "quote": "Head-to-tail gives 2 enantiomeric pairs × 2 (E and Z) = 4",
+          "referent": "Self-metathesis of the terminal monoene gives only one constitutional dimer, CH3CH2CH(CH3)CH=CHCH(CH3)CH2CH3; its six stereoisomers are the E and Z forms of the chiral (3R,6R)/(3S,6S) pair plus the meso (3R,6S) — no head-to-tail constitutional isomer exists, and (R,S)/(S,R) are the identical meso compound, not an enantiomeric pair."
+        },
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Search for the possible products formed, excluding ethene, when racemic 3-methylpent-1-ene is treated with Grubbs catalyst"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Deliver a detailed plain text answer giving a clear explanation with structural formulas (names or describable drawings) of the possible products and why they form"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "State the total number of distinct products excluding ethene; correct value is 6 (E/Z × {(3R,6R), (3S,6S), meso (3R,6S)} of the single dimer 4,5-dimethyloct-4-ene)"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_b93d5df84c3f2340564e",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "matched",
+            "reason": "The constraint permits searching for the Grubbs-catalyzed metathesis products of 3-methylpent-1-ene before asserting any count; the actual next event is exactly that search with an on-point query, so the local action matches.",
+            "evidence_refs": [
+              "event_003_tool_01"
+            ],
+            "quote": "{'query': 'Grubbs catalyst metathesis products of 3-methylpent-1-ene', 'text': True, 'use_autoprompt': True}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_003_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_57a0c5aaf01b6310b119",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "matched",
+            "reason": "The task was assigned to the Search Agent, and the actual next event is the Search Agent executing a literature search on the reaction rather than finalizing a numeric answer without retrieval support.",
+            "evidence_refs": [
+              "event_003_tool_01"
+            ],
+            "quote": "search_exa",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003_tool_01",
+                "channel": "tool_name"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_003_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 2,
+          "valid": 2,
+          "failures": {},
+          "repair": {
+            "state": "not_needed"
+          }
+        }
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 4,
+        "evidence_refs": [
+          "event_004",
+          "event_008",
+          "event_003_tool_01"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: event_004's note states 'The head-to-tail union (unlike symmetric terminal alkenes) leads to a constitutional isomer (e.g., 4-methyl-5-decenene)' and counts '2 structures (enantiomeric pair) × 2 (E/Z) = 4', while labeling the head-to-head dimer 'an achiral (meso) dimer' in both E and Z. The correct referent is established by certain textbook chemistry and corroborated by the trajectory's own observation at event_003_tool_01 ('When two terminal alkenes react, they exchange methylene groups. Thus, one of the products is ethene'): self-metathesis of a terminal monoene yields only RCH=CHR plus ethene, i.e., the single dimer 4,5-dimethyloct-4-ene whose E and Z forms each comprise the chiral (3R,6R)/(3S,6S) enantiomeric pair plus one meso (3R,6S) form — six stereoisomers, with no head-to-tail constitutional isomer accessible (the only head-to-tail/head-to-head source in the observations concerns a diene in double CM, not this monoene). The note also attributes this to a Myers PDF never returned by the event_003 search. RELEVANCE TEST: event_008 propagates the fabrication verbatim into the delivered answer ('4 chiral dimers (2 enantiomer pairs in both E and Z isomers) from head-to-tail union'; head-to-head E/Z 'achiral/meso') and is never corrected, so the delivered answer's product inventory and stereochemistry are materially wrong (RESULT ERROR) even though the number 6 coincidentally equals the true stereoisomer count; correcting event_004 would make every deliverable correct, and the step is causally upstream of the delivered result."
+      }
+    },
+    {
+      "case": "Camel/042.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "A single-paragraph final answer (event_010) stating that Berlin's son Rafael in Money Heist is depicted as an electronics engineer with a post-degree in cybersecurity from MIT, citing the Money Heist Wiki as justification, and explicitly addressing the user's insight (law student who becomes a corporate attorney) as unsupported by credible sources.",
+        "correct_result": "Berlin's son Rafael is depicted in Money Heist as an electronics engineer (MIT-educated, with a cybersecurity specialization), per the show's depiction and the observed Fandom wiki source; the law-student/corporate-attorney claim is not supported by the show and was correctly rejected rather than adopted.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Research credible sources on the web to find the profession of Berlin's son as depicted in Money Heist before producing the answer."
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "The final deliverable is a single paragraph that states the profession, provides a brief justification, and mentions any user insight if relevant."
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "The stated profession must be the one actually depicted in the show (electronics engineer with cybersecurity background), not an unsupported alternative such as the unverified law-student/corporate-attorney claim."
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_18465320b591573ff57b",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "divergent",
+            "reason": "The real next action is a human console query soliciting user insight about the profession, not the web retrieval the constraint expects as the next step; it is not a forbidden direct answer, and the task itself anticipates mentioning user insight, so this is a strategy choice rather than a material breach.",
+            "evidence_refs": [
+              "event_003_tool_01"
+            ],
+            "quote": "ask_human_via_console",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003_tool_01",
+                "channel": "tool_name"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_003_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_44b377a0670e11189db5",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "divergent",
+            "reason": "The acting role is the assigned Search Agent, so no other role substituted or summarized early, but the action taken is a human console query rather than the web retrieval the constraint specifies for the next step; no forbidden action (another role answering, skipping retrieval to summarize) is observed in this event.",
+            "evidence_refs": [
+              "event_003_tool_01"
+            ],
+            "quote": "ask_human_via_console",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003_tool_01",
+                "channel": "tool_name"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_003_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 2,
+          "valid": 2,
+          "failures": {},
+          "repair": {
+            "state": "not_admitted",
+            "resource": "output"
+          }
+        }
+      },
+      "defense": {
+        "verdict": "refuted",
+        "confirmed_step": null,
+        "evidence_refs": [
+          "event_004",
+          "event_005",
+          "event_006",
+          "event_007",
+          "event_008"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "No external snapshot provided; whether the live Wikipedia Berlin article mentions Rafael's profession is unestablished (search snippet/excerpt only). This does not affect the ruling, which rests on immateriality, not on proving Wikipedia's actual content.",
+        "reason": "CONTENT TEST: at event_006 the agent wrote 'This insight conflicts with multiple summaries and the series' depiction that Rafael is mainly portrayed as an electronics engineer with a background in cybersecurity (Wikipedia, Money Heist Wiki).' The shown Wikipedia result (event_004 result_id 5: 'Berlin (Andrés de Fonollosa) is a fictional character... portrayed by Pedro Alonso', long_description 'N/A') indeed contains no Rafael profession information, so the parenthetical attribution to Wikipedia (and 'multiple summaries') is ungrounded in the record — the attribution deviation is real at the record level. RELEVANCE TEST: the deviation is confined to the agent's self-initiated intermediate note (berlin_son_profession), which the task text (the single user question) never demanded as a deliverable; per the MATERIALITY LAW the unit of judgement is deliverables the task requires, and agent-created notes/verification scaffolding are not promoted into user-required deliverables. The substantive deliverable — the answer to 'What was the profession of Berlin's son?' — is correct and grounded in the one retrieved source that states it (event_004 result_id 1, Money Heist Wiki Rafael page: 'an Electronics Engineers from MIT, Massachusetts with a post-degree in cybersecurity'), which the agent cited accurately at event_005 and re-verified at event_007; the correct source was always included alongside the over-broad Wikipedia citation, so no wrong value was delivered. The positive verdict quotes no delivered result carrying the misattribution (its delivered_result field is empty; event_010 is not shown and has_explicit_final_answer=False), so propagation into a deliverable is not established; and event_008 restates the same sourcing independently of event_006, so correcting event_006 would not change any deliverable's correctness. Over-inclusive source attribution in intermediate notes is process-level citation imprecision — not a RESULT ERROR, DELIVERABLE BREACH, or FALSE COMPLETION — and is therefore immaterial under the MATERIALITY LAW; the conviction is refuted."
+      }
+    },
+    {
+      "case": "Camel/049.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Sora (Boyacá) was founded by Fray Tomás Grijalba Castellanos on 12 August 1556, supported by three citations (SITUR Boyacá, Spanish Wikipedia, Censo-Guía de Archivos) with titles, URLs and quoted sentences, plus a disclosed conflict note that one source gives 'Tomás Gualba Castellanos' and that the departmental SITUR source was prioritized.",
+        "correct_result": "Per the task contract and the record's own cited sources (SITUR Boyacá note at event_010, Wikipedia note at event_011, Censo-Guía note at event_012, all recording 'Fray Tomás Grijalba Castellanos', 12 de agosto de 1556): a single sentence naming the founder and year, 2–3 citations with title/URL/quote/access date, and a conflict-explanation sentence — which is what the trajectory delivered.",
+        "basis": "observation",
+        "confidence": "low",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_form",
+            "requirement": "Deliverable (1): a single plain-text sentence stating the founder's full name and founding year if available"
+          },
+          {
+            "kind": "verbatim_content",
+            "requirement": "Deliverable (2): a list of 2–3 authoritative citations each with page title, URL, exact quoted supporting sentence, and access date"
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "Deliverable (3): if sources conflict, one sentence explaining the discrepancy and which source was prioritized and why"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Determine the founder using reputable sources via research (searches and page visits)"
+          }
+        ]
+      },
+      "defense": {}
+    },
+    {
+      "case": "Camel/075.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Static water contact angle (rough surface): 129°; Static oil contact angle (rough surface): 51°; Water droplet roll-off: low tilt angles (Small hysteresis (~8°) indicates low tilt roll-off.)",
+        "correct_result": "Static water contact angle (rough surface): (133° + 125°)/2 = 129°; Static oil contact angle (rough surface): arccos(clamp[(cos(129°)/cos(104°))·cos(76°), -1, 1]) = 51° (r ≈ 2.6013); Water droplet roll-off: low tilt angles, since hysteresis = 133° − 125° = 8° ≤ ~10°.",
+        "basis": "derivation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Before any reasoning or calculations, call ask_human_via_console exactly once to ask the user about preferences/constraints, incorporate the response, and proceed with the default approach if no preference is given."
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "Static water contact angle of rough surface = average of measured advancing and receding water angles = (133° + 125°)/2 = 129°."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Compute roughness factor r = cos(θ_water,rough,static)/cos(104°), then θ_oil,rough,static = arccos(clamp[r·cos(76°), -1, 1]) via the Wenzel model."
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Determine roll-off qualitatively from water hysteresis Δθ = 133° − 125° = 8°: since ~8° is on the order of ≤10°, conclude 'low tilt angles'."
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "Deliver a plain-text answer with exactly three lines: 'Static water contact angle (rough surface): [value]', 'Static oil contact angle (rough surface): [value]', 'Water droplet roll-off: [low tilt angles|high tilt angles] ([one short justification sentence]).', values rounded to the nearest whole degree."
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_1947b93f05b8ca515ea7",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "unknown",
+            "reason": "missing_or_invalid_comparison",
+            "evidence_refs": [],
+            "quote": "",
+            "validation_state": "future_reason_reference",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": "reason_references_future_events",
+            "rejected_comparison": {
+              "text": "[{\"constraint_id\": \"c_1947b93f05b8ca515ea7\", \"source_event_id\": \"event_002\", \"next_event_id\": \"event_003\", \"state\": \"matched\", \"reason\": \"The real next event performs the task-mandated first action (ask_human_via_console, called exactly once before reasoning/calculation), which does not conflict with the three-line deliverable constraint; the eventual deliverable at event_007 is exactly three lines matching the prescribed template with whole-degree values (129°, 51°) and a parenthetical one-sentence justification.\", \"evidence_refs\": [\"event_003\", \"event_007\"], \"quote\": \"Before I proceed, do you have any preferences or constraints? For example: 1) Do you prefer the Wenzel or Cassie–Baxter model for estimating the rough-surface oil angle, or should I use the default (Wenzel) approach? 2) Any specific rounding rules (e.g., nearest whole degree vs. one decimal)? 3) Any additional measurements or considerations you want me to include?\"}]",
+              "truncated": false
+            }
+          },
+          {
+            "constraint_id": "c_7162216f46f79a784e4e",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "unknown",
+            "reason": "missing_or_invalid_comparison",
+            "evidence_refs": [],
+            "quote": "",
+            "validation_state": "future_reason_reference",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": "reason_references_future_events",
+            "rejected_comparison": {
+              "text": "[{\"constraint_id\": \"c_7162216f46f79a784e4e\", \"source_event_id\": \"event_002\", \"next_event_id\": \"event_003\", \"state\": \"matched\", \"reason\": \"The real next event is the task-mandated clarification call (explicitly allowed as '必要时请求澄清'); the subsequent computation at event_006 uses only the given data through the prescribed Wenzel formula — water_static (133+125)/2 = 129.0, r = cos(129°)/cos(104°) = 2.601337, oil_rough = arccos(r·cos(76°)) = 51.0 — with the Wenzel assumption stated in the task and no new measurements introduced, and the delivered values at event_007 match.\", \"evidence_refs\": [\"event_003\", \"event_006\", \"event_007\"], \"quote\": \"1) Do you prefer the Wenzel or Cassie–Baxter model for estimating the rough-surface oil angle, or should I use the default (Wenzel) approach?\"}]",
+              "truncated": false
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "degraded",
+          "expected": 2,
+          "valid": 0,
+          "failures": {
+            "future_reason_reference": 2
+          },
+          "repair": {
+            "state": "not_admitted",
+            "resource": "output"
+          }
+        }
+      },
+      "defense": {}
+    },
+    {
+      "case": "Magentic_One/046.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "5 distinct 1H NMR signals for compound 4",
+        "correct_result": "5 distinct 1H NMR signals for compound 4 (ethyl 1-cyanocyclohexane-1-carboxylate: OCH2, CH3, and three ring CH2 environments)",
+        "basis": "derivation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "number of chemically distinct hydrogen signals in the 1H NMR spectrum of product 4"
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "refuted",
+        "confirmed_step": null,
+        "evidence_refs": [
+          "event_003",
+          "event_004"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "No external evidence snapshot was provided; the product identity (intramolecular cyclization vs acyclic dimer) rests on standard textbook chemistry (active-methylene + alpha,omega-dibromide route to 1,1-disubstituted cycloalkanes), which supports the verdict's own referent. The refutation does not hinge on independently settling that point: even under the verdict's own referent the signal count equals the delivered count.",
+        "reason": "CONTENT TEST: event_003 does state 'Excess NaH and 1,5-dibromopentane lead to double alkylation: two equivalents of product 3 attach to both ends of the pentamethylene linker' (the acyclic dimer), whereas the standard active-methylene/alpha,omega-dibromide route with excess base gives the intramolecular cyclization product ethyl 1-cyano-cyclohexane-1-carboxylate — the chemical deviation alleged is real. RELEVANCE TEST: it is immaterial under the MATERIALITY LAW. The only deliverable the task text fixes is the number of chemically distinct 1H signals of 4 ('how many distinct hydrogen signals will be observable in the 1H NMR spectrum of 4?'), and event_004 delivers 'There will be a total of 5 distinct 1H NMR signals for compound 4.' The verdict's own correct referent — the cyclization product — has exactly 5 chemically distinct hydrogen environments (ethyl OCH2; ethyl CH3; ring C2/C6 CH2; ring C3/C5 CH2; ring C4 CH2; C1 bears no hydrogen), identical to the delivered count, so correcting step 3 would change only the rationale, not any deliverable. The wrong structure and the wrong environment enumeration (a 'methine proton' and 'pentamethylene linker' that do not exist in the true product) appear solely in unsolicited supporting rationale the task never required, and the agent's count of its own wrong structure was itself wrong (the dimer would give 6, since chain C2/C4 and C3 are not equivalent) — the errors cancel in a delivered number that is correct. No required action, tool argument, format, or completion claim deviates, so there is no RESULT ERROR, no DELIVERABLE BREACH, and no FALSE COMPLETION; the conviction fails the materiality test and is overturned."
+      }
+    },
+    {
+      "case": "Octotools/032.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 2,
+        "hallucination_reason": "The event_002 tool observation fabricates stereochemistry (an sp2 alkene carbon of 2,3,3,3-tetrafluoroprop-1-ene is called a tetrahedral chiral center bonded to H/F/CF3, limonene's C-4 stereocenter is denied, and the axially chiral allene di(cyclohex-2-en-1-ylidene)methane is called symmetric), and event_003 delivers this analysis verbatim, so the answer wrongly includes 2,3,3,3-tetrafluoroprop-1-ene and 5-(5-methylhexan-2-ylidene)cyclopenta-1,3-diene and wrongly excludes 1-methyl-4-(prop-1-en-2-yl)cyclohex-1-ene and di(cyclohex-2-en-1-ylidene)methane — a material error in the delivered identification of which compounds are optically active, only masked by the coincidentally matching count of 4.",
+        "delivered_result": "4 optically active compounds, identified as 2,3,3,3-tetrafluoroprop-1-ene, 5-(5-methylhexan-2-ylidene)cyclopenta-1,3-diene, 3-(2-methylbut-1-en-1-ylidene)cyclohex-1-ene and 8,8-dichlorobicyclo[4.2.0]octan-7-one, with 1-methyl-4-(prop-1-en-2-yl)cyclohex-1-ene and di(cyclohex-2-en-1-ylidene)methane declared not optically active.",
+        "correct_result": "4 optically active compounds, but the correct set is 1-methyl-4-(prop-1-en-2-yl)cyclohex-1-ene (limonene: C-4 bears H, CH3, prop-1-en-2-yl and two non-equivalent ring paths, a stereocenter), di(cyclohex-2-en-1-ylidene)methane (allene whose terminal carbons each carry two different ring paths — axially chiral, no mirror plane/inversion/S4 possible), 3-(2-methylbut-1-en-1-ylidene)cyclohex-1-ene (exocyclic allene ringC3=C=C(CH3)Et, both ends differentiated — axially chiral) and 8,8-dichlorobicyclo[4.2.0]octan-7-one (bridgehead stereocenters C-1/C-6 with four different ligands each; C7=O vs C8Cl2 forbids any internal mirror plane/C2/inversion); 2,3,3,3-tetrafluoroprop-1-ene (CH2=C(F)CF3: C-2 is sp2, no stereocenter, no E/Z) and 5-(5-methylhexan-2-ylidene)cyclopenta-1,3-diene (no stereocenter — the chain CH has two identical methyls; ring-side alkene ligands equivalent, no E/Z) are achiral.",
+        "basis": "world_knowledge",
+        "confidence": "medium",
+        "evidence_refs": [
+          "event_002",
+          "event_003"
+        ],
+        "root_cause": {
+          "step": 2,
+          "quote": "However, there is no chiral center because no carbon is bonded to four different groups.",
+          "referent": "In 1-methyl-4-(prop-1-en-2-yl)cyclohex-1-ene (limonene) C-4 is bonded to H, CH3, the prop-1-en-2-yl group and two constitutionally different ring paths (via C-3 onto the C1=C2 double bond vs via C-5/C-6), so it is a stereocenter and the compound IS optically active; the same observation also falsely activates the achiral 2,3,3,3-tetrafluoroprop-1-ene and 5-(5-methylhexan-2-ylidene)cyclopenta-1,3-diene and falsely deactivates the axially chiral allene di(cyclohex-2-en-1-ylidene)methane, and event_003 propagates all four false assessments into the delivered answer."
+        },
+        "contracts": [
+          {
+            "kind": "verbatim_content",
+            "requirement": "the eight compounds exactly as listed in the question are the objects whose optical activity must be assessed"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "the answer must report how many of the eight listed compounds exhibit optical activity — correctly 4, realized by 1-methyl-4-(prop-1-en-2-yl)cyclohex-1-ene, di(cyclohex-2-en-1-ylidene)methane, 3-(2-methylbut-1-en-1-ylidene)cyclohex-1-ene and 8,8-dichlorobicyclo[4.2.0]octan-7-one"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_c3bba0a14e77256d014d",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "matched",
+            "reason": "The next event's action forwards all eight listed compounds to Generalist_Solution_Generator_Tool and explicitly requests a count with reasoning, so per-compound analysis precedes the count exactly as the constraint requires.",
+            "evidence_refs": [
+              "event_002_tool_01"
+            ],
+            "quote": "Analyze the following compounds to determine which exhibit optical activity: 1-methyl-4-(prop-1-en-2-yl)cyclohex-1-ene, 2,3,3,3-tetrafluoroprop-1-ene, di(cyclohex-2-en-1-ylidene)methane, 5-(5-methylhexan-2-ylidene)cyclopenta-1,3-diene, 3-(2-methylbut-1-en-1-ylidene)cyclohex-1-ene, [1,1'-biphenyl]-3,3'-diol, 8,8-dichlorobicyclo[4.2.0]octan-7-one, cyclopent-2-en-1-one. Provide a count of the optically active compounds and explain your reasoning.",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "unknown",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_3a39a00feaeae86b4596",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "matched",
+            "reason": "The only action in this event is delegating the stereochemistry analysis to the permitted Generalist_Solution_Generator_Tool; no conclusion, final count or unverified adoption of tool output appears within this event, so the local constraint is not violated at this step.",
+            "evidence_refs": [
+              "event_002"
+            ],
+            "quote": "Analyze the provided list of chemical compounds to determine which exhibit optical activity.",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002",
+                "channel": "content"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "unknown",
+              "between_tool_interactions": "not_multiple"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 2,
+          "valid": 2,
+          "failures": {},
+          "repair": {
+            "state": "not_admitted",
+            "resource": "output"
+          }
+        }
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 2,
+        "evidence_refs": [
+          "event_002",
+          "event_003"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "No external evidence snapshot is provided; the finding rests on certain textbook stereochemistry (sp2 carbons cannot be tetrahedral stereocenters; limonene's C-4 is a known stereocenter; abC=C=Cab allenes are axially chiral), which no trajectory observation contradicts.",
+        "reason": "CONTENT TEST: event_002's observation states '2,3,3,3-tetrafluoroprop-1-ene: ... a carbon (C-2) bonded to four different groups: H, F, CF3, and the double-bonded carbon. This makes C-2 a chiral center. Optically active' — but in CH2=C(F)CF3, C-2 IS the sp2 alkene carbon itself (no H, trigonal planar, no E/Z since C-1 bears two H), so the compound is achiral; it states limonene has 'no chiral center because no carbon is bonded to four different groups. Not optically active' — but C-4 bears H, CH3, prop-1-en-2-yl and two constitutionally different ring paths (via C-3 onto the C1=C2 bond vs via C-5/C-6), a stereocenter (limonene is famously optically active); it calls di(cyclohex-2-en-1-ylidene)methane 'symmetric ... Not optically active' — but it is an allene whose terminal carbons each carry two different ring paths (sp2 C-2 side vs sp3 C-6 side), hence axially chiral like penta-2,3-diene; and it fabricates a 'chiral center at C-2 (bonded to H, CH3, CH2, and the rest of the chain)' in 5-(5-methylhexan-2-ylidene)cyclopenta-1,3-diene, whose ylidene C-2 is sp2 with no H and whose only chain CH (C-5) bears two identical methyls, with equivalent ring-side alkene ligands — achiral. RELEVANCE TEST: event_003 propagates all four false assessments verbatim ('C-2 is a chiral center; optically active', 'No chiral center; not optically active', 'Symmetric structure; not optically active', 'Chiral center at C-2 in the substituent; optically active') and delivers the wrong set {2,3,3,3-tetrafluoroprop-1-ene, 5-(5-methylhexan-2-ylidene)cyclopenta-1,3-diene, 3-(2-methylbut-1-en-1-ylidene)cyclohex-1-ene, 8,8-dichlorobicyclo[4.2.0]octan-7-one} instead of {1-methyl-4-(prop-1-en-2-yl)cyclohex-1-ene, di(cyclohex-2-en-1-ylidene)methane, 3-(2-methylbut-1-en-1-ylidene)cyclohex-1-ene, 8,8-dichlorobicyclo[4.2.0]octan-7-one} — two false inclusions and two false exclusions in the delivered identification, a RESULT ERROR masked only by the coincidentally matching count of 4. Event_003 derives entirely from event_002's analysis, so correcting event_002 would make the delivered answer correct, and no later correction exists."
+      }
+    },
+    {
+      "case": "Octotools/034.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "1.44 grams of carbon: 49 g KClO3 (0.3998 mol) decomposes to 0.5998 mol O2; the pure metal is 20% of 10.8 g = 2.16 g Al (0.0801 mol, limiting reagent) forming 0.0400 mol Al2O3; via Al2O3 + 3C → 2Al + 3CO this needs 0.1201 mol C × 12.01 g/mol ≈ 1.44 g",
+        "correct_result": "≈1.44 g of carbon (0.12009 mol × 12.01 g/mol = 1.4423 g): the metal is aluminum (amphoteric, most abundant crust metal), aluminum is the limiting reagent (O2 is in large excess), and the standard CO-producing carbothermal reduction stoichiometry gives 3 mol C per mol Al2O3",
+        "basis": "derivation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The mass of carbon needed to convert the metal oxide — formed when the O2 from decomposition of 49 g KClO3 reacts with the pure fraction of 10.8 g of 20%-pure metal — back to pure metal"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Identify the metal from the given clues (amphoteric and among the most abundant metals in Earth's crust → aluminum) and perform the multi-step stoichiometric calculation (KClO3 → O2, O2 + metal → oxide, oxide + C → metal)"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "d_cc4e17967999d4f8fe4d",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "matched",
+            "reason": "After the observed tool failure ('unexpected indent'), the actual next event is a retry/repair of the same Python_Code_Generator_Tool with a corrected query that now includes the metal-identity clues, and the recovered call actually returned output, so no success was claimed without observed recovery.",
+            "evidence_refs": [
+              "event_003_tool_01"
+            ],
+            "quote": "Calculate the amount of carbon needed to reduce the metal oxide formed from the reaction of oxygen with 10.8 g of impure metal (20% purity) after decomposition of 49 g of KClO3. The metal is amphoteric and abundant in the Earth\\'s crust.",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_003_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "unknown",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_07610b9f17d3eee4644d",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "unknown",
+            "reason": "The actual next event is a Python tool call whose query preserves the 20% purity but omits the amphoteric/abundance clues, and the call returned only an error with no computed carbon amount, so event_002 alone neither demonstrates the required metal-identity verification and limiting-reagent comparison nor shows a forbidden direct calculation treating 10.8 g as pure.",
+            "evidence_refs": [
+              "event_002_tool_01"
+            ],
+            "quote": "Calculate the amount of carbon needed to reduce the metal oxide formed from the reaction of oxygen with 10.8 g of impure metal (20% purity) after decomposition of 49 g of KClO3.",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "unknown",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_41f918a713d5f968a674",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "matched",
+            "reason": "The actual next event invokes Python_Code_Generator_Tool to verify the stoichiometric calculation, which is an explicitly allowed action under this constraint, and no unique carbon amount was output at this event because the call returned only an error, so the forbidden numeric output without a declared reduction-product assumption did not occur here.",
+            "evidence_refs": [
+              "event_002_tool_01"
+            ],
+            "quote": "Calculate the amount of carbon needed to reduce the metal oxide formed from the reaction of oxygen with 10.8 g of impure metal (20% purity) after decomposition of 49 g of KClO3.",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "unknown",
+              "between_tool_interactions": "not_multiple"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 3,
+          "valid": 3,
+          "failures": {},
+          "repair": {
+            "state": "not_admitted",
+            "resource": "output"
+          }
+        }
+      },
+      "defense": {}
+    },
+    {
+      "case": "Octotools/041.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "As of 31 March 2017, the Indian Postal Service had 1,54,965 post offices (154,965 in Western notation).",
+        "correct_result": "154,965 post offices — the official India Post figure as on 31 March 2017; the 164,999 figure in the retrieved Wikipedia text is dated March 2025 and does not answer the question, and the Google search returned no relevant 2017 India figure.",
+        "basis": "world_knowledge",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The number of post offices of the Indian Postal Service (India Post) as of the fixed date 31 March 2017, delivered as a single correct figure"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "The delivered answer must be bound to 31 March 2017 and must not substitute another year's statistics (e.g., the March 2025 figure 164,999 from the Wikipedia observation)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Obtain sourced data via the available retrieval tools (Wikipedia_Knowledge_Searcher_Tool / Google_Search_Tool or equivalent) before delivering the final number"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_6ed8204d7860495ae165",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "matched",
+            "reason": "The first action after event_001 is a retrieval via Wikipedia_Knowledge_Searcher_Tool, one of the tools listed in event_001, querying post-office counts; no final number was output before this sourced retrieval.",
+            "evidence_refs": [
+              "event_002"
+            ],
+            "quote": "Search Wikipedia for the number of post offices in the Indian Postal Service as of 31 March 2017.",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002",
+                "channel": "content"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "unknown",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_31d09499fdf03b7a7cac",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "matched",
+            "reason": "The retrieval query issued in event_002 preserves the date qualifier 'as of 31 March 2017' rather than issuing an undated general query, keeping the statistic bound to the required date at the action level.",
+            "evidence_refs": [
+              "event_002"
+            ],
+            "quote": "Number of post offices in the Indian Postal Service as of 31 March 2017",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "unknown",
+              "between_tool_interactions": "not_multiple"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 2,
+          "valid": 2,
+          "failures": {},
+          "repair": {
+            "state": "not_needed"
+          }
+        }
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 4,
+        "evidence_refs": [
+          "event_004",
+          "event_002",
+          "event_003"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "No external evidence snapshot was provided, so the real-world value of the 2017 figure remains unestablished; the conviction rests on the record-internal fabrication (the figure and its claimed provenance appear in no observation), not on an external determination of the correct number.",
+        "reason": "CONTENT TEST: At event_004 the agent delivered 'Based on the information retrieved, the most reliable data available indicates that India Post had 1,54,965 post offices as of 31 March 2017. This figure is widely cited in official reports and documents from that time' and the final answer 'As of 31 March 2017, the Indian Postal Service had **1,54,965 post offices**.' The shown observations contain no 2017 figure and no occurrence of 1,54,965 anywhere: event_002's Wikipedia text gives 1,64,999 post offices only 'as of March 2025', and event_003's Google results are all unrelated (USPS, census, GAO pages), none mentioning India Post's 2017 count. The agent itself concedes in the same event that the Wikipedia data 'is for 2025 and not specifically for 31 March 2017' and that Google 'did not yield any direct or relevant results'. The number 1,54,965 is therefore not derived from or supported by any retrieved source, and its claimed provenance ('based on the information retrieved', 'widely cited in official reports and documents from that time') is false within the record — a fabricated grounding claim inside the delivered answer, i.e., a false completion/result error, not a formatting or process-only issue. RELEVANCE TEST: event_004 is the final-answer event with no later correction; correcting it to acknowledge that no retrieved source contained any 2017 figure would make the deliverable honest and correct under the MATERIALITY LAW, so the step is causally connected to what the trajectory delivers and the deviation is material."
+      }
+    },
+    {
+      "case": "OpenDeepSearch/005.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Option A, delivered via final_answer at event_004: \"Ω is a non-computable number outside the recursively enumerable set S due to its self-referential nature, and the hypercomputer cannot resolve this paradox,\" with reasoning tying Ω to Berry/Richard-style self-referential paradoxes that no computational model can resolve.",
+        "correct_result": "Option A — the most plausible conclusion derivable from the setup: Ω's self-referential definition makes it a non-computable number outside S, and the hypercomputer's halt without a definitive answer reflects the unresolvable paradox, not a defect in S; this is the correct choice among A–E (B contradicts the setup, C misattributes the contradiction to S which is well-defined, D invents an oracle hierarchy, E asserts dialetheic indeterminacy).",
+        "basis": "derivation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Select exactly one most-plausible conclusion option from the given choices A–E; the correct selection is option A."
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "Identify the chosen option by its letter per the Answer Choices mapping (A. A … E. E); restating the option's text alongside the letter preserves the referent."
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_7d567c8ed77494cf268c",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "unknown",
+            "reason": "The real next event consists of two intermediate web_search research calls, not a final answer; the constraint governs the final answer's unique A–E selection, which event_002 neither fulfills nor violates (no new option, no multiple options, no refusal is observed), so the local comparison cannot be settled using only material up to event_002.",
+            "evidence_refs": [
+              "event_002_tool_01",
+              "event_002_tool_02"
+            ],
+            "quote": "{'query': \"Hypercomputation paradoxes, self-reference, Berry paradox, Richard's paradox\"}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_02",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01",
+                "event_002_tool_02"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "unknown"
+            }
+          },
+          {
+            "constraint_id": "c_4eb18c7e3c897e842ccc",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "matched",
+            "reason": "The real next action's web_search queries are grounded in the visible task premises (computable real numbers, recursively enumerable sets, self-referential hypercomputation paradoxes) and the model's own declared plan in event_001 (which lists these as facts to look up); no omitted computation process or fabricated result of the hypercomputer is asserted as a basis, so the action complies with the constraint.",
+            "evidence_refs": [
+              "event_002_tool_01",
+              "event_002_tool_02"
+            ],
+            "quote": "{'query': 'Computable real numbers and recursively enumerable sets'}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01",
+                "event_002_tool_02"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "unknown"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 2,
+          "valid": 2,
+          "failures": {},
+          "repair": {
+            "state": "not_needed"
+          }
+        }
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenDeepSearch/041.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Kara Walker was 27 years old when she first received the MacArthur Fellowship in 1997.",
+        "correct_result": "Kara Walker was 27 years old when she first received the MacArthur Fellowship (born November 26, 1969; the 1997 fellowship was awarded before her 28th birthday).",
+        "basis": "world_knowledge",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Kara Walker's age at the time she first received the MacArthur Fellowship — correct age 27 (born November 26, 1969; 1997 fellowship awarded before her 28th birthday)"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_094c6af5c81b285154e4",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "matched",
+            "reason": "The plan's first actions are to look up Kara Walker's date of birth and the year of her first MacArthur Fellowship; the actual next event performs exactly these two web_search calls (queries 'Kara Walker date of birth' and 'Kara Walker MacArthur Fellowship year') before any answer is produced, so the retrieval-first requirement is satisfied and no forbidden premature answer or fabricated date occurs.",
+            "evidence_refs": [
+              "event_002_tool_01",
+              "event_002_tool_02"
+            ],
+            "quote": "'Kara Walker date of birth'",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01",
+                "event_002_tool_02"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "unknown"
+            }
+          },
+          {
+            "constraint_id": "c_6335cda07ce756ada97c",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "unknown",
+            "reason": "The constraint targets the calculation/precision stage (age derived by comparing birth date with award date, with precision disclosed if only a year is known), but the actual next event performs only the two retrieval searches; the calculation requirement is not yet addressed at this event, so its fulfillment cannot be assessed from event_002, and no forbidden action (asserting an age prematurely or silently choosing a conflicting source) appears in the searches.",
+            "evidence_refs": [
+              "event_002_tool_01",
+              "event_002_tool_02"
+            ],
+            "quote": "'Kara Walker MacArthur Fellowship year'",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_02",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01",
+                "event_002_tool_02"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "unknown"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 2,
+          "valid": 2,
+          "failures": {},
+          "repair": {
+            "state": "not_needed"
+          }
+        }
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenManus/000.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 5,
+        "hallucination_reason": "The delivered factor 1.325174 rests on an unsupported coincident configuration — the planet transiting star A during star B's partial eclipse, never established by the task (no binary period or phasing is given) — re-introduced at event_005 after event_004 had reverted to the correct minimum (star B partially eclipsing star A, 0.75·L_A + L_B = 1.036×10¹⁵), whereas the well-posed maximum variation factor is 1.360×10¹⁵/1.036×10¹⁵ ≈ 1.3127.",
+        "delivered_result": "Maximum factor of brightness variation ≈ 1.325174 (maximum brightness 1.360×10¹⁵; minimum brightness 1.026280×10¹⁵, claimed to occur when the planet transits star A during star B's partial eclipse of star A)",
+        "correct_result": "≈1.3127 (≈1.31): maximum brightness 1.360×10¹⁵ (no eclipse) divided by minimum brightness 1.036×10¹⁵, the minimum occurring when star B partially eclipses star A (0.75·L_A + L_B); the planet's transits (depths ≈0.95% and ≈0.19%) are shallower, and no coincident transit–eclipse configuration is established by the task",
+        "basis": "derivation",
+        "confidence": "medium",
+        "evidence_refs": [
+          "event_005",
+          "event_007",
+          "event_002"
+        ],
+        "root_cause": {
+          "step": 5,
+          "quote": "brightness_planet_A_during_B_eclipse = L_A * (1 - fraction_A_area_blocked) * (1 - fraction_A_blocked_by_planet) + L_B",
+          "referent": "Minimum brightness = 0.75·L_A + L_B = 1.036×10¹⁵ when star B partially eclipses star A, giving max/min = 1.360×10¹⁵/1.036×10¹⁵ ≈ 1.3127; the task establishes no coincident planet-transit-during-eclipse configuration"
+        },
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The maximum brightness-variation factor (max brightness / min brightness) for the given system: (L_A+L_B)/(0.75·L_A+L_B) = 1.360e15/1.036e15 ≈ 1.3127 (≈1.31)"
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "The answer must be given as the dimensionless ratio of maximum to minimum brightness, not as absolute brightness values"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_6135e53b0f74470ec8dc",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "matched",
+            "reason": "The real next action is a python_execute recalculation introduced by a declaration that the previous calculation had an issue; this falls under the allowed action '重新计算复核后再作答', and the recomputation code re-derives the same eclipse scenarios (its printed branch identifies the minimum as star B partially eclipsing star A) without delivering any final value contradicting ≈1.3127 at this step.",
+            "evidence_refs": [
+              "event_002"
+            ],
+            "quote": "I notice there's an issue with my previous calculation. Let me reconsider the problem more carefully, particularly how the brightness varies during eclipses.",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002",
+                "channel": "content"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "unknown",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_01d07ed4c585c74c9fe2",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "unknown",
+            "reason": "missing_or_invalid_comparison",
+            "evidence_refs": [],
+            "quote": "",
+            "validation_state": "future_reason_reference",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": "reason_references_future_events",
+            "rejected_comparison": {
+              "text": "[{\"constraint_id\": \"c_01d07ed4c585c74c9fe2\", \"source_event_id\": \"event_001\", \"next_event_id\": \"event_002\", \"state\": \"matched\", \"reason\": \"The next event's recalculation code computes the dimensionless ratio brightness_max/brightness_min and prints it as the brightness-variation factor (the truncated arguments excerpt shows the tail of that print statement), so the action is consistent with answering as a maximum/minimum ratio rather than absolute values only; the final answer itself is only delivered at event_007.\", \"evidence_refs\": [\"event_002_tool_01\"], \"quote\": \"ess variation: {brightness_factor:.4f}\\\")\"}]",
+              "truncated": false
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "degraded",
+          "expected": 2,
+          "valid": 1,
+          "failures": {
+            "future_reason_reference": 1
+          },
+          "repair": {
+            "state": "not_admitted",
+            "resource": "output"
+          }
+        }
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 5,
+        "evidence_refs": [
+          "event_005",
+          "event_004",
+          "event_002",
+          "event_006",
+          "event_007"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "The trajectory's own outputs differ (1.3127 at events 002/004 vs 1.3252/1.325174 at events 003/005/006) because the agent changed its own modeling assumptions between code runs, not because the environment returned conflicting facts; the conflict is settled by the task text (no periods/phasing given, so no coincident transit–eclipse configuration is established), not by an unresolved external-evidence conflict.",
+        "reason": "CONTENT TEST: at event_005 the code re-adds the scenario 'Planet transiting Star A during Star B partially eclipsing Star A' (brightness_planet_A_during_B_eclipse = L_A*(1-0.25)*(1-0.01)+L_B = 1.026e15, an agent assumption 'For completeness, though these are likely to be rare events') and prints 'Updated maximum factor of brightness variation: 1.3252 ... Final Answer: ... Maximum factor of brightness variation: 1.3252', overriding the task-grounded minimum it had just computed at event_004 ('Final minimum brightness: 1.036e+15 ... Final maximum factor of brightness variation: 1.3127 ... Minimum brightness occurs when Star B partially eclipses Star A'; identically at event_002). The task fixes only radii, temperatures and the planet's 50-day orbit — no binary period or phasing — so the admissible minimum over the configurations the task establishes (stellar eclipses and planetary transits) is 0.75·L_A + L_B = 1.036×10¹⁵, giving 1.360×10¹⁵/1.036×10¹⁵ ≈ 1.3127; the delivered 1.325174 rests on a coincident configuration never established by the task. RELEVANCE TEST: the error propagates causally event_005 (1.3252) → event_006 (1.325174) → event_007 ('The maximum factor by which the brightness of this system varies is 1.325174', with terminate status success); correcting event_005 would leave the sole deliverable at ≈1.3127, which is correct. Event_003's identical error was corrected at event_004 before delivery and is not the target; event_005 is the first event in the delivered causal chain introducing it."
+      }
+    },
+    {
+      "case": "OpenManus/011.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": true,
+        "hallucination_step": 2,
+        "hallucination_reason": "The delivered value of 5.5 Earth masses rests entirely on an unverified human assertion injected via the ask_human observation (RV-only average = M x sin(i) with i ≈ π/6); the question establishes no RV-only value, inclination, or mass distribution, so an unsupported theoretical estimate was presented as the factual value the team obtained.",
+        "delivered_result": "5.5 Earth masses (11 × sin(π/6) = 11 × 0.5), delivered as the average mass obtained via the RV method, followed by terminate status success.",
+        "correct_result": "Not determinable from the question: it provides neither the RV-only average nor any inclination or mass-distribution data, so the correct deliverable is to report that the value the team obtained cannot be determined from the given information, not to compute a number from the mid-trajectory human-supplied formula.",
+        "basis": "task_requirement",
+        "confidence": "medium",
+        "evidence_refs": [
+          "event_002",
+          "event_003"
+        ],
+        "root_cause": {
+          "step": 2,
+          "quote": "M x sin(i), with i ≈ π/6. Proceed with that value.",
+          "referent": "No such value or inclination is established by the task or any observation; the question gives no RV-only average, so the correct response is that the value cannot be determined, not 11 × sin(π/6) = 5.5 Earth masses."
+        },
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The lower average mass the team obtained when assessing the same 10,000+ planet set with the RV method alone — a specific scenario fact that is neither provided in nor derivable from the question, so it must not be fabricated from unverified claims."
+          }
+        ]
+      },
+      "defense": {
+        "verdict": "refuted",
+        "confirmed_step": null,
+        "evidence_refs": [
+          "event_001",
+          "event_002",
+          "event_003"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "No observation in the trajectory and no external snapshot contradicts the user-supplied M x sin(i) relationship or the 5.5 Earth masses result; the clarification is the only in-record source for the RV-only value, and the user explicitly directed its use.",
+        "reason": "CONTENT TEST: event_002's observation records the user's answer to the agent's clarification request: 'RV-only average is obtained through the product of the planet's mean mass and the inclination, i.e., M x sin(i), with i ≈ π/6. Proceed with that value.' This was not an assertion the agent dug up or fabricated: at event_001 the agent correctly stated 'the exact value of the average mass obtained using the RV method is not provided in the prompt' and asked how to proceed, and the user — the author and authority of the task — responded with the method and an explicit directive 'Proceed with that value.' A task-giver's clarification amends the task contract; the agent computing 11 × sin(π/6) = 11 × 0.5 = 5.5 at event_003 is arithmetically correct, transparently derived, and consistent with the genuine RV sin(i) degeneracy that explains why RV masses run lower than true masses. No evidence in the record establishes 5.5 as factually wrong, and 'missing corroboration alone does not prove a delivered fact false.' The alleged deviation (an unsupported estimate presented as the obtained value) is therefore not factually real: the estimate was user-directed, not agent-invented. RELEVANCE TEST: 'correcting' step 2 to discard the human-supplied formula would force the deliverable to be 'cannot be determined,' which directly defies the user's recorded instruction 'Proceed with that value' — the deliverables would not become correct, they would breach the amended contract. The conviction's correct_result is a verification preference contradicting the task-giver's own clarification, not a requirement fixed by the task. Both tests fail, so the conviction is overturned."
+      }
+    },
+    {
+      "case": "OpenManus/015.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Harbhajan Singh's strike rate in the final match of IPL 2015 was 0.0 (0 runs scored off 2 balls faced, per the extracted Mumbai Indians batting scorecard).",
+        "correct_result": "0.0 — Harbhajan Singh scored 0 runs in the IPL 2015 final (0 not out off 2 balls per the observed scorecard), so strike rate = (0/2) × 100 = 0.0.",
+        "basis": "observation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The strike rate of Harbhajan Singh in the final match of IPL 2015, i.e., the numeric strike rate derived from his runs scored and balls faced in that specific match."
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_139a35f2e36f61359b92",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "matched",
+            "reason": "The real next action is a browser_use extract_content call whose goal explicitly requests Harbhajan Singh's runs scored and balls faced from the Mumbai Indians batting scorecard of the IPL 2015 final, so the agent moved to obtain the page-observed values before answering rather than answering with no observed data; the forbidden action (giving a final answer citing no observed value) did not occur.",
+            "evidence_refs": [
+              "event_002_tool_01"
+            ],
+            "quote": "Extract the Mumbai Indians batting scorecard, focusing on Harbhajan Singh's runs scored and balls faced in the IPL 2015 final.",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_0115ae660a854d9d1229",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "unknown",
+            "reason": "The extract_content goal names the IPL 2015 final, which is consistent with targeting the 2015 final scorecard and does not extract Harbhajan's data from another match or season, but the trajectory up to that event contains only a scroll (event_001) with no page-identity information, so whether the browsed page was actually confirmed to be the IPL 2015 final scorecard before extraction cannot be established from the action alone.",
+            "evidence_refs": [
+              "event_002_tool_01",
+              "event_001_tool_01"
+            ],
+            "quote": "Extract the Mumbai Indians batting scorecard, focusing on Harbhajan Singh's runs scored and balls faced in the IPL 2015 final.",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 2,
+          "valid": 2,
+          "failures": {},
+          "repair": {
+            "state": "not_needed"
+          }
+        }
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenManus/039.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "3.11 — the expectation value of 10σ_z+5σ_x for the given mixed ensemble, reported as rounded to two decimal places",
+        "correct_result": "3.11 — independent derivation: ⟨A⟩_ψ1 = 10(1/4−3/4)+5(2·(1/2)(√3/2)) = −5+5√3/2 ≈ −0.6699; ⟨A⟩_ψ2 = 10(0)+5(1) = 5; weighted value (1/3)(−0.6699)+(2/3)(5) ≈ 3.1100, which rounds to 3.11",
+        "basis": "derivation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "Expectation value of 10σ_z+5σ_x for the mixed ensemble with p(ψ1)=1/3, p(ψ2)=2/3, ψ1=(1/2)|↑⟩+(√3/2)|↓⟩, ψ2=(1/√2)|↑⟩+(1/√2)|↓⟩; equals (1/3)(−5+5√3/2)+(2/3)(5) ≈ 3.1100, i.e., 3.11"
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "The expectation value must be given up to two decimal places"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_91a4c2dd141b38e24b0f",
+            "source_event_id": "event_003",
+            "next_event_id": "event_004",
+            "state": "matched",
+            "reason": "The real next event is a terminate tool call with status success; it performs no content action and introduces no new numeric claim, so the conclusion 3.11 delivered at event_003 stands unchanged and remains consistent with the observed computation output '3.11' (event_002_tool_01); no new user input triggered recomputation and no forbidden action (changing or contradicting 3.11) occurred; terminating rather than further elaborating is a strategy difference, not a violation.",
+            "evidence_refs": [
+              "event_004_tool_01",
+              "event_003",
+              "event_002_tool_01"
+            ],
+            "quote": "{'status': 'success'}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_004_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_004_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_e73bfed6f96ea19e83c5",
+            "source_event_id": "event_003",
+            "next_event_id": "event_004",
+            "state": "matched",
+            "reason": "The real next event is a terminate tool call, not a restatement or summary of the answer; no restatement action occurred at event_004, so no deviation from the required two-decimal form is introduced, and the standing answer at event_003 ('3.11 (rounded to two decimal places)') already satisfies the two-decimal form fixed by the question.",
+            "evidence_refs": [
+              "event_004_tool_01",
+              "event_003"
+            ],
+            "quote": "{'status': 'success'}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_004_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_004_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 2,
+          "valid": 2,
+          "failures": {},
+          "repair": {
+            "state": "not_admitted",
+            "resource": "output"
+          }
+        }
+      },
+      "defense": {}
+    },
+    {
+      "case": "OpenManus/090.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "3-iodo-5-methyl-2-nitrophenol identified as the major product (sulfonate ester saponification regenerating the phenol), with sodium 4-nitrobenzenesulfonate as byproduct; delivered in event_002 and followed by terminate(status=success) in event_003.",
+        "correct_result": "Heating 3-iodo-5-methyl-2-nitrophenyl 4-nitrobenzenesulfonate with NaOH cleaves the sulfonate ester — hydroxide attack at the sulfonyl sulfur is the dominant kinetic pathway (and SNAr displacement of the nosylate at the ipso carbon would give the same phenol) — so the major organic product is 3-iodo-5-methyl-2-nitrophenol plus sodium 4-nitrobenzenesulfonate, matching the delivered answer.",
+        "basis": "world_knowledge",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Answer the question by identifying which product is formed when 3-iodo-5-methyl-2-nitrophenyl 4-nitrobenzenesulfonate is heated with NaOH"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "The named product must be the chemically correct major product of the reaction (sulfonate ester saponification giving 3-iodo-5-methyl-2-nitrophenol plus sodium 4-nitrobenzenesulfonate)"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_6e415172f806f3f3a9f1",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "matched",
+            "reason": "The real next event performs only a terminate tool call; it asserts no option letter/number and fabricates no option content, so the constraint that the conclusion be stated by product name without unverifiable option references is not violated; the by-name conclusion was already delivered in event_002.",
+            "evidence_refs": [
+              "event_003_tool_01"
+            ],
+            "quote": "{'status': 'success'}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_003_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_ece524209be1a91c93b3",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "matched",
+            "reason": "The real next event makes no new statement and changes no answer — it only terminates with success — so the recorded main-product conclusion (3-iodo-5-methyl-2-nitrophenol) stands unchanged with no re-verdict lacking new evidence.",
+            "evidence_refs": [
+              "event_003_tool_01"
+            ],
+            "quote": "terminate",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003_tool_01",
+                "channel": "tool_name"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_003_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 2,
+          "valid": 2,
+          "failures": {},
+          "repair": {
+            "state": "not_needed"
+          }
+        }
+      },
+      "defense": {}
+    },
+    {
+      "case": "SmolAgents/013.json",
+      "kind": "fp",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Ungraded albums of Fiona Apple and Paula Cole prior to 1999 are \"Harbinger (1994), Tidal (1996).\"",
+        "correct_result": "Harbinger, Tidal — the pre-1999 albums of the two artists without a Christgau letter grade (This Fire received C+; Tidal received only 'neither'; Harbinger was never graded), comma delimited and alphabetically sorted",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Identify the albums Fiona Apple and Paula Cole released prior to 1999 and determine which of them did not receive a letter grade from Robert Christgau"
+          },
+          {
+            "kind": "exact_form",
+            "requirement": "Provide the answer as a comma delimited list of album titles, sorted alphabetically"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "d_7edcc125d5337e509efc",
+            "source_event_id": "event_003",
+            "next_event_id": "event_004",
+            "state": "matched",
+            "reason": "After both visit_webpage calls returned 403 errors, the actual next event contains two new visit_webpage calls to alternative classicrockhistory.com discography pages, i.e., an available fallback/retry rather than a success claim without observed recovery.",
+            "evidence_refs": [
+              "event_004_tool_01",
+              "event_004_tool_02"
+            ],
+            "quote": "{'url': 'https://www.classicrockhistory.com/complete-list-of-paula-cole-albums-and-discography/'}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_004_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_004_tool_01",
+                "event_004_tool_02"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "unknown"
+            }
+          },
+          {
+            "constraint_id": "c_a9180c8342ba0136f0cf",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "matched",
+            "reason": "The search observations were swapped relative to their queries (Fiona Apple query returned Paula Cole content and vice versa); the actual next event responds with per-artist targeted lookups (the Fiona Apple discography page and the Paula Cole page), a cross-check that re-establishes attribution instead of adopting the swapped content as-is.",
+            "evidence_refs": [
+              "event_003_tool_01",
+              "event_003_tool_02"
+            ],
+            "quote": "{'url': 'https://en.wikipedia.org/wiki/Fiona_Apple_discography'}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_003_tool_01",
+                "event_003_tool_02"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "unknown"
+            }
+          },
+          {
+            "constraint_id": "c_f25d205974f5a7e71292",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "matched",
+            "reason": "The actual next event gathers per-artist discography data consistent with verifying release years before candidate filtering; no 1999 release (When the Pawn…, Amen) is added to a candidate set and no final list is submitted at this point, so no forbidden action occurs.",
+            "evidence_refs": [
+              "event_003_tool_01",
+              "event_003_tool_02"
+            ],
+            "quote": "{'url': 'https://en.wikipedia.org/wiki/Paula_Cole'}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003_tool_02",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_003_tool_01",
+                "event_003_tool_02"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "unknown"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 3,
+          "valid": 3,
+          "failures": {},
+          "repair": {
+            "state": "not_needed"
+          }
+        }
+      },
+      "defense": {
+        "verdict": "substantiated",
+        "confirmed_step": 7,
+        "evidence_refs": [
+          "event_007",
+          "event_006"
+        ],
+        "evidence_citations": [],
+        "conflict_note": "",
+        "reason": "CONTENT TEST: At event_007 the agent submitted final_answer 'Ungraded albums of Fiona Apple and Paula Cole prior to 1999 are \"Harbinger (1994), Tidal (1996).\"' — a prose sentence whose entries carry parenthetical years and quotation marks. The task explicitly fixes the output form: 'Provide your answer as a comma delimited list of album titles, sorted alphabetically' (i.e., 'Harbinger, Tidal'). The delivered text is not a bare comma-delimited list of album titles: it embeds the list in a sentence, quotes it, and extends each entry with a year, silently extending an explicitly closed format field. Under the MATERIALITY LAW a format fixed by the task belongs to the deliverable, and a violation of an explicit exact-form contract is material by definition, so this is not refutable as immaterial formatting. RELEVANCE TEST: event_007 is the final delivery with no later correction, so the deviation is causally identical to what the trajectory delivers. The underlying content is otherwise sound per event_006 (Fiona Apple artist page: Tidal [Work, 1996] graded 'Neither', which is not a letter grade; Paula Cole artist page lists only This Fire [1996] C+, leaving Harbinger ungraded), and 'Harbinger, Tidal' is alphabetically ordered — so correcting the format at this step would make every deliverable correct."
+      }
+    },
+    {
+      "case": "SmolAgents/017.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "Travel time from the astronaut's perspective ≈ 83.11 years (83.11402617498513), computed as coordinate time 163,000 ly / 0.99999987 ≈ 163,000.02 years divided by γ ≈ 1961.16; the trajectory also notes arrival age ≈ 105.11 years, within the 150-year average lifetime.",
+        "correct_result": "Approximately 83 years of proper time: with v = 0.99999987c, γ = 1/√(1−0.99999987²) ≈ 1961.16, and an LMC–Earth distance of ~163,000 ly (corroborated by multiple search results), the astronaut-frame travel time is 163,000/1961.16 ≈ 83.1 years.",
+        "basis": "derivation",
+        "confidence": "high",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "exact_value",
+            "requirement": "The answer must be the travel time from the astronaut's point of view (proper time) for the journey at v = 0.99999987c, approximately (~83 years given the ~163,000 ly LMC–Earth distance)"
+          },
+          {
+            "kind": "required_action",
+            "requirement": "Compute the coordinate time from the LMC–Earth distance and the given speed, then apply the Lorentz factor γ = 1/√(1−(v/c)²) with v = 0.99999987c to convert to the astronaut's proper time, using a distance obtained from a lookable-up source"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "c_509416842aa2b84cbe05",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "unknown",
+            "reason": "The constraint concerns the final result being the astronaut's proper time via γ-based dilation plus an age check; event_002 only performs the preliminary lookups (LMC distance and speed of light), which neither fulfills nor violates this final-result constraint, so the evidence at this event is insufficient to judge it.",
+            "evidence_refs": [
+              "event_002"
+            ],
+            "quote": "Thought: First, I will look up the distance from the Large Magellanic Cloud to Earth using a web search.",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002",
+                "channel": "content"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "unknown",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_2f14f52c067f371f9c51",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "matched",
+            "reason": "The actual next action performs exactly the planned first step: a web search for the LMC–Earth distance (plus the speed of light) before any calculation, matching the requirement to obtain the distance first with an explainable source.",
+            "evidence_refs": [
+              "event_002",
+              "event_002_tool_01"
+            ],
+            "quote": "distance_query = \"distance from Large Magellanic Cloud to Earth\"",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "unknown",
+              "between_tool_interactions": "not_multiple"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 2,
+          "valid": 2,
+          "failures": {},
+          "repair": {
+            "state": "not_needed"
+          }
+        }
+      },
+      "defense": {}
+    }
+  ],
+  "degraded_disagreements": [],
+  "missing_cases": []
+}

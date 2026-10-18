@@ -262,6 +262,7 @@ def build_action_forecast(packet: Mapping[str, Any], *, config: Mapping[str, Any
     contract_errors: list[str] = []
     provider_errors: list[dict[str, Any]] = []
     budget_failure: str | None = None
+    budget_origin: str | None = None
     for _rank, source_id, target_id in targets:
         if admitted >= requested:
             break
@@ -294,6 +295,13 @@ def build_action_forecast(packet: Mapping[str, Any], *, config: Mapping[str, Any
                                                            "route": route, "system": FORECAST_SYSTEM}, predict)
         except AddedBudgetExceeded as exc:
             budget_failure = exc.resource
+            # ``health`` and ``warnings`` keep their historical shape so every
+            # recorded reading still parses; the origin is the added fact that
+            # tells a reader which budget refused. Without it, a batch whose
+            # queue consumed the optional allowance is indistinguishable from a
+            # case that ran out of its own allowance -- two very different
+            # measurement events recorded identically.
+            budget_origin = exc.origin
             break
         except ProviderError as exc:
             if exc.error_type in FATAL_PROVIDER_ERRORS or exc.error_type == "case_deadline_exceeded":
@@ -314,7 +322,9 @@ def build_action_forecast(packet: Mapping[str, Any], *, config: Mapping[str, Any
                                       "prefix_view": view, "provider": prediction["provider"]})
     if admitted == 0:
         if budget_failure is not None:
-            result.update(health="budget_exhausted", warnings=[budget_failure])
+            result.update(health="budget_exhausted", warnings=[budget_failure],
+                          exhaustion={"resource": budget_failure,
+                                      "origin": budget_origin or "case_budget"})
         elif contract_errors:
             result.update(health="contract_error", warnings=contract_errors[:3])
         elif provider_errors:

@@ -9,6 +9,7 @@ from detector.causal_contracts import (
     RISK_PROFILE_SCHEMA, SCORER, SIGNAL_PRIORITY, arithmetic_check,
     bound_fields, field_binding, seal, validate_seal,
 )
+from detector.candidate_scorer import load_scorer, row_features, score_row
 from detector.identity import artifact_digest, digest
 from detector.packet import (
     ROLE_CHANNEL_AGENT,
@@ -172,11 +173,23 @@ def select_causal_candidates(
         raise ValueError("mandatory event ids must be strings")
     mandatory = list(dict.fromkeys(mandatory_event_ids))
     selection_rows = risk_candidate_rows(profile)
+    scorer = load_scorer(policy.get("scorer_artifact"))
+    span = len(profile["by_event"])
+    def order(row: Mapping[str, Any]) -> tuple:
+        verified = -sum(signal["verification_status"] == "verified"
+                        for signal in row["risk_signals"])
+        if scorer is None:
+            # No artifact: the key is exactly the historical one, so a deployed
+            # policy without a scorer keeps its recorded ordering and results.
+            return (row["priority"], verified, row["position"])
+        # A learned score breaks ties inside one priority band only. Priority
+        # stays the first element, so a scorer can never promote an unsupported
+        # claim over a recorded tool failure, and it cannot drop a row.
+        return (row["priority"], -score_row(
+            row_features(row, position_count=span), scorer), verified, row["position"])
     ranked = sorted((row for row in selection_rows.values()
                      if row["score_status"] in {"scored", "truncated"} and row["risk_signals"]),
-                    key=lambda row: (row["priority"], -sum(
-                        signal["verification_status"] == "verified" for signal in row["risk_signals"]),
-                        row["position"]))
+                    key=order)
     top = [row["event_id"] for row in ranked[:policy["top_k"]]]
     selected = list(dict.fromkeys([*mandatory, *top]))
     capacity = policy["max_projection_events"]

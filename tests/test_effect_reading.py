@@ -96,3 +96,40 @@ def test_effect_threshold_requires_a_valid_registered_number(readings, tmp_path,
     path.write_text(json.dumps({"criteria": {"effect": {"significance_level": level}}}), encoding="utf-8")
     with pytest.raises(ValueError, match="significance_level"):
         load_plan(plan_path=path, measurement_path=plan.measurement.source)
+
+
+@pytest.mark.parametrize("added,removed,not_worse,p_value", [
+    (0, 0, True, 1.0),
+    # A net removal always passes, however small the sample.
+    (1, 3, True, 1.0),
+    # Three broken against one fixed is still inside the noise of a clean-case
+    # pairing (p=0.3125). A raw "fp must not exceed baseline" rule rejects it.
+    (3, 1, True, 0.3125),
+    # One broken clean case on its own is not evidence of anything: this is the
+    # round-2 shape (7 fp against 6) and it must not read as a failure.
+    (1, 0, True, 0.5),
+    (2, 0, True, 0.25),
+    # Six or seven additions against one removal still clear nothing; the rule
+    # is deliberately conservative, and this is its measured minimum detectable.
+    (6, 1, True, 0.0625),
+    (8, 1, False, 0.0195),
+    (9, 1, False, 0.0107),
+])
+def test_false_positive_parity_reads_the_pairing_not_the_counts(added, removed, not_worse, p_value):
+    from experiments.reading import false_positive_parity
+
+    reading = false_positive_parity({"added": added, "removed": removed}, significance_level=0.05)
+    assert reading["not_worse"] is not_worse
+    assert reading["one_sided_p"] == pytest.approx(p_value, abs=1e-4)
+    # Both raw counts reach the reader; a rule must expose the numbers it used.
+    assert (reading["fp_added"], reading["fp_removed"]) == (added, removed)
+
+
+def test_a_tied_false_positive_count_is_not_a_regression():
+    """The exact round-2 disagreement: 6 fp became 7, one clean case each way."""
+    from experiments.reading import false_positive_parity
+
+    tied = false_positive_parity({"added": 3, "removed": 2}, significance_level=0.05)
+    assert tied["discordant"] == 5
+    assert tied["not_worse"] is True
+    assert "noise" in tied["reason"]

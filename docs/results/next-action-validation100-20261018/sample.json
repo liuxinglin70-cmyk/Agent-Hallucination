@@ -1,0 +1,1429 @@
+{
+  "schema_version": "research.next_action_single_arm_100_sample.v1",
+  "created_from": "datasets/raw/agenthallu/AgentHallu",
+  "selection": "62 positives + 38 negatives; unseen in recent live runs; present in the pre-next-action G0 baseline; single-task-turn records only (multi-turn records without turn metadata are outside the forecast stage's contract); family-proportional within label; fixed seed",
+  "seed": "next-action-ab100-20261017",
+  "corpus_cases": 693,
+  "remaining_unseen_cases": 570,
+  "eligible_with_baseline": 420,
+  "excluded_used_cases": {
+    "count": 123,
+    "digest": "532f43a3126e9d592be28f9ae8a34634ba10c688c703b867b19beab53f74c2bb"
+  },
+  "baseline_source": "docs\\results\\full693-20260927\\baseline_report.json",
+  "baseline_sha256": "f90208a68bae2b90ee976c8d91e62bdfa8e7b28a5b3eab10c928e8555d4d75db",
+  "label_counts": {
+    "false": 38,
+    "true": 62
+  },
+  "family_counts": {
+    "Camel": 18,
+    "Magentic_One": 18,
+    "Octotools": 10,
+    "OpenDeepSearch": 17,
+    "OpenManus": 20,
+    "SmolAgents": 17
+  },
+  "cases": [
+    {
+      "case": "Camel/002.json",
+      "family": "Camel",
+      "gold": false,
+      "sha256": "584f2fa8b258c55e5616c4377f18fa6fe01e8dc56b74b15b51bb42a50ff00e3b",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/007.json",
+      "family": "Camel",
+      "gold": false,
+      "sha256": "8150b342dae1419b5f502144a2e7e9dfbf1199af69a47e5f59b42c999199beb9",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": null,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/017.json",
+      "family": "Camel",
+      "gold": false,
+      "sha256": "2d24d593267054c147483e2b779dda8a9c836297a092a5bb1173c63bf0830c12",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 4,
+        "gold_step": null,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/019.json",
+      "family": "Camel",
+      "gold": true,
+      "sha256": "d884322357691b6dafcb12de1ba6776465a7550049a7f1268fb36079c36a01d2",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/030.json",
+      "family": "Camel",
+      "gold": true,
+      "sha256": "f54eaca8ecc863940b30c028c29bd8530749130fd8a1e3621469434b1f9a45db",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/031.json",
+      "family": "Camel",
+      "gold": true,
+      "sha256": "ae11ff8934818d33b98d1579b65cea26847c53722bc4fff4e7d8eb9934692b09",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/042.json",
+      "family": "Camel",
+      "gold": false,
+      "sha256": "ffcfd9a42368bf8cefa671954c9de71915783fe0cc040e117760cef6b0b0afef",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/049.json",
+      "family": "Camel",
+      "gold": true,
+      "sha256": "91c1a47382fab7b912aa3cac5ff4fc3c7cd11bcfb41d5d5dd6d0d4417d1f687e",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 5,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/059.json",
+      "family": "Camel",
+      "gold": true,
+      "sha256": "84de603ca47a3450b038bebe822853ac7768eb25ccc2efe4dd2270c76c1b4c6c",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 4,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/060.json",
+      "family": "Camel",
+      "gold": true,
+      "sha256": "759b6382ad5ba45ced579127089d1a3150f6e13b927a331cdf71a83bc487da54",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 4,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/063.json",
+      "family": "Camel",
+      "gold": true,
+      "sha256": "7488cca1b2c4fd8035eedbcbf68e9460430f11effd35691f4b75ef4cf82b0211",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 4,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/070.json",
+      "family": "Camel",
+      "gold": true,
+      "sha256": "0f35502a4c9bd40dade6b572c7e750e156509958ecdea0c09c0fa82aa838c0df",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 4,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/071.json",
+      "family": "Camel",
+      "gold": true,
+      "sha256": "dc499d5f2ef14221995fa9e7890780384d01f1de69f7b51c992327088069a470",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 4,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/075.json",
+      "family": "Camel",
+      "gold": true,
+      "sha256": "da40f2123a7b62dbb692f7fb33cfb74d8778778c3e166d1bb4da8d8d5525d62b",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 1,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/078.json",
+      "family": "Camel",
+      "gold": false,
+      "sha256": "a807419fddf911eb53d07ef3acc785ef5982de4abbedacbddb391ae9d0a1327d",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/082.json",
+      "family": "Camel",
+      "gold": false,
+      "sha256": "6dc948cff1ce926469053b7e4c70866abdd83544cbc119923b0b523d70738dc9",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/085.json",
+      "family": "Camel",
+      "gold": false,
+      "sha256": "2c769c9f67d3975e397dd49f792395b09137d261caa3514c476916eb984ebe17",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Camel/090.json",
+      "family": "Camel",
+      "gold": true,
+      "sha256": "078f9734725d51d2533529a3b53c734dab71a1082f24907fe2babca93bfe3600",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 11,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/000.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "sha256": "bae1ec88638ebd53513cb242ed0559d6ab4165ebf30f24c569e483c7e3eccb4f",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/001.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "sha256": "6e8d459660297f51e168b30bdfe86a8db13404272977a6dac740d2bbd8ae72c9",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 9,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/009.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "sha256": "f93f4f4cbb18d94808aec2390732882adb07864db49bc4c49a29f5bfea0589ce",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/012.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "sha256": "f3a2c164b62895699d889fc1fec68fcb74738e530a7a8b54ee8d3d4674a34a7e",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/013.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "sha256": "d0b797fceece8f30ec1bac9f34b34f54d6053aa1dbb3c209653edebcdd8d9a96",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 10,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/015.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "sha256": "c77e887c7bc00b809c2de48e7fb8db26c6c5c413814f8dff14ba91fc81bbeede",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/017.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "sha256": "3902bf27721612359068afeccf758952b54be71e728e5c668f71e1e54b6ec5cf",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/019.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "sha256": "5796410d2725a7d4d67aba25b02e14a843d905a1918999c6f79c4172d7b2e04f",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 5,
+        "gold_step": 5,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/026.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "sha256": "8b40e184615a8f3a68f0c199504c3d697ba19c64a9cf4ec7a3b4b016831a8bb4",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/032.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "sha256": "f0933117bd7df705380187b07fe96f19a11429846650925f1d8e11883efb9da9",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 7,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/040.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "sha256": "ccb1eb07f5c67e1bfc6d1cef43bd63b2e442f4bac3b559123f562672d88627e5",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/046.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "sha256": "2e9619db922ae1172901e045de96db218095c7254813c6cb0a5e64b0c2fb8f26",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/051.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "sha256": "fdfa23c1b6a0e652b5e33e7581b445dee6c7729049c4e6ac1e9a1941c32b0291",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 6,
+        "gold_step": 6,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/053.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "sha256": "ca9b5d0ed76fa7fd8b0a694d523d00695c2a05020bee2dd321772b12a733f0e2",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/059.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "sha256": "7ffd11a5f257373b997194eeb21f9da31bcf7f38af55c62499c3473c7c8019b2",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 6,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/072.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "sha256": "705887071b4ab3c285e1a78b17c44448a122f894fc0b7372d740a882e20aac56",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/086.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "sha256": "fc0e0f713792742b938758146ede5b9ab2a02d7c862690ec3234180fa294bd8f",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Magentic_One/088.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "sha256": "ab96a1763bf79f4d81bd3ee35deaadb4298acd21496d9bcee806df4a237a7aef",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 4,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Octotools/012.json",
+      "family": "Octotools",
+      "gold": true,
+      "sha256": "6f733ba8d6ad984c99e954d6f7e3b983d0e5c6fe4ca37f23650a2be504472e3b",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 2,
+        "gold_step": 2,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Octotools/014.json",
+      "family": "Octotools",
+      "gold": true,
+      "sha256": "c75758609106269bbea885a60f4b1db50af4cc97c99643fd7628ed86141fdbd6",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 2,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Octotools/018.json",
+      "family": "Octotools",
+      "gold": true,
+      "sha256": "e909002f863d9dc99c19a57adaeedb8f64359e68ea150042ebf5bb02169c1000",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 4,
+        "gold_step": 4,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Octotools/019.json",
+      "family": "Octotools",
+      "gold": true,
+      "sha256": "6f93cc8eff956e180448bb3d9f264b5e63849c7aeabe4ba999d0db3b6223b279",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 5,
+        "gold_step": 2,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Octotools/022.json",
+      "family": "Octotools",
+      "gold": true,
+      "sha256": "9b826a4af8236ecd26faf8584a8a9aa70d24edcee84c8f89aec47bef8a3a2d3b",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 4,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Octotools/032.json",
+      "family": "Octotools",
+      "gold": false,
+      "sha256": "2679b6faf8777da3be266a1149b9d310f3655220700010ae8ede00532cfbd454",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": null,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Octotools/034.json",
+      "family": "Octotools",
+      "gold": true,
+      "sha256": "c93ce29f9b001c3ae93994ff8d6dbf5224546b760da5912c1e6bd8ff78f42d43",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 3,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Octotools/038.json",
+      "family": "Octotools",
+      "gold": false,
+      "sha256": "91644ad80121fe2f38d9d5f0aca07e46d7c147026f0e31d5b7fd328abcc7088d",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Octotools/041.json",
+      "family": "Octotools",
+      "gold": false,
+      "sha256": "f9b1f1609fc76f2a1a91073be0be6f4f1f70722bc0655e0aba028fc1fddd13e9",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 4,
+        "gold_step": null,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "Octotools/042.json",
+      "family": "Octotools",
+      "gold": false,
+      "sha256": "afb80806bdcb2e8f7b8ec154c9e82c8d3d858fd203c2fa88bea7864aef4c3344",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": null,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/005.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "sha256": "2c9c106a9485311c5ab845bb427a1ab4a78aa5e3a58d12deac585e7a19a93063",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 3,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/015.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "sha256": "11761982b73b1fd66560fcb16a1dd338197d61e911cbfa9931ffc4f16503d443",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 5,
+        "gold_step": 4,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/019.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "sha256": "4a55e5b2618cfebde9e2982769babfe0e544d40822deefd3b1f1efae02a59b81",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 2,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/020.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "sha256": "20afda820f579ffdc49104f59ef889e558fb28bdd7633e6e09ac4b77e424548b",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 12,
+        "gold_step": 7,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/021.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "sha256": "680dc2f8c9794730edb7c2abc2916503b35c56ad63379421c0c06fb151d34602",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/024.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "sha256": "463a4cf2b60b8b7d6a084c953155c60deb75247e9e8c2282b2597f622b0e9c68",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/028.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "sha256": "39198d7cfddb3574f4f006d54faa33c8965901fdada0a27fadb00e1540085dcb",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/032.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "sha256": "7c3a1d1bb19426280b37c5549a0295ac0a344e16a445fac02b363f98db7a8a15",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 5,
+        "gold_step": 5,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/041.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "sha256": "0796550d6100ab68d40605e1a92d93a4d4cc1be276eb4a7f98c195114afb9cdb",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 3,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/059.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "sha256": "ac2732b2d2324b3c31a1da0e6026de822d75401377a53ce0c3918d1a33c888b5",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/060.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "sha256": "e0a6012c85bedf3397ebe2c11685e237580497469cb81f2800268377628a06c8",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/064.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "sha256": "b30cb2877af83b8c1bb388101652e335e41cf0ba3cf92068bb7eb44cff03a5c1",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/070.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "sha256": "11c548df660db35af3b463f89310b729c44b45472754f6061455ad813d97ea06",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 9,
+        "gold_step": 9,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/082.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "sha256": "6323b1837bcaaac3b909a565c26e692ce9a395ef4f46319d99d5161b9e0c1459",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/083.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "sha256": "2eb07fc27ccbc637ee3e9daf1ea78f8ef89a61681222c83f4b14dbe1c0b1f707",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/085.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "sha256": "ae01257595f19df688a5b032e8af3a239e3aec2f8d657ec00941a30a46428121",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenDeepSearch/099.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "sha256": "2a8a8118eaff9d3121217e3800a7b2244626cc7eb235b67e5cafd84b272f7b85",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/000.json",
+      "family": "OpenManus",
+      "gold": false,
+      "sha256": "94e9c0553c2a4aad6b678c5e86183ea91b789daedb1fd979b664e87e011a0860",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 5,
+        "gold_step": null,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/003.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "dc7d9a00a543b06841450bbec5646d9945407a02d718a01769d4992899e885b4",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 1,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/011.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "db6af9a17f6db99a1748fec46fb71add5db9ed852756f501bf042c964d830bdc",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 2,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/015.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "344904fc0d721e6b6605b1415353ebcd1b5696ba49da472b4e5631fd2b8e76f4",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 2,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/017.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "91f2ce86d3426c26fb7e848b888b521b40e52af15be49dde364e089673cc01d6",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 7,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/022.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "a73a268278d6c7fddd8430b4ab5ceab444ec175ea6cb2257b4fe050d56b73ad6",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 6,
+        "gold_step": 6,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/024.json",
+      "family": "OpenManus",
+      "gold": false,
+      "sha256": "04bae7dd141dac86aeb24dd67c31d3ec5ba600595b77b964dd14c59fda992676",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/029.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "2d164c7cf4976f09d4543317eb3445e773ba494f0645cce25694fafd6e3e7375",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 6,
+        "gold_step": 5,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/038.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "ca0506fa833db2e303413b5403b017e042d4f67c1a2e2f651c2c884bbefab0d2",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/039.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "cf4e352adde804ee3dde5951703fe25bb22323b63a9b512a8845d565c23fd1c1",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 1,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/042.json",
+      "family": "OpenManus",
+      "gold": false,
+      "sha256": "d4e6686ebc16c058051d5b23fbbf17a329f5351b97301701253b0c6a5b6ef984",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/049.json",
+      "family": "OpenManus",
+      "gold": false,
+      "sha256": "812deeac6a20bd850e32eb40d0da8691569670bf8bda7313a81c38ceef26b3be",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/066.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "f65f2e48efbc81321588a956631172a27bffa84a65c764730d920c8b408dfea9",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 2,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/076.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "c12daceb7b1e4c5230d19327306c186969791e31f785695b969fbf9ac2784581",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 2,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/077.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "3781131ce4242d0e2becd4ccc1cf32b6577ab0b36b0101456b256d7796fc9ab5",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/084.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "8777f1765f5ffe349ad2cfec2f4df7239258760b475533e9439d8b0095a7c15a",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 2,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/088.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "cf70b4699773c4b8817cb73315296dee194e6a63ad626ba84a7837a1bb97aadd",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/090.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "15676f02178a941854501e73060a20caf913b3de69c007bc8c1a44a50bba7eb3",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 1,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/094.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "a4e861ca3991149b7e4ba97eae4e65ae58b16ce3d84dbdab727147f9175f6b62",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 2,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "OpenManus/103.json",
+      "family": "OpenManus",
+      "gold": true,
+      "sha256": "a3a2268a6d4157a7a48f035871dbad75cc009ab9f95b4332c9b3b4c9c735c29c",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 2,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/003.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "sha256": "f472bee916111acae533e059f8667a83c2815ab2e10783d39bfe6246431b1ea2",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 1,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/008.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "sha256": "980ca3a1b57835644ec8762cf012e6209164d7a4165587924ee27543bc0be9c0",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 2,
+        "gold_step": 2,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/013.json",
+      "family": "SmolAgents",
+      "gold": false,
+      "sha256": "d05f5326b696b8babf7a918ecb2426e4c90a53fe5d0fdff9dbead65a52fca254",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/015.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "sha256": "133bcfb5a2be97c10d6f9ee0679e6924ade74f444548f012cadd3aefffdbee0e",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 11,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/016.json",
+      "family": "SmolAgents",
+      "gold": false,
+      "sha256": "2e20517df744a7e2ce30ee5a97946ab862b63145963583f3c27c1fa0b776a891",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/017.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "sha256": "3474edbc83fd8d54e535606486c378e4274819851c9cb69e894b2763c14794ce",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": 2,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/018.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "sha256": "adca4b7bfbe318e60bf7ddfcb7305b7ca5c1a5554560f2ea8a0f8a4321ad2ba8",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 9,
+        "gold_step": 9,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/029.json",
+      "family": "SmolAgents",
+      "gold": false,
+      "sha256": "c926e4a1ff60a5a974765e148256c2e9aaed7f05bc30ff23105d55f17fc87954",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/044.json",
+      "family": "SmolAgents",
+      "gold": false,
+      "sha256": "ade2552d820f75397ea971dcfbcb102e6c5a8e75281f9772778bf74cbc8813fc",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/055.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "sha256": "d682c9b6635c3e2c435456704a3b562ea0b240687d1c91cc069cee2a687aaa6c",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 6,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/056.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "sha256": "a799b668844c7178517431f53b322d3a66bf0cc41d940686a0fafe4e6a8a1fc2",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/059.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "sha256": "4cf0e730b8e5c3c9073ec9c93ae14ab07dc1f980e64f1de3d7212860a9083e53",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 4,
+        "gold_step": 3,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/063.json",
+      "family": "SmolAgents",
+      "gold": false,
+      "sha256": "f0441d92876c7582489b29e8254941a9cbd22a46c9560649de92a93d22160dbe",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/064.json",
+      "family": "SmolAgents",
+      "gold": false,
+      "sha256": "72775f1618b421fbfab131f38715942703e3cbb53f399a9d75e7f49f4bfa8532",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/078.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "sha256": "5000b147fde3686605ee810346875b098cb47a9aab210cd0c4b897c3b16c3239",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 3,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/081.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "sha256": "d2a8a62885349b082fc88adc32c357204c8c47966283f4fe1448780bbc425cf1",
+      "pre_mechanism_baseline": {
+        "prediction": true,
+        "terminal_prediction": true,
+        "responsible_step": 5,
+        "gold_step": 1,
+        "state": "verified_error",
+        "authority": "authoritative"
+      }
+    },
+    {
+      "case": "SmolAgents/087.json",
+      "family": "SmolAgents",
+      "gold": false,
+      "sha256": "9c2b17882981dee504022b3b8339416fc2443020a73e38b811912293447c669f",
+      "pre_mechanism_baseline": {
+        "prediction": false,
+        "terminal_prediction": false,
+        "responsible_step": null,
+        "gold_step": null,
+        "state": "verified_clean",
+        "authority": "authoritative"
+      }
+    }
+  ]
+}

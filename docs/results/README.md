@@ -1,6 +1,21 @@
 # 结果与证据索引
 
-更新：2026-10-16。实验结论与分母由[实验日志](../experiment-log.md)集中说明；方法讨论见[研究主文档](../research-positioning-and-roadmap.md)。本目录保存可版本化的结果原件与派生核对，完整逐请求日志和proof保留在本地 `artifacts/`。
+更新：2026-10-18。实验结论与分母由[实验日志](../experiment-log.md)集中说明；方法讨论见[研究主文档](../research-positioning-and-roadmap.md)。本目录保存可版本化的结果原件与派生核对，完整逐请求日志和proof保留在本地 `artifacts/`。
+
+## 0. 新100例单臂验证：两轮机制测试（最新）
+
+2026-10-18。新抽 100 例（62 阳性 / 38 阴性，均未在此前真实运行中出现、均带同案 G0 基线行、仅单任务轮次记录），启动前冻结清单、配置与验收标准。**两轮结果：定位 18/62 → 34/62 → 36/62，检测 82 → 81 → 82（与基线持平），FP 6 → 7 → 7。按预注册标准判定未通过（仅 FP 一项），机制价值与权衡见报告。**
+
+| 文件 | 用途 |
+| --- | --- |
+| [完整报告](next-action-validation100-20261018/report.md) | 两轮设计、读数、逐例归因、成本与边界 |
+| [第二轮配对比较](next-action-validation100-20261018/round2-comparison.json) | 与 G0 基线的逐例变化、机制覆盖、健康状态、全部 journal 摘要 |
+| [第二轮最终评分](next-action-validation100-20261018/round2-final-evaluation.json) | 100 例采用来源与逐例结果 |
+| [第一轮比较](next-action-validation100-20261018/round1-comparison.json) / [评分](next-action-validation100-20261018/round1-final-evaluation.json) | 第一轮读数与归因依据 |
+| [样本清单](next-action-validation100-20261018/sample.json) | 抽样规则、排除集摘要、每例基线行与 SHA-256 |
+| [归档清单](next-action-validation100-20261018/manifest.json) | 逐文件字节数与 SHA-256、两轮源码身份 |
+
+真实原件与逐请求日志保留在 `artifacts/detector/live_checks/next_action_validation100_20261017/` 与 `..._round2_20261018/`。两轮源码分别通过 2649 项测试 + 18 项检查。同批样本已两次用于内部测评，未做同源码 off/on 消融。
 
 ## 1. 下一步预测：同组100例真实验证
 

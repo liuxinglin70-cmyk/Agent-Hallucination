@@ -37,8 +37,12 @@ from detector.dataset import gold_fields, load_case, project_record  # noqa: E40
 from detector.localization import gold_step_mapping  # noqa: E402
 from detector.next_action import build_next_action_audit  # noqa: E402
 from detector.packet import build_packet  # noqa: E402
+from detector.candidate_scorer import FEATURES, load_scorer, row_features, score_row  # noqa: E402
+from detector.candidate_scorer import SCORER_ARTIFACT_SCHEMA  # noqa: E402
+from detector.config import validate_causal_config  # noqa: E402
 from detector.step_uncertainty import (  # noqa: E402
     build_step_risk_profile,
+    risk_candidate_rows,
     select_causal_candidates,
 )
 
@@ -169,6 +173,9 @@ def _collect(root: pathlib.Path, policy: Mapping[str, Any]) -> dict[str, Any]:
                 "unresolved": len(selection["unresolved_event_ids"]),
             },
             "forecast_positions": sorted(forecast_positions),
+            "event_positions": position_of,
+            "packet": packet,
+            "unconfigured_profile": profile,
         })
 
     return {
@@ -424,6 +431,123 @@ def _leave_one_family_out(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     return {"pooled": pooled, "per_family": per_family}
 
 
+def _fit_scorer_weights(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Fit the ranking artifact from labelled families only.
+
+    Each feature is fitted as its own log-lift over the event-level base rate,
+    the same construction ``_fit_lift`` uses, with a two-observation prior so a
+    feature seen once in training cannot dominate. Per-feature fitting rather
+    than a joint fit is deliberate: with a few hundred labelled events a joint
+    fit on seven correlated features would memorise the family it trained on,
+    and the leaving-one-family-out reading is the point of this measurement.
+    """
+    import math
+
+    at_gold: Counter[str] = Counter()
+    elsewhere: Counter[str] = Counter()
+    labelled = 0
+    observations = 0
+    for case in rows:
+        if case["gold_position"] is None:
+            continue
+        labelled += 1
+        length = len(case["event_positions"]) or 1
+        for row in case["rows"]:
+            observations += 1
+            features = row_features(row, position_count=length)
+            target = at_gold if row["position"] == case["gold_position"] else elsewhere
+            for name, value in features.items():
+                if value:
+                    target[name] += 1
+    base = labelled / observations if observations else 0.0
+    weights: dict[str, str] = {}
+    for name in FEATURES:
+        hit, miss = at_gold[name], elsewhere[name]
+        precision = (hit + 2 * base) / (hit + miss + 2) if (hit + miss) else base
+        weights[name] = f"{(math.log(precision / base) if base and precision else 0.0):.12f}"
+    return {"schema_version": SCORER_ARTIFACT_SCHEMA, "id": "probe-leave-one-family-out",
+            "bias": "0", "weights": weights}
+
+
+def _scorer_leave_one_family_out(
+    rows: Sequence[Mapping[str, Any]], *, top_k: int,
+) -> dict[str, Any]:
+    """Measure the wired ranking path, not a re-implementation of it.
+
+    The weights come from every other family; the held-out family is then run
+    through the real ``select_causal_candidates`` with the artifact attached, so
+    a bug in the production path shows up in these numbers.
+    """
+    import tempfile
+    from pathlib import Path
+
+    families = sorted({case["family"] for case in rows})
+    totals = {"current": {"top1": 0, "top3": 0, "n": 0},
+              "scored": {"top1": 0, "top3": 0, "n": 0}}
+    per_family: dict[str, Any] = {}
+    with tempfile.TemporaryDirectory() as workspace:
+        for family in families:
+            train = [case for case in rows if case["family"] != family]
+            test = [case for case in rows if case["family"] == family]
+            if not train or not test:
+                continue
+            path = Path(workspace) / f"scorer_{family}.json"
+            path.write_text(json.dumps(_fit_scorer_weights(train)), encoding="utf-8")
+            policy = validate_causal_config(
+                {**_policy(), "scorer_artifact": str(path), "top_k": top_k}, base_dir=workspace)
+            bucket = {"current": [0, 0, 0], "scored": [0, 0, 0]}
+            loader = load_scorer(policy["scorer_artifact"])
+            unconfigured = validate_causal_config(
+                {**_policy(), "top_k": top_k}, base_dir=workspace)
+            for case in test:
+                gold = case["gold_position"]
+                if gold is None:
+                    continue
+                # The profile is sealed to the policy that produced it, so the
+                # configured policy needs its own profile rather than a patched
+                # digest: a rewritten seal would report identity it does not
+                # have, and this measurement must exercise the real path.
+                plain = select_causal_candidates(
+                    case["unconfigured_profile"], mandatory_event_ids=[],
+                    policy=unconfigured)
+                profile = build_step_risk_profile(case["packet"], policy=policy)
+                plain_positions = [case["event_positions"][e] for e in plain["top_k_event_ids"]]
+                scored_selection = select_causal_candidates(
+                    profile, mandatory_event_ids=[], policy=policy)
+                scored_positions = [case["event_positions"][e]
+                                    for e in scored_selection["top_k_event_ids"]]
+                for name, positions, acc in (
+                    ("current", plain_positions, bucket["current"]),
+                    ("scored", scored_positions, bucket["scored"]),
+                ):
+                    acc[0] += int(bool(positions) and positions[0] == gold)
+                    acc[1] += int(gold in positions)
+                    acc[2] += 1
+            per_family[family] = {
+                "cases": bucket["current"][2],
+                "current": {"top1": bucket["current"][0], "top3": bucket["current"][1]},
+                "scored": {"top1": bucket["scored"][0], "top3": bucket["scored"][1]},
+            }
+            for name in ("current", "scored"):
+                totals[name]["top1"] += bucket[name][0]
+                totals[name]["top3"] += bucket[name][1]
+                totals[name]["n"] += bucket[name][2]
+    total = totals["scored"]["n"]
+    return {
+        "top_k": top_k,
+        "cases": total,
+        "current_top1_rate": totals["current"]["top1"] / total if total else None,
+        "current_top3_rate": totals["current"]["top3"] / total if total else None,
+        "scored_top1_rate": totals["scored"]["top1"] / total if total else None,
+        "scored_top3_rate": totals["scored"]["top3"] / total if total else None,
+        "delta_top1": (
+            (totals["scored"]["top1"] - totals["current"]["top1"]) / total if total else None),
+        "delta_top3": (
+            (totals["scored"]["top3"] - totals["current"]["top3"]) / total if total else None),
+        "per_family": per_family,
+    }
+
+
 def probe(root: pathlib.Path, policy: Mapping[str, Any]) -> dict[str, Any]:
     collected = _collect(root, policy)
     errors = [case for case in collected["cases"] if case["error"]]
@@ -489,6 +613,10 @@ def probe(root: pathlib.Path, policy: Mapping[str, Any]) -> dict[str, Any]:
         "ties": _tie_structure(with_rows),
         "signal_lift": _lift(with_rows),
         "leave_one_family_out": _leave_one_family_out(with_rows),
+        "learned_scorer": _scorer_leave_one_family_out(
+            [case for case in with_rows if case["gold_position"] is not None],
+            top_k=int(policy["top_k"]),
+        ),
         "selection": dict(Counter(
             case["selection"]["state"] for case in collected["cases"]
         )),

@@ -250,8 +250,16 @@ def request_observer_scope(observer: Callable[[Mapping[str, Any]], None] | None)
 
 
 class AddedBudgetExceeded(CaseExecutionError):
-    def __init__(self, resource: str):
+    def __init__(self, resource: str, *, origin: str = "case_budget"):
         self.resource = resource
+        # Which budget refused: the case's own allowance, or the view that may
+        # not touch the diagnostic reservation. ``health`` stays
+        # ``budget_exhausted`` for both, because in either case the optional
+        # work did not run; the origin is what lets a reader tell "the batch
+        # queue used up the optional allowance" apart from "this case ran out of
+        # its own budget". Merging them would make every queue delay look like a
+        # measurement failure.
+        self.origin = origin
         super().__init__(f"added case budget exhausted: {resource}")
 
 
@@ -403,13 +411,13 @@ class OptionalBudget:
         self.parent.check()
         deadline = self.deadline
         if deadline is not None and time.monotonic() >= deadline:
-            raise AddedBudgetExceeded("time")
+            raise AddedBudgetExceeded("time", origin="diagnostic_reservation")
 
     def _admit_input(self, size: int) -> None:
         available = (self.parent._policy["max_added_prompt_tokens_per_case"]
                      - self.reserve_limits["max_added_prompt_tokens_per_case"])
         if self.parent.input_bytes + size > available:
-            raise AddedBudgetExceeded("input")
+            raise AddedBudgetExceeded("input", origin="diagnostic_reservation")
 
     def reserve(self, *, system: str, user: str, output_tokens: int,
                 extra_input: Mapping[str, Any] | None = None) -> int:
@@ -421,12 +429,12 @@ class OptionalBudget:
                 size += len(json.dumps(extra_input, ensure_ascii=False, allow_nan=False).encode("utf-8"))
             if self.parent.requests >= (self.parent._policy["max_added_provider_requests_per_case"]
                                         - self.reserve_limits["max_added_provider_requests_per_case"]):
-                raise AddedBudgetExceeded("requests")
+                raise AddedBudgetExceeded("requests", origin="diagnostic_reservation")
             self._admit_input(size)
             available = (self.parent._policy["max_added_output_tokens_per_case"]
                          - self.reserve_limits["max_added_output_tokens_per_case"] - self.parent.output_tokens)
             if available <= 0:
-                raise AddedBudgetExceeded("output")
+                raise AddedBudgetExceeded("output", origin="diagnostic_reservation")
             return self.parent.reserve(system=system, user=user, output_tokens=min(output_tokens, available),
                                        extra_input=extra_input)
 
