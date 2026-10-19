@@ -1,0 +1,1530 @@
+{
+  "historical": {
+    "decisive": 99,
+    "unresolved": 1,
+    "completion": 0.99,
+    "decisive_accuracy": 0.6868686868686869,
+    "all_case_accuracy": 0.68,
+    "tp": 35,
+    "fp": 5,
+    "fn": 26,
+    "tn": 33,
+    "positive_precision": 0.875,
+    "positive_recall": 0.5737704918032787,
+    "positive_f1": 0.693069306930693,
+    "macro_precision": 0.7171610169491525,
+    "macro_recall": 0.7210957722174288,
+    "macro_f1": 0.6867408390323568,
+    "authoritative": 99,
+    "degraded": 0,
+    "requested_cases": 100,
+    "found_results": 100,
+    "missing_cases": 0,
+    "terminal_metrics": {
+      "decisive": 99,
+      "unresolved": 1,
+      "completion": 0.99,
+      "decisive_accuracy": 0.6868686868686869,
+      "all_case_accuracy": 0.68,
+      "tp": 35,
+      "fp": 5,
+      "fn": 26,
+      "tn": 33,
+      "positive_precision": 0.875,
+      "positive_recall": 0.5737704918032787,
+      "positive_f1": 0.693069306930693,
+      "macro_precision": 0.7171610169491525,
+      "macro_recall": 0.7210957722174288,
+      "macro_f1": 0.6867408390323568
+    },
+    "step_localization": {
+      "n": 62,
+      "hits": 22,
+      "accuracy": 0.3548387096774194,
+      "target": "dataset_first_error_event.v1"
+    }
+  },
+  "recent": {
+    "decisive": 99,
+    "unresolved": 1,
+    "completion": 0.99,
+    "decisive_accuracy": 0.7676767676767676,
+    "all_case_accuracy": 0.76,
+    "tp": 42,
+    "fp": 4,
+    "fn": 19,
+    "tn": 34,
+    "positive_precision": 0.9130434782608695,
+    "positive_recall": 0.6885245901639344,
+    "positive_f1": 0.7850467289719626,
+    "macro_precision": 0.7772764561115668,
+    "macro_recall": 0.7916307161345988,
+    "macro_f1": 0.766149738112355,
+    "authoritative": 99,
+    "degraded": 1,
+    "degraded_disagreeing": 0,
+    "terminal_metrics": {
+      "decisive": 100,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.77,
+      "all_case_accuracy": 0.77,
+      "tp": 43,
+      "fp": 4,
+      "fn": 19,
+      "tn": 34,
+      "positive_precision": 0.9148936170212766,
+      "positive_recall": 0.6935483870967742,
+      "positive_f1": 0.7889908256880733,
+      "macro_precision": 0.7782015254917704,
+      "macro_recall": 0.7941426146010186,
+      "macro_f1": 0.7681217864704103
+    },
+    "provider_unresolved": 0,
+    "no_terminal_decision": 0,
+    "requested_cases": 100,
+    "found_results": 100,
+    "missing_cases": 0,
+    "step_localization": {
+      "target": "dataset_first_error_event.v1",
+      "step_unit": "trajectory_event_position",
+      "n": 62,
+      "hits": 27,
+      "accuracy": 0.43548387096774194
+    }
+  },
+  "current": {
+    "decisive": 98,
+    "unresolved": 1,
+    "completion": 0.98989898989899,
+    "decisive_accuracy": 0.7346938775510204,
+    "all_case_accuracy": 0.7272727272727273,
+    "tp": 39,
+    "fp": 5,
+    "fn": 21,
+    "tn": 33,
+    "positive_precision": 0.8863636363636364,
+    "positive_recall": 0.65,
+    "positive_f1": 0.75,
+    "macro_precision": 0.7487373737373737,
+    "macro_recall": 0.7592105263157896,
+    "macro_f1": 0.7336956521739131,
+    "authoritative": 98,
+    "requested_cases": 99,
+    "step_localization": {
+      "n": 61,
+      "hits": 24,
+      "accuracy": 0.39344262295081966
+    }
+  },
+  "paired_historical": {
+    "detection_fixed": [
+      "BFCL/085.json",
+      "BFCL/030.json",
+      "Magentic_One/065.json",
+      "OpenDeepSearch/071.json",
+      "BFCL/056.json",
+      "OpenManus/073.json",
+      "BFCL/052.json",
+      "BFCL/055.json",
+      "SmolAgents/024.json",
+      "BFCL/144.json",
+      "OpenDeepSearch/087.json"
+    ],
+    "detection_regressed": [
+      "OpenDeepSearch/058.json",
+      "Camel/001.json",
+      "Octotools/028.json",
+      "BFCL/071.json",
+      "OpenManus/064.json",
+      "OpenManus/031.json",
+      "Camel/012.json"
+    ],
+    "localization_fixed": [
+      "BFCL/030.json",
+      "SmolAgents/066.json",
+      "BFCL/052.json",
+      "BFCL/144.json",
+      "OpenDeepSearch/087.json"
+    ],
+    "localization_regressed": [
+      "Camel/022.json",
+      "OpenManus/064.json",
+      "BFCL/037.json"
+    ]
+  },
+  "paired_recent": {
+    "detection_fixed": [
+      "SmolAgents/043.json",
+      "OpenManus/095.json",
+      "SmolAgents/024.json"
+    ],
+    "detection_regressed": [
+      "OpenDeepSearch/058.json",
+      "Octotools/028.json",
+      "BFCL/071.json",
+      "OpenManus/064.json",
+      "OpenDeepSearch/034.json",
+      "OpenManus/031.json"
+    ],
+    "localization_fixed": [
+      "Camel/021.json",
+      "SmolAgents/043.json",
+      "BFCL/144.json"
+    ],
+    "localization_regressed": [
+      "BFCL/085.json",
+      "BFCL/056.json",
+      "OpenManus/064.json",
+      "BFCL/037.json",
+      "OpenManus/031.json"
+    ]
+  },
+  "cost_all_attempts": {
+    "started_requests": 798,
+    "finished_requests": 801,
+    "started_without_finish": 0,
+    "by_purpose": {
+      "judge": 323,
+      "defense": 181,
+      "step_tracer": 53,
+      "recall_scanner": 37,
+      "recall_scanner_repair": 22,
+      "causal_upgrade": 76,
+      "judge_repair": 30,
+      "step_tracer_repair": 27,
+      "action_comparison_repair": 10,
+      "action_forecast": 39
+    },
+    "started_by_run": {
+      "optimization99": 756,
+      "optimization99_recovery": 42
+    },
+    "status_counts": {
+      "response": 774,
+      "transport_error": 24,
+      "added_budget_exceeded": 3
+    },
+    "usage": {
+      "prompt_tokens": 5346539,
+      "completion_tokens": 8444124,
+      "total_tokens": 13790663,
+      "input_tokens": 5346539,
+      "output_tokens": 8444124
+    },
+    "usage_missing": 27,
+    "pricing": "未取得服务实际账单单价，不估造货币费用。",
+    "journals": [
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__000.json\\attempts\\001_20261017T034150\\requests.jsonl",
+        "sha256": "be502c5131a3c8e73deab145d4c54600b2f1b87e3ea944c95adf371afa099fb0"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__011.json\\attempts\\001_20261017T040631\\requests.jsonl",
+        "sha256": "ae58307858dfe8441bab33c64f11efcd4ba46211257f5326e5fd7295ba8806de"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__021.json\\attempts\\001_20261017T035400\\requests.jsonl",
+        "sha256": "6bb3bde08ad85bc391b0d3e5baf9479613955f531db07308e6729cab5a2043bf"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__030.json\\attempts\\001_20261017T021142\\requests.jsonl",
+        "sha256": "e840b856b90b6166b9c1ab50e5c450288ea6173daf92cf515fb012f581258b5a"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__031.json\\attempts\\001_20261017T021142\\requests.jsonl",
+        "sha256": "a4cf58a2e4d074a661c178dd0c273e621c0ffcec57d3f45e5313829515989445"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__037.json\\attempts\\001_20261017T040052\\requests.jsonl",
+        "sha256": "cd1891b9b0694de7719303417216ee888fd010adf67fe220e798abb57828dd9b"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__052.json\\attempts\\001_20261017T033145\\requests.jsonl",
+        "sha256": "8fe2c25d593dbb9c766558febd9481cc5188baedec7b998973c7922564b7e6e9"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__055.json\\attempts\\001_20261017T034844\\requests.jsonl",
+        "sha256": "76a6094b8e762be08503fabf66ffe1d69c9ec9f261818d5f46c75955d58d0d0d"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__056.json\\attempts\\001_20261017T030621\\requests.jsonl",
+        "sha256": "026cb2db22bb7935ee5dc72bd58e90775927a31917d57f91b52d0d8448163dff"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__071.json\\attempts\\001_20261017T030327\\requests.jsonl",
+        "sha256": "cda907f546620aeb8cefaa0f19838468eace126358639c7079ca350c043b3ea6"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__072.json\\attempts\\001_20261017T023622\\requests.jsonl",
+        "sha256": "6704d54a74334f87df7b42db89da68273672674861918fdba8de0ae1b9ac6766"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__085.json\\attempts\\001_20261017T021142\\requests.jsonl",
+        "sha256": "9709fa4470cc9006a1f4772514c45e4e4d92034b5c807fd7606b8e2539b35b08"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__087.json\\attempts\\001_20261017T021142\\requests.jsonl",
+        "sha256": "c5d714f9e401cc8aec264ed89c134b8b931aec675164b49a83c6a965a642cc20"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__088.json\\attempts\\001_20261017T032621\\requests.jsonl",
+        "sha256": "48bccaeae23e9c59948a47697d8aa1d14fc0314ccb339fa640c5b4cf576483bb"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__114.json\\attempts\\001_20261017T023544\\requests.jsonl",
+        "sha256": "5e7418c0c06f8f9cc94825b91e5330a78045ccc3fe29c9d01d5b343958327c24"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__115.json\\attempts\\001_20261017T021142\\requests.jsonl",
+        "sha256": "a5afdec4ad6ee681090af07ac94522117fd6a4bcda24fc0511bf299dacec8de3"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__118.json\\attempts\\001_20261017T024928\\requests.jsonl",
+        "sha256": "d4dc5b45ad1d0f82dac54e7738620e3741620d86902f3658daaa6634cbdb30a4"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__122.json\\attempts\\001_20261017T034754\\requests.jsonl",
+        "sha256": "e72d39d2ff79a536895c988b04e815755672f7ebd07fc096855cca845d23f899"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__125.json\\attempts\\001_20261017T044217\\requests.jsonl",
+        "sha256": "af86b25dcb246571fafe4c246e7beeb68562dfc249d1e3d79fc0a998e7a518c7"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__127.json\\attempts\\001_20261017T050103\\requests.jsonl",
+        "sha256": "fa7b156197766cb550a29623e4d5a07f6e49b482f132670e6246e3ab8bb874ce"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__129.json\\attempts\\001_20261017T021142\\requests.jsonl",
+        "sha256": "8994b72e8bc8a86e2faf5a6c22ad30761debfe71180f03a26056a2ad76012e1f"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__130.json\\attempts\\001_20261017T045919\\requests.jsonl",
+        "sha256": "84b1d795ebe3a3d0ec31dfcc93c64335e2131820cbbaca617bbc02d04a4fad24"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__144.json\\attempts\\001_20261017T043929\\requests.jsonl",
+        "sha256": "138b0c0d117fb890bba5a089668c47656829d523f2c531bb8bd5dd18a172eb76"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__150.json\\attempts\\001_20261017T043139\\requests.jsonl",
+        "sha256": "d203ca9828310fb14775d2fd873bb796e7a313473db697bab4ce4022c1160dff"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\BFCL__155.json\\attempts\\001_20261017T021142\\requests.jsonl",
+        "sha256": "4d45dbcd20879b347f1691fda024183586be88d160b526ebfdfacea5877b3592"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__001.json\\attempts\\001_20261017T022700\\requests.jsonl",
+        "sha256": "70921126db5e798ec8ceddaa245360754bbb9471c0677cc92f230b8705274673"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__006.json\\attempts\\001_20261017T044155\\requests.jsonl",
+        "sha256": "af9f6a672e8c13960bbb35e1243f0cf928fe804e06ef517390a20149ddf9fc64"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__010.json\\attempts\\001_20261017T025024\\requests.jsonl",
+        "sha256": "e048c0c7f4ea885ce90f64b654b11e41ace5bdce278d77b8fc2c6ab1924075c9"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__012.json\\attempts\\001_20261017T050119\\requests.jsonl",
+        "sha256": "c5b116b38147e10db6450858eb9e9b913f0a01fedfd25d85ed7944177f6a9841"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__016.json\\attempts\\001_20261017T035514\\requests.jsonl",
+        "sha256": "d25cf8be5236d8e29bc2ae52bde85bef079a3cd5b62448d87ef3d3c93bffa51d"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__021.json\\attempts\\001_20261017T024636\\requests.jsonl",
+        "sha256": "d30d8bf3a15986cdc74410a1585a96d69b378b638c7b00a52a87116fc1f7c252"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__022.json\\attempts\\001_20261017T021142\\requests.jsonl",
+        "sha256": "abebc8eee418dbbf7979538b9bf2164a5e8fceb86e0c0162c8f71e189087ee31"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__024.json\\attempts\\001_20261017T045056\\requests.jsonl",
+        "sha256": "ce58ccbe8bf339086ed45dc03dc1b4de82fd7e95420cf998252db1da7d18042c"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__032.json\\attempts\\001_20261017T035750\\requests.jsonl",
+        "sha256": "66928fcaed597ec801dbc26e2a4729e81e101b999ac43af522b6f9ef9b69df2c"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__043.json\\attempts\\001_20261017T032331\\requests.jsonl",
+        "sha256": "922e146c8c81ab80a3354fc30b9b1581b46f9e6234080cc161c2d6ec880f25c3"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__076.json\\attempts\\001_20261017T032923\\requests.jsonl",
+        "sha256": "8565b82c253ca9660df95e0c617bda070a34367aa280d9096e06efc1c4294bf7"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__077.json\\attempts\\001_20261017T023440\\requests.jsonl",
+        "sha256": "885390f45587f37a08da6b925373fd83aab211157071284cbcad2d23b1514b0a"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__084.json\\attempts\\001_20261017T045851\\requests.jsonl",
+        "sha256": "1ce751ec5ff446f5f31e81f742fc73c1b8c9cb955e703dd6f9d716f96ef6c104"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Camel__086.json\\attempts\\001_20261017T034011\\requests.jsonl",
+        "sha256": "ac3a69274228dbb7cf3a9bd307b1fe15d2cc8083d3aeaadcff769d5782331bbb"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__025.json\\attempts\\001_20261017T025215\\requests.jsonl",
+        "sha256": "b53ae97f190ad8d3d502a77de82ef7e25ab2801cfb9dc7a24175de1c7fffbdfc"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__027.json\\attempts\\001_20261017T032014\\requests.jsonl",
+        "sha256": "3a2734d86d70666da6c7e6d6bb76c749d3d7b1756b6d09fa43cdbf3da312c539"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__055.json\\attempts\\001_20261017T041204\\requests.jsonl",
+        "sha256": "e5178c3c465fcadec0500bf803fbc8e0d7244f71af3c29e5e6a9b5a9bf18f118"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__060.json\\attempts\\001_20261017T025118\\requests.jsonl",
+        "sha256": "db49e0ef300aae204ae673401f8e096aa78eee83a76f3a54f88110b56ca4506c"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__061.json\\attempts\\001_20261017T021142\\requests.jsonl",
+        "sha256": "59bcf6d629066cbd50dead7db628dbab91377e4be1a9280deb454f558c222557"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__065.json\\attempts\\001_20261017T022857\\requests.jsonl",
+        "sha256": "673f9a59dceb5737a134314070cfcf8e3b9146d82d4d24d2fccbc7b6b527af4f"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__071.json\\attempts\\001_20261017T042908\\requests.jsonl",
+        "sha256": "d5d5c1008e82f3477e239c750e30042e64ef428b144cf6500ed5ee50e7b2c4f5"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__074.json\\attempts\\001_20261017T032254\\requests.jsonl",
+        "sha256": "25e4d9ebab245206debadf75b2d73450a6ce37abe21dcfa6787b02f6e2081fa5"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__076.json\\attempts\\001_20261017T044320\\requests.jsonl",
+        "sha256": "b6349dbc1fe547bad94f85110fefe31e1a45d55b46a17acfc0a8a00e0fb9a11b"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__078.json\\attempts\\001_20261017T022342\\requests.jsonl",
+        "sha256": "6f4ef19e8588bd20a99a334bd91656a4b886e8884b7fe5271b951afd624994c3"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__090.json\\attempts\\001_20261017T045417\\requests.jsonl",
+        "sha256": "8a526d84ef3595df1c09e086bf9f056469740e49bea04641bba89019bffdac15"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Magentic_One__091.json\\attempts\\001_20261017T023758\\requests.jsonl",
+        "sha256": "e0fab84c55ad732758434cf2f9778f93fca1e010b84489c13515128911220ab8"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Octotools__020.json\\attempts\\001_20261017T024737\\requests.jsonl",
+        "sha256": "4794a549d15f711a9087dc350aa75ce204dd5633167848195e04b3458719ad3b"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Octotools__023.json\\attempts\\001_20261017T034340\\requests.jsonl",
+        "sha256": "fca3a11d561c6d51d19b4706e593b6b8de34c54e3376f391a274e031f4486de9"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\Octotools__028.json\\attempts\\001_20261017T025052\\requests.jsonl",
+        "sha256": "5728f6c1a5dfa01559f3969d29b473702f3e33b1c6733231e189901ded8f00dd"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__007.json\\attempts\\001_20261017T041925\\requests.jsonl",
+        "sha256": "239b4df4bb79777ec0ec8bb706a58bba9bb5cc5e8ba42847ec5ba739aece7697"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__011.json\\attempts\\001_20261017T023324\\requests.jsonl",
+        "sha256": "b67db214d77d24a4fbe0c4b877d7156db36e776a055e8830017efa8bdf2a8514"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__014.json\\attempts\\001_20261017T043454\\requests.jsonl",
+        "sha256": "ea69a86f8c19bd2b85ff3740ea06647dc885a736b703baaa95a761e6c21ca490"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__022.json\\attempts\\001_20261017T032319\\requests.jsonl",
+        "sha256": "4547c0ae09285fda1e19c71bfe5134feecb88f1ef531d7624c266da5878b315b"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__023.json\\attempts\\001_20261017T021142\\requests.jsonl",
+        "sha256": "53933f7b6a6ae9b9015c2c42a530997126eaa5a2f9711158429b271eee3258c0"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__027.json\\attempts\\001_20261017T023516\\requests.jsonl",
+        "sha256": "17afdaf8d9574cb0a413fafb9fd512dd49edac0ace83e4b0487dfeb75187737c"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__034.json\\attempts\\001_20261017T034440\\requests.jsonl",
+        "sha256": "064b684b792cc0994cda0a6d2f80c7724026bb98feffdb5543827e91203b333a"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__036.json\\attempts\\001_20261017T044133\\requests.jsonl",
+        "sha256": "36cbb5039c909f22b346fc8c774c11f9c2b28fdaf3ab688b8c0fe99687d9d496"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__040.json\\attempts\\001_20261017T033447\\requests.jsonl",
+        "sha256": "b75f8ce85d779539a385e66b589a6a17bab44792c34fb6ca285d16cc86e8bc2f"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__042.json\\attempts\\001_20261017T024224\\requests.jsonl",
+        "sha256": "9c34acf6567ac64937aef486ef72054a7353e914a92d3097209e3a13f5e1c4b8"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__043.json\\attempts\\001_20261017T025106\\requests.jsonl",
+        "sha256": "d45bac7c4107889ec3daebb881be5d0ad9e23543d4bb2eaba90fdd4fffa534ed"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__055.json\\attempts\\001_20261017T025136\\requests.jsonl",
+        "sha256": "dc6e4f5638ffcbf4680f3627146fe0af9e451d34e456d20d80c1758291ce1e8c"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__058.json\\attempts\\001_20261017T021319\\requests.jsonl",
+        "sha256": "c43ce052d9d91f04092a7d2aaabc91ddde98737b64e52ac6da4fc24dccea8b7f"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__065.json\\attempts\\001_20261017T031351\\requests.jsonl",
+        "sha256": "179dab78d83a2d354b37641d168b93ba90bc5259e9a3949efdbdc7a721fec256"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__068.json\\attempts\\001_20261017T043840\\requests.jsonl",
+        "sha256": "e0683edf870a6732baaa94673734cff213722cdd962e061dd230bd693536a71a"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__071.json\\attempts\\001_20261017T025629\\requests.jsonl",
+        "sha256": "333437e631321d2509a1954809be03fa818e8793f5b51607e16e380cef7f7312"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__072.json\\attempts\\001_20261017T035959\\requests.jsonl",
+        "sha256": "d05a4ac876186173b831a9039317d0f5f9fe039c578ffe08eb17731f58656299"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__087.json\\attempts\\001_20261017T045203\\requests.jsonl",
+        "sha256": "b1fed638dd52ba35a847976a5ceb377167645a6982d1c85db143e219344d2d08"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenDeepSearch__090.json\\attempts\\001_20261017T040125\\requests.jsonl",
+        "sha256": "12b732b036ed70f3a4c5aa93eb0ff32f034a028e4262170960f9697ff34e8423"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__012.json\\attempts\\001_20261017T022104\\requests.jsonl",
+        "sha256": "246cae3ab5d06e56d7e0c9c40332df4c762a25804f03aac256d73f16865d442c"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__016.json\\attempts\\001_20261017T034358\\requests.jsonl",
+        "sha256": "7c0a9c17b3bc4396929b3e43872137b0e6d2f5691e5f0600f18c3eb1deea1c80"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__031.json\\attempts\\001_20261017T042738\\requests.jsonl",
+        "sha256": "ca90d7631b6a2a764410a4e22b86bd04bf4e43404873205d09f7d37a1d64e7ac"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__037.json\\attempts\\001_20261017T034454\\requests.jsonl",
+        "sha256": "959036d9fc56532232cefa981b1d9450ff261ab2acbc95a535db5e16a97c71e3"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__040.json\\attempts\\001_20261017T022240\\requests.jsonl",
+        "sha256": "9204eb195a853767356ffe0a09d6e4ea0baaa58424b15a95eb538aac8997a4c6"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__043.json\\attempts\\001_20261017T032230\\requests.jsonl",
+        "sha256": "4d88700d32391c998de131327b89ea0e7f6007d7a7946c7277be4e69b1d7dee2"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__055.json\\attempts\\001_20261017T030653\\requests.jsonl",
+        "sha256": "a37abe35571ca802b07946a081432e5c5a4a7d39d2c667f77390b69d917c99d1"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__064.json\\attempts\\001_20261017T033220\\requests.jsonl",
+        "sha256": "1f98a0d3ba916e6d8e2f231918450203d4c7dfacedf4c49ba150b4c6440f3c0d"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__068.json\\attempts\\001_20261017T045129\\requests.jsonl",
+        "sha256": "43c431ad656aa4e82658f3e5645d19f29befec454544c3b911aaf59b870a264e"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__073.json\\attempts\\001_20261017T032314\\requests.jsonl",
+        "sha256": "cee7128843aaf2e3acb443a6b69870fbd99e7a8025ce27c37409306bd059994b"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__083.json\\attempts\\001_20261017T033108\\requests.jsonl",
+        "sha256": "a33dc54f62f93ff41b0596a51d2cb16c53709224d2ffc715a27335f931a4d1e8"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__095.json\\attempts\\001_20261017T034601\\requests.jsonl",
+        "sha256": "b6d3818d60078e03e00d666ad94f4cea460c1ceea3cc979729e8bb53e9dc224c"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__097.json\\attempts\\001_20261017T032344\\requests.jsonl",
+        "sha256": "90b7f76fdbf3c7404ac59b01140c4d6882be9997affc23136b31a19f8487d783"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\OpenManus__102.json\\attempts\\001_20261017T030730\\requests.jsonl",
+        "sha256": "8844b23bcf10dbf2f549534e2a9ee77632985acd68bc4b031b26a42b5325daf2"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__011.json\\attempts\\001_20261017T022013\\requests.jsonl",
+        "sha256": "d45a7e093509f000f3d0306b69654016898ae382647b05e490f9934fc5644a08"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__022.json\\attempts\\001_20261017T024129\\requests.jsonl",
+        "sha256": "235d2aeeff520eb7d94ef370300cc30ab3bb89cd73ba2859cfa2ea5cd5863762"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__024.json\\attempts\\001_20261017T041842\\requests.jsonl",
+        "sha256": "0df43da530ae32fc157ba851f9e77bc90a29381752e35c1934cb3049bb6f997e"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__043.json\\attempts\\001_20261017T025629\\requests.jsonl",
+        "sha256": "f20cf4ad4b6738d5ea5914972af44005629ac6ee6bd113fdc936ecf09fb8a81f"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__047.json\\attempts\\001_20261017T032418\\requests.jsonl",
+        "sha256": "778b912b70dfcc347328bcb7a614408c08c4f1ae6a7881b7d53f6c76588868c0"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__048.json\\attempts\\001_20261017T043658\\requests.jsonl",
+        "sha256": "6c7c4156f40b930576c362c9193d0799d8da541803b9769bea249f6e97365f85"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__051.json\\attempts\\001_20261017T040602\\requests.jsonl",
+        "sha256": "082b53de558f9a1ccfbab2dfa5d5d5cd4d98908bdbe7ed59a6cd0b22c18b2242"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__062.json\\attempts\\001_20261017T043433\\requests.jsonl",
+        "sha256": "6da142cc05c940bdee142120cfce03e8e75d824e12dc4ae48c3b24739c30e801"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__066.json\\attempts\\001_20261017T025958\\requests.jsonl",
+        "sha256": "32054b51522555e4f097bea178a50fe5a0d6af901171ac0101f80525707bc2d4"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__085.json\\attempts\\001_20261017T041604\\requests.jsonl",
+        "sha256": "d130f72297d1b0e3892e7af30e72bf5dbd4c48784664add8eb794a45c7e98e46"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__088.json\\attempts\\001_20261017T031438\\requests.jsonl",
+        "sha256": "894de158604bc29b2910c53375ffcd47dc7be9a50a8fa20362aa4d1c55b347d1"
+      },
+      {
+        "path": "runs\\optimization99\\cases\\SmolAgents__090.json\\attempts\\001_20261017T023724\\requests.jsonl",
+        "sha256": "14e7f710907985f4d5c9dcffb31de41294159e13ff9df1ecaea630ac02efadfa"
+      },
+      {
+        "path": "runs\\optimization99_recovery\\cases\\OpenDeepSearch__071.json\\attempts\\001_20261017T052613\\requests.jsonl",
+        "sha256": "433ba0372b220e653166d983abafaa257976ad214745845c199d3bce78b4e3b9"
+      },
+      {
+        "path": "runs\\optimization99_recovery\\cases\\OpenManus__064.json\\attempts\\001_20261017T052613\\requests.jsonl",
+        "sha256": "0c9ac213a9240f351e8c4a63b7953cdab03dc3cc451d1fdc620702f3708b13cd"
+      },
+      {
+        "path": "runs\\optimization99_recovery\\cases\\OpenManus__068.json\\attempts\\001_20261017T052613\\requests.jsonl",
+        "sha256": "6b060a54b3d13b974da0fa767d4a07d274335ba79ddc202ab5b45be7ff490d94"
+      },
+      {
+        "path": "runs\\optimization99_recovery\\cases\\OpenManus__073.json\\attempts\\001_20261017T052613\\requests.jsonl",
+        "sha256": "05304d40eb107d4b8d176cc283c41ea1d94e255aaf84c98599ef279493de93f5"
+      }
+    ]
+  },
+  "mechanisms": [
+    {
+      "case": "Magentic_One/061.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/023.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1,
+        "divergent": 1
+      }
+    },
+    {
+      "case": "BFCL/085.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "BFCL/115.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "BFCL/087.json",
+      "health": "task_alignment_unknown",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/031.json",
+      "health": "task_alignment_unknown",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/129.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "Camel/022.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/030.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "BFCL/155.json",
+      "health": "task_alignment_unknown",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/058.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/011.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 2
+      }
+    },
+    {
+      "case": "OpenManus/012.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 2
+      }
+    },
+    {
+      "case": "OpenManus/040.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Magentic_One/078.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/001.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Magentic_One/065.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/011.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Camel/077.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/027.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "divergent": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "BFCL/114.json",
+      "health": "task_alignment_unknown",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/072.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "SmolAgents/090.json",
+      "health": "provider_error",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Magentic_One/091.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/022.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/042.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "divergent": 2
+      }
+    },
+    {
+      "case": "Camel/021.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Octotools/020.json",
+      "health": "contract_error",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/118.json",
+      "health": "task_alignment_unknown",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/010.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Octotools/028.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "OpenDeepSearch/043.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Magentic_One/060.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/055.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "divergent": 1,
+        "matched": 1
+      }
+    },
+    {
+      "case": "Magentic_One/025.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/043.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "OpenDeepSearch/071.json",
+      "health": "contract_error",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/066.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/071.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "BFCL/056.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "OpenManus/055.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/102.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "divergent": 2
+      }
+    },
+    {
+      "case": "OpenDeepSearch/065.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "divergent": 1,
+        "matched": 1
+      }
+    },
+    {
+      "case": "SmolAgents/088.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Magentic_One/027.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/043.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Magentic_One/074.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/073.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "OpenDeepSearch/022.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Camel/043.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/097.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/047.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "unknown": 2
+      }
+    },
+    {
+      "case": "BFCL/088.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "Camel/076.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/083.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 2
+      }
+    },
+    {
+      "case": "BFCL/052.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "OpenManus/064.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/040.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "divergent": 2
+      }
+    },
+    {
+      "case": "Camel/086.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/000.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "Octotools/023.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/016.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/034.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "OpenManus/037.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 2
+      }
+    },
+    {
+      "case": "OpenManus/095.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/122.json",
+      "health": "task_alignment_unknown",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/055.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 3,
+      "comparison_states": {
+        "matched": 3
+      }
+    },
+    {
+      "case": "BFCL/021.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "Camel/016.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/032.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/072.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "BFCL/037.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 3,
+      "comparison_states": {
+        "matched": 2,
+        "divergent": 1
+      }
+    },
+    {
+      "case": "OpenDeepSearch/090.json",
+      "health": "contract_error",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/051.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 2
+      }
+    },
+    {
+      "case": "BFCL/011.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "Magentic_One/055.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/085.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/024.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/007.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/031.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Magentic_One/071.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/150.json",
+      "health": "task_alignment_unknown",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "SmolAgents/062.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 3
+      }
+    },
+    {
+      "case": "OpenDeepSearch/014.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "divergent": 1,
+        "matched": 1
+      }
+    },
+    {
+      "case": "SmolAgents/048.json",
+      "health": "provider_error",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "OpenDeepSearch/068.json",
+      "health": "budget_exhausted",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/144.json",
+      "health": "task_alignment_unknown",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenDeepSearch/036.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 2
+      }
+    },
+    {
+      "case": "Camel/006.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/125.json",
+      "health": "task_alignment_unknown",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Magentic_One/076.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/024.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "OpenManus/068.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 3
+      }
+    },
+    {
+      "case": "OpenDeepSearch/087.json",
+      "health": "ok",
+      "used": true,
+      "model_predictions": 1,
+      "deterministic_predictions": 0,
+      "comparison_states": {
+        "matched": 1,
+        "unknown": 1
+      }
+    },
+    {
+      "case": "Magentic_One/090.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/084.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "BFCL/130.json",
+      "health": "task_alignment_unknown",
+      "used": true,
+      "model_predictions": 0,
+      "deterministic_predictions": 1,
+      "comparison_states": {
+        "matched": 1
+      }
+    },
+    {
+      "case": "BFCL/127.json",
+      "health": "task_alignment_unknown",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    },
+    {
+      "case": "Camel/012.json",
+      "health": "ok",
+      "used": false,
+      "model_predictions": 0,
+      "deterministic_predictions": 0,
+      "comparison_states": {}
+    }
+  ],
+  "mechanism_used_cases": 43,
+  "case_elapsed_seconds_median": 776.4666953000706,
+  "scope": "Second and final authorized run, same ordered 99 eligible cases; original 100-case denominators and one allowed runtime exclusion also reported. Repeated same-cohort optimization is internal development validation."
+}

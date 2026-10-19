@@ -1,0 +1,169 @@
+{
+  "started_at_utc": "2026-10-19T11:57:03.868015+00:00",
+  "finished_at_utc": "2026-10-19T12:18:58.752256+00:00",
+  "python": "3.13.7",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "scope": "all",
+  "network_policy": "loopback_only",
+  "pytest_workers": 3,
+  "pytest_distribution": "worksteal",
+  "not_run": [],
+  "source_sha256": "f953e0932b2bb7ad4f2a35c62ae4cd1a1960d4d403911d75edd3f1a86f4f918d",
+  "passed": true,
+  "tests": {
+    "tests": 2748,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 2748
+  },
+  "checks": [
+    {
+      "name": "source_audit",
+      "exit_code": 0
+    },
+    {
+      "name": "dataset_integrity",
+      "exit_code": 0
+    },
+    {
+      "name": "pytest",
+      "arguments": [
+        "-m",
+        "pytest",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "-p",
+        "scripts.verification_plugin",
+        "--durations=20",
+        "--verification-report=E:\\agent hallucination\\agent hallucination\\artifacts\\code_quality\\f953e0932b2bb7ad4f2a35c62ae4cd1a1960d4d403911d75edd3f1a86f4f918d\\06acb1f690b74b918751334ccb31410e\\test_execution.json",
+        "--junitxml=E:\\agent hallucination\\agent hallucination\\artifacts\\code_quality\\f953e0932b2bb7ad4f2a35c62ae4cd1a1960d4d403911d75edd3f1a86f4f918d\\06acb1f690b74b918751334ccb31410e\\pytest.xml",
+        "-n",
+        "3",
+        "--dist=worksteal",
+        "--max-worker-restart=0"
+      ],
+      "exit_code": 0,
+      "seconds": 1283.202
+    },
+    {
+      "name": "test_execution_complete",
+      "exit_code": 0,
+      "detail": "collection and executed test ids must match exactly, without skips or duplicate executions"
+    },
+    {
+      "name": "detector_cli",
+      "arguments": [
+        "-m",
+        "detector",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.343
+    },
+    {
+      "name": "detector_cli_registers_commands",
+      "exit_code": 0
+    },
+    {
+      "name": "evolution_cli",
+      "arguments": [
+        "-m",
+        "evolution",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.59
+    },
+    {
+      "name": "evolution_cli_registers_commands",
+      "exit_code": 0
+    },
+    {
+      "name": "experiments_cli",
+      "arguments": [
+        "-m",
+        "experiments",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.471
+    },
+    {
+      "name": "experiments_cli_registers_commands",
+      "exit_code": 0
+    },
+    {
+      "name": "capability_audit",
+      "arguments": [
+        "-m",
+        "evolution",
+        "capability-audit"
+      ],
+      "exit_code": 0,
+      "seconds": 0.872
+    },
+    {
+      "name": "capability_audit_admissible",
+      "exit_code": 0,
+      "detail": "all_admitted=True, sandbox_blockers=[]"
+    },
+    {
+      "name": "metamorphic_gate",
+      "arguments": [
+        "-m",
+        "evolution",
+        "metamorphic-gate"
+      ],
+      "exit_code": 0,
+      "seconds": 0.766
+    },
+    {
+      "name": "sandbox_check",
+      "arguments": [
+        "-m",
+        "evolution",
+        "sandbox-check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.342
+    },
+    {
+      "name": "smoke",
+      "arguments": [
+        "-m",
+        "evolution",
+        "smoke",
+        "--config",
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_m6ckax0j\\config.json"
+      ],
+      "exit_code": 0,
+      "seconds": 16.039
+    },
+    {
+      "name": "smoke_admission_and_audit",
+      "exit_code": 0
+    },
+    {
+      "name": "smoke_round_path_single_shot",
+      "exit_code": 0
+    },
+    {
+      "name": "capability_smoke",
+      "arguments": [
+        "-m",
+        "evolution",
+        "capability-smoke",
+        "--config",
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_m6ckax0j\\config.json"
+      ],
+      "exit_code": 0,
+      "seconds": 8.833
+    },
+    {
+      "name": "source_unchanged_during_checks",
+      "exit_code": 0
+    }
+  ]
+}

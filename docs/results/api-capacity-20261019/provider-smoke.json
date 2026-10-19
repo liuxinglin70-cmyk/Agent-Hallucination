@@ -1,0 +1,26 @@
+[
+  {
+    "route": "judge",
+    "model": "DeepSeek-V4.1-Flash-1017",
+    "parsed": {
+      "ok": true
+    },
+    "ok": true
+  },
+  {
+    "route": "defense",
+    "model": "DeepSeek-V4.1-Flash-1017",
+    "parsed": {
+      "ok": true
+    },
+    "ok": true
+  },
+  {
+    "route": "recall",
+    "model": "DeepSeek-V4.1-Flash-1017",
+    "parsed": {
+      "ok": true
+    },
+    "ok": true
+  }
+]

@@ -2,9 +2,9 @@
 
 Closed vocabulary only. Preliminary positives arrive as a hearing queue
 (the judge first, then every recall-upgrade candidate from earliest
-corrected step); defense substantiates or refutes each hearing, and the
-first substantiated hearing convicts. Defense can only overturn with a
-proven ``refuted`` verdict.
+corrected step); defense substantiates or refutes each hearing. Among valid
+convictions, the earliest localized origin decides; ties retain hearing order.
+Defense can only overturn with a proven ``refuted`` verdict.
 """
 
 from __future__ import annotations
@@ -106,12 +106,26 @@ def _clean_positive(positive: Mapping[str, Any], step: int | None) -> dict[str, 
     return clean
 
 
+def _hearing_stage_ok(hearing: Mapping[str, Any], stage: str) -> bool:
+    result = hearing.get(f"{stage}_result")
+    if not isinstance(result, Mapping) or result.get("ok", True) is not True:
+        return False
+    status = hearing.get(f"{stage}_status")
+    if status is not None and (not isinstance(status, Mapping) or status.get("state") != "ok"):
+        return False
+    provider = result.get("provider")
+    vote = provider.get("vote") if isinstance(provider, Mapping) else None
+    return not isinstance(vote, Mapping) or vote.get("quorum_met") is not False
+
+
 def _hearing_verdict(
     hearing: Mapping[str, Any], packet: Mapping[str, Any] | None = None,
 ) -> str:
     parsed = (hearing.get("defense_result") or {}).get("parsed")
     parsed = parsed if isinstance(parsed, Mapping) else {}
     verdict = str(parsed.get("verdict") or "none")
+    if verdict in CONVICTING_VERDICTS and not _hearing_stage_ok(hearing, "defense"):
+        return "invalid"
     if verdict not in CONVICTING_VERDICTS or packet is None:
         return verdict
     alleged_step = hearing.get("step")
@@ -137,14 +151,18 @@ def _hearing_verdict(
 
 def _convicted_hearing(
     hearings: Sequence[Mapping[str, Any]], packet: Mapping[str, Any],
+    upgrade_result: Mapping[str, Any] | None = None,
 ) -> Mapping[str, Any] | None:
-    return next(
-        (
-            h for h in hearings
-            if _hearing_verdict(h, packet) in CONVICTING_VERDICTS
-        ),
-        None,
-    )
+    convicted = []
+    for index, hearing in enumerate(hearings):
+        if _hearing_verdict(hearing, packet) not in CONVICTING_VERDICTS:
+            continue
+        step = _hearing_localization_step(hearing, packet, upgrade_result)
+        if step is not None:
+            convicted.append((step, index, hearing))
+    if not convicted:
+        return None
+    return min(convicted, key=lambda entry: (entry[0], entry[1]))[2]
 
 
 def _convicted_candidate_step(
@@ -168,20 +186,45 @@ def _convicted_candidate_step(
     if candidate is None:
         return None
     step = candidate.get("corrected_step")
-    return int(step) if isinstance(step, int) else None
+    return step if type(step) is int else None
 
 
-def _tracer_step(hearing: Mapping[str, Any] | None) -> int | None:
+def _tracer_step(hearing: Mapping[str, Any] | None, packet: Mapping[str, Any]) -> int | None:
     """The step one hearing's tracer parsed, or ``None`` when it failed."""
+    if not hearing or not _hearing_stage_ok(hearing, "tracer"):
+        return None
     parsed = ((hearing or {}).get("tracer_result") or {}).get("parsed")
     if not isinstance(parsed, Mapping):
         return None
     step = parsed.get("step")
-    return int(step) if isinstance(step, int) and not isinstance(step, bool) else None
+    if event_id_for_step(packet, step) is None:
+        return None
+    return step if evidence_refs_support_step(packet, parsed.get("evidence_refs") or [], step) else None
+
+
+def _hearing_localization_step(
+    hearing: Mapping[str, Any], packet: Mapping[str, Any],
+    upgrade_result: Mapping[str, Any] | None = None,
+) -> int | None:
+    """Apply LOCALIZATION_STEP_PRIORITY for both hearing selection and adoption."""
+    traced_step = _tracer_step(hearing, packet)
+    if traced_step is not None:
+        return traced_step
+    defense = (hearing.get("defense_result") or {}).get("parsed") or {}
+    confirmed = defense.get("confirmed_step")
+    if defense.get("verdict") == "substantiated" and event_id_for_step(packet, confirmed) is not None:
+        return confirmed
+    if hearing.get("source") == "recall_upgrade":
+        candidate_step = _convicted_candidate_step(upgrade_result, hearing)
+        if event_id_for_step(packet, candidate_step) is not None:
+            return candidate_step
+    alleged_step = hearing.get("step")
+    return alleged_step if event_id_for_step(packet, alleged_step) is not None else None
 
 
 def _localization_record(
     *,
+    packet: Mapping[str, Any],
     hearings: Sequence[Mapping[str, Any]],
     convicted: Mapping[str, Any],
     adopted_step: int | None,
@@ -213,8 +256,8 @@ def _localization_record(
     ``resolution``, and not charged as a contradiction, because the adopted
     step is then the tracer's own and the row agrees with itself.
     """
-    convicted_tracer = _tracer_step(convicted)
-    first_tracer = _tracer_step(hearings[0] if hearings else None)
+    convicted_tracer = _tracer_step(convicted, packet)
+    first_tracer = _tracer_step(hearings[0] if hearings else None, packet)
     allegation = None
     if isinstance(convicted, Mapping):
         value = convicted.get("step")
@@ -304,6 +347,7 @@ def adjudicate(
     hearings: Sequence[Mapping[str, Any]] | None = None,
     hearing_facts: Sequence[Mapping[str, Any]] | None = None,
     predicate_conviction_verdicts: Mapping[str, Any] | None = None,
+    recall_trigger_metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     guards = set(guard_actions or ())
     conviction_verdicts = dict(predicate_conviction_verdicts or {})
@@ -575,7 +619,7 @@ def adjudicate(
             "authority_failure_reasons": reasons,
         }
 
-    convicted = _convicted_hearing(hearing_queue, packet)
+    convicted = _convicted_hearing(hearing_queue, packet, upgrade_result)
     if convicted is None:
         # No hearing substantiated and not all refuted: the defense failed
         # to settle, the preliminary verdict survives with degraded
@@ -646,21 +690,13 @@ def adjudicate(
             "authority_failure_reasons": reasons,
         }
 
-    working_positive = hearing_target(convicted)
+    working_positive = _clean_positive(
+        hearing_target(convicted), _hearing_localization_step(convicted, packet, upgrade_result),
+    )
     convicted_parsed = (
         (convicted.get("defense_result") or {}).get("parsed") or {}
     )
-    convicted_tracer = (
-        (convicted.get("tracer_result") or {}).get("parsed") or {}
-    )
-    if convicted.get("source") == "recall_upgrade":
-        working_positive["step"] = _convicted_candidate_step(
-            upgrade_result, convicted,
-        ) or int(working_positive.get("step") or 0)
-    traced_step = None
-    if convicted_tracer.get("step") is not None:
-        traced_step = int(convicted_tracer.get("step"))
-        working_positive = _clean_positive(working_positive, traced_step)
+    traced_step = _tracer_step(convicted, packet)
 
     verdict = str(convicted_parsed.get("verdict") or "")
     degraded = verdict == "substantiated_upgraded"
@@ -670,22 +706,11 @@ def adjudicate(
         if isinstance(defense_step, int) and not isinstance(defense_step, bool)
         else None
     )
-    if traced_step is None and not degraded:
-        confirmed = convicted_parsed.get("confirmed_step")
-        # The step tracer is the dedicated localization authority; the
-        # defense-confirmed step is only a fallback when tracing failed.
-        # ``LOCALIZATION_STEP_PRIORITY`` states this rule in the record a
-        # conflicted row carries, so the choice is reproducible from the row
-        # alone instead of living only in this branch.
-        if isinstance(confirmed, int):
-            event_count = len(list(packet.get("events") or []))
-            if 1 <= confirmed <= event_count:
-                working_positive = _clean_positive(working_positive, confirmed)
-
     step = working_positive.get("step")
     responsible_event_id = event_id_for_step(packet, step)
     authority = AUTHORITY_DEGRADED_JUDGE_ONLY if degraded else AUTHORITY_AUTHORITATIVE
     localization_conflict, localization_sources = _localization_record(
+        packet=packet,
         hearings=hearing_queue,
         convicted=convicted,
         adopted_step=step,
@@ -698,6 +723,32 @@ def adjudicate(
         LOCALIZATION_AUTHORITY_DEGRADED_CONFLICT if localization_conflict
         else LOCALIZATION_AUTHORITY_AUTHORITATIVE
     )
+    # P0-3: 构建触发假设与最终指控的对比记录
+    recall_trigger_record = None
+    if recall_trigger_metadata and convicted.get("source") == "recall_upgrade":
+        recall_trigger_record = {
+            "trigger_hypothesis": recall_trigger_metadata,
+            "final_conviction": {
+                "source": convicted.get("source"),
+                "candidate_id": convicted.get("candidate_id"),
+                "convicted_step": step,
+                "verdict": verdict,
+            },
+            "trigger_vs_conviction": {
+                "triggered_by_candidates": recall_trigger_metadata.get("triggered_by_action_candidates", False),
+                # P2-1修复：比较原始触发ID和最终定罪ID，而不是比较最终ID是否在upgraded_candidates中
+                "convicted_same_candidate": (
+                    convicted.get("candidate_id") in recall_trigger_metadata.get("original_action_candidate_ids", [])
+                    if recall_trigger_metadata.get("triggered_by_action_candidates") else None
+                ),
+                # P2-1修复：根据真实的ID比较生成解释文本
+                "conviction_explanation": (
+                    "原触发候选通过验证并被定罪"
+                    if convicted.get("candidate_id") in recall_trigger_metadata.get("original_action_candidate_ids", [])
+                    else "扩大搜索后发现的新指控"
+                ) if recall_trigger_metadata.get("triggered_by_action_candidates") else None,
+            }
+        }
     return {
         "state": STATE_ERROR,
         "decision_authority": authority,
@@ -708,6 +759,8 @@ def adjudicate(
         # and which rule picked among them. ``localization_conflict`` above is
         # the subset that is a real contradiction; this is the whole record.
         "localization_sources": localization_sources,
+        # P0-3: 添加触发假设追踪记录
+        "recall_trigger_record": recall_trigger_record,
         # Recorded here because this is the last place that still holds the
         # packet: a reader downstream sees only the responsible step, and
         # "was it an action step or a content step" must be answerable from

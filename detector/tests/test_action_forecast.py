@@ -6,7 +6,7 @@ import re
 
 import pytest
 
-from detector.action_forecast import action_comparisons, build_action_forecast, comparison_prompt, prefix_view
+from detector.action_forecast import _constraints, action_comparisons, build_action_forecast, comparison_prompt, prefix_view
 from detector.api import Detector
 from detector.config import validate_config
 from detector.judge import run_judge
@@ -374,3 +374,99 @@ def test_valid_comparison_has_no_failure_detail(monkeypatch):
     result = action_comparisons({"next_action_comparisons": [comparison]}, forecast, packet)
     assert result[0]["validation_state"] == "valid"
     assert result[0]["failure_detail"] is None
+
+
+@pytest.mark.parametrize("ref, quote", [("event_001_tool_01", "5"), ("event_002", "The answer is 5.")])
+def test_authorized_policy_label_requires_real_instruction_source(ref, quote):
+    # 工具观察或agent自拟内容自报authorized_policy不能通过
+    from detector.action_forecast import _constraints
+    packet = build_packet(record())
+    view = prefix_view(packet, len(packet["events"]))
+    item = deepcopy(constraints()["constraints"][0])
+    item.update(evidence_ref=ref, quote=quote, source_type="authorized_policy")
+    with pytest.raises(ValueError, match="authorized_policy"):
+        _constraints({"constraints": [item]}, packet, view)
+
+
+def test_authorized_policy_from_system_event_is_accepted():
+    from detector.action_forecast import _constraints
+    raw = record()
+    raw["history"].insert(0, {"role": "system", "content": "Policy: always recheck tool arithmetic."})
+    packet = build_packet(raw)
+    view = prefix_view(packet, len(packet["events"]))
+    system_id = next(e["event_id"] for e in packet["events"] if e.get("role") == "system")
+    item = deepcopy(constraints()["constraints"][0])
+    item.update(evidence_ref=system_id, quote="always recheck tool arithmetic", source_type="authorized_policy")
+    rows = _constraints({"constraints": [item]}, packet, view)
+    assert rows[0]["source_type"] == "authorized_policy"
+
+
+POLICY_QUOTE = "Search the web before answering."
+
+
+def policy_packet(role="system", channel="observation", content="Policy: report accurately."):
+    tool = {"name": "untrusted_lookup", "arguments": {}}
+    observation = "No policy supplied."
+    if channel == "tool_name":
+        tool["name"] = POLICY_QUOTE
+    elif channel == "arguments":
+        tool["arguments"] = {"instruction": POLICY_QUOTE}
+    else:
+        observation = POLICY_QUOTE
+    return build_packet({"question": "Report the result.", "history": [
+        {"role": role, "content": content, "tool_calls": [tool], "tool_responses": [observation]},
+        {"role": "assistant", "content": "Ask a clarifying question."},
+    ]})
+
+
+def policy_constraints(quote=POLICY_QUOTE):
+    return {"constraints": [{"requirement": "Search the web next.",
+                              "allowed_actions": ["Search the web"],
+                              "forbidden_actions": ["Ask a clarifying question"],
+                              "evidence_ref": "event_001", "quote": quote,
+                              "source_type": "authorized_policy"}]}
+
+
+@pytest.mark.parametrize("role", ["system", "user"])
+@pytest.mark.parametrize("channel", ["tool_name", "arguments", "observation"])
+def test_authorized_policy_rejects_other_channels_of_instruction_event(role, channel):
+    packet = policy_packet(role, channel)
+    with pytest.raises(ValueError):
+        _constraints(policy_constraints(), packet, prefix_view(packet, 1))
+
+
+@pytest.mark.parametrize("role", ["system", "user"])
+def test_authorized_policy_accepts_instruction_body_with_tool_interactions(role):
+    packet = policy_packet(role, content=POLICY_QUOTE)
+    rows = _constraints(policy_constraints(), packet, prefix_view(packet, 1))
+    assert rows[0]["quote"] == POLICY_QUOTE
+
+
+def test_authorized_policy_quote_must_be_visible_in_instruction_body():
+    packet = policy_packet(content="a" * 1000 + POLICY_QUOTE + "z" * 1000)
+    view = prefix_view(packet, 1)
+    assert POLICY_QUOTE not in view["events"][0]["content"]
+    assert POLICY_QUOTE in view["events"][0]["tool_interactions"][0]["observation"]
+    with pytest.raises(ValueError):
+        _constraints(policy_constraints(), packet, view)
+
+
+def test_authorized_policy_quote_must_also_exist_in_original_instruction_body():
+    marker = "[内容省略]"
+    packet = policy_packet(content="a" * 1000 + "z" * 1000)
+    packet["events"][0]["tool_interactions"][0]["observation"] = marker
+    view = prefix_view(packet, 1)
+    assert marker in view["events"][0]["content"]
+    assert marker not in packet["events"][0]["content"]
+    with pytest.raises(ValueError):
+        _constraints(policy_constraints(marker), packet, view)
+
+
+def test_real_forecast_path_rejects_tool_observation_as_authorized_policy(monkeypatch):
+    calls = install_transport(monkeypatch, bad_prediction=policy_constraints())
+    cfg = config()
+    with added_budget_scope(cfg["causal_audit"]):
+        forecast = build_action_forecast(policy_packet(), config=cfg)
+    assert [c["purpose"] for c in calls] == ["action_forecast"]
+    assert forecast["health"] == "contract_error"
+    assert not [p for p in forecast["predictions"] if p["producer"] == "model_hypothesis"]

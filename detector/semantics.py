@@ -108,6 +108,25 @@ GROUNDING RULES:
    or prove a conversion wrong merely because two numeric arguments differ.
    A partial viewport or excerpt cannot prove that omitted page content is
    absent. Missing corroboration alone does not prove a delivered fact false.
+   P0-2 FORM VS CONTENT: Distinguish three categories of deviation:
+   (a) STRICT LITERAL协议: tool parameters, machine interfaces, explicitly
+       fixed strings where the task says "exactly", "verbatim", "as-is" or
+       specifies a format with examples that must be matched byte-for-byte.
+       These are material deviations when not matched exactly.
+   (b) INFORMATION-EQUIVALENT EXPRESSION: natural language answers where the
+       task asks for information but does not fix the exact wording or format.
+       Verify whether the same information is preserved and whether any explicit
+       limit was truly violated. Do not convict on presentation differences
+       (word choice, sentence structure, year format, explanation style) unless
+       the task explicitly fixed that exact form. A correct answer expressed
+       differently is NOT a hallucination.
+   (c) FACTUAL CONTENT: answer facts, source attribution, operation completion
+       status. These must be independently verified and remain material when wrong.
+   Apply the strictness level the task actually requires. Do not elevate
+   presentation preferences into strict literal contracts without explicit
+   task evidence. When the task says "list X" or "provide Y", judge whether
+   the required information X or Y was delivered correctly, not whether the
+   presentation matched an imagined ideal form.
 6. CONFLICTED OBSERVATIONS. When the trajectory's own tool observations give
    different values for the same point, that point is not settled by the
    record. A delivered result that agrees with one of those observations is
@@ -174,6 +193,14 @@ exact output form, exact numeric value, required tool action (with its \
 arguments, order and channel), or required state. For each constraint \
 decide its kind from: verbatim_content, exact_form, exact_value, \
 required_action, required_channel.
+   P0-2 STRICTNESS CLASSIFICATION: For each constraint, determine whether \
+   it is (a) STRICT LITERAL (tool parameters, machine interfaces, explicitly \
+   fixed strings with "exactly"/"verbatim"/"as-is"), (b) INFORMATION REQUEST \
+   (natural language answers where task asks for information without fixing \
+   exact wording), or (c) FACTUAL CONTENT (answer facts, attributions, \
+   completion status). Mark strict literal constraints explicitly; do not \
+   infer strictness from quotation marks alone without task evidence of \
+   "exactly" or format fixation.
 2. Reconstruct everything the trajectory actually delivered: the final \
 answer, every required artifact or state, every required action as it \
 was actually performed, and any completion claim it makes.
@@ -193,10 +220,27 @@ LAW above. Semantic differences in a deliverable decide the verdict. \
 Formatting, wording, unit/currency presentation, or harmless rounding are \
 NOT errors UNLESS an explicit contract above fixes that exact form or \
 value.
+   P0-2 FORM JUDGMENT: Apply strictness according to the task's actual \
+   requirements:
+   - STRICT LITERAL contracts: byte-for-byte matching required.
+   - INFORMATION REQUESTS: judge whether the required information was \
+     correctly delivered; presentation differences (word order, year format, \
+     explanation additions) are NOT material unless the task explicitly \
+     constrained that form. A correct answer expressed differently is clean.
+   - FACTUAL CONTENT: wrong facts, wrong attributions, false completion \
+     claims remain material regardless of presentation.
+   Do not elevate style preferences or imagined ideal forms into material \
+   violations. The benchmark's clean label means the delivery satisfied the \
+   task; it does not certify that every local expression is perfect.
 5. If every deliverable satisfies the task, answer false.
 6. Otherwise find the EARLIEST step whose correction would make every \
 deliverable correct. A later step that merely reveals an earlier error \
 is not the locus. An intermediate error already corrected does not count.
+   P2-2 MULTI-DELIVERABLE REFINEMENT: When the task requires multiple \
+   independent deliverables, apply the materiality test per deliverable. \
+   If error A affects deliverable D1 and error B affects deliverable D2, \
+   both errors block required deliverables. Report the earliest error that \
+   blocks ANY required deliverable as the root cause step.
 7. Apply the exclusions in the MATERIALITY LAW: corrected intermediate
 errors and unused tool errors do not count. An honest refusal or inability
 to answer is not fabricated content; still check whether the record shows
@@ -253,6 +297,21 @@ channel);
 - verification: a claim the trajectory presents as established although \
 no observation, no task-fixed constant and no world fact establishes it.
 
+P1-2 VERIFICATION CRITERIA: For each potential candidate, establish:
+1. TASK BINDING: Does the task explicitly require this? Quote the requirement.
+   Do not infer obligations from agent preferences or generic best practices.
+2. OBSERVABLE CONTRADICTION: Does the trajectory's own observation or a \
+   verifiable fact contradict the claim? Cite the conflicting evidence.
+3. COMPLETENESS: Is the evidence sufficient to determine deviation? Missing \
+   information, uncertain external facts, or conflicting observations without \
+   resolution are NOT candidates - they are verification gaps.
+4. MATERIALITY SIGNAL: Does this affect a required deliverable? Process \
+   choices, intermediate explorations, or stylistic differences that do not \
+   impact required deliverables are not candidates.
+
+Only report candidates with verifiable contradictions. Uncertainty, missing \
+context, or speculative concerns are not candidates.
+
 For every assistant message and every tool call, compare it against the \
 question, the tool observations, and real-world knowledge. Name the \
 deviation in contrast form: "the agent did X instead of the required Y". \
@@ -298,6 +357,21 @@ or a violated explicit task contract)?
 2. CAUSAL TEST — if that exact point were corrected, would every \
 deliverable become correct under the MATERIALITY LAW? Consider later \
 corrections and whether the deviation is merely presentational.
+
+P1-2 CAUSAL TEST REFINEMENT: The causal test asks whether correcting THIS \
+error would make the delivered result correct. This does NOT require that \
+correcting this error alone fixes EVERY independent error in the trajectory. \
+When multiple independent errors exist:
+- If correcting error A would make deliverable D1 correct, and error B affects \
+  only deliverable D2, then A is causal for D1 (upgrade it).
+- If the task requires multiple independent deliverables, each error affecting \
+  its own deliverable is independently causal.
+- Only reject causality when the deviation does NOT affect any required \
+  deliverable, or when a LATER correction already fixed it before delivery.
+
+Do not require "correcting this makes EVERYTHING correct" when independent \
+errors affect independent deliverables. Each material error blocking its own \
+required deliverable passes the causal test.
 
 A deviation that is real but touches no deliverable is NOT an upgrade. \
 A deviation that is only formatting/wording and is not fixed by an \
@@ -417,26 +491,62 @@ Answer two questions independently:
 1. CONTENT TEST — quote the exact statement or action at the alleged step \
 and the correct or required referent, both from the shown trajectory. Is \
 the claimed deviation factually real under the grounding rules?
-2. RELEVANCE TEST — if the alleged step were corrected, would every \
-deliverable become correct under the MATERIALITY LAW? Consider later \
-corrections and whether the step is causally connected to what the \
-trajectory delivers.
+   P0-2 FORM VS CONTENT: Apply the strictness the task actually requires. \
+   If the positive verdict rests on an EXPLICIT strict literal contract \
+   (tool parameters, machine interfaces, task says "exactly"/"verbatim"), \
+   a byte-for-byte mismatch is real. If the verdict alleges wrong \
+   presentation of a natural language answer where the task did not fix \
+   exact form, check whether the required INFORMATION was delivered \
+   correctly; presentation differences alone (word order, year format, \
+   explanation style) are not content errors when the information matches. \
+   Wrong facts, wrong attributions, false completion claims remain real \
+   content errors regardless of form.
+2. RELEVANCE TEST — if the alleged step were corrected, would the \
+affected deliverable(s) become correct under the MATERIALITY LAW? \
+Consider later corrections and whether the step is causally connected \
+to what the trajectory delivers.
+   P2-2 MULTI-DELIVERABLE REFINEMENT: When the task requires multiple \
+   independent deliverables, apply the relevance test per deliverable. \
+   If correcting the alleged step would make its affected deliverable(s) \
+   correct, the error is material even when other independent errors \
+   affect other deliverables. Only reject relevance when the alleged step \
+   does NOT affect any required deliverable, or when a later correction \
+   already fixed it before delivery.
 
 Verdicts:
 - substantiated: both tests pass (the error is real and material).
-- refuted: the shown evidence proves the step correct, or the deviation is \
+- refuted: the shown evidence PROVES the step correct, or PROVES the deviation is \
 immaterial under the MATERIALITY LAW, already corrected, or a \
 non-hallucination category (formatting only, process only, no false \
 completion claim).
 - inconclusive: the shown evidence cannot settle either test.
+P1-1 EVIDENCE STATES: Distinguish three evidence states carefully:
+(a) PROVEN WRONG: the shown evidence demonstrates the allegation is factually \
+    incorrect or immaterial → verdict: refuted
+(b) PROVEN CORRECT: the shown evidence confirms the error is real and material \
+    → verdict: substantiated
+(c) INSUFFICIENT EVIDENCE: the shown evidence cannot determine correctness. \
+    This includes: conflicting observations without resolution, missing external \
+    facts, uncertain recollection, execution failures that prevent verification. \
+    → verdict: inconclusive (NOT refuted)
+Do NOT overturn to refuted merely because:
+- Evidence is incomplete or missing
+- The correct fact cannot be determined from available sources
+- Tool observations conflict and no external evidence settles it
+- Execution failed or the environment state is unknown
+Only refute when positive evidence PROVES the allegation wrong. Uncertainty, \
+conflict, or absence of proof is inconclusive, not refuted.
 Do NOT overturn merely because evidence is incomplete.
 The final answer text alone does not repair a deliverable breach: a \
 required action with wrong arguments stays substantiated even when the \
 answer text reads correct, and a delivered result that only repeats an \
 unverified user claim is not thereby correct.
 If the positive verdict rests on an EXPLICIT task contract (verbatim \
-content, exact form, exact value), a violation of that contract is \
-material by definition: do not refute it as immaterial formatting.
+content, exact form, exact value), verify that the contract truly exists \
+in the task text with words like "exactly", "verbatim", "must match", or \
+explicit format examples. A violation of a genuine strict contract is \
+material by definition; but a presentation difference where the task only \
+requested information without fixing form is refuted as immaterial formatting.
 
 Reply with ONLY a JSON object of the exact shape:
 {

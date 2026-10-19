@@ -1,0 +1,83 @@
+{
+  "archived_on": "2026-10-19",
+  "files": [
+    {
+      "file": "cases.json",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/cases.json",
+      "bytes": 2368,
+      "sha256": "5d4491aaa0b3102d2b544d85f5cec37947e0750dfb6791d07b0b44815bfa8db2"
+    },
+    {
+      "file": "config.json",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/config.json",
+      "bytes": 1150,
+      "sha256": "481ee5826dbca91d7b99f9a2af8c33cb5faa86e9ce922206a70781dd123e210c"
+    },
+    {
+      "file": "manifest.json",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/manifest.json",
+      "bytes": 311388,
+      "sha256": "a8a5591e00b97c6eccac94b86aa253538a573e04e044c9b227b5c84364bf3fa4"
+    },
+    {
+      "file": "first-evaluation.json",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/first-evaluation.json",
+      "bytes": 143767,
+      "sha256": "90fbcf3ec7b8605c80a35e819fa5f88ad780b3f465f21c8d59090895852eb15c"
+    },
+    {
+      "file": "final-evaluation.json",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/final-evaluation.json",
+      "bytes": 93185,
+      "sha256": "8b16984696f08d0f3a5f47770f8756d961b11e58f08f68f1a9b3dce4b9f3ff45"
+    },
+    {
+      "file": "recovery-evaluation.json",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/recovery-evaluation.json",
+      "bytes": 9880,
+      "sha256": "3cf8527b9db0dc9872c074e288ec7b6cd0b6e06b89ccdee6ce780e52d47a978c"
+    },
+    {
+      "file": "comparison.json",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/comparison.json",
+      "bytes": 49357,
+      "sha256": "ffb5154c460ac59b46e845364c91dcab2813d00fe3cd4540936fe101251b3687"
+    },
+    {
+      "file": "benefit-comparison.json",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/benefit-comparison.json",
+      "bytes": 29679,
+      "sha256": "8149c907f5fd1f712a3ad77bc7ee983dd4574adea1b9fd243b61fcb92e98ee34"
+    },
+    {
+      "file": "completion-audit.json",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/completion-audit.json",
+      "bytes": 35911,
+      "sha256": "b671fb984f2c724a951e63193f21e01969a1c513de6007739e52690d0d58e0d5"
+    },
+    {
+      "file": "finalization-audit.json",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/finalization-audit.json",
+      "bytes": 4209,
+      "sha256": "b736e15a5092a1b3b09615d763b65d6f4f897911d42117b2ca57e9c66b7fda1c"
+    },
+    {
+      "file": "original100-evaluation.json",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/original100-evaluation.json",
+      "bytes": 60645,
+      "sha256": "50c7d00c6297b16a456d0213785ec621c069cda6a8db8a2b0b7ef08b030b2c35"
+    },
+    {
+      "file": "report.md",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/report.md",
+      "bytes": 922,
+      "sha256": "2257b33f185a038a3c2a2568da653b5149ed9358878884eef636cc79906bdb55"
+    },
+    {
+      "file": "final-summary.md",
+      "source": "artifacts/detector/live_checks/mechanism100_optimization_rerun/final-summary.md",
+      "bytes": 5785,
+      "sha256": "1af7cc4c25e08275a9f354a7b8f4ab7dcaeded703b286437d7c0dcd5a144a2f3"
+    }
+  ]
+}

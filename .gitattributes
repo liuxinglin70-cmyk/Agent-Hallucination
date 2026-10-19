@@ -5,3 +5,9 @@ docs/results/localization100-20261015/*.json -text
 
 docs/results/next-action100-20261015/*.json -text
 docs/results/next-action100-20261015/report.md -text
+
+docs/results/api-capacity-20261019/** -text whitespace=cr-at-eol
+docs/results/infrastructure-20261018/** -text whitespace=cr-at-eol
+docs/results/mechanism100-20261016/** -text whitespace=cr-at-eol
+docs/results/mechanism100-optimization-rerun/** -text whitespace=cr-at-eol
+docs/results/repository-maintenance-20261019/** -text whitespace=cr-at-eol

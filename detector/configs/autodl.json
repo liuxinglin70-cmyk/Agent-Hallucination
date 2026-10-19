@@ -15,7 +15,7 @@
   },
   "provider": {
     "endpoint": "https://www.autodl.art/api/v1",
-    "model": "GLM-5.3-flash",
+    "model": "DeepSeek-V4.1-Flash-1017",
     "api_key_env": "AUTODL_API_KEY",
     "temperature": 0.0,
     "timeout_seconds": 900,
@@ -28,17 +28,17 @@
     }
   },
   "judge_route": {
-    "model": "GLM-5.3-flash",
+    "model": "DeepSeek-V4.1-Flash-1017",
     "json_mode": true,
     "votes": 3,
     "vote_topup": 2
   },
   "defense_route": {
-    "model": "GLM-5.3-flash",
+    "model": "DeepSeek-V4.1-Flash-1017",
     "votes": 3,
     "vote_topup": 2
   },
   "recall_route": {
-    "model": "GLM-5.3-flash"
+    "model": "DeepSeek-V4.1-Flash-1017"
   }
 }

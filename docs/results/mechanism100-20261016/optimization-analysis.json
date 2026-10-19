@@ -1,0 +1,79 @@
+{
+  "schema_version": "research.mechanism_optimization_analysis.v1",
+  "phase": "implemented_waiting_full_verification",
+  "created_at": "2026-10-16T16:50:00.502099+00:00",
+  "source_round": "mechanism100_20261016",
+  "completed_audit": "completion-audit.json",
+  "effectiveness_met": false,
+  "paired_changes": {
+    "detection_fixed": [
+      "BFCL/071.json",
+      "SmolAgents/024.json"
+    ],
+    "detection_regressed": [
+      "OpenDeepSearch/058.json",
+      "OpenDeepSearch/027.json",
+      "OpenDeepSearch/071.json",
+      "Camel/012.json"
+    ],
+    "localization_fixed": [
+      "Camel/022.json"
+    ],
+    "localization_regressed": [
+      "BFCL/085.json",
+      "OpenDeepSearch/027.json"
+    ]
+  },
+  "candidate_root_cause": {
+    "observation": "99 vote comparisons rejected as quote_not_in_action; 75 rejected quotes include event renderer labels rather than an exact raw action channel.",
+    "hypothesis": "Judge comparison prompt and rendered trajectory expose composite labelled rows, whereas action_comparisons requires an exact single action channel quote.",
+    "source_locations": [
+      "detector/action_forecast.py:comparison_prompt",
+      "detector/action_forecast.py:action_comparisons",
+      "detector/judge.py:_run_judge",
+      "detector/action_context.py:action_channels"
+    ],
+    "status": "requires controlled reproduction and minimal source-rule fix",
+    "constraints": "Preserve strict original-channel citation validation, unknown semantics, authority boundaries, vote counts, diagnostic reserve and budgets; do not accept fabricated/composite text by weakening validation."
+  },
+  "other_findings": {
+    "forecast_health": {
+      "ok": 54,
+      "task_alignment_unknown": 23,
+      "budget_exhausted": 15,
+      "contract_error": 6,
+      "provider_error": 1
+    },
+    "comparison_validation": {
+      "valid": 114,
+      "quote_not_in_action": 99,
+      "not_an_assistant_action": 3,
+      "missing": 7,
+      "future_reason_reference": 3,
+      "invalid_quote": 2
+    },
+    "comparison_states": {
+      "matched": 85,
+      "divergent": 16,
+      "unknown": 127
+    },
+    "mechanism": {
+      "forecast_used_cases": 42,
+      "model_prediction_cases": 26,
+      "action_candidate_cases": 5,
+      "comparison_repair_cases": 2
+    }
+  },
+  "next_step": "Reproduce renderer/action-channel mismatch with real rejected quotes and Fake/Mock provider; audit paired regressions before choosing a general fix. Then focused and full offline checks before the one authorized rerun of eligible cases.",
+  "updated_at": "2026-10-16T17:34:49.216986+00:00",
+  "fix": {
+    "source_rule": "comparison_prompt and repair_comparisons now share bounded exact raw action-channel excerpts, separate from reference/rendering labels.",
+    "validation": "Strict single-channel quote, future-event, observation/action, authority and source identity validation retained.",
+    "counterexample_before": "action-channel-before.xml: one integration failure (no raw actual_action context), one strict composite-quote rejection pass.",
+    "focused_after": "critical-green.xml: 92 passed, no failures.",
+    "boundary_examples": "Raw tool action quote validates; observations/future excluded from local action view; clipped excerpts remain exact raw substrings; concatenated excerpts/rendering labels and altered packet identity are rejected.",
+    "paired_case_audit": "Two new false positives use world_knowledge with no independent snapshot. No new broad verdict heuristic added from two labelled cases; this semantic risk is recorded rather than claimed solved.",
+    "configuration": "Same original resolved config/model/budgets; votes and diagnostic reserves unchanged."
+  },
+  "verification_report": "artifacts/code_quality/9d0522fa2da23aa9b25ed7494ab257a560cc1c41b11a0eba27f594c7a4d901f9/56cbac51a1894d8ca125ee00b283d0bf"
+}

@@ -5,6 +5,7 @@ import argparse
 from collections import Counter
 from datetime import datetime, timezone
 import hashlib
+from importlib.util import find_spec
 import json
 import os
 from pathlib import Path
@@ -34,11 +35,37 @@ def source_manifest() -> dict[str, str]:
             for p in sorted(set(files)) if p.is_file()}
 
 
+def worker_count(requested: int | None) -> int:
+    if requested is not None and requested < 1:
+        raise ValueError("--jobs must be a positive integer")
+    available = find_spec("xdist") is not None
+    if requested is not None and requested > 1 and not available:
+        raise ValueError("parallel verification requires the test extra: pip install -e .[test]")
+    return requested or (min(4, max(1, (os.cpu_count() or 1) - 1)) if available else 1)
+
+
+def pytest_arguments(scope: str, output: Path, jobs: int) -> list[str]:
+    arguments = ["-m", "pytest", "-q", "-p", "no:cacheprovider",
+                 "-p", "scripts.verification_plugin", "--durations=20",
+                 f"--verification-report={output / 'test_execution.json'}",
+                 f"--junitxml={output / 'pytest.xml'}"]
+    if jobs > 1:
+        arguments.extend(["-n", str(jobs), "--dist=worksteal", "--max-worker-restart=0"])
+    if scope != "all":
+        arguments.extend(["-m", scope])
+    return arguments
+
+
 def main(argv=None) -> int:
     global OUT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scope", choices=("code_only", "local_data", "platform", "all"), default="code_only")
+    parser.add_argument("--jobs", type=int, help="pytest worker processes; 1 runs serially; default reserves one CPU")
     args = parser.parse_args(argv)
+    try:
+        jobs = worker_count(args.jobs)
+    except ValueError as exc:
+        parser.error(str(exc))
     started = datetime.now(timezone.utc).isoformat()
     initial = source_manifest()
     identity = hashlib.sha256(json.dumps(initial, sort_keys=True).encode()).hexdigest()
@@ -54,7 +81,10 @@ def main(argv=None) -> int:
                     "smoke.json", "capability_smoke.json"):
         save(pending, {"status": "not_run"})
     checks = []
-    environment = {**os.environ, "PYTHONUTF8": "1", "PYTHONDONTWRITEBYTECODE": "1"}
+    environment = {**os.environ, "PYTHONUTF8": "1", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONUNBUFFERED": "1"}
+    # Verification owns its test selection and distribution; user-local pytest
+    # options must not silently filter a full run or select a different scheduler.
+    environment.pop("PYTEST_ADDOPTS", None)
     environment["PYTHONPATH"] = os.pathsep.join([
         str(ROOT / "scripts/offline_guard"), str(ROOT), environment.get("PYTHONPATH", "")])
     if args.scope == "code_only":
@@ -68,10 +98,13 @@ def main(argv=None) -> int:
 
     def run_capture(name: str, arguments: list[str]):
         before = time.monotonic()
-        result = subprocess.run([sys.executable, *arguments], cwd=ROOT, env=environment,
-                                text=True, encoding="utf-8", errors="replace",
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        (OUT / f"{name}.log").write_text(result.stdout, encoding="utf-8")
+        log_path = OUT / f"{name}.log"
+        print(f"{name}: RUNNING (log: {log_path})", flush=True)
+        with log_path.open("w", encoding="utf-8") as log:
+            result = subprocess.run([sys.executable, *arguments], cwd=ROOT, env=environment,
+                                    text=True, encoding="utf-8", errors="replace",
+                                    stdout=log, stderr=subprocess.STDOUT)
+        result.stdout = log_path.read_text(encoding="utf-8", errors="replace")
         checks.append({"name": name, "arguments": arguments,
                        "exit_code": result.returncode,
                        "seconds": round(time.monotonic() - before, 3)})
@@ -112,11 +145,12 @@ def main(argv=None) -> int:
         save("dataset_integrity.json", integrity)
         checks.append({"name": "dataset_integrity", "exit_code": 0 if integrity["passed"] else 1})
         print(f"dataset_integrity: {'PASS' if integrity['passed'] else 'FAIL'}", flush=True)
-    pytest_args = ["-m", "pytest", "-q", "-p", "no:cacheprovider",
-                   f"--junitxml={OUT / 'pytest.xml'}"]
-    if args.scope != "all":
-        pytest_args.extend(["-m", args.scope])
-    run("pytest", pytest_args)
+    print(f"pytest workers: {jobs}", flush=True)
+    run("pytest", pytest_arguments(args.scope, OUT, jobs))
+    execution_path = OUT / "test_execution.json"
+    execution = json.loads(execution_path.read_text(encoding="utf-8")) if execution_path.exists() else {}
+    record("test_execution_complete", execution.get("passed") is True,
+           "collection and executed test ids must match exactly, without skips or duplicate executions")
     # Importability is not coverage: ``--help`` exits 0 for a CLI whose
     # commands the parser no longer registers. Assert the subcommands the
     # repository's own docs and scripts invoke are actually there.
@@ -200,6 +234,7 @@ def main(argv=None) -> int:
     summary = {"started_at_utc": started, "finished_at_utc": datetime.now(timezone.utc).isoformat(),
                "python": platform.python_version(), "platform": platform.platform(),
                "scope": args.scope, "network_policy": "loopback_only",
+               "pytest_workers": jobs, "pytest_distribution": "worksteal" if jobs > 1 else "serial",
                "not_run": [name for name in ("code_only", "local_data", "platform")
                            if args.scope not in {name, "all"}],
                "source_sha256": digest, "passed": passed, "tests": dict(test_totals), "checks": checks}
@@ -209,13 +244,13 @@ def main(argv=None) -> int:
         f"# 代码验证结果\n\n生成时间（UTC）：{started}\n\n"
         f"总状态：**{'PASS' if passed else 'FAIL'}**。pytest：{test_totals['passed']} 通过，"
         f"{test_totals['failures']} 失败，{test_totals['errors']} 错误，{test_totals['skipped']} 跳过。\n\n"
-        f"验证范围：`{args.scope}`；原始数据核对：{'已执行' if integrity is not None else '未执行'}。\n\n"
+        f"验证范围：`{args.scope}`；pytest进程：{jobs}；原始数据核对：{'已执行' if integrity is not None else '未执行'}。\n\n"
         "| 检查 | 结果 |\n|---|---|\n" + rows + "\n\n"
         "仅所选范围的检查已执行；离线验证不代表真实模型准确率或独立泛化。\n\n"
         "历史真实实验统一见 docs/experiment-log.md；本命令不调用模型服务。\n\n"
         f"源码 SHA-256：`{digest}`。逐文件摘要见 [source_manifest.json](source_manifest.json)。\n\n"
-        f"复现：在仓库根目录运行 `python scripts/verify.py --scope {args.scope}`。机器摘要见 [summary.json](summary.json)，"
-        "测试详情见 [pytest.xml](pytest.xml) 和 [pytest.log](pytest.log)。\n",
+        f"复现：在仓库根目录运行 `python scripts/verify.py --scope {args.scope} --jobs {jobs}`。机器摘要见 [summary.json](summary.json)，"
+        "测试详情见 [pytest.xml](pytest.xml)、实时日志[pytest.log](pytest.log)及完整执行清单[test_execution.json](test_execution.json)。\n",
         encoding="utf-8")
     return 0 if passed else 1
 

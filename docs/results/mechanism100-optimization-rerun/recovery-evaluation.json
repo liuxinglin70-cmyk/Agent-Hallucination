@@ -1,0 +1,280 @@
+{
+  "run_id": "optimization99_recovery",
+  "metrics": {
+    "decisive": 3,
+    "unresolved": 1,
+    "completion": 0.75,
+    "decisive_accuracy": 0.6666666666666666,
+    "all_case_accuracy": 0.5,
+    "tp": 1,
+    "fp": 0,
+    "fn": 1,
+    "tn": 1,
+    "positive_precision": 1.0,
+    "positive_recall": 0.5,
+    "positive_f1": 0.6666666666666666,
+    "macro_precision": 0.75,
+    "macro_recall": 0.75,
+    "macro_f1": 0.6666666666666666,
+    "authoritative": 3,
+    "degraded": 1,
+    "degraded_disagreeing": 0,
+    "terminal_metrics": {
+      "decisive": 4,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.75,
+      "all_case_accuracy": 0.75,
+      "tp": 2,
+      "fp": 0,
+      "fn": 1,
+      "tn": 1,
+      "positive_precision": 1.0,
+      "positive_recall": 0.6666666666666666,
+      "positive_f1": 0.8,
+      "macro_precision": 0.75,
+      "macro_recall": 0.8333333333333333,
+      "macro_f1": 0.7333333333333334
+    },
+    "provider_unresolved": 0,
+    "no_terminal_decision": 0,
+    "requested_cases": 4,
+    "found_results": 4,
+    "missing_cases": 0,
+    "step_localization": {
+      "target": "dataset_first_error_event.v1",
+      "step_unit": "trajectory_event_position",
+      "unmapped_annotations": 0,
+      "target_mismatch_rows": 0,
+      "n": 3,
+      "hits": 0,
+      "accuracy": 0.0,
+      "by_step_kind": {
+        "action_step": {
+          "n": 2,
+          "hits": 0,
+          "accuracy": 0.0
+        },
+        "unclassified": {
+          "n": 1,
+          "hits": 0,
+          "accuracy": 0.0
+        }
+      },
+      "note": "action-step and content-step accuracy answer different questions; read them apart, never as one rate"
+    }
+  },
+  "rows": [
+    {
+      "case": "OpenDeepSearch/071.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/073.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "OpenManus/064.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "OpenManus/068.json",
+      "gold": true,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative"
+    }
+  ],
+  "errors": [
+    {
+      "case": "OpenManus/068.json",
+      "kind": "fn",
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "judge": {
+        "is_hallucination": false,
+        "hallucination_step": null,
+        "hallucination_reason": null,
+        "delivered_result": "University of Cape Town (UCT), delivered as the university that awarded El Anatsui an honorary doctorate in 2016, matching the extracted Wikipedia content, followed by a success termination.",
+        "correct_result": "University of Cape Town (UCT) — the answer supported by the tool-observed extraction from the El Anatsui Wikipedia page; no established or confidently known contradicting fact exists in the record or in certain public knowledge.",
+        "basis": "observation",
+        "confidence": "medium",
+        "evidence_refs": [],
+        "root_cause": null,
+        "contracts": [
+          {
+            "kind": "required_action",
+            "requirement": "Research and determine which university awarded El Anatsui an honorary doctorate in 2016, with honest failure reporting if genuinely blocked"
+          },
+          {
+            "kind": "exact_value",
+            "requirement": "The final answer must name the university that conferred the honorary doctorate on El Anatsui in 2016"
+          }
+        ],
+        "next_action_comparisons": [
+          {
+            "constraint_id": "d_d89d87a173911d45ae0f",
+            "source_event_id": "event_001",
+            "next_event_id": "event_002",
+            "state": "matched",
+            "reason": "After the web_search failure (invalid URL), the actual next event is an available-fallback repair: a browser_use go_to_url call with a valid Google search URL, within the allowed actions (retry_or_repair / available_fallback); no success was claimed in that event without observed recovery.",
+            "evidence_refs": [
+              "event_002_tool_01",
+              "event_001_tool_01"
+            ],
+            "quote": "{'action': 'go_to_url', 'url': 'https://www.google.com/search?q=El+Anatsui+honorary+doctorate+2016+university'}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_002_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_002_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_ed4cdd6e02bca86b1bf4",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "matched",
+            "reason": "Before asserting any university name, the agent opened a relevant source (the El Anatsui Wikipedia page) via go_to_url, which is one of the allowed actions (open a relevant source) ensuring the answer would be backed by page evidence rather than asserted without viewing content.",
+            "evidence_refs": [
+              "event_003_tool_01"
+            ],
+            "quote": "{'action': 'go_to_url', 'url': 'https://en.wikipedia.org/wiki/El_Anatsui'}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_003_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          },
+          {
+            "constraint_id": "c_211745dbc9ccd9afc358",
+            "source_event_id": "event_002",
+            "next_event_id": "event_003",
+            "state": "matched",
+            "reason": "The recovery after the invalid-URL web_search failure followed the already-successful go_to_url pattern with a valid URL (the Wikipedia source page), matching the allowed action of opening a search or source page; the broken web_search call was not resent.",
+            "evidence_refs": [
+              "event_003_tool_01",
+              "event_001_tool_01"
+            ],
+            "quote": "{'action': 'go_to_url', 'url': 'https://en.wikipedia.org/wiki/El_Anatsui'}",
+            "validation_state": "valid",
+            "comparison_scope": "retrospective_judge",
+            "decision_authority": "none",
+            "localization_authority": "none",
+            "failure_detail": null,
+            "action_channels": [
+              {
+                "reference": "event_003_tool_01",
+                "channel": "arguments"
+              }
+            ],
+            "timing": {
+              "call_precedes_own_observation": [
+                "event_003_tool_01"
+              ],
+              "omitted_interactions": 0,
+              "content_vs_tools": "not_mixed",
+              "between_tool_interactions": "not_multiple"
+            }
+          }
+        ],
+        "next_action_comparison_health": {
+          "state": "ok",
+          "expected": 3,
+          "valid": 3,
+          "failures": {},
+          "repair": {
+            "state": "not_needed"
+          }
+        }
+      },
+      "defense": {}
+    }
+  ],
+  "degraded_disagreements": [],
+  "missing_cases": []
+}

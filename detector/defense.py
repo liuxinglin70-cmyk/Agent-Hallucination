@@ -62,6 +62,7 @@ def _parse_defense(parsed: Any) -> tuple[dict | None, str]:
     refs = parsed.get("evidence_refs")
     if refs is None:
         refs = []
+    # P1-1: refuted 需要证据证明错误，不能仅因为证据不足就refuted
     if verdict == "refuted" and not refs:
         return None, "refuted requires at least one evidence reference"
     cited = parsed.get("evidence_citations")
@@ -74,6 +75,10 @@ def _parse_defense(parsed: Any) -> tuple[dict | None, str]:
     reason = str(parsed.get("reason") or "").strip()
     if not reason:
         return None, "reason is required"
+
+    # P1-2修复：移除关键词黑名单，信任有evidence_refs支持的refuted判决
+    # refuted需要证据引用（已在上面67行检查），不能基于reason中的自然语言词汇否决
+
     return {
         "verdict": verdict,
         "confirmed_step": confirmed if verdict == "substantiated" else None,

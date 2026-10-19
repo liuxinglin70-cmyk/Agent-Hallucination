@@ -391,10 +391,11 @@ def test_recall_trigger_forces_recall_net_for_unanimous_clean_judge(
     )
     assert result["state"] == "verified_error"
     deployment = result["proof"]["deployment"]
-    assert any(
+    # P2回归：策略谓词只执行一次，审计元数据复用首次决策
+    assert sum(
         item.get("event") == "recall_triggered"
         for item in deployment.get("fired") or ()
-    )
+    ) == 1
 
 
 def test_detect_judge_conviction_is_authoritative(sample_record, monkeypatch):

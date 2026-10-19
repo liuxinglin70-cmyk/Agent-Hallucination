@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-19",
+  "local_links_checked": 420,
+  "broken_links": [],
+  "script_index_missing": [],
+  "source_audit": {
+    "files": 92,
+    "duplicate_definitions": [],
+    "boundary_violations": [],
+    "import_cycles": [],
+    "passed": true
+  },
+  "archive_source_copies_verified": 34,
+  "unarchived_deletions": [],
+  "cost_calibration_preserved": true,
+  "prior_full_suite_delta": {
+    "changed": [
+      "detector/config.py",
+      "detector/configs/autodl.json",
+      "tests/test_p2_2_multi_deliverable.py"
+    ],
+    "added": [
+      "scripts/probe_api_capacity.py"
+    ],
+    "removed": []
+  },
+  "credential_values_found": [],
+  "passed": true,
+  "whitespace_only_change": "tests/test_p2_2_multi_deliverable.py: remove blank line at EOF",
+  "evidence_git_attributes": "New archive directories use -text to preserve manifest hashes across checkout.",
+  "staged_archive_blobs_verified": 38,
+  "git_diff_check_passed": true
+}

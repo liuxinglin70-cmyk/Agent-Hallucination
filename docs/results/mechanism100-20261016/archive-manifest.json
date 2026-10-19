@@ -1,0 +1,77 @@
+{
+  "archived_on": "2026-10-19",
+  "files": [
+    {
+      "file": "cases.json",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/cases.json",
+      "bytes": 2368,
+      "sha256": "5d4491aaa0b3102d2b544d85f5cec37947e0750dfb6791d07b0b44815bfa8db2"
+    },
+    {
+      "file": "config.json",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/config.json",
+      "bytes": 1150,
+      "sha256": "481ee5826dbca91d7b99f9a2af8c33cb5faa86e9ce922206a70781dd123e210c"
+    },
+    {
+      "file": "manifest.json",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/manifest.json",
+      "bytes": 172901,
+      "sha256": "3eeb7cec1b80e2bd6bbed8c7201c26ba3834ddcd46c22b043f31bf42b5371a06"
+    },
+    {
+      "file": "first-evaluation.json",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/first-evaluation.json",
+      "bytes": 150384,
+      "sha256": "6aa362703b9b4c9b09b171692aedceee0f086ce14c59373c720878e3824fff06"
+    },
+    {
+      "file": "final-evaluation.json",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/final-evaluation.json",
+      "bytes": 93031,
+      "sha256": "2623634aa8cdbc35a87aa1580ff3b6b684103a2cfa71deea95245d0a2517a58c"
+    },
+    {
+      "file": "recovery-evaluation.json",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/recovery-evaluation.json",
+      "bytes": 17,
+      "sha256": "fb2989323b717f2e869a06272d8ee4b35b4e516d6a555f4ce3d19f9ee3606ff0"
+    },
+    {
+      "file": "comparison.json",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/comparison.json",
+      "bytes": 47924,
+      "sha256": "ff63672897bcd0ca708b082a00f119aef7422a3749e146c86cedd9e6d73e3b7b"
+    },
+    {
+      "file": "benefit-comparison.json",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/benefit-comparison.json",
+      "bytes": 34212,
+      "sha256": "dcbf235ac88f613755e13d87bba64ab7fac75fb7dc0a5189685cd23d054e94f3"
+    },
+    {
+      "file": "completion-audit.json",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/completion-audit.json",
+      "bytes": 38406,
+      "sha256": "f849dcda634d23002575c2e70ba00c9e06ed423293c54ca649dd825b76a018f3"
+    },
+    {
+      "file": "exclusion.json",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/exclusion.json",
+      "bytes": 960,
+      "sha256": "0ad244d2a09aea1c071b578efe698ecb1a4d2280ad65d260965b2dbf2c06ece9"
+    },
+    {
+      "file": "report.md",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/report.md",
+      "bytes": 2116,
+      "sha256": "2dc9fa39389a79e3fa650dcc5851bfc4e6ea75f5c502615889fece3167aec40f"
+    },
+    {
+      "file": "optimization-analysis.json",
+      "source": "artifacts/detector/live_checks/mechanism100_20261016/optimization-analysis.json",
+      "bytes": 3851,
+      "sha256": "814bb82714026b4f8cb9876ee00ea715b4f98aceabc8f622a99ebdec4183864e"
+    }
+  ]
+}

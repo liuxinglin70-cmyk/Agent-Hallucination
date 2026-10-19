@@ -1,0 +1,137 @@
+{
+  "schema_version": "research.final_supervision_audit.v1",
+  "checked_at": "2026-10-16T22:33:39.507477+00:00",
+  "passed": true,
+  "frozen_identity_verified": true,
+  "all_103_case_commits_verified": true,
+  "adopted_99_result_hashes_verified": true,
+  "active_related_processes": [],
+  "eligible_cases": 99,
+  "original_requested_cases": 100,
+  "authoritative": 98,
+  "unresolved_cases": [
+    "OpenManus/064.json"
+  ],
+  "excluded_cases": [
+    "Magentic_One/031.json"
+  ],
+  "recovery_cases_attempted": 4,
+  "recovery_cases_adopted": [
+    "OpenDeepSearch/071.json",
+    "OpenManus/073.json",
+    "OpenManus/068.json"
+  ],
+  "started_without_finish": 0,
+  "finished_without_start": 3,
+  "earlier_matched99": {
+    "metrics": {
+      "decisive": 99,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.6868686868686869,
+      "all_case_accuracy": 0.6868686868686869,
+      "tp": 35,
+      "fp": 5,
+      "fn": 26,
+      "tn": 33,
+      "positive_precision": 0.875,
+      "positive_recall": 0.5737704918032787,
+      "positive_f1": 0.693069306930693,
+      "macro_precision": 0.7171610169491525,
+      "macro_recall": 0.7210957722174288,
+      "macro_f1": 0.6867408390323568,
+      "authoritative": 99,
+      "requested_cases": 99,
+      "step_localization": {
+        "n": 61,
+        "hits": 22,
+        "accuracy": 0.36065573770491804
+      }
+    },
+    "paired": {
+      "detection_fixed": [
+        "BFCL/085.json",
+        "BFCL/030.json",
+        "Magentic_One/065.json",
+        "OpenDeepSearch/071.json",
+        "BFCL/056.json",
+        "OpenManus/073.json",
+        "BFCL/052.json",
+        "BFCL/055.json",
+        "SmolAgents/024.json",
+        "BFCL/144.json",
+        "OpenDeepSearch/087.json"
+      ],
+      "detection_regressed": [
+        "OpenDeepSearch/058.json",
+        "Camel/001.json",
+        "Octotools/028.json",
+        "BFCL/071.json",
+        "OpenManus/064.json",
+        "OpenManus/031.json",
+        "Camel/012.json"
+      ],
+      "localization_fixed": [
+        "BFCL/030.json",
+        "SmolAgents/066.json",
+        "BFCL/052.json",
+        "BFCL/144.json",
+        "OpenDeepSearch/087.json"
+      ],
+      "localization_regressed": [
+        "Camel/022.json",
+        "OpenManus/064.json",
+        "BFCL/037.json"
+      ]
+    }
+  },
+  "paired_counts": {
+    "previous_forecast": {
+      "detection_fixed": 2,
+      "detection_regressed": 5,
+      "localization_fixed": 2,
+      "localization_regressed": 4
+    },
+    "first_mechanism_round": {
+      "detection_fixed": 2,
+      "detection_regressed": 3,
+      "localization_fixed": 2,
+      "localization_regressed": 3
+    },
+    "recent_off": {
+      "detection_fixed": 3,
+      "detection_regressed": 6,
+      "localization_fixed": 3,
+      "localization_regressed": 5
+    }
+  },
+  "adopted_path_change_percent": {
+    "previous_forecast": {
+      "adopted_started_requests": -4.325699745547073,
+      "latency_median_seconds": -19.63361622852412,
+      "latency_p95_seconds": -17.59624750089711
+    },
+    "first_mechanism_round": {
+      "adopted_started_requests": -10.794780545670225,
+      "latency_median_seconds": -20.022659388196516,
+      "latency_p95_seconds": -15.158472541102574
+    }
+  },
+  "same99_all_attempt_request_change_vs_first_percent": -5.338078291814952,
+  "comparison_valid_rates": {
+    "first_mechanism": 0.5,
+    "optimization_rerun": 0.9022222222222223
+  },
+  "artifact_sha256": {
+    "completion-audit.json": "b671fb984f2c724a951e63193f21e01969a1c513de6007739e52690d0d58e0d5",
+    "final-evaluation.json": "8b16984696f08d0f3a5f47770f8756d961b11e58f08f68f1a9b3dce4b9f3ff45",
+    "original100-evaluation.json": "50c7d00c6297b16a456d0213785ec621c069cda6a8db8a2b0b7ef08b030b2c35",
+    "benefit-comparison.json": "8149c907f5fd1f712a3ad77bc7ee983dd4574adea1b9fd243b61fcb92e98ee34",
+    "report.md": "2257b33f185a038a3c2a2568da653b5149ed9358878884eef636cc79906bdb55",
+    "manifest.json": "a8a5591e00b97c6eccac94b86aa253538a573e04e044c9b227b5c84364bf3fa4"
+  },
+  "automation_id": "100",
+  "automation_status": "PAUSED",
+  "final_summary_sha256": "1af7cc4c25e08275a9f354a7b8f4ab7dcaeded703b286437d7c0dcd5a144a2f3",
+  "finalized_at": "2026-10-16T22:35:12.122783+00:00"
+}

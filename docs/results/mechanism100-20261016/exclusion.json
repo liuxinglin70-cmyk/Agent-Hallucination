@@ -1,0 +1,22 @@
+{
+  "authorized_at_utc": "2026-10-16T16:44:16.123307+00:00",
+  "case": "Magentic_One/031.json",
+  "reason": "user_excluded_runtime_failure",
+  "user_instruction": "Directly exclude this case, allow its failure, summarize results.",
+  "supervisor_pid": 23312,
+  "provider_worker_pids": [
+    26260
+  ],
+  "original_supervision": {
+    "state": "live_running",
+    "pid": 23312,
+    "updated_at": "2026-10-16T11:04:04.243948+00:00",
+    "verification_report": "E:\\agent hallucination\\agent hallucination\\artifacts\\code_quality\\3e2ec2bc3973c0dd15583af555dab4b27c0c4aef06b6798f91d76e7f6fedecc7\\ee3366e39aa1455baf5d69426c0041de"
+  },
+  "original_manifest_state": "running",
+  "last_request_journals": {
+    "runs\\mechanism100\\cases\\Magentic_One__031.json\\attempts\\001_20261016T220713\\requests.jsonl": "4f024f3a45dd49d05a6b3303d912252adf58e7b7eb356e47ffd925af7266ee76"
+  },
+  "requests_may_have_unknown_remote_completion": true,
+  "do_not_rerun": true
+}

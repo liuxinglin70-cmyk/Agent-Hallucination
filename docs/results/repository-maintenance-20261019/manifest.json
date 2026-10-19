@@ -1,0 +1,29 @@
+{
+  "archived_on": "2026-10-19",
+  "files": [
+    {
+      "file": "validation.json",
+      "source": "artifacts/repository-maintenance/20261019-git/validation.json",
+      "bytes": 976,
+      "sha256": "47992ae2839ae124b4eeabcfb2c3e701b7b946fa4df884330cb8c7da9d26342b"
+    },
+    {
+      "file": "targeted-pytest.xml",
+      "source": "artifacts/repository-maintenance/20261019-git/pytest.xml",
+      "bytes": 29297,
+      "sha256": "5e40ce2981778283c3e2bc86b9c3aaf6b9bdb4a2bccbb4c96a1aadcf6cd23094"
+    },
+    {
+      "file": "prior-full-summary.json",
+      "source": "artifacts/code_quality/f953e0932b2bb7ad4f2a35c62ae4cd1a1960d4d403911d75edd3f1a86f4f918d/06acb1f690b74b918751334ccb31410e/summary.json",
+      "bytes": 4130,
+      "sha256": "a2127676a8285b565f7ce57db849daf4ac897aa06a7a848b93f508dd07f18c93"
+    },
+    {
+      "file": "prior-source-manifest.json",
+      "source": "artifacts/code_quality/f953e0932b2bb7ad4f2a35c62ae4cd1a1960d4d403911d75edd3f1a86f4f918d/06acb1f690b74b918751334ccb31410e/source_manifest.json",
+      "bytes": 33802,
+      "sha256": "df58468ea0639d25147c2741efa49e661d724df723ea90d4568cf0fbe3166258"
+    }
+  ]
+}

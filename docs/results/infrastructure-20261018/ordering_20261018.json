@@ -1,0 +1,429 @@
+{
+  "baselines": {
+    "current": {
+      "cases": 443,
+      "counts": {
+        "1": 169,
+        "3": 289
+      },
+      "rates": {
+        "1": 0.38148984198645597,
+        "3": 0.6523702031602708
+      },
+      "skipped": 0
+    },
+    "earliest": {
+      "cases": 443,
+      "counts": {
+        "1": 112,
+        "3": 278
+      },
+      "rates": {
+        "1": 0.2528216704288939,
+        "3": 0.6275395033860045
+      },
+      "skipped": 0
+    },
+    "latest": {
+      "cases": 443,
+      "counts": {
+        "1": 22,
+        "3": 217
+      },
+      "rates": {
+        "1": 0.04966139954853273,
+        "3": 0.4898419864559819
+      },
+      "skipped": 0
+    },
+    "reverse_within_priority": {
+      "cases": 443,
+      "counts": {
+        "1": 142,
+        "3": 298
+      },
+      "rates": {
+        "1": 0.32054176072234764,
+        "3": 0.672686230248307
+      },
+      "skipped": 0
+    }
+  },
+  "corpus": {
+    "built": 693,
+    "error_cases": 443,
+    "error_cases_with_candidates": 443,
+    "events": 5269,
+    "failed": [],
+    "root": "E:/agent hallucination/agent hallucination/datasets/raw/agenthallu/AgentHallu",
+    "trajectories": 693
+  },
+  "coverage": {
+    "cases": 443,
+    "counts": {
+      "1": 169,
+      "10": 430,
+      "2": 219,
+      "3": 289,
+      "4": 341,
+      "5": 365,
+      "6": 394,
+      "8": 420
+    },
+    "rates": {
+      "1": 0.38148984198645597,
+      "10": 0.9706546275395034,
+      "2": 0.49435665914221216,
+      "3": 0.6523702031602708,
+      "4": 0.7697516930022573,
+      "5": 0.8239277652370203,
+      "6": 0.8893905191873589,
+      "8": 0.9480812641083521
+    },
+    "skipped": 0
+  },
+  "forecast": {
+    "gold_in_target": 301,
+    "gold_in_target_rate": 0.6794582392776524,
+    "targets": 3828,
+    "trajectories_with_target": 679,
+    "trajectory_rate": 0.9797979797979798
+  },
+  "learned_scorer": {
+    "cases": 443,
+    "current_top1_rate": 0.38148984198645597,
+    "current_top3_rate": 0.6523702031602708,
+    "delta_top1": -0.009029345372460496,
+    "delta_top3": -0.004514672686230248,
+    "per_family": {
+      "BFCL": {
+        "cases": 103,
+        "current": {
+          "top1": 38,
+          "top3": 55
+        },
+        "scored": {
+          "top1": 38,
+          "top3": 54
+        }
+      },
+      "Camel": {
+        "cases": 57,
+        "current": {
+          "top1": 33,
+          "top3": 42
+        },
+        "scored": {
+          "top1": 33,
+          "top3": 42
+        }
+      },
+      "Magentic_One": {
+        "cases": 54,
+        "current": {
+          "top1": 11,
+          "top3": 30
+        },
+        "scored": {
+          "top1": 11,
+          "top3": 30
+        }
+      },
+      "Octotools": {
+        "cases": 30,
+        "current": {
+          "top1": 14,
+          "top3": 24
+        },
+        "scored": {
+          "top1": 14,
+          "top3": 23
+        }
+      },
+      "OpenDeepSearch": {
+        "cases": 58,
+        "current": {
+          "top1": 18,
+          "top3": 39
+        },
+        "scored": {
+          "top1": 18,
+          "top3": 39
+        }
+      },
+      "OpenManus": {
+        "cases": 84,
+        "current": {
+          "top1": 45,
+          "top3": 71
+        },
+        "scored": {
+          "top1": 42,
+          "top3": 71
+        }
+      },
+      "SmolAgents": {
+        "cases": 57,
+        "current": {
+          "top1": 10,
+          "top3": 28
+        },
+        "scored": {
+          "top1": 9,
+          "top3": 28
+        }
+      }
+    },
+    "scored_top1_rate": 0.3724604966139955,
+    "scored_top3_rate": 0.6478555304740407,
+    "top_k": 3
+  },
+  "leave_one_family_out": {
+    "per_family": {
+      "BFCL": {
+        "lift": {
+          "cases": 103,
+          "top1": 0.10679611650485436,
+          "top3": 0.46601941747572817
+        },
+        "prior": {
+          "cases": 103,
+          "top1": 0.3106796116504854,
+          "top3": 0.6601941747572816
+        },
+        "static": {
+          "cases": 103,
+          "top1": 0.36893203883495146,
+          "top3": 0.5339805825242718
+        }
+      },
+      "Camel": {
+        "lift": {
+          "cases": 57,
+          "top1": 0.5789473684210527,
+          "top3": 0.7368421052631579
+        },
+        "prior": {
+          "cases": 57,
+          "top1": 0.5789473684210527,
+          "top3": 0.7368421052631579
+        },
+        "static": {
+          "cases": 57,
+          "top1": 0.5789473684210527,
+          "top3": 0.7368421052631579
+        }
+      },
+      "Magentic_One": {
+        "lift": {
+          "cases": 54,
+          "top1": 0.2037037037037037,
+          "top3": 0.5555555555555556
+        },
+        "prior": {
+          "cases": 54,
+          "top1": 0.16666666666666666,
+          "top3": 0.3333333333333333
+        },
+        "static": {
+          "cases": 54,
+          "top1": 0.2037037037037037,
+          "top3": 0.5555555555555556
+        }
+      },
+      "Octotools": {
+        "lift": {
+          "cases": 30,
+          "top1": 0.4666666666666667,
+          "top3": 0.8
+        },
+        "prior": {
+          "cases": 30,
+          "top1": 0.5,
+          "top3": 0.9333333333333333
+        },
+        "static": {
+          "cases": 30,
+          "top1": 0.4666666666666667,
+          "top3": 0.8
+        }
+      },
+      "OpenDeepSearch": {
+        "lift": {
+          "cases": 58,
+          "top1": 0.3103448275862069,
+          "top3": 0.6724137931034483
+        },
+        "prior": {
+          "cases": 58,
+          "top1": 0.39655172413793105,
+          "top3": 0.7413793103448276
+        },
+        "static": {
+          "cases": 58,
+          "top1": 0.3103448275862069,
+          "top3": 0.6724137931034483
+        }
+      },
+      "OpenManus": {
+        "lift": {
+          "cases": 84,
+          "top1": 0.6309523809523809,
+          "top3": 0.8571428571428571
+        },
+        "prior": {
+          "cases": 84,
+          "top1": 0.5357142857142857,
+          "top3": 0.8571428571428571
+        },
+        "static": {
+          "cases": 84,
+          "top1": 0.5357142857142857,
+          "top3": 0.8452380952380952
+        }
+      },
+      "SmolAgents": {
+        "lift": {
+          "cases": 57,
+          "top1": 0.17543859649122806,
+          "top3": 0.49122807017543857
+        },
+        "prior": {
+          "cases": 57,
+          "top1": 0.21052631578947367,
+          "top3": 0.5614035087719298
+        },
+        "static": {
+          "cases": 57,
+          "top1": 0.17543859649122806,
+          "top3": 0.49122807017543857
+        }
+      }
+    },
+    "pooled": {
+      "learned_lift": {
+        "cases": 443,
+        "top1": 0.33860045146726864,
+        "top3": 0.6388261851015802
+      },
+      "position_prior": {
+        "cases": 443,
+        "top1": 0.38148984198645597,
+        "top3": 0.6839729119638827
+      },
+      "static": {
+        "cases": 443,
+        "top1": 0.38148984198645597,
+        "top3": 0.6523702031602708
+      }
+    }
+  },
+  "next_action": {
+    "reachable": {
+      "action_states": {
+        "compliant": 114,
+        "unknown": 95
+      },
+      "boundaries": 209,
+      "boundary_rate_of_events": 0.03966597077244259,
+      "divergence_patterns": {
+        "honest_failure_report": 26,
+        "observed_retry_or_repair": 88,
+        "possible_fallback_unverified": 72,
+        "unrelated_or_unrecognized_action": 23
+      },
+      "trajectories": 139
+    },
+    "routed": {
+      "action_states": {
+        "compliant": 109,
+        "unknown": 90
+      },
+      "boundaries": 199,
+      "divergence_patterns": {
+        "honest_failure_report": 26,
+        "observed_retry_or_repair": 83,
+        "possible_fallback_unverified": 68,
+        "unrelated_or_unrecognized_action": 22
+      },
+      "trajectories": 139
+    }
+  },
+  "policy": {
+    "max_dependency_depth": 8,
+    "max_projection_events": 16,
+    "score_source": "semantic_proxy",
+    "top_k": 3
+  },
+  "schema_version": "evolution.candidate_ordering_probe.v1",
+  "selection": {
+    "selected": 693
+  },
+  "signal_counts": {
+    "external_guidance": 112,
+    "observed_tool_failure": 215,
+    "unsupported_claim": 2583,
+    "unverified_action": 3387,
+    "unverified_observation": 3423
+  },
+  "signal_lift": {
+    "base_rate": 0.13363499245852187,
+    "labelled_cases": 443,
+    "signal_bearing_rows": 3315,
+    "signals": {
+      "external_guidance": {
+        "at_gold": 73,
+        "elsewhere": 15,
+        "lift": 6.207546685819824,
+        "precision": 0.8295454545454546
+      },
+      "observed_tool_failure": {
+        "at_gold": 38,
+        "elsewhere": 110,
+        "lift": 1.9213287779879202,
+        "precision": 0.25675675675675674
+      },
+      "unsupported_claim": {
+        "at_gold": 195,
+        "elsewhere": 1409,
+        "lift": 0.9097248413953829,
+        "precision": 0.121571072319202
+      },
+      "unverified_action": {
+        "at_gold": 322,
+        "elsewhere": 1649,
+        "lift": 1.2225005239631541,
+        "precision": 0.16336884830035514
+      },
+      "unverified_observation": {
+        "at_gold": 254,
+        "elsewhere": 1712,
+        "lift": 0.9667852361476936,
+        "precision": 0.12919633774160733
+      }
+    }
+  },
+  "ties": {
+    "cases": 443,
+    "distinct_signal_patterns": 35,
+    "duplicate_sort_key_rate": 0.9887133182844243,
+    "duplicate_sort_keys": 438,
+    "position_order_equals_current_top3": 79,
+    "position_order_equals_current_top3_rate": 0.17832957110609482,
+    "tied_above": {
+      "1": 281,
+      "2": 209,
+      "3": 141
+    },
+    "tied_above_rate": {
+      "1": 0.6343115124153499,
+      "2": 0.4717832957110609,
+      "3": 0.3182844243792325
+    }
+  },
+  "trajectory_length": {
+    "max": 43,
+    "mean": 7.603174603174603,
+    "median": 6
+  }
+}

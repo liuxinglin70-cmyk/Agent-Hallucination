@@ -396,15 +396,22 @@ class Detector:
                     "attempts": 0, "view": "not_rendered", "warnings": [],
                 }
 
+        # P2修复：策略谓词只执行一次，审计元数据复用这次决策结果，
+        # 避免重复触发事件或第二次资源不足时误记为false
+        policy_triggered = (
+            judge_status.get("state") == "ok"
+            and not judge_positive
+            and bool(plan.recall_triggered(
+                packet,
+                judge_positive=judge_positive,
+                judge_parsed=judge_parsed,
+            ))
+        )
         recall_forced = (
             judge_status.get("state") == "ok"
             and not judge_positive
             and (
-                plan.recall_triggered(
-                    packet,
-                    judge_positive=judge_positive,
-                    judge_parsed=judge_parsed,
-                )
+                policy_triggered
                 # An active evidence snapshot reopens the review on its own:
                 # the scan is the stage that can confront the delivered
                 # result with the retrieved record, and it convicts nothing
@@ -412,9 +419,14 @@ class Detector:
                 # tests). Without this, a unanimous clean judge would leave
                 # the snapshot unread on exactly the cases it exists for.
                 or snapshot is not None
-                # A candidate is a hypothesis without verdict authority. It is
-                # what reopens the review for a judge-negative case, and the
-                # scanner and upgrade still have to convict on their own.
+                # P0-3: A candidate is a hypothesis without verdict authority.
+                # It triggers recall to allow the scanner to find other candidates,
+                # but any resulting conviction must be independently verified:
+                # - The triggering hypothesis itself must be validated or rejected
+                # - Any new allegation from the expanded scan must establish its own
+                #   task binding, complete evidence, and delivery impact
+                # - The triggering reason and the final conviction reason must be
+                #   clearly distinguished in the audit trail
                 or bool(action_candidates)
                 or action_candidates_degraded
             )
@@ -578,6 +590,23 @@ class Detector:
             packet,
             fact_rows=guard_fact_rows,
         )
+        # P0-3: 记录触发假设和实际指控的来源
+        # P2-1修复：保存原始action_candidates的ID，用于后续比较
+        recall_trigger_metadata = {
+            "triggered_by_action_candidates": bool(action_candidates),
+            "triggered_by_snapshot": snapshot is not None,
+            "triggered_by_policy": policy_triggered,
+            "triggered_by_judge_uncertainty": (
+                judge_status.get("state") == "ok"
+                and not judge_positive
+                and _judge_negative_needs_recall(judge_result, self.config)
+            ),
+            "action_candidates_count": len(action_candidates) if action_candidates else 0,
+            # P2-1修复：保存原始触发候选ID，用于与最终定罪候选进行比较
+            "original_action_candidate_ids": [
+                c.get("candidate_id") for c in (action_candidates or []) if c.get("candidate_id")
+            ],
+        }
         proof = adjudicate(
             packet=packet,
             judge_result=judge_result,
@@ -595,6 +624,7 @@ class Detector:
             hearings=hearings,
             hearing_facts=hearing_facts,
             predicate_conviction_verdicts=plan.predicate_conviction_verdicts,
+            recall_trigger_metadata=recall_trigger_metadata,
         )
         provenance: dict[str, Any] = {
             "packet_hash": digest(packet),

@@ -48,7 +48,7 @@ def detector_env_fingerprint() -> dict[str, str]:
 
 _PROVIDER_DEFAULTS: dict[str, Any] = {
     "endpoint": "https://www.autodl.art/api/v1",
-    "model": "GLM-5.3-flash",
+    "model": "DeepSeek-V4.1-Flash-1017",
     "api_key_env": "AUTODL_API_KEY",
     "temperature": 0.0,
     "timeout_seconds": 240,
