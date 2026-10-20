@@ -47,11 +47,15 @@ flowchart TD
 
 `dataset.py` 分离任务输入和标签；`packet.py` 建立事件 ID、位置、工具观察、交付物及答案锚点。gold 只用于评估，不能参与判断或责任步骤映射。`semantics.py` 是各模型阶段共享的判错与定位规则。
 
-Judge 多票阴性结果的 confidence 取所有支持阴性票的最低值，原始 ballots 保持不变；多数裁决、quorum、分票和弃权逻辑不变。只有完整且全部 high 的一致阴性可以跳过常规 Recall，弱置信票不再因代表票顺序被隐藏。
+Judge 多票阴性结果的 confidence 取所有支持阴性票的最低值，原始 ballots 保持不变；多数裁决、quorum、分票和弃权逻辑不变。任一有效阴性票以derivation或world_knowledge为依据时，即使全部high也进入一次既有Scanner→Upgrade复查；同一模型的共识不能独立验证推导或正确事实参照。检查所有有效阴性ballots，旧信封缺raw时读取parsed，不依赖代表票顺序。无上述依据、无分歧/弃权/弱置信或其他强制信号时保留一致high阴性的快捷路径。Scanner本身没有定罪权，仍须通过原Upgrade与Defense，失败/无结论不提高权威。proof.recall_trigger_metadata分别记录不确定性、事实参照复查、snapshot、policy和行动候选触发；这不是将causal_audit.negative_feedback_enabled开启。
+
+各模型阶段的内置控制提示词统一使用英文，包括系统提示、user控制说明、修复提示和预测截断标记；预测校验诊断同样使用英文。九个生产系统提示词常量（含演化提案器）同时接受英文与JSON模式回归约束。question、轨迹、逐字引文、工具数据与来源语言识别规则保留原语言，不翻译冻结指令或历史证据。semantics.INPUT_LAW、DELIVERY_LAW和CAUSALITY_LAW统一数据/指令边界、允许的交付通道以及逐交付物的实际因果影响：工具观察可能承载答案，结束状态不抹除早前交付，但通道存在不证明正确或满足显式格式；修正来源时沿同一错误的依赖副本追踪，不要求单次编辑修复所有独立错误。Judge不再同时接收“仅限轨迹信息”与允许确定公共知识的冲突指令；不确定记忆及未解决观察冲突仍不能定罪。Recall区分有具体证据但材料性待审的候选与纯信息缺口。候选、Defense指控及Tracer结果参照以带有不可信声明的JSON数据传递，模型生成的contracts/correct_result不能升级为独立事实。
+
+Defense.confirmed_step必须等于本听证alleged_step；Tracer.step才追溯同一错误的更早来源。二者职责不通过提示词混同，最终定位冲突与降权合同保留。预测提示明确每个动作数组1–3项、字符串1–240字符、最多两个约束，以及user_request只引用question、authorized_policy只引用授权事件正文；不能为填满结构编造禁令。rejected_prediction新增validation_error，首个失败后即使后续预算耗尽仍保留合同原因。英文统一及离线合同通过不证明中英文准确率优劣，真实效果需同源码/模型/样本配对测量。
 
 `next_action.py` 从截至 t 的前缀生成明确工具失败后的只读动作边界，并比较真实 t+1；不调用 provider，不生成工具 Observation，不在缺失下一步时补造动作。明确重试或诚实失败报告匹配局部合规模式，不证明参数正确或任务全部履约；不同工具的潜在 fallback 仍为 unknown，没有明确恢复观察却宣称成功构成诊断偏离。当前粒度是下一原始事件，事件内动作、返回与声明未拆成严格决策时序。所有结果保持 hypothesis、decision_authority=none、localization_authority=none。失败信号进入静态风险排序，Top K 候选的 action audit 仅随绑定 risk context 传入 Tracer；该risk_context通路不直接交给Judge/Defense/裁决；新增Judge诊断通路见下节action_forecast。
 
-**后续推测/下一步预测能力现状**：`next_action.py` 提供 `predict_action_boundary`（识别工具失败、构造 ActionBoundary 含前缀摘要/风险模式/证据/失败工具名，全程 hypothesis 无判定权限）、`compare_next_action`（比较真实下一事件，识别重试/诚实失败报告/无恢复成功声明，返回 action_state 与 divergence_pattern，可能 fallback 标记 unverified）、`build_next_action_audit`（批量构造审计，封装 schema+provider_requests=0）、`scan_static_action_risks`（遍历事件提取 top_k 失败候选输出 risk_signals）。调用路径：`risk_context.py:75` 调用 build_next_action_audit，结果嵌入 risk_context 的 candidates[n]["next_action_audit"] 字段，仅随 risk context 传入 Tracer（technical-solution.md:52）。`step_uncertainty.py` 的 `build_step_risk_profile`（policy 控制 score_source/max_projection_events，扫描事件生成 by_event 列表含 score_status/risk_signals/priority，调用 scan_static_action_risks）与 `select_causal_candidates`（从 profile 合并风险候选行按 priority 与 verified 比例排序取 top_k，超过 max_projection_events 时截断返回 state 为 selected/unknown）由 `causal_audit.py:328` 调用，api.py:460+677 在 shadow/tracer_context 模式下构造 causal_diagnostics。`step_tracer.py` 的 `run_step_tracer` 在 causal_context 下为单个 positive 运行反事实修复，输出含 provider 字段但 localization_authority 仍为 none（hearing.py:88 调用）。`semantic_trace.py` 的 `build_semantic_trace` 构造语义依赖边输出 claim_equivalence=unestablished、decision/localization authority=none，`referent_provenance` 提取溯源 truth_status=requires_independent_verification。配置开关：counterfactual_mode（deterministic_only 默认 / model_hypothesis 在 causal_audit.py:196 触发 provider_call）、score_source（semantic_proxy 默认 / teacher_forced_ppl 标记 unsupported）、negative_feedback_enabled（默认 false，控制 api.py:689-713 阴性反馈 review）。覆盖情形：明确工具失败（_FAILURE_LINE 正则）后紧邻下一事件比较、同工具名重试、_FAILURE_REPORT 正则诚实报告、_SUCCESS_CLAIM 正则成功声明。标为 unverified/unsupported：不同工具 fallback（possible_fallback_unverified）、action_state=unknown 的 divergence_pattern、semantic_trace 的 claim_equivalence=unestablished、step_tracer 生成修复事件 verification_status=hypothesis、counterfactual 的 state_changes_verified=false、score_source=teacher_forced_ppl 时 profile.health.state=unsupported、risk_signals 中 unsupported_claim、evolution.action_failure_triplet.v1 的 deviation_status=unverified。缺失能力（research:§7.3-7.4、§12）：微事件视图（分离请求/返回/声明严格时序）、义务实例绑定四态检查（not_applicable/satisfied/violated/unknown）、失败外三类约束（固定字段、实体/单位/时间转换、状态变更+后置验证）、共享谓词解释器与两类反例学习、counterfactual 的 state_changes_verified 只有局部算术符号域。权限边界：所有 next_action/step_uncertainty/semantic_trace 输出 decision_authority/localization_authority 均为 none 仅作诊断输入不直接进入裁决，只在 api.py 的 hearing/judge/defense/adjudication 层经校准与证据核验后才可能获得判定权限。测试文件：test_next_action.py、test_causal_audit.py、test_causal_context.py、test_causal_diagnostics.py、test_causal_feedback.py、test_causal_task.py、evolution/tests/test_action_failure_triplets.py、test_causal_failures.py。
+`next_action.py`维护明确工具失败后的确定性动作边界；`action_forecast.py`、`action_context.py`与`action_evidence.py`负责有界前缀预测、逐约束比较和无权威候选接线。它们复用风险筛选、任务绑定、预算和现有听证，不独立定罪或授予定位权限。当前输入、接线和权限合同统一见下节；历史逐行代码梳理保存在整理前文档快照，不作为稳定接口。
 
 ### 高危前缀预测与真实下一步对比
 
@@ -59,11 +63,11 @@ Judge 多票阴性结果的 confidence 取所有支持阴性票的最低值，�
 
 `causal_audit.next_action_mode` 为 `off`、`shadow` 或 `judge_context`；默认部署文件autodl.json与deepseek.json已显式选择judge_context。自行构造的配置仍以off作为未声明值，不自动继承部署文件。Forecast使用 `detector.action_forecast.v2`，每条约束有独立constraint_id；原Judge逐项返回matched/divergent/unknown，比较执行健康与语义状态分开保存。缺失、重复、无效引用/原文及理由显式引用未来事件分别记录；真实动作引用只接受content、工具名或参数，不能由其返回代证。可修复的合同失败在剩余新增请求/输出额度内仅补局部比较，不修改原Judge判决；明确的语义unknown不重试至确定。局部修复只读取各自前缀及真实下一动作；其余比较仍由全轨迹Judge生成，不宣称严格在线或完全无未来语义影响。
 
-预测、比较修复与附加上下文通过OptionalBudget使用同一父预算的剩余额度，先保护既有诊断的默认30秒/6000 UTF-8字节（上限为本例总额度）；既有模型审计或阴性反馈启用时也保留其默认请求/输出额度。总额度未扩大，整例期限、取消、并发与原票数不变；额度仅够原有诊断时明确拒绝可选预测。`max_forecast_output_tokens_per_request`、`max_comparison_repair_output_tokens_per_request` 默认均4096，并受整例新增输出总额约束；通常1次新增请求的配置没有额外修复容量。缓存命中不重复预留各阶段上下文。凭据、配额及整例截止仍传播，新增预算终止保留已有请求日志和未知usage；历史journal不回填，预留额度不等于实际费用。
+预测、比较修复与附加上下文通过OptionalBudget使用同一父预算的剩余额度，先保护既有诊断的默认30秒/6000 UTF-8字节（上限为本例总额度）；既有模型审计或阴性反馈启用时也保留其默认请求/输出额度。整例期限、取消、并发与原票数不变；额度仅够原有诊断时明确拒绝可选预测。请求发送前按输出上限保守预留，合同失败也不退款，不按实际usage减少已预留额度；输出不足继续抛出`AddedBudgetExceeded("output", origin="diagnostic_reservation")`。两次8192上限请求需要16384总输出额度，第三次仍受请求上限拒绝。`max_forecast_output_tokens_per_request`、`max_comparison_repair_output_tokens_per_request` 的代码缺省均4096，部署可显式提高；比较修复共享两次请求额度，不另领预算。缓存命中不重复预留各阶段上下文。凭据、配额及整例截止仍传播，新增预算终止保留已有请求日志和未知usage；历史journal不回填，预留额度不等于实际费用。
 
 `action_evidence.py` 将达到比较票quorum及严格多数的局部偏离转为Recall候选，或复用literal_arithmetic.v1重算证书核验显式source_ref字段复制。两者均为无判定/定位权限的假设；模型约束、缺少佐证与模型记忆不升级为独立真值。候选仍须经过原Upgrade的内容/材料性检查、Defense和Tracer；阴性Judge可因此请求复核，升级拒绝或Defense推翻仍可清白。来源、采纳和交付分别提示，局部证书不证明通用材料性或首次来源。所有接收者核验packet、引用、摘要和权限；新增上下文参与重试及阶段回放身份，不能复用关闭模式的对应结果。
 
-proof保留action_forecast、action_forecast_used、逐约束/逐票比较及健康状态、action_candidates和各阶段附加证据准入。前述[同100例历史测量](results/next-action100-20261015/report.md)的76/100、27/62归属修复前实测源码，不能作为本轮修复效果。默认部署配置已按用户要求开启judge_context，新增可选请求上限2次、输入60000 UTF-8字节、输出8192 token及时间180秒；原诊断预留规则不变。当前离线修复与验收见[修复记录](archive/20261019/next-action-integrity-fixes.md)，准确率和独立增益需新的同源码实测确认。
+proof保留action_forecast、action_forecast_used、逐约束/逐票比较及健康状态、action_candidates和各阶段附加证据准入。前述[同100例历史测量](results/next-action100-20261015/report.md)的76/100、27/62归属修复前实测源码，不能作为本轮修复效果。默认部署配置autodl.json启用judge_context，可选请求上限2次、输入1048576 UTF-8字节、总输出65536 token，预测与比较修复单次上限均32768。新增时间额度10800秒与整例上限对齐，实际仍取整例剩余期限并保护诊断预留，不延长案例期限；放宽预算不增加预测次数。deepseek.json保留自身部署预算。当前P0验收见[修复报告](../artifacts/code-review/random100-p0-fix/report.md)；此前证据链修复见[修复记录](archive/20261019/next-action-integrity-fixes.md)，准确率和独立增益需新的同源码实测确认。
 
 `evolution.causal_failures.build_action_failure_triplets` 将前序风险、真实下一步动作及实际终端交付归档为密封 `evolution.action_failure_triplet.v1`。终端摘录最多1024字符，并保留完整delivery digest与截断状态；启发式偏离不宣称终端错误已成立。`build_causal_failure_record` 在记录与policy可用时自动附加三元组，包括无阳性hearing的漏检；prompt视图只保留抽象risk_pattern/action_state/divergence_pattern和允许动作，不携带案例、步号或交付答案。正常邻居强制保护及复合起草器已接入：多个成员共享风险AND下一步偏离时，只起草Tracer定位模板；L0要求至少两个匹配且将回放的健康合规正常邻居，L1禁止收益抵消邻居退化。当前离线与真实验收状态见实施台账及detector-deep-optimization-20261013.md。
 
@@ -342,6 +346,12 @@ python scripts/cost_model_693.py --json artifacts/cost_model_693.json
 
 verify.py 默认执行 code_only（合成输入与临时夹具），可显式选择 platform（回环 HTTP、worker、锁、沙箱）、local_data（本地数据和证据完整性）或 all。所有测试禁公网，Python 子进程继承同一回环边界；code_only 拒绝访问原始数据及历史 artifacts。验证报告按源码摘要及独立运行 ID 写入 artifacts/code_quality，不覆盖历史报告；源码 AST 检查覆盖重复定义、包依赖边界和循环依赖。成本工具从实验日志的命名 JSON 块读取冻结样本并保留 original_source；旧样本有选择偏差，不代表完整语料的最新成本。
 
+`scripts/preflight_real_run.py` 只读预检，不调用供应商。清单依次覆盖corpus、labels、split、gates_satisfiable、timeouts、budget、forecast_budget、forecast_alignment、long_tail、credentials、detector_env、work_root、path_length、calibration、runner_admission、source_identity和cost。baseline模式跳过进化轮预算与准入要求；0 BLOCKER即READY，WARN保留原因。
+
+`forecast_budget` 使用实际加载并补齐缺省值的detector配置：next_action_mode非off且新增请求上限至少2时，要求总输出额度≥2×单次预测上限，不满足为BLOCKER；默认autodl配置满足。`forecast_alignment` 按corpus冻结顺序扫描，统计多轮列表question且history没有task_turn/user事件的案例数、家族和前5例；非零为WARN，说明模型预测将因task_alignment_unknown跳过。该检查只识别缺失轮次事件，不证明已有事件可正确匹配；跳过保持原有前缀合同，不改数据或猜轮次，基础Judge及后续按需Recall/听证仍继续运行。JSON模式生产系统提示词通过静态回归断言包含"json"，传输兜底仍由provider_call执行。
+
+`scripts/check_detector_smoke.py`为全量前的只读结果门，不调用供应商、不读金标评分或重写运行结果。它在既有run lease下核对有序案例、当前源码/有效配置、summary完整权威覆盖、case_commit与逐例输入/执行身份、必要阶段和quorum，并核验启用预测的健康、身份与实际使用。合法task_alignment_unknown按输入确认后允许跳过；整组冒烟仍须有可对齐案例完成至少一次有效模型预测并有实际response记录，避免全是跳过却宣称验证了供应商输出上限。CLI返回0才可执行后续全量；degraded、伪造汇总、缺失阶段、旧身份或未覆盖模型路径均返回非零。新启动清单和独立run-id须重新冻结，旧P0脚本与历史证据不改写。
+
 安装并行依赖后，验收工具默认使用最多4个独立测试进程，并预留一个CPU；当前4核机器默认3个进程。`--jobs 1` 保留串行执行，少量快速用例可避免多进程启动开销；显式指定多个进程而未安装依赖时直接报错。采用 pytest-xdist 的 worksteal 分配变长用例，禁止崩溃进程自动重启。完整验收不筛减用例、不复用旧通过结果；`pytest.log` 持续写入，`test_execution.json` 核对各进程收集的用例一致，并逐项确认只执行一次、无遗漏、跳过或失败。执行清单增加独立门禁，原有来源身份、证据、期限和资源检查保留；用户环境的 `PYTEST_ADDOPTS` 不影响验收范围。具体耗时与修复验收结论由当轮报告记录。
 
 engine smoke 的共享合成配置明确选择 `proposer.mode=offline`，模块级 autouse fixture 禁止构造 LLMProposer；显式 Scripted/Recording 注入对象继续由 Engine 使用，生产默认配置保持原语义。源码、平台、CLI、安装、权限与引用边界的实际验证结果及剩余验收见[实施台账](../IMPLEMENTATION_PLAN.md)及其报告；离线测试不证明真实模型收益。
@@ -373,7 +383,7 @@ Judge、Recall、Causal Upgrade、Tracer 和 Defense 的合同修复请求统一
 
 共享MATERIALITY规则逐项检查每个必需交付物：先前成功动作不能替代后续新请求或状态核验。如实报告工具失败不构成虚假成功，但也不豁免从任务及可见能力独立成立的必需动作遗漏或顺序错误；缺失工具说明时不臆造前置动作。Judge的失败/拒答排除条款服从这条共享规则，避免与DELIVERABLE BREACH冲突。
 
-provider_call 的累计 deadline 同时约束容量排队与传输/重试；排队超时属于该调用的传输失败，案例截止/取消仍优先传递。新增机制时间预算扣除基础 provider 调用等待的并集，多票重叠等待不重复扣除；added_request_scope 内的新机制请求仍消耗新增时间，案例总截止不延长。snapshot 同时报 baseline_wait_seconds 与新增 elapsed_seconds。
+provider_call 的累计 deadline 同时约束容量排队与传输/重试；排队超时属于该调用的传输失败，案例截止/取消仍优先传递。新增机制时间预算扣除基础 provider 调用等待的并集，多票重叠等待不重复扣除；added_request_scope 内的新机制请求仍消耗新增时间，案例总截止不延长。snapshot 同时报 baseline_wait_seconds 与新增 elapsed_seconds。`json_mode` 路由发送 `response_format=json_object` 时，供应商要求消息中出现 "json"；provider_call 在提示词未提及时追加一句 `Return a single JSON value.`，作为传输层兜底，避免单个提示词漂移以 HTTP 400 停止整批。action_comparison_repair 的系统提示词自身也显式要求只输出 JSON 对象。
 
 运行时 request_observer_scope 提供统一的 queued/started/finished 观测，唯一 request_id 关联排队、发送和完成；正式 batch 在每个案例 attempt/requests.jsonl 实时 flush+fsync，保留阶段、时间、超时、排队与已观测 usage，不记录凭据/完整 prompt/响应正文。观测不增加 usage 计数，不构成裁决或完整测量；硬中止后只有完整结果进入评分，未完成远端请求的用量仍未知。
 
@@ -389,4 +399,44 @@ README负责安装、结果摘要与导航；本文维护已实现行为；研�
 
 排序artifact由`detector/candidate_scorer.py`加载，仅修改同优先级档内次序；Decimal精确求和，非法artifact报错，无artifact沿用历史排序。当前学习权重实测为负，不作为已验证收益默认部署。OptionalBudget保护父预算及诊断预留，耗尽证据用origin区分case_budget与diagnostic_reservation。FP配对读数见`experiments/reading.py:false_positive_parity`，原始新增/撤除数必须同时报告，统计不显著不证明非劣；历史实验沿用当时冻结标准。
 
-脚本按离线验证、已有证据读取、冻结预检、离线探针与真实运行分类，完整清单和运行边界统一见[脚本入口](../scripts/README.md)。现有脚本、pytest插件及回环网络保护模块保留路径；真实运行工具须有对应授权。一次性外层脚本留在维护归档，不作为当前命令入口。
+批次 `summary.json` 顶层`wall_clock_seconds`为当前manifest.started_at至同一份summary.finished_at的时间戳差，单位秒；恢复执行时对应当前attempt，缺起始时间时为null。`measurement.elapsed_seconds`保留兼容，仍是本次实际执行的逐例耗时之和（含未完成案例已记录的执行，缓存行为0），与invocation_cost同口径；并发运行时可显著大于墙钟。2026-10-19随机100例历史实测为21025.2秒逐例之和、墙钟23.3分钟，历史summary不补写。任何“总耗时”表述必须明确是哪一个量。
+
+### 脚本入口
+
+从仓库根目录运行，输出统一放在artifacts。可复用CLI、pytest插件与回环网络保护模块保留现有路径；历史测量脚本沿用各自冻结标准，不自动继承新协议。各实验目录下的监督、恢复、定稿和比较脚本是原轮复现材料，不是默认启动入口；已完成实验不再运行其旧finalizer覆盖后继汇总。脚本用途和运行边界如下。
+
+#### 离线验证与读取
+
+| 用途 | 脚本 | 运行边界 |
+| --- | --- | --- |
+| 离线验收 | [verify.py](../scripts/verify.py)、[source_audit.py](../scripts/source_audit.py)、[dryrun_fake_detector.py](../scripts/dryrun_fake_detector.py) | verify 调用 Fake/Mock 或受控回环；报告明确检查范围 |
+| 既有证据与成本 | [analyze_detector_calls.py](../scripts/analyze_detector_calls.py)、[audit_calibration.py](../scripts/audit_calibration.py)、[cost_model_693.py](../scripts/cost_model_693.py)、[evidence_coverage.py](../scripts/evidence_coverage.py)、[experiment_status.py](../scripts/experiment_status.py)、[paired_endpoint.py](../scripts/paired_endpoint.py)、[read_multigen.py](../scripts/read_multigen.py) | 读取已保存记录，缺失身份或 usage 不补造 |
+| 冻结与预检 | [freeze_measured_prefix.py](../scripts/freeze_measured_prefix.py)、[freeze_measurement_manifest.py](../scripts/freeze_measurement_manifest.py)、[prepare_g0_evolution.py](../scripts/prepare_g0_evolution.py)、[prepare_next_action_ab100.py](../scripts/prepare_next_action_ab100.py)、[preflight_real_run.py](../scripts/preflight_real_run.py) | 冻结工具会写输出；preflight 只读检查，不调用模型 |
+| 冒烟结果验收 | [check_detector_smoke.py](../scripts/check_detector_smoke.py) | 只读核对完整权威结果、必要阶段、输入身份与预测实际覆盖；返回0才允许继续全量，不调用供应商 |
+| 离线语料探针 | [predicate_corpus_probe.py](../scripts/predicate_corpus_probe.py)、[probe_candidate_ordering.py](../scripts/probe_candidate_ordering.py)、[calibrate_conviction_predicates.py](../scripts/calibrate_conviction_predicates.py) | 金标仅用于离线评分；校准输出由参数控制 |
+
+```bash
+python scripts/verify.py --scope code_only
+python scripts/verify.py --scope all --jobs 3
+python scripts/cost_model_693.py --json artifacts/cost_model_693.json
+```
+
+`verification_plugin.py` 是 [pytest 执行完整性插件](../scripts/verification_plugin.py)，由 verify 加载；[offline_guard/sitecustomize.py](../scripts/offline_guard/sitecustomize.py) 约束测试及继承的 Python 子进程只能访问回环网络。这两个文件不是独立命令。
+
+#### 真实 API 与研究运行
+
+| 用途 | 脚本 | 运行边界 |
+| --- | --- | --- |
+| 合成 API 容量 | [probe_api_capacity.py](../scripts/probe_api_capacity.py) | 读取默认 Judge 路由；同步分档测试、无重试、出现失败停止升档；默认每档2轮 |
+| 集成与重复性 | [live_smoke.py](../scripts/live_smoke.py)、[real_path_check.py](../scripts/real_path_check.py)、[measure_noise_floor.py](../scripts/measure_noise_floor.py) | 调用真实模型；合成集成、已暴露样本重复性与效果评测分开解释 |
+| 实验与研究驱动 | [run_baseline_693.py](../scripts/run_baseline_693.py)、[run_deep_optimization.py](../scripts/run_deep_optimization.py)、[run_next_action_experiment.py](../scripts/run_next_action_experiment.py)、[run_validation100_20261017.py](../scripts/run_validation100_20261017.py)、[run_research_round.py](../scripts/run_research_round.py) | 调用真实服务，保留当时样本顺序、协议和验收标准 |
+
+本节命令须有对应真实运行授权；整理仓库或运行离线验收不包含这类授权。凭据来自本地 `.env` 或进程环境，不入 Git。
+
+容量测试的[已存结果](results/api-capacity-20261019/report.md)建议日常并发64，最高全通过合成档位128；未确认供应商硬限额。以下仅展示复现命令，本次整理不执行：
+
+```bash
+python scripts/probe_api_capacity.py --levels 16,32,64,128 --rounds 2 --max-tokens 1024 --output artifacts/api-capacity/new-run/short.json
+```
+
+参数细节以源码和支持的 `--help` 为准；不通过批量执行脚本来生成清单。

@@ -77,6 +77,18 @@ def _judge_negative_needs_recall(
     return cast < requested or positives > 0 or bool(vote.get("tie"))
 
 
+def _negative_referent_review_bases(judge_result: Mapping[str, Any]) -> list[str]:
+    """Agreement cannot independently verify a derivation or model recollection."""
+    parsed = judge_result.get("parsed") or {}
+    if parsed.get("is_hallucination") is not False:
+        return []
+    raw = judge_result.get("raw")
+    ballots = raw if isinstance(raw, list) and raw else [raw if isinstance(raw, Mapping) else parsed]
+    return sorted({ballot["basis"] for ballot in ballots
+                   if isinstance(ballot, Mapping) and ballot.get("is_hallucination") is False
+                   and ballot.get("basis") in {"derivation", "world_knowledge"}})
+
+
 class Detector:
     """One configured, stateless-between-calls detector."""
 
@@ -323,6 +335,7 @@ class Detector:
             )
         judge_parsed = judge_result.get("parsed") or {}
         judge_positive = bool(judge_parsed.get("is_hallucination"))
+        referent_review_bases = _negative_referent_review_bases(judge_result)
         causal_policy = self.config["causal_audit"]
         # 修复API-001: action_candidates 现在直接从 judge_result 获取
         # 但需要区分"没有候选项"和"生成失败"两种情况
@@ -437,12 +450,11 @@ class Detector:
             and (
                 recall_forced
                 or causal_review is not None
+                or bool(referent_review_bases)
                 or _judge_negative_needs_recall(judge_result, self.config)
             )
         )
         if negative_needs_recall:
-            # Multi-vote consensus is already a recall signal. Scanner is
-            # reserved for dissent, abstention or low-confidence negatives.
             run_recall_net()
         elif judge_status.get("state") == "ok" and not judge_positive:
             recall_result = {"ok": True, "candidates": []}
@@ -601,6 +613,10 @@ class Detector:
                 and not judge_positive
                 and _judge_negative_needs_recall(judge_result, self.config)
             ),
+            "triggered_by_unverified_referent": (
+                judge_status.get("state") == "ok" and not judge_positive and bool(referent_review_bases)
+            ),
+            "unverified_referent_bases": referent_review_bases,
             "action_candidates_count": len(action_candidates) if action_candidates else 0,
             # P2-1修复：保存原始触发候选ID，用于与最终定罪候选进行比较
             "original_action_candidate_ids": [
@@ -671,6 +687,7 @@ class Detector:
             "defense": defense_result.get("provider") if defense_result else None,
         }
         proof["judge"] = judge_result.get("parsed")
+        proof["recall_trigger_metadata"] = deepcopy(recall_trigger_metadata)
         if action_candidates:
             proof["action_candidates"] = action_candidates
         if action_candidates_degraded:

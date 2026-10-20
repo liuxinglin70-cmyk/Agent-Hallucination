@@ -92,6 +92,23 @@ def test_optional_output_cap_is_respected_before_the_parent_is_touched():
     assert pa.output_tokens == 40
 
 
+@pytest.mark.parametrize("total,resource,admitted", [
+    (16384, "requests", 2),
+    (8192, "output", 1),
+])
+def test_two_forecasts_require_two_full_output_allowances(total, resource, admitted):
+    pa = parent(max_added_output_tokens_per_case=total)
+    view = optional(pa)
+    for _ in range(admitted):
+        assert reserve(view, output=8192) == 8192
+    with pytest.raises(AddedBudgetExceeded) as failure:
+        reserve(view, output=8192)
+    assert failure.value.resource == resource
+    assert failure.value.origin == "diagnostic_reservation"
+    assert pa.requests == admitted
+    assert pa.output_tokens == admitted * 8192
+
+
 def test_optional_input_cap_counts_bytes_exactly():
     pa = parent(max_added_prompt_tokens_per_case=2000)
     view = optional(pa, max_added_prompt_tokens_per_case=120)

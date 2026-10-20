@@ -30,7 +30,7 @@ class TestP1Fix1TypeValidation:
                 }
             ]
         }
-        with pytest.raises(ValueError, match="约束source_type必须是字符串"):
+        with pytest.raises(ValueError, match="constraint source_type must be a string"):
             _constraints(parsed, prefix, view)
 
     def test_source_type_list_raises_value_error(self):
@@ -52,7 +52,7 @@ class TestP1Fix1TypeValidation:
                 }
             ]
         }
-        with pytest.raises(ValueError, match="约束source_type必须是字符串"):
+        with pytest.raises(ValueError, match="constraint source_type must be a string"):
             _constraints(parsed, prefix, view)
 
     def test_source_type_int_raises_value_error(self):
@@ -74,7 +74,7 @@ class TestP1Fix1TypeValidation:
                 }
             ]
         }
-        with pytest.raises(ValueError, match="约束source_type必须是字符串"):
+        with pytest.raises(ValueError, match="constraint source_type must be a string"):
             _constraints(parsed, prefix, view)
 
     def test_applies_to_null_raises_value_error(self):
@@ -93,7 +93,7 @@ class TestP1Fix1TypeValidation:
                 }
             ]
         }
-        with pytest.raises(ValueError, match="约束applies_to必须是字符串"):
+        with pytest.raises(ValueError, match="constraint applies_to must be a string"):
             _constraints(parsed, prefix, view)
 
     def test_time_constraint_list_raises_value_error(self):
@@ -112,7 +112,7 @@ class TestP1Fix1TypeValidation:
                 }
             ]
         }
-        with pytest.raises(ValueError, match="约束time_constraint必须是字符串"):
+        with pytest.raises(ValueError, match="constraint time_constraint must be a string"):
             _constraints(parsed, prefix, view)
 
     def test_valid_new_fields_accepted(self):
@@ -242,7 +242,7 @@ class TestP1Fix3SourceBinding:
                 }
             ]
         }
-        with pytest.raises(ValueError, match="source_type='user_request'必须引用question"):
+        with pytest.raises(ValueError, match="source_type='user_request' must cite question"):
             _constraints(parsed, prefix, view)
 
     def test_user_request_from_question_accepted(self):

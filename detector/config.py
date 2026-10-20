@@ -95,8 +95,8 @@ def diagnostic_budget_reserve(policy: Mapping[str, Any]) -> dict[str, int]:
     therefore no optional capacity left, and the optional request is refused and
     recorded (``warnings=[...]`` in the forecast proof, ``budget_exhausted``
     health) rather than quietly spent. A deployment that wants the optional
-    forecast work must budget for it: the shipped configs raise the added
-    allowance to 180s / 60000 input bytes / 8192 output tokens / 2 requests.
+    forecast work must budget for it in its deployment config, including the
+    full output ceilings of its optional requests and this diagnostic reserve.
     """
     model_work = policy.get("counterfactual_mode") == "model_hypothesis" or policy.get("negative_feedback_enabled")
     # The first two are consumed by the deterministic diagnostic context even

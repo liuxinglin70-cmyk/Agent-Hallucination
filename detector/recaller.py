@@ -562,13 +562,9 @@ def run_causal_upgrade(
     user = (
         "Decide whether any candidate below can upgrade this trajectory to "
         "hallucinated. Apply both tests to every candidate.\n\nCANDIDATES:\n"
-        + "\n".join(
-            f"- {c['candidate_id']}: {c['claim']} "
-            f"(locus {c['locus_event_id']}, refs {c['evidence_refs']}, "
-            f"evidence {c.get('evidence_citations') or []}, "
-            f"quote {c['quote'] or '?'})"
-            for c in candidates
-        )
+        + json.dumps([{key: c.get(key) for key in (
+            "candidate_id", "claim", "locus_event_id", "evidence_refs", "evidence_citations", "quote",
+        )} for c in candidates], ensure_ascii=False)
         + evidence_block
         + "\n\nTRAJECTORY:\n" + view_text
         + snapshot_block + task_source_block(packet)

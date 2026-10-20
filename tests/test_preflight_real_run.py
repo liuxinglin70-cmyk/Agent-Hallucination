@@ -194,6 +194,84 @@ def test_a_bounded_round_passes(preflight, tmp_path):
     assert not report.blockers and not report.warnings
 
 
+@pytest.mark.code_only
+@pytest.mark.parametrize("mode,requests,total,status", [
+    ("judge_context", 2, 8192, "BLOCKER"),
+    ("judge_context", 2, 16384, "OK"),
+    ("off", 2, 8192, "OK"),
+    ("judge_context", 1, 8192, "OK"),
+])
+def test_forecast_budget_checks_both_full_output_ceilings(
+    preflight, tmp_path, mode, requests, total, status,
+):
+    cfg = _config(tmp_path)
+    path = Path(cfg["detector_config"])
+    detector = json.loads(path.read_text(encoding="utf-8"))
+    detector["causal_audit"] = {
+        "next_action_mode": mode,
+        "max_added_provider_requests_per_case": requests,
+        "max_forecast_output_tokens_per_request": 8192,
+        "max_added_output_tokens_per_case": total,
+    }
+    path.write_text(json.dumps(detector), encoding="utf-8")
+    report = preflight.Report()
+    preflight.check_forecast_budget(report, cfg)
+    item, = report.items
+    assert item["status"] == status
+    if mode != "off" and requests >= 2:
+        assert "16384" in item["detail"]
+        assert "8192" in item["detail"]
+    else:
+        assert "not required" in item["detail"]
+
+
+@pytest.mark.code_only
+def test_default_forecast_budget_is_ready(preflight, tmp_path):
+    cfg = _config(tmp_path)
+    cfg["detector_config"] = str(REPO / "detector/configs/autodl.json")
+    report = preflight.Report()
+    preflight.check_forecast_budget(report, cfg)
+    item, = report.items
+    assert item["status"] == "OK"
+    assert "2 *" in item["detail"]
+
+
+@pytest.mark.code_only
+@pytest.mark.parametrize("binding,status", [
+    ({}, "WARN"),
+    ({"task_turn": 1}, "OK"),
+    ({"role": "user", "content": "first"}, "OK"),
+])
+def test_forecast_alignment_warns_only_for_missing_turn_events(
+    preflight, tmp_path, binding, status,
+):
+    cfg = _config(tmp_path)
+    root = tmp_path / "corpus"
+    cfg["dataset_root"] = str(root)
+    records = {
+        "BFCL/001.json": {"question": [["first"], ["second"]],
+                          "history": [{"role": "assistant", "content": "answer", **binding}]},
+        "Other/001.json": {"question": "single task", "history": []},
+    }
+    for case, record in records.items():
+        path = root / case
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record), encoding="utf-8")
+    report = preflight.Report()
+    preflight.check_forecast_alignment(report, cfg, list(records))
+    item, = report.items
+    assert item["status"] == status
+    assert not report.blockers
+    if status == "WARN":
+        assert "1 case(s)" in item["detail"]
+        assert "BFCL" in item["detail"] and "BFCL/001.json" in item["detail"]
+        assert "skipped" in item["detail"]
+        assert item["families"] == {"BFCL": 1}
+        assert item["cases"] == ["BFCL/001.json"]
+    else:
+        assert "0 case(s)" in item["detail"]
+
+
 # ---------------------------------------------------------------------------
 # Gates must be satisfiable before provider budget is spent
 def test_the_coverage_floor_must_fit_the_sentinel_set(preflight, tmp_path):
@@ -307,6 +385,8 @@ def test_the_checklist_covers_every_condition_it_claims(preflight):
     assert executed == set()
     assert "corpus" in preflight.CHECK_ORDER
     assert "path_length" in preflight.CHECK_ORDER
+    assert "forecast_budget" in preflight.CHECK_ORDER
+    assert "forecast_alignment" in preflight.CHECK_ORDER
     assert len(preflight.CHECK_ORDER) == len(set(preflight.CHECK_ORDER))
 
 

@@ -1,0 +1,87 @@
+{
+  "created_at": "2026-10-19T22:04:42.304835+00:00",
+  "authorization": "User-authorized second and final uniform recovery per class; exact run ids requested by user.",
+  "history_directory": "artifacts\\detector\\live_checks\\full693_20261020\\history\\before-category2_20261019T220416Z",
+  "classes": {
+    "failed": {
+      "run_id": "full693_failed2",
+      "cases": [
+        "Camel/039.json"
+      ],
+      "selection_evidence": [
+        {
+          "case": "Camel/039.json",
+          "previous_run": "full693_recovery1",
+          "measurement_status": "infrastructure_failure",
+          "result_sha256": "0b85716901eac9791e66fc5ee6cc2cdd6a64919c9b194b87f47d1e88875d360d"
+        }
+      ],
+      "cases_file": "category2-failed-cases.json",
+      "cases_digest": "a46c87ddcd7bcfa6448dc840dd1d8c04e9f63d945d75e160c34d2ef9139e3875",
+      "category_round": 2
+    },
+    "degraded": {
+      "run_id": "full693_degraded1",
+      "cases": [
+        "Camel/042.json",
+        "Camel/048.json",
+        "Octotools/015.json",
+        "OpenDeepSearch/000.json",
+        "SmolAgents/078.json"
+      ],
+      "selection_evidence": [
+        {
+          "case": "Camel/042.json",
+          "previous_run": "full693_recovery1",
+          "measurement_status": "degraded",
+          "result_sha256": "25266c7e46d610891c0a7855be9c719e8446468ecf45ab93a5996cea220f0e0b"
+        },
+        {
+          "case": "Camel/048.json",
+          "previous_run": "full693_recovery1",
+          "measurement_status": "degraded",
+          "result_sha256": "7ea6965e9f93bb3de40ba3c05a1e4855ec8862affc9e18d1ab57d2a811312ac1"
+        },
+        {
+          "case": "Octotools/015.json",
+          "previous_run": "full693_recovery1",
+          "measurement_status": "degraded",
+          "result_sha256": "1868c44c040d46122e27da95e4908606f0ad189516e6b13f1834ef9b83c0edfd"
+        },
+        {
+          "case": "OpenDeepSearch/000.json",
+          "previous_run": "full693_recovery1",
+          "measurement_status": "degraded",
+          "result_sha256": "0147ca88f915323d5eb5726d47a12a7c45d87673db9163f3cf1bf65099555d98"
+        },
+        {
+          "case": "SmolAgents/078.json",
+          "previous_run": "full693_recovery1",
+          "measurement_status": "degraded",
+          "result_sha256": "f50a18671b4d84ecd21ceaa6ffdf6ae703597a1de997de65d49ec3fa80a24e56"
+        }
+      ],
+      "cases_file": "category2-degraded-cases.json",
+      "cases_digest": "e58d6f85f593cd1b40de2933c90cd56f1dfaa344f624665baa21f6b477c3b14b",
+      "category_round": 2
+    }
+  },
+  "source_identity": "5531587be7fef7e89b09eb8d2ac7bf4f7ccc6cb3a666a0876ed302f2f837cb0a",
+  "config_hash": "9085f7619f227a3a3e1d13b051aebc5f2f5c333fd4c82e274b8bdd410b8fb6cb",
+  "freeze_sha256": "9dfc362055f77b221f5a70f8a14130ee8f39ddb925bca757f9e9001ec851bc12",
+  "previous_final_sha256": "4ce564356838d88514859abc5caab883dedf16d1b7ded02cd18f9c7f0094d0fb",
+  "gold_used_for_selection": false,
+  "case_selection": "All six currently non-authoritative cases, classified once by latest recovery1 measurement status; fixed sets.",
+  "provider_concurrency": 6,
+  "case_workers": {
+    "failed": 1,
+    "degraded": 5
+  },
+  "adoption_rule": "Only adopt new authoritative rows; preserve each previously selected row otherwise.",
+  "max_rounds_per_category": 2,
+  "further_rounds_after_this": 0,
+  "bfcl_structural_skips_excluded": 162,
+  "immutable_detector": true,
+  "immutable_config_prompts_budget_inputs": true,
+  "old_run_file_count": 2849
+}

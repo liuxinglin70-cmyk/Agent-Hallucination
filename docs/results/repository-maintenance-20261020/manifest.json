@@ -1,0 +1,41 @@
+{
+  "generated": "2026-10-20 Asia/Singapore",
+  "files": {
+    "maintenance-verification.json": {
+      "source": "artifacts/repository-maintenance/20261020/verification.json",
+      "sha256": "a69e3550d226fabe9a8af9f7badb4ccde96b1c44dde03f313ba8bb82e7b56b57",
+      "bytes": 1669
+    },
+    "cleanup-manifest.json": {
+      "source": "artifacts/repository-maintenance/20261020/cleanup-manifest.json",
+      "sha256": "e675c876a7f6aa21afbd3c715f92888f85c2f4d87d6bae893cdc38678b236782",
+      "bytes": 66757
+    },
+    "content-classification.json": {
+      "source": "artifacts/repository-maintenance/20261020/content-classification.json",
+      "sha256": "3b81b827db7e12ae532c65806940670623b2b3b62ed6df73e11a9ed78c46087c",
+      "bytes": 936
+    },
+    "full693-readonly-check.json": {
+      "source": "artifacts/repository-maintenance/20261020/full693-readonly-check.json",
+      "sha256": "131a8a10833752e7cb23a367c4c1e10fb6922992767d4a2929b8af0cca441bfd",
+      "bytes": 4509
+    },
+    "offline-summary.json": {
+      "source": "artifacts/code_quality/2e49d4720149e6dc5bc01f7adaa395c078cf6118ddf8e5e839b6ffcb8388b3cb/e23d738606a94ae380a6737257d2763a/summary.json",
+      "sha256": "3e4282dc028b611e2a7608c2e5b6d10cd4ee1f4289874894b6f5670bec5a9e21",
+      "bytes": 4129
+    },
+    "offline-source-manifest.json": {
+      "source": "artifacts/code_quality/2e49d4720149e6dc5bc01f7adaa395c078cf6118ddf8e5e839b6ffcb8388b3cb/e23d738606a94ae380a6737257d2763a/source_manifest.json",
+      "sha256": "78d2fd98755153b095f98bbf393663e0451bac9ad403a0d9c40d9d159e7c6950",
+      "bytes": 34472
+    },
+    "offline-test-execution.json": {
+      "source": "artifacts/code_quality/2e49d4720149e6dc5bc01f7adaa395c078cf6118ddf8e5e839b6ffcb8388b3cb/e23d738606a94ae380a6737257d2763a/test_execution.json",
+      "sha256": "c881110207297166238188ded43fc6accb2240274d5120b9dea495f7a3384487",
+      "bytes": 639613
+    }
+  },
+  "scope": "Read-only export of prior exact-source offline acceptance and repository preservation checks; no new full suite or model run."
+}

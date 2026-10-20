@@ -1,0 +1,143 @@
+{
+  "run_id": "random100_recovery2",
+  "metrics": {
+    "decisive": 1,
+    "unresolved": 3,
+    "completion": 0.25,
+    "decisive_accuracy": 1.0,
+    "all_case_accuracy": 0.25,
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "tn": 0,
+    "positive_precision": 1.0,
+    "positive_recall": 1.0,
+    "positive_f1": 1.0,
+    "macro_precision": 0.5,
+    "macro_recall": 0.5,
+    "macro_f1": 0.5,
+    "authoritative": 1,
+    "degraded": 3,
+    "degraded_disagreeing": 0,
+    "terminal_metrics": {
+      "decisive": 4,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 1.0,
+      "all_case_accuracy": 1.0,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "positive_precision": 1.0,
+      "positive_recall": 1.0,
+      "positive_f1": 1.0,
+      "macro_precision": 0.5,
+      "macro_recall": 0.5,
+      "macro_f1": 0.5
+    },
+    "provider_unresolved": 0,
+    "no_terminal_decision": 0,
+    "requested_cases": 4,
+    "found_results": 4,
+    "missing_cases": 0,
+    "step_localization": {
+      "target": "dataset_first_error_event.v1",
+      "step_unit": "trajectory_event_position",
+      "unmapped_annotations": 0,
+      "target_mismatch_rows": 0,
+      "n": 4,
+      "hits": 1,
+      "accuracy": 0.25,
+      "by_step_kind": {
+        "content_step": {
+          "n": 4,
+          "hits": 1,
+          "accuracy": 0.25
+        }
+      },
+      "note": "action-step and content-step accuracy answer different questions; read them apart, never as one rate"
+    }
+  },
+  "rows": [
+    {
+      "case": "Magentic_One/002.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 11,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 11,
+        "position": 11,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 11,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "Magentic_One/020.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 7,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 7,
+        "position": 7,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 7,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "authoritative"
+    },
+    {
+      "case": "Magentic_One/052.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 15,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 15,
+        "position": 15,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 36,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only"
+    },
+    {
+      "case": "SmolAgents/060.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 1,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only"
+    }
+  ],
+  "errors": [],
+  "degraded_disagreements": [],
+  "missing_cases": []
+}

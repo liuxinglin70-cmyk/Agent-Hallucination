@@ -1,0 +1,254 @@
+{
+  "outcomes": [
+    {
+      "category": "failed",
+      "category_round": 2,
+      "case": "Camel/039.json",
+      "new_run": "full693_failed2",
+      "measurement_status": "authoritative",
+      "adopted": true,
+      "previous_selected_run": "full693_main",
+      "selected_run": "full693_failed2",
+      "new_state": "verified_error",
+      "new_authority": "authoritative",
+      "defense_verdict": "substantiated",
+      "reason": "new_authoritative",
+      "latest_failure_reasons": []
+    },
+    {
+      "category": "degraded",
+      "category_round": 2,
+      "case": "Camel/042.json",
+      "new_run": "full693_degraded1",
+      "measurement_status": "degraded",
+      "adopted": false,
+      "previous_selected_run": "full693_main",
+      "selected_run": "full693_main",
+      "new_state": "verified_error",
+      "new_authority": "degraded_judge_only",
+      "defense_verdict": "unsettled",
+      "reason": "new_result_not_authoritative_keep_previous",
+      "latest_failure_reasons": [
+        {
+          "component": "defense",
+          "candidate_id": "",
+          "code": "inconclusive",
+          "error_type": "",
+          "error": "",
+          "vote_failures": []
+        }
+      ]
+    },
+    {
+      "category": "degraded",
+      "category_round": 2,
+      "case": "Camel/048.json",
+      "new_run": "full693_degraded1",
+      "measurement_status": "authoritative",
+      "adopted": true,
+      "previous_selected_run": "full693_main",
+      "selected_run": "full693_degraded1",
+      "new_state": "verified_clean",
+      "new_authority": "authoritative",
+      "defense_verdict": null,
+      "reason": "new_authoritative",
+      "latest_failure_reasons": []
+    },
+    {
+      "category": "degraded",
+      "category_round": 2,
+      "case": "Octotools/015.json",
+      "new_run": "full693_degraded1",
+      "measurement_status": "degraded",
+      "adopted": false,
+      "previous_selected_run": "full693_main",
+      "selected_run": "full693_main",
+      "new_state": "verified_error",
+      "new_authority": "degraded_judge_only",
+      "defense_verdict": "unsettled",
+      "reason": "new_result_not_authoritative_keep_previous",
+      "latest_failure_reasons": [
+        {
+          "component": "defense",
+          "candidate_id": "",
+          "code": "inconclusive",
+          "error_type": "",
+          "error": "",
+          "vote_failures": []
+        }
+      ]
+    },
+    {
+      "category": "degraded",
+      "category_round": 2,
+      "case": "OpenDeepSearch/000.json",
+      "new_run": "full693_degraded1",
+      "measurement_status": "authoritative",
+      "adopted": true,
+      "previous_selected_run": "full693_main",
+      "selected_run": "full693_degraded1",
+      "new_state": "verified_error",
+      "new_authority": "authoritative",
+      "defense_verdict": "substantiated",
+      "reason": "new_authoritative",
+      "latest_failure_reasons": []
+    },
+    {
+      "category": "degraded",
+      "category_round": 2,
+      "case": "SmolAgents/078.json",
+      "new_run": "full693_degraded1",
+      "measurement_status": "degraded",
+      "adopted": false,
+      "previous_selected_run": "full693_main",
+      "selected_run": "full693_main",
+      "new_state": "verified_error",
+      "new_authority": "degraded_judge_only",
+      "defense_verdict": "unsettled",
+      "reason": "new_result_not_authoritative_keep_previous",
+      "latest_failure_reasons": [
+        {
+          "component": "defense",
+          "candidate_id": "",
+          "code": "inconclusive",
+          "error_type": "",
+          "error": "",
+          "vote_failures": []
+        }
+      ]
+    }
+  ],
+  "restored": 3,
+  "remaining_failed": [],
+  "remaining_degraded": [
+    "Camel/042.json",
+    "Octotools/015.json",
+    "SmolAgents/078.json"
+  ],
+  "additional_costs": {
+    "per_run": {
+      "full693_failed2": {
+        "queued": 17,
+        "started": 17,
+        "finished": 17,
+        "started_without_finish": [],
+        "queued_without_start": [],
+        "statuses": {
+          "response": 17
+        },
+        "http_statuses": {
+          "200": 17
+        },
+        "purposes": {
+          "action_forecast": 2,
+          "judge": 3,
+          "judge_repair": 2,
+          "recall_scanner": 1,
+          "recall_scanner_repair": 1,
+          "causal_upgrade": 3,
+          "step_tracer": 1,
+          "step_tracer_repair": 1,
+          "defense": 3
+        },
+        "models": {
+          "deepseek-v4-1-flash-261017": 17
+        },
+        "usage": {
+          "completion_tokens": 101676,
+          "prompt_tokens": 245045,
+          "total_tokens": 346721,
+          "prompt_tokens_details": {
+            "cached_tokens": 98304
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 96693
+          }
+        },
+        "finished_without_usage": 0,
+        "usage_is_lower_bound": false,
+        "journals": [
+          {
+            "path": "artifacts\\detector\\live_checks\\full693_20261020\\runs\\full693_failed2\\cases\\Camel__039.json\\attempts\\001_20261019T230844\\requests.jsonl",
+            "sha256": "b6c66a84e0ade69c4b6c11b1eea5af5fad6251cdf84ad07a6c2250542b0bcc88"
+          }
+        ]
+      },
+      "full693_degraded1": {
+        "queued": 52,
+        "started": 52,
+        "finished": 52,
+        "started_without_finish": [],
+        "queued_without_start": [],
+        "statuses": {
+          "response": 52
+        },
+        "http_statuses": {
+          "200": 52
+        },
+        "purposes": {
+          "action_forecast": 10,
+          "judge": 15,
+          "judge_repair": 1,
+          "defense": 18,
+          "step_tracer": 4,
+          "recall_scanner": 1,
+          "causal_upgrade": 3
+        },
+        "models": {
+          "deepseek-v4-1-flash-261017": 52
+        },
+        "usage": {
+          "completion_tokens": 475068,
+          "prompt_tokens": 297552,
+          "total_tokens": 772620,
+          "prompt_tokens_details": {
+            "cached_tokens": 220160
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 455440
+          }
+        },
+        "finished_without_usage": 0,
+        "usage_is_lower_bound": false,
+        "journals": [
+          {
+            "path": "artifacts\\detector\\live_checks\\full693_20261020\\runs\\full693_degraded1\\cases\\Camel__042.json\\attempts\\001_20261019T230844\\requests.jsonl",
+            "sha256": "a48e7356f8c3c4e37089eb7aadf179457dbac8f5a7314912207bd5ac708b729d"
+          },
+          {
+            "path": "artifacts\\detector\\live_checks\\full693_20261020\\runs\\full693_degraded1\\cases\\Camel__048.json\\attempts\\001_20261019T230844\\requests.jsonl",
+            "sha256": "0e2f1665cdcc3de007b98b4b2c53effb6ad986cef3966374ed2b4db4ba7c4eca"
+          },
+          {
+            "path": "artifacts\\detector\\live_checks\\full693_20261020\\runs\\full693_degraded1\\cases\\Octotools__015.json\\attempts\\001_20261019T230844\\requests.jsonl",
+            "sha256": "e80e5f735a4e1d341badb0d55238613aa6c2644d7d56febd713231e0e2d7f210"
+          },
+          {
+            "path": "artifacts\\detector\\live_checks\\full693_20261020\\runs\\full693_degraded1\\cases\\OpenDeepSearch__000.json\\attempts\\001_20261019T230844\\requests.jsonl",
+            "sha256": "b5350c34b03d2b15208bd6d5fbb91759b9142e04a6ec828c3af222f66a845f75"
+          },
+          {
+            "path": "artifacts\\detector\\live_checks\\full693_20261020\\runs\\full693_degraded1\\cases\\SmolAgents__078.json\\attempts\\001_20261019T230844\\requests.jsonl",
+            "sha256": "a887b6a15036e3f9b55910fbc1837fa52d64952e4f6c302faf5441ff814f4c78"
+          }
+        ]
+      }
+    },
+    "started": 69,
+    "finished": 69,
+    "finished_without_usage": 0,
+    "started_without_finish": [],
+    "queued_without_start": [],
+    "usage": {
+      "completion_tokens": 576744,
+      "prompt_tokens": 542597,
+      "total_tokens": 1119341,
+      "prompt_tokens_details": {
+        "cached_tokens": 318464
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 552133
+      }
+    }
+  }
+}

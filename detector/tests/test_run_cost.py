@@ -1,6 +1,27 @@
 from detector.runner import _summarize, run_batch
 from detector.tests.test_runner import _FakeDetector, _envelope, _write_dataset
 import json
+import pytest
+
+
+@pytest.mark.parametrize("started_at,expected", [
+    ("2026-10-19T10:00:00Z", 80.5),
+    ("2026-10-19T18:00:00+08:00", 80.5),
+    (None, None),
+])
+def test_summary_wall_clock_is_timestamp_difference_not_summed_case_time(monkeypatch, started_at, expected):
+    finished_at = "2026-10-19T10:01:20.500000+00:00"
+    monkeypatch.setattr("detector.runner.utc_now", lambda: finished_at)
+    summary = _summarize(
+        run_id="r", cases=["a.json", "b.json"],
+        rows=[{"case": case, "result": _envelope(case), "elapsed_seconds": 100}
+              for case in ("a.json", "b.json")],
+        manifest={"started_at": started_at}, stop_reason={},
+    )
+    assert summary["finished_at"] == finished_at
+    assert summary["wall_clock_seconds"] == expected
+    assert summary["measurement"]["elapsed_seconds"] == 200
+    assert summary["measurement"]["invocation_cost"]["elapsed_seconds"] == 200
 
 
 def test_cache_hit_has_zero_invocation_cost_and_retains_case_cost():

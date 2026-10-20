@@ -151,7 +151,7 @@ def test_full_chain_adopts_earliest_origin_with_its_own_candidate(monkeypatch, r
             parsed = {"step": step, "quote": "5" if step == 1 else "7", "referent": "4" if step == 1 else "6",
                       "evidence_refs": [f"event_{step:03d}_tool_01"], "reason": "The tool first introduced this same error."}
         elif purpose == "defense":
-            step = 3 if "alleged_step=3\n" in kwargs["user"] else 5
+            step = json.JSONDecoder().raw_decode(kwargs["user"].split("ALLEGATION (unverified model output):\n", 1)[1])[0]["alleged_step"]
             parsed = {"verdict": "substantiated", "confirmed_step": step, "evidence_refs": [f"event_{step:03d}"],
                       "reason": "The explicit arithmetic independently proves this required result wrong."}
         else:

@@ -1,0 +1,169 @@
+{
+  "started_at_utc": "2026-10-19T17:05:28.348092+00:00",
+  "finished_at_utc": "2026-10-19T17:24:17.625914+00:00",
+  "python": "3.13.7",
+  "platform": "Windows-10-10.0.19045-SP0",
+  "scope": "all",
+  "network_policy": "loopback_only",
+  "pytest_workers": 3,
+  "pytest_distribution": "worksteal",
+  "not_run": [],
+  "source_sha256": "2e49d4720149e6dc5bc01f7adaa395c078cf6118ddf8e5e839b6ffcb8388b3cb",
+  "passed": true,
+  "tests": {
+    "tests": 2809,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": 2809
+  },
+  "checks": [
+    {
+      "name": "source_audit",
+      "exit_code": 0
+    },
+    {
+      "name": "dataset_integrity",
+      "exit_code": 0
+    },
+    {
+      "name": "pytest",
+      "arguments": [
+        "-m",
+        "pytest",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "-p",
+        "scripts.verification_plugin",
+        "--durations=20",
+        "--verification-report=E:\\agent hallucination\\agent hallucination\\artifacts\\code_quality\\2e49d4720149e6dc5bc01f7adaa395c078cf6118ddf8e5e839b6ffcb8388b3cb\\e23d738606a94ae380a6737257d2763a\\test_execution.json",
+        "--junitxml=E:\\agent hallucination\\agent hallucination\\artifacts\\code_quality\\2e49d4720149e6dc5bc01f7adaa395c078cf6118ddf8e5e839b6ffcb8388b3cb\\e23d738606a94ae380a6737257d2763a\\pytest.xml",
+        "-n",
+        "3",
+        "--dist=worksteal",
+        "--max-worker-restart=0"
+      ],
+      "exit_code": 0,
+      "seconds": 1099.88
+    },
+    {
+      "name": "test_execution_complete",
+      "exit_code": 0,
+      "detail": "collection and executed test ids must match exactly, without skips or duplicate executions"
+    },
+    {
+      "name": "detector_cli",
+      "arguments": [
+        "-m",
+        "detector",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.285
+    },
+    {
+      "name": "detector_cli_registers_commands",
+      "exit_code": 0
+    },
+    {
+      "name": "evolution_cli",
+      "arguments": [
+        "-m",
+        "evolution",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.354
+    },
+    {
+      "name": "evolution_cli_registers_commands",
+      "exit_code": 0
+    },
+    {
+      "name": "experiments_cli",
+      "arguments": [
+        "-m",
+        "experiments",
+        "--help"
+      ],
+      "exit_code": 0,
+      "seconds": 0.324
+    },
+    {
+      "name": "experiments_cli_registers_commands",
+      "exit_code": 0
+    },
+    {
+      "name": "capability_audit",
+      "arguments": [
+        "-m",
+        "evolution",
+        "capability-audit"
+      ],
+      "exit_code": 0,
+      "seconds": 0.698
+    },
+    {
+      "name": "capability_audit_admissible",
+      "exit_code": 0,
+      "detail": "all_admitted=True, sandbox_blockers=[]"
+    },
+    {
+      "name": "metamorphic_gate",
+      "arguments": [
+        "-m",
+        "evolution",
+        "metamorphic-gate"
+      ],
+      "exit_code": 0,
+      "seconds": 0.699
+    },
+    {
+      "name": "sandbox_check",
+      "arguments": [
+        "-m",
+        "evolution",
+        "sandbox-check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.339
+    },
+    {
+      "name": "smoke",
+      "arguments": [
+        "-m",
+        "evolution",
+        "smoke",
+        "--config",
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_v7ya560b\\config.json"
+      ],
+      "exit_code": 0,
+      "seconds": 15.38
+    },
+    {
+      "name": "smoke_admission_and_audit",
+      "exit_code": 0
+    },
+    {
+      "name": "smoke_round_path_single_shot",
+      "exit_code": 0
+    },
+    {
+      "name": "capability_smoke",
+      "arguments": [
+        "-m",
+        "evolution",
+        "capability-smoke",
+        "--config",
+        "E:\\agent hallucination\\agent hallucination\\artifacts\\offline_verification_v7ya560b\\config.json"
+      ],
+      "exit_code": 0,
+      "seconds": 8.642
+    },
+    {
+      "name": "source_unchanged_during_checks",
+      "exit_code": 0
+    }
+  ]
+}

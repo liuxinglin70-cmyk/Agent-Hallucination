@@ -1,0 +1,80 @@
+{
+  "schema_version": "detector.config.v1",
+  "case_timeout_seconds": 10800,
+  "judge_route": {
+    "endpoint": "https://www.autodl.art/api/v1",
+    "model": "DeepSeek-V4.1-Flash-1017",
+    "api_key_env": "AUTODL_API_KEY",
+    "temperature": 0.0,
+    "timeout_seconds": 900,
+    "total_timeout_seconds": 2400,
+    "transport_retries": 2,
+    "timeout_growth_factor": 1.5,
+    "max_output_tokens_per_request": null,
+    "long_input_threshold_characters": 48000,
+    "long_output_tokens_per_request": null,
+    "context_cache": {
+      "enabled": true,
+      "mode": "automatic"
+    },
+    "json_mode": true,
+    "votes": 3,
+    "vote_topup": 2
+  },
+  "defense_route": {
+    "endpoint": "https://www.autodl.art/api/v1",
+    "model": "DeepSeek-V4.1-Flash-1017",
+    "api_key_env": "AUTODL_API_KEY",
+    "temperature": 0.0,
+    "timeout_seconds": 900,
+    "total_timeout_seconds": 2400,
+    "transport_retries": 2,
+    "timeout_growth_factor": 1.5,
+    "max_output_tokens_per_request": null,
+    "long_input_threshold_characters": 48000,
+    "long_output_tokens_per_request": null,
+    "context_cache": {
+      "enabled": true,
+      "mode": "automatic"
+    },
+    "votes": 3,
+    "vote_topup": 2
+  },
+  "recall_route": {
+    "endpoint": "https://www.autodl.art/api/v1",
+    "model": "DeepSeek-V4.1-Flash-1017",
+    "api_key_env": "AUTODL_API_KEY",
+    "temperature": 0.0,
+    "timeout_seconds": 900,
+    "total_timeout_seconds": 2400,
+    "transport_retries": 2,
+    "timeout_growth_factor": 1.5,
+    "max_output_tokens_per_request": null,
+    "long_input_threshold_characters": 48000,
+    "long_output_tokens_per_request": null,
+    "context_cache": {
+      "enabled": true,
+      "mode": "automatic"
+    }
+  },
+  "causal_audit": {
+    "mode": "tracer_context",
+    "score_source": "semantic_proxy",
+    "policy_version": "dataset-origin-risk-v2",
+    "top_k": 3,
+    "max_projection_events": 16,
+    "max_graph_edges": 64,
+    "max_dependency_depth": 8,
+    "max_added_provider_requests_per_case": 2,
+    "max_added_prompt_tokens_per_case": 60000,
+    "max_added_output_tokens_per_case": 8192,
+    "max_added_seconds_per_case": 900,
+    "counterfactual_mode": "deterministic_only",
+    "negative_feedback_enabled": false,
+    "negative_feedback_policy": null,
+    "scorer_artifact": null,
+    "next_action_mode": "judge_context",
+    "max_forecast_output_tokens_per_request": 8192,
+    "max_comparison_repair_output_tokens_per_request": 4096
+  }
+}

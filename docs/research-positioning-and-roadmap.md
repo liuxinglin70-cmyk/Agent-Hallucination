@@ -1,8 +1,8 @@
 # 从轨迹审计到诊断规则学习：项目理论主线与创新路线
 
-更新：2026-10-19。本文是整个仓库的研究定位与后续论文写作主文档，覆盖检测、首错定位、解释和检测器自进化。当前行为以[技术合同](technical-solution.md)为准，工作状态见[实施台账](../IMPLEMENTATION_PLAN.md)。文中“拟议方法”是本次形成的研究设计，尚未实现；已有实验统一在 §6，概念评审在 §10，二者分开判断。
+更新：2026-10-20。本文是整个仓库的研究定位与后续论文写作主文档，覆盖检测、首错定位、解释和检测器自进化。当前行为以[技术合同](technical-solution.md)为准，工作状态见[实施台账](../IMPLEMENTATION_PLAN.md)。文中“拟议方法”是本次形成的研究设计，尚未实现；已有实验统一在 §6，概念评审在 §10，二者分开判断。
 
-本次按 `ccf-idea-optimizer` 与 `ccf-idea-reviewer` 的思路，围绕问题、洞察、机制及可反驳主张组织，由同一分析者独立完成。公开文献有针对性检索至 2026-10-15，并非穷尽检索。实验依据包括历史653例、10月13日恢复基线、当前100例首轮及10月15日补测最终合并；本次只读核对全部已完成结果和请求日志，未启动新实验。
+本次按 `ccf-idea-optimizer` 与 `ccf-idea-reviewer` 的思路，围绕问题、洞察、机制及可反驳主张组织，由同一分析者独立完成。公开文献有针对性检索至 2026-10-15，并非穷尽检索。实验依据现覆盖历史653例、原100例恢复及预测机制、两轮新100例、随机100例和10月20日全693最终结果。完成读数统一见实验日志，本文保留方法解释；本次文档整理不启动新实验。
 
 ## 1. 总体判断：把研究对象从模块转为诊断规则
 
@@ -191,6 +191,20 @@ flowchart LR
 
 ## 6. 已有实验能支持什么
 
+### 最新全量证据与解释范围
+
+10月20日全693最终690例权威，检测76.96%、macro-F1 75.98%、首错206/443=46.50%。对旧G0共同权威648例，检测净增12正确；映射一致的414例阳性首错净增83命中，收益集中于Human-Interaction和Retrieval。FP上升及部分家族回退同时保留。底座、源码与预算共同变化，不能把差值归因于下一步预测或规则学习，后两者仍需要同源码、同预算对照。最新[完整配对与边界](results/full693-20261020/historical-paper-comparison.md)和[实验总表](experiment-log.md)替代下列历史阶段的“当前”读数；下文日期限定的分析保留其原语境。
+
+### 模型能力与框架贡献的可识别性
+
+GPT-5、Gemini-2.5-Pro与DeepSeek-V4.1-Flash-1017不能仅按品牌或Flash后缀排序。GPT-5是可配置推理强度的推理模型；Gemini-2.5-Pro支持思考与长上下文；DeepSeek官方于2026-10-17发布当前更新，强调推理、编码与Agent任务改进。当前DeepSeek官方模型卡比较的是更近期模型，未提供与这里两个确切旧版本在同一AgentHallu协议下的配对结果。因此“当前Flash一定弱于旧Pro”没有依据，“当前DeepSeek必然在该检测任务最强”也未得到验证。[GPT-5官方说明](https://developers.openai.com/api/docs/models/gpt-5)、[Gemini官方说明](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-pro)、[DeepSeek官方更新与模型卡](https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash-1017)。
+
+指标提升完全可能主要来自底座或推理预算提升，现有结果不能排除这种解释。旧653例是GLM-5.3-flash加旧框架，当前是DeepSeek加新框架及新预算，论文则是其各模型的标准/逐步提示；三者不是只改变一个因素的对照。新系统减轻了输入指令边界、事实复核、Recall与定位等问题，证明这些路径可执行不等于证明它们独立带来实测增益。尤其当前同案检测仅56修正/44回退、净增12，误报也增加；定位净增83虽大，仍无法从模型、提示、预算、框架及交互项中识别贡献比例。
+
+已有一条名义同模型的内部比较线索：当前全量相对10月19日random100（同DeepSeek版本名及响应model），共同权威97例检测73→77正确，6修正/2回退；64例共同权威阳性定位33→34，4修正/3回退。这组差异不是GLM到DeepSeek的换底座差异，但源码、提示、预算和随机输出仍有变化，不能将其直接解释为某模块稳定收益，更不能据此分摊相对G0的全部定位提升。
+
+最直接的下一步是先冻结当前DeepSeek版本，在同一案例、输入投影、证据权限和评分目标上增加原论文标准提示与逐步提示baseline，再与完整框架配对；明确原论文预算复现与同计算预算比较是两种不同问题。若需比较三个模型，则构造三模型×原提示/当前框架的矩阵，每格记录推理模式、请求/输出上限、全部实际token、未决率、检测/定位与配对修正回退；旧新框架×GLM/DeepSeek的2×2矩阵进一步分离历史模型效应与框架效应。这里只提出验证设计，不启动新真实调用。
+
 ### 6.1 10月15日历史恢复结果
 
 本节保留早期恢复分析；最新真实验证及排序负结果见末节“当前研究方向与证据约束”，完整读数由实验日志维护。
@@ -234,9 +248,9 @@ flowchart LR
 
 上述 `next_action.py` 的 `allowed_actions` 是静态类别表，同名工具重试不证明参数合法或任务完成；按完整事件比较还可能混合动作、观察和声明。`action_failure_triplet.v1` 保留终端摘录，但其 `deviation_status` 是 unverified。共享条件目前只是多成员之间两种模式标签的交集，候选落到 `tracer.system` 提示边界。**这些是可复用原型，不是 §3–4 的通用规则生成、局部监督或学习算法。**
 
-**实现现状详细梳理**（2026-10-15）：`next_action.py` 包含四个核心函数：`predict_action_boundary`（detector/next_action.py:70-85，识别工具失败构造 ActionBoundary 含前缀摘要/风险模式/证据/失败工具名，全程 hypothesis 无判定权限）、`compare_next_action`（88-131行，比较真实下一事件识别重试/诚实失败报告/无恢复成功声明，返回 action_state 与 divergence_pattern，可能 fallback 标记 unverified）、`build_next_action_audit`（134-143行，批量构造审计封装 schema+provider_requests=0）、`scan_static_action_risks`（146-167行，遍历事件提取 top_k 失败候选输出 risk_signals）。调用链：risk_context.py:75 调用 build_next_action_audit → 结果嵌入 candidates[n]["next_action_audit"] → 仅随 risk context 传入 Tracer，Judge/Defense/裁决不直接消费。`step_uncertainty.py` 的 `build_step_risk_profile`（185-284行，policy 控制 score_source/max_projection_events，扫描事件生成 by_event 列表含 score_status/risk_signals/priority）与 `select_causal_candidates`（298-336行，从 profile 合并风险候选行按 priority/verified 比例排序取 top_k，超限截断返回 state=selected/unknown）由 causal_audit.py:328 调用，api.py:460+677 在 shadow/tracer_context 模式构造 causal_diagnostics。`step_tracer.py` 的 `run_step_tracer`（57-239行）在 causal_context 下为单个 positive 运行反事实修复，输出含 provider 字段但 localization_authority=none（hearing.py:88 调用）。`semantic_trace.py` 的 `build_semantic_trace`（274-276行）构造语义依赖边输出 claim_equivalence=unestablished、decision/localization authority=none，`referent_provenance`（292-300行）提取溯源 truth_status=requires_independent_verification。配置开关（config.py:75-80、165-194行）：counterfactual_mode（deterministic_only 默认 / model_hypothesis 在 causal_audit.py:196 触发 provider_call 让模型输出候选 role/claim_status/evidence_refs）、score_source（semantic_proxy 默认 / teacher_forced_ppl 时 step_uncertainty.py:190、255 标记 unsupported 全链退化）、negative_feedback_enabled（默认 false，控制 causal_recall_decision 在 api.py:689-713 触发负反馈 review，需 mode=tracer_context+judge 确认 is_hallucination=false+audit 健康+verified 算术 anomaly+offline_policy 允许）。覆盖情形：_FAILURE_LINE 正则匹配明确工具失败后紧邻下一事件、同工具名重试、_FAILURE_REPORT 正则诚实报告、_SUCCESS_CLAIM 正则成功声明与 observed_success 字段检测。标为 unverified/unsupported：不同工具 fallback（possible_fallback_unverified）、action_state=unknown 的 divergence_pattern、semantic_trace 的 claim_equivalence=unestablished（270行）、step_tracer 生成修复事件 verification_status=hypothesis、counterfactual 字段 state_changes_verified=false（causal_audit.py:131、causal_task.py:53）、score_source=teacher_forced_ppl 时 profile.health.state=unsupported（step_uncertainty.py:282）、risk_signals 中 unsupported_claim（250-254行）、evolution.action_failure_triplet.v1 的 deviation_status=unverified。缺失能力（§7.3-7.4、§12）：微事件视图（分离请求/返回/声明严格时序）、义务实例绑定四态检查（not_applicable/satisfied/violated/unknown）、失败外三类约束（固定字段、实体/单位/时间转换、状态变更+后置验证）、共享谓词解释器与两类反例学习（§4.2-4.3）、counterfactual 的 state_changes_verified 始终 false（只有局部算术符号域）。权限边界：所有 next_action/step_uncertainty/semantic_trace 输出 decision_authority/localization_authority 均为 none 仅作诊断输入不直接进入裁决，只在 api.py 的 hearing/judge/defense/adjudication 层经校准与证据核验后才可能获得判定权限。测试文件：detector/tests/test_next_action.py、test_causal_audit.py、test_causal_context.py、test_causal_diagnostics.py、test_causal_feedback.py、test_causal_task.py、evolution/tests/test_action_failure_triplets.py、test_causal_failures.py。
+当前已有确定性动作边界、有界模型前缀约束、逐票比较及Recall/Upgrade/Tracer/Defense接线；新增输出保持假设权限。严格微事件、通用义务绑定和双类反例学习尚未实现。模块调用和部署预算统一由[技术文档](technical-solution.md)维护，本文只区分研究角色和待验证能力，移除会随代码行号漂移的重复梳理。
 
-**本次实现扩展**：`action_forecast.py` 已将截至t前缀的有界模型约束预测与真实下一原始事件比较接入Judge，复用现有Top K、预算、投票、证据和听证边界；明确工具失败仍走零请求规则。默认关闭，`shadow`仅记录，`judge_context`参与原Judge独立核对。预测有前缀原文绑定，matched/divergent比较有下一事件动作/声明短引；未知、截断和预算退化均可见。它实现了受限的前缀预测和检测输入增强；§7.3所述严格微事件时序、四类共享谓词及两类反例学习仍未实现。[同组100例真实结果](results/next-action100-20261015/report.md)为76/100、首错27/62，相对最近基线无净增益；43例使用模型预测，代表票8条为非unknown，但这些结构有效比较不等于语义准确率。采用路径请求与中位耗时分别上升7.70%和22.73%，功能保持默认关闭；不能从接线与离线测试推断增强有效。
+**10月15日该轮实现与历史状态**：`action_forecast.py` 已将截至t前缀的有界模型约束预测与真实下一原始事件比较接入Judge，复用现有Top K、预算、投票、证据和听证边界；明确工具失败仍走零请求规则。默认关闭，`shadow`仅记录，`judge_context`参与原Judge独立核对。预测有前缀原文绑定，matched/divergent比较有下一事件动作/声明短引；未知、截断和预算退化均可见。它实现了受限的前缀预测和检测输入增强；§7.3所述严格微事件时序、四类共享谓词及两类反例学习仍未实现。[同组100例真实结果](results/next-action100-20261015/report.md)为76/100、首错27/62，相对最近基线无净增益；43例使用模型预测，代表票8条为非unknown，但这些结构有效比较不等于语义准确率。采用路径请求与中位耗时分别上升7.70%和22.73%，该轮结束时保持默认关闭；当前AutoDL/DeepSeek部署已选择judge_context，启用状态与效果证据分开解释。不能从接线与离线测试推断增强有效。
 
 ### 7.2 应预测“下一步必须满足什么”，而非唯一动作
 

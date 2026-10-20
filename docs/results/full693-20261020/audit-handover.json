@@ -1,0 +1,13 @@
+{
+  "activated": true,
+  "original_pid": 7588,
+  "reason": "Corrected deterministic adjudication audit passed all 693 existing commits.",
+  "new_measurements_before_handover": 0,
+  "old_attention_preserved": {
+    "updated_at": "2026-10-19T21:31:19.603965+00:00",
+    "pid": 7588,
+    "type": "AssertionError",
+    "message": "",
+    "traceback": "Traceback (most recent call last):\n  File \"E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\full693_20261020\\supervise.py\", line 246, in <module>\n    for row in recovered['rows']:\n    ^^\n  File \"E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\full693_20261020\\supervise.py\", line 193, in main\n    assert forecast['packet_digest'] == digest(packet)\n                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\full693_20261020\\supervise.py\", line 160, in audit\n    upgrade_status=statuses.get('causal_upgrade'),\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+  }
+}

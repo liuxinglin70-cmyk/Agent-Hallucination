@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "checked_at": "2026-10-19T17:41:25.201895+00:00",
+  "quality_tests": 2809,
+  "quality_checks": 19,
+  "quality_source_matches": true,
+  "raw_files": 695,
+  "cases": 693,
+  "packets": {
+    "checked": 693,
+    "unreadable": [],
+    "invalid_records": [],
+    "events": {
+      "min": 3,
+      "max": 43,
+      "mean": 7.6
+    }
+  },
+  "case_list": {
+    "manifest_path": "E:\\agent hallucination\\agent hallucination\\datasets\\protocols\\development_exposure.json",
+    "dataset_root": "E:\\agent hallucination\\agent hallucination\\datasets\\raw\\agenthallu\\AgentHallu",
+    "manifest_cases": 693,
+    "disk_cases": 693,
+    "manifest_unique": 693,
+    "disk_unique": 693,
+    "missing_on_disk": [],
+    "not_in_manifest": [],
+    "duplicates": [],
+    "path_collisions": {},
+    "order_identical": true,
+    "source_counts": {
+      "BFCL": 164,
+      "Camel": 93,
+      "Magentic_One": 94,
+      "Octotools": 47,
+      "OpenDeepSearch": 100,
+      "OpenManus": 104,
+      "SmolAgents": 91
+    }
+  },
+  "disk_free_bytes": 405804404736
+}

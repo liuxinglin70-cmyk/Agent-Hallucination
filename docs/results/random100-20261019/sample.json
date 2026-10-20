@@ -1,0 +1,620 @@
+{
+  "seed": 20261019,
+  "dataset_root": "E:\\agent hallucination\\agent hallucination\\datasets\\raw\\agenthallu\\AgentHallu",
+  "dataset_cases": 693,
+  "sample_size": 100,
+  "sample_digest": "3b286f0e1c6607613fc0f43faab10d283db277c3c8f1b23b23386cb16b983d13",
+  "family_counts": {
+    "BFCL": 19,
+    "Camel": 13,
+    "Magentic_One": 26,
+    "Octotools": 7,
+    "OpenDeepSearch": 7,
+    "OpenManus": 16,
+    "SmolAgents": 12
+  },
+  "gold_positive": 67,
+  "gold_negative": 33,
+  "cases": [
+    {
+      "case": "BFCL/000.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "BFCL/005.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "5"
+    },
+    {
+      "case": "BFCL/020.json",
+      "family": "BFCL",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "BFCL/028.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "10"
+    },
+    {
+      "case": "BFCL/038.json",
+      "family": "BFCL",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "BFCL/042.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "8"
+    },
+    {
+      "case": "BFCL/043.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "4"
+    },
+    {
+      "case": "BFCL/049.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "7"
+    },
+    {
+      "case": "BFCL/066.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "2"
+    },
+    {
+      "case": "BFCL/071.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "4"
+    },
+    {
+      "case": "BFCL/079.json",
+      "family": "BFCL",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "BFCL/080.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "7"
+    },
+    {
+      "case": "BFCL/082.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "11"
+    },
+    {
+      "case": "BFCL/100.json",
+      "family": "BFCL",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "BFCL/109.json",
+      "family": "BFCL",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "BFCL/110.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "7"
+    },
+    {
+      "case": "BFCL/123.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "7"
+    },
+    {
+      "case": "BFCL/139.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "BFCL/141.json",
+      "family": "BFCL",
+      "gold": true,
+      "gold_step": "7"
+    },
+    {
+      "case": "Camel/001.json",
+      "family": "Camel",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Camel/004.json",
+      "family": "Camel",
+      "gold": true,
+      "gold_step": "10"
+    },
+    {
+      "case": "Camel/025.json",
+      "family": "Camel",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Camel/027.json",
+      "family": "Camel",
+      "gold": true,
+      "gold_step": "5"
+    },
+    {
+      "case": "Camel/031.json",
+      "family": "Camel",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Camel/037.json",
+      "family": "Camel",
+      "gold": true,
+      "gold_step": "5"
+    },
+    {
+      "case": "Camel/053.json",
+      "family": "Camel",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Camel/055.json",
+      "family": "Camel",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "Camel/071.json",
+      "family": "Camel",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Camel/079.json",
+      "family": "Camel",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Camel/082.json",
+      "family": "Camel",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Camel/086.json",
+      "family": "Camel",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Camel/092.json",
+      "family": "Camel",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Magentic_One/001.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Magentic_One/002.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "11"
+    },
+    {
+      "case": "Magentic_One/004.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Magentic_One/011.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "Magentic_One/015.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Magentic_One/016.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Magentic_One/018.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Magentic_One/019.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "5"
+    },
+    {
+      "case": "Magentic_One/020.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "7"
+    },
+    {
+      "case": "Magentic_One/042.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "5"
+    },
+    {
+      "case": "Magentic_One/044.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Magentic_One/049.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Magentic_One/052.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "15"
+    },
+    {
+      "case": "Magentic_One/053.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Magentic_One/059.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "6"
+    },
+    {
+      "case": "Magentic_One/066.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Magentic_One/067.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Magentic_One/070.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Magentic_One/073.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "Magentic_One/074.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Magentic_One/076.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Magentic_One/077.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Magentic_One/079.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "Magentic_One/086.json",
+      "family": "Magentic_One",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Magentic_One/087.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Magentic_One/090.json",
+      "family": "Magentic_One",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "Octotools/006.json",
+      "family": "Octotools",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Octotools/011.json",
+      "family": "Octotools",
+      "gold": true,
+      "gold_step": "2"
+    },
+    {
+      "case": "Octotools/025.json",
+      "family": "Octotools",
+      "gold": true,
+      "gold_step": "2"
+    },
+    {
+      "case": "Octotools/034.json",
+      "family": "Octotools",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "Octotools/038.json",
+      "family": "Octotools",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "Octotools/043.json",
+      "family": "Octotools",
+      "gold": true,
+      "gold_step": "2"
+    },
+    {
+      "case": "Octotools/045.json",
+      "family": "Octotools",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "OpenDeepSearch/001.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "OpenDeepSearch/014.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "OpenDeepSearch/016.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "OpenDeepSearch/052.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "OpenDeepSearch/064.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "OpenDeepSearch/082.json",
+      "family": "OpenDeepSearch",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "OpenDeepSearch/083.json",
+      "family": "OpenDeepSearch",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "OpenManus/002.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "5"
+    },
+    {
+      "case": "OpenManus/004.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "5"
+    },
+    {
+      "case": "OpenManus/008.json",
+      "family": "OpenManus",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "OpenManus/015.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "2"
+    },
+    {
+      "case": "OpenManus/035.json",
+      "family": "OpenManus",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "OpenManus/041.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "OpenManus/054.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "OpenManus/059.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "2"
+    },
+    {
+      "case": "OpenManus/060.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "6"
+    },
+    {
+      "case": "OpenManus/069.json",
+      "family": "OpenManus",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "OpenManus/071.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "3"
+    },
+    {
+      "case": "OpenManus/088.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "OpenManus/089.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "2"
+    },
+    {
+      "case": "OpenManus/093.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "OpenManus/094.json",
+      "family": "OpenManus",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "OpenManus/099.json",
+      "family": "OpenManus",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "SmolAgents/001.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "SmolAgents/002.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "gold_step": "7"
+    },
+    {
+      "case": "SmolAgents/003.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "SmolAgents/005.json",
+      "family": "SmolAgents",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "SmolAgents/020.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "gold_step": "5"
+    },
+    {
+      "case": "SmolAgents/029.json",
+      "family": "SmolAgents",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "SmolAgents/033.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "SmolAgents/054.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "SmolAgents/056.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "SmolAgents/060.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "gold_step": "1"
+    },
+    {
+      "case": "SmolAgents/075.json",
+      "family": "SmolAgents",
+      "gold": false,
+      "gold_step": null
+    },
+    {
+      "case": "SmolAgents/081.json",
+      "family": "SmolAgents",
+      "gold": true,
+      "gold_step": "1"
+    }
+  ]
+}

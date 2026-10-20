@@ -7,6 +7,7 @@ failures keep the positive verdict and degrade authority.
 
 from __future__ import annotations
 
+import json
 from typing import Any, Mapping, Sequence
 from detector.stage_retry import memo_stage
 from detector.provider import provider_fallback_scope
@@ -444,18 +445,18 @@ def run_defense(
         "\n\n" + render_evidence_block(snapshot) if snapshot is not None else ""
     )
     allegation = (
-        "POSITIVE VERDICT:\n"
-        f"alleged_step={facts['step']}\n"
-        f"reason={facts['reason']}\n"
-        f"delivered_result={facts['delivered_result']}\n"
-        f"correct_result={facts['correct_result']}\n"
+        "ALLEGATION (unverified model output):\n"
+        + json.dumps({"alleged_step": facts["step"], "reason": facts["reason"],
+                      "delivered_result": facts["delivered_result"], "correct_result": facts["correct_result"]},
+                     ensure_ascii=False) + "\n"
         + evidence_block
     )
 
     def user_for(view_text: str, *, auxiliary: bool = True) -> str:
         return (
-            "Review the positive verdict below using only the shown "
-            "trajectory evidence.\n\n" + allegation + "\n" + view_text
+            "Independently review this allegation against the shown task, trajectory "
+            "and applicable attached evidence under the grounding laws. Model claims "
+            "below are not established facts.\n\n" + allegation + "\n" + view_text
             + snapshot_block + (referent_source_block(packet, positive, snapshot) + task_source_block(packet)
                                 if auxiliary else "")
         )

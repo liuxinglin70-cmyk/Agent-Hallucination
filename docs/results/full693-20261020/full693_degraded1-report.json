@@ -1,0 +1,597 @@
+{
+  "schema_version": "detector.baseline_report.v1",
+  "run_id": "full693_degraded1",
+  "dataset_root": "E:\\agent hallucination\\agent hallucination\\datasets\\raw\\agenthallu\\AgentHallu",
+  "runs_root": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\full693_20261020\\runs",
+  "generated_at_utc": "2026-10-19T22:22:10.727305+00:00",
+  "case_list": {
+    "cases": [
+      "Camel/042.json",
+      "Camel/048.json",
+      "Octotools/015.json",
+      "OpenDeepSearch/000.json",
+      "SmolAgents/078.json"
+    ]
+  },
+  "batch": {
+    "schema_version": "detector.run_summary.v3",
+    "run_id": "full693_degraded1",
+    "cases": [
+      "Camel/042.json",
+      "Camel/048.json",
+      "Octotools/015.json",
+      "OpenDeepSearch/000.json",
+      "SmolAgents/078.json"
+    ],
+    "completed": 5,
+    "case_sources": {
+      "Camel/042.json": "measured",
+      "Octotools/015.json": "measured",
+      "SmolAgents/078.json": "measured",
+      "OpenDeepSearch/000.json": "measured",
+      "Camel/048.json": "measured"
+    },
+    "state_counts": {
+      "verified_error": 4,
+      "verified_clean": 1,
+      "unresolved": 0
+    },
+    "measurement": {
+      "requested": 5,
+      "returned": 5,
+      "missing": 0,
+      "missing_cases": [],
+      "status_counts": {
+        "degraded": 3,
+        "authoritative": 2
+      },
+      "authoritative": 2,
+      "measured": 5,
+      "not_started": 0,
+      "not_started_cases": [],
+      "elapsed_seconds": 2507.4,
+      "attempt_id": "001_20261019T230844",
+      "attempts": 1,
+      "deadline_seconds": null,
+      "usage": {
+        "completion_tokens": 475068,
+        "prompt_tokens": 297552,
+        "total_tokens": 772620,
+        "prompt_tokens_details": {
+          "cached_tokens": 220160
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 455440
+        }
+      },
+      "usage_missing_attempts": 0,
+      "usage_unknown_cases": 0,
+      "invocation_cost": {
+        "elapsed_seconds": 2507.4,
+        "usage": {
+          "completion_tokens": 475068,
+          "prompt_tokens": 297552,
+          "total_tokens": 772620,
+          "prompt_tokens_details": {
+            "cached_tokens": 220160
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 455440
+          }
+        },
+        "usage_source": "request_observations",
+        "provider_attempts": 52,
+        "usage_missing_attempts": 0,
+        "usage_unknown_cases": 0
+      },
+      "case_attempt_cost": {
+        "elapsed_seconds": 2507.4,
+        "usage": {
+          "completion_tokens": 475068,
+          "prompt_tokens": 297552,
+          "total_tokens": 772620,
+          "prompt_tokens_details": {
+            "cached_tokens": 220160
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 455440
+          }
+        },
+        "usage_source": "request_observations",
+        "provider_attempts": 52,
+        "usage_missing_attempts": 0,
+        "usage_unknown_cases": 0
+      },
+      "run_lifetime_cost": {
+        "elapsed_seconds": 2507.2,
+        "usage": {
+          "completion_tokens": 475068,
+          "prompt_tokens": 297552,
+          "total_tokens": 772620,
+          "prompt_tokens_details": {
+            "cached_tokens": 220160
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 455440
+          }
+        },
+        "usage_source": "request_observations",
+        "provider_attempts": 52,
+        "usage_missing_attempts": 0,
+        "usage_unknown_cases": 0
+      },
+      "peak_provider_inflight": 6
+    },
+    "stop": {},
+    "finished_at": "2026-10-19T22:20:44.250426+00:00",
+    "wall_clock_seconds": 719.621493
+  },
+  "metrics": {
+    "decisive": 2,
+    "unresolved": 3,
+    "completion": 0.4,
+    "decisive_accuracy": 1.0,
+    "all_case_accuracy": 0.4,
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "tn": 1,
+    "positive_precision": 1.0,
+    "positive_recall": 1.0,
+    "positive_f1": 1.0,
+    "macro_precision": 1.0,
+    "macro_recall": 1.0,
+    "macro_f1": 1.0,
+    "authoritative": 2,
+    "degraded": 3,
+    "degraded_disagreeing": 1,
+    "terminal_metrics": {
+      "decisive": 5,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 0.8,
+      "all_case_accuracy": 0.8,
+      "tp": 3,
+      "fp": 1,
+      "fn": 0,
+      "tn": 1,
+      "positive_precision": 0.75,
+      "positive_recall": 1.0,
+      "positive_f1": 0.8571428571428571,
+      "macro_precision": 0.875,
+      "macro_recall": 0.75,
+      "macro_f1": 0.7619047619047619
+    },
+    "provider_unresolved": 0,
+    "no_terminal_decision": 0,
+    "requested_cases": 5,
+    "found_results": 5,
+    "missing_cases": 0,
+    "step_localization": {
+      "target": "dataset_first_error_event.v1",
+      "step_unit": "trajectory_event_position",
+      "unmapped_annotations": 0,
+      "target_mismatch_rows": 0,
+      "n": 3,
+      "hits": 0,
+      "accuracy": 0.0,
+      "by_step_kind": {
+        "content_step": {
+          "n": 1,
+          "hits": 0,
+          "accuracy": 0.0
+        },
+        "action_step": {
+          "n": 2,
+          "hits": 0,
+          "accuracy": 0.0
+        }
+      },
+      "note": "action-step and content-step accuracy answer different questions; read them apart, never as one rate"
+    }
+  },
+  "by_source": {
+    "Camel": {
+      "n": 2,
+      "metrics": {
+        "decisive": 1,
+        "unresolved": 1,
+        "completion": 0.5,
+        "decisive_accuracy": 1.0,
+        "all_case_accuracy": 0.5,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "tn": 1,
+        "positive_precision": 0.0,
+        "positive_recall": 0.0,
+        "positive_f1": 0.0,
+        "macro_precision": 0.5,
+        "macro_recall": 0.5,
+        "macro_f1": 0.5
+      }
+    },
+    "Octotools": {
+      "n": 1,
+      "metrics": {
+        "decisive": 0,
+        "unresolved": 1,
+        "completion": 0.0,
+        "accuracy": null,
+        "decisive_accuracy": null,
+        "all_case_accuracy": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "positive_precision": null,
+        "positive_recall": null,
+        "positive_f1": null,
+        "macro_precision": null,
+        "macro_recall": null,
+        "macro_f1": null
+      }
+    },
+    "OpenDeepSearch": {
+      "n": 1,
+      "metrics": {
+        "decisive": 1,
+        "unresolved": 0,
+        "completion": 1.0,
+        "decisive_accuracy": 1.0,
+        "all_case_accuracy": 1.0,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "positive_precision": 1.0,
+        "positive_recall": 1.0,
+        "positive_f1": 1.0,
+        "macro_precision": 0.5,
+        "macro_recall": 0.5,
+        "macro_f1": 0.5
+      }
+    },
+    "SmolAgents": {
+      "n": 1,
+      "metrics": {
+        "decisive": 0,
+        "unresolved": 1,
+        "completion": 0.0,
+        "accuracy": null,
+        "decisive_accuracy": null,
+        "all_case_accuracy": 0.0,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "positive_precision": null,
+        "positive_recall": null,
+        "positive_f1": null,
+        "macro_precision": null,
+        "macro_recall": null,
+        "macro_f1": null
+      }
+    }
+  },
+  "by_gold": {
+    "clean": {
+      "n": 2,
+      "metrics": {
+        "decisive": 1,
+        "unresolved": 1,
+        "completion": 0.5,
+        "decisive_accuracy": 1.0,
+        "all_case_accuracy": 0.5,
+        "tp": 0,
+        "fp": 0,
+        "fn": 0,
+        "tn": 1,
+        "positive_precision": 0.0,
+        "positive_recall": 0.0,
+        "positive_f1": 0.0,
+        "macro_precision": 0.5,
+        "macro_recall": 0.5,
+        "macro_f1": 0.5
+      }
+    },
+    "error": {
+      "n": 3,
+      "metrics": {
+        "decisive": 1,
+        "unresolved": 2,
+        "completion": 0.3333333333333333,
+        "decisive_accuracy": 1.0,
+        "all_case_accuracy": 0.3333333333333333,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "positive_precision": 1.0,
+        "positive_recall": 1.0,
+        "positive_f1": 1.0,
+        "macro_precision": 0.5,
+        "macro_recall": 0.5,
+        "macro_f1": 0.5
+      }
+    }
+  },
+  "coverage": {
+    "requested_cases": 5,
+    "found_results": 5,
+    "missing_cases": [],
+    "authoritative": 2,
+    "degraded": 3,
+    "degraded_disagreeing": 1,
+    "no_terminal_decision": 0,
+    "provider_unresolved": 0,
+    "undecided_decomposition": {
+      "metrics_unresolved": 3,
+      "degraded_rows_with_a_non_authoritative_answer": 3,
+      "rows_with_no_answer_at_all": 0,
+      "identity": "metrics.unresolved == degraded + no_terminal_decision + degraded rows that were also wrong (already inside degraded)"
+    },
+    "state_counts": {
+      "verified_clean": 1,
+      "verified_error": 4
+    },
+    "authority_counts": {
+      "authoritative": 2,
+      "degraded_judge_only": 3
+    }
+  },
+  "timing": {
+    "measured_cases": 5,
+    "unmeasured_cases": 0,
+    "sum_seconds": 2507.4,
+    "mean_seconds": 501.5,
+    "min_seconds": 357.9,
+    "p50_seconds": 471.8,
+    "p90_seconds": 632.3,
+    "max_seconds": 719.3,
+    "slowest": [
+      {
+        "case": "Camel/048.json",
+        "elapsed_seconds": 719.3
+      },
+      {
+        "case": "OpenDeepSearch/000.json",
+        "elapsed_seconds": 501.8
+      },
+      {
+        "case": "SmolAgents/078.json",
+        "elapsed_seconds": 471.8
+      },
+      {
+        "case": "Octotools/015.json",
+        "elapsed_seconds": 456.6
+      },
+      {
+        "case": "Camel/042.json",
+        "elapsed_seconds": 357.9
+      }
+    ]
+  },
+  "usage": {
+    "measured_cases": 5,
+    "unmeasured_cases": 0,
+    "total": {
+      "completion_tokens": 475068,
+      "prompt_tokens": 297552,
+      "total_tokens": 772620,
+      "prompt_tokens_details": {
+        "cached_tokens": 220160
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 455440
+      }
+    },
+    "usage_source": "request_observations",
+    "total_tokens": 772620,
+    "mean_tokens_per_case": 154524.0,
+    "max_tokens_case": [
+      191513.0,
+      "Camel/048.json"
+    ],
+    "attempts_without_usage": 0,
+    "cases_with_missing_usage": 0,
+    "usage_unknown_cases": 0,
+    "total_is_lower_bound": false,
+    "scope": "Sum of provider counters actually returned; every attempt reported usage metadata.",
+    "per_case": [
+      {
+        "case": "Camel/042.json",
+        "usage": {
+          "completion_tokens": 89832,
+          "prompt_tokens": 80750,
+          "total_tokens": 170582,
+          "prompt_tokens_details": {
+            "cached_tokens": 64768
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 85288
+          }
+        },
+        "usage_source": "request_observations"
+      },
+      {
+        "case": "Camel/048.json",
+        "usage": {
+          "completion_tokens": 136849,
+          "prompt_tokens": 54664,
+          "total_tokens": 191513,
+          "prompt_tokens_details": {
+            "cached_tokens": 34176
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 133551
+          }
+        },
+        "usage_source": "request_observations"
+      },
+      {
+        "case": "Octotools/015.json",
+        "usage": {
+          "completion_tokens": 91272,
+          "prompt_tokens": 57254,
+          "total_tokens": 148526,
+          "prompt_tokens_details": {
+            "cached_tokens": 43648
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 87612
+          }
+        },
+        "usage_source": "request_observations"
+      },
+      {
+        "case": "OpenDeepSearch/000.json",
+        "usage": {
+          "completion_tokens": 84458,
+          "prompt_tokens": 44420,
+          "total_tokens": 128878,
+          "prompt_tokens_details": {
+            "cached_tokens": 31744
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 80189
+          }
+        },
+        "usage_source": "request_observations"
+      },
+      {
+        "case": "SmolAgents/078.json",
+        "usage": {
+          "completion_tokens": 72657,
+          "prompt_tokens": 60464,
+          "total_tokens": 133121,
+          "prompt_tokens_details": {
+            "cached_tokens": 45824
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 68800
+          }
+        },
+        "usage_source": "request_observations"
+      }
+    ]
+  },
+  "errors": [],
+  "degraded_disagreements": [
+    {
+      "case": "Camel/042.json",
+      "gold": false,
+      "terminal_prediction": true,
+      "state": "verified_error",
+      "authority": "degraded_judge_only",
+      "kind": "fp"
+    }
+  ],
+  "rows": [
+    {
+      "case": "Camel/042.json",
+      "gold": false,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only",
+      "source": "Camel",
+      "elapsed_seconds": 357.9
+    },
+    {
+      "case": "Camel/048.json",
+      "gold": false,
+      "prediction": false,
+      "terminal_prediction": false,
+      "gold_step": null,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": null,
+        "position": null,
+        "mapping_state": "unannotated"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": null,
+      "responsible_step": null,
+      "responsible_step_kind": null,
+      "state": "verified_clean",
+      "authority": "authoritative",
+      "source": "Camel",
+      "elapsed_seconds": 719.3
+    },
+    {
+      "case": "Octotools/015.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 4,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 4,
+        "position": 4,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 4,
+      "responsible_step_kind": "content_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only",
+      "source": "Octotools",
+      "elapsed_seconds": 456.6
+    },
+    {
+      "case": "OpenDeepSearch/000.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 7,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 7,
+        "position": 7,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 8,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "source": "OpenDeepSearch",
+      "elapsed_seconds": 501.8
+    },
+    {
+      "case": "SmolAgents/078.json",
+      "gold": true,
+      "prediction": null,
+      "terminal_prediction": true,
+      "gold_step": 1,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 1,
+        "position": 1,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 2,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "degraded_judge_only",
+      "source": "SmolAgents",
+      "elapsed_seconds": 471.8
+    }
+  ]
+}

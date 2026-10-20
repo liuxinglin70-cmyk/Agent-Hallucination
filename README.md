@@ -13,16 +13,16 @@
 | [实验日志](docs/experiment-log.md) | 已完成实验的结论、分母、失败与成本解释 |
 | [结果与证据索引](docs/results/README.md) | 原始报告归档、来源身份、校验清单及历史对比 |
 | [组会汇报](docs/group-meetings/20261015-results-and-research.md) | 2026-10-15阶段结果、方法解释与研究问题 |
-| [脚本入口](scripts/README.md) | 离线验证、证据读取、冻结预检与真实运行边界 |
+| [脚本入口](docs/technical-solution.md#脚本入口) | 离线验证、证据读取、冻结预检与真实运行边界 |
 | [实施台账](IMPLEMENTATION_PLAN.md) | 当前任务、验收证据、待办及四项续接检查点 |
 
 历史审计保留在 `docs/archive/`，按原日期阅读。当前行为以技术文档及代码为准，研究设计和历史审计不赋予新接口实现状态。
 
 ## 已完成结果
 
-最近一周（2026-10-13—10-19）已完成多轮机制修复、旧样本复测、新100例两轮验证及基座加固。新样本第二轮100/100权威，检测82/100与同案G0持平，首错18/62→36/62，FP6→7；按当时冻结标准未通过。旧样本初版净收益为0，随后99例两轮复测也未达标。不同样本与源码不可直接比较或用于单模块因果归因。
+最新全693例已完成主轮、一次统一恢复及最后分类补测：690/693权威，检测531/690=76.96%（全请求76.62%），macro-F1 75.98%，首错206/443=46.50%，TP/FP/FN/TN=335/53/106/196。三例Defense inconclusive未决，补测轮次已用尽，停止重试。[最终报告](docs/results/full693-20261020/report.md)保留全部轮次、采纳与成本审计。
 
-离线排序学习top-1/top-3覆盖为负收益；候选宽度扩大仅有覆盖探针证据，未改变默认值。真实进化仍无新增准入。完整分母、成本、失败、历史验收与本周进展集中见[实验日志](docs/experiment-log.md)，原件见[结果索引](docs/results/README.md)。
+对历史653例的共同权威648例，检测56修正/44回退；排除两例步号映射变化后，414例阳性定位101修正/18回退。不同底座、预算和开发曝光限制归因，论文baseline只作数值参照，见[同案与论文对比](docs/results/full693-20261020/historical-paper-comparison.md)。近期随机100、新100机制两轮、旧样本复测与早期自进化的历史分母及失败统一见[实验日志](docs/experiment-log.md)；候选覆盖、HTTP200和离线验收不等同真实净收益，尚无新增真实进化准入。
 
 ## 安装与使用
 
@@ -44,7 +44,7 @@ python scripts/verify.py --scope code_only
 python -m detector detect --record datasets/raw/agenthallu/AgentHallu/BFCL/001.json --case-id BFCL/001.json --output-dir artifacts/detector/single
 ```
 
-当前诊断默认为 `tracer_context` / `semantic_proxy`。默认部署配置（AutoDL及DeepSeek）以 `causal_audit.next_action_mode=judge_context` 开启下一步预测与行动比较；`off` 显式关闭，`shadow` 为旁路。默认新增额度为180秒、60000输入字节、8192输出token及2次可选请求，仍保留原诊断预留；显式自定义配置不继承部署文件，未声明该字段时保持off。复现实验使用[完整冻结配置](docs/results/next-action100-20261015/config.json)，其中新增工作额度不同于默认值。风险与动作审计无独立定罪或定位权限；真实 teacher-forced PPL 仍 unsupported，阴性反馈默认关闭。完整命令、回放与预算见[技术合同](docs/technical-solution.md)。
+当前诊断默认为 `tracer_context` / `semantic_proxy`。默认部署配置（AutoDL及DeepSeek）以 `causal_audit.next_action_mode=judge_context` 开启下一步预测与行动比较；`off` 显式关闭，`shadow` 为旁路。当前AutoDL部署的新增额度为10800秒、1048576输入UTF-8字节、65536输出token及2次可选请求，单次预测/比较修复上限32768；DeepSeek配置保留自身180秒/60000字节/8192 token额度，仍保护原诊断预留；显式自定义配置不继承部署文件，未声明该字段时保持off。复现实验使用[完整冻结配置](docs/results/next-action100-20261015/config.json)，该文件属于历史测量，不能当作当前AutoDL默认配置。风险与动作审计无独立定罪或定位权限；真实 teacher-forced PPL 仍 unsupported，阴性反馈默认关闭。完整命令、回放与预算见[技术合同](docs/technical-solution.md)。
 
 ## 目录与维护
 

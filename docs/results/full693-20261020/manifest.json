@@ -1,0 +1,129 @@
+{
+  "generated_at": "2026-10-19T22:22:13.540425+00:00",
+  "files": {
+    "paired-comparison.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\paired-comparison.json",
+      "sha256": "73c327f0606fa4ceb29ff4af18830b6aa247f0a742a5e56ebb2c5a0a0d5fb45c",
+      "bytes": 4037
+    },
+    "report.md": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\report.md",
+      "sha256": "abd73f354d03021e0dee6c661b003a814f45d077c24a41237204fa6095e9d69a",
+      "bytes": 6758
+    },
+    "independent-completion-audit.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\independent-completion-audit.json",
+      "sha256": "feda8d22a1313a6ab8d573cb849a8ec9567daffbd1e7308e742e1d1b9cb50606",
+      "bytes": 69689
+    },
+    "category2-degraded-cases.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\category2-degraded-cases.json",
+      "sha256": "9a03a3999a123e9c6e300c72d0015ee07e1c6ffb32841dff490173d9f2da45ca",
+      "bytes": 121
+    },
+    "category2-failed-cases.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\category2-failed-cases.json",
+      "sha256": "47a61aaa6f44ec56ef2743cfbf151b28554738a502ea0857c7f169c22c33d12d",
+      "bytes": 23
+    },
+    "category-round2-outcomes.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\category-round2-outcomes.json",
+      "sha256": "2505bb7928ba200ad8c1c123d80913c0b7fb8ac8da0c4154ba28f24b02bcae58",
+      "bytes": 8078
+    },
+    "category-round2-policy.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\category-round2-policy.json",
+      "sha256": "a0c9fb940258ccc56702713eb35fd2c8b2fb8cf2c987ec6243edf33d2a670ad0",
+      "bytes": 3489
+    },
+    "final-evaluation.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\final-evaluation.json",
+      "sha256": "dad7bef3131a608c32cc870f1da42cf38ca072c2c201a5850d0f57e50eb85bd5",
+      "bytes": 431071
+    },
+    "recovery-cases.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\recovery-cases.json",
+      "sha256": "d59405f37d35b8f1fb19374c4c8616ad8d922841b0d325ad40dded31ba608689",
+      "bytes": 259
+    },
+    "smoke-gate.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\smoke-gate.json",
+      "sha256": "c70df51a526cd4a12bfd57cb58b1cc2bd07ead00c78de4bd55f913398dcd5d2e",
+      "bytes": 502
+    },
+    "prelaunch-test-summary.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\prelaunch-test-summary.json",
+      "sha256": "1de0c9564abde4772f7d1978cc913b1de7cdf1c35aa47632b2b715cebeb3abd7",
+      "bytes": 159
+    },
+    "extended-evaluation.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\extended-evaluation.json",
+      "sha256": "4899d737c8f7e091ef580d67ff8afab7160b12c6964dc997470b2370cee6cf7f",
+      "bytes": 242523
+    },
+    "audit-handover.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\audit-handover.json",
+      "sha256": "3ced6178c9e090a2e14576ab7831a5cea767c811a492772997098dbb665a9c17",
+      "bytes": 1090
+    },
+    "freeze.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\freeze.json",
+      "sha256": "9dfc362055f77b221f5a70f8a14130ee8f39ddb925bca757f9e9001ec851bc12",
+      "bytes": 115511
+    },
+    "full693-cases.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\full693-cases.json",
+      "sha256": "3ccacea61ee2b0c34d38ae42445ba8be885c601a5a42ee8d59ccad426821fc47",
+      "bytes": 17011
+    },
+    "recovery-report.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\recovery-report.json",
+      "sha256": "b53bd33d3d8eab7cb6aa2e80ba270e0012bdba8bc029895a7d5b7d81e23b17e0",
+      "bytes": 33510
+    },
+    "by-family.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\by-family.json",
+      "sha256": "2aa3bf84e5bee4cc6fe18b836b202d2d4104469f85c6f45f6d5e8c3d9fad62bf",
+      "bytes": 3337
+    },
+    "policy.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\policy.json",
+      "sha256": "fdef69aa32580c76a22820a30a59d215ec9250247927ccb4e674d1f2e0ec7b4b",
+      "bytes": 3074
+    },
+    "completion-audit.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\completion-audit.json",
+      "sha256": "feda8d22a1313a6ab8d573cb849a8ec9567daffbd1e7308e742e1d1b9cb50606",
+      "bytes": 69689
+    },
+    "main-report.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\main-report.json",
+      "sha256": "2339c1b41cd7a70188e4a4b9da063f58e5b092142033196b3978dea4f36e0338",
+      "bytes": 1496062
+    },
+    "full693_degraded1-report.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\full693_degraded1-report.json",
+      "sha256": "fe64d88193d7fa1deff89821ea350fb93dff6a3f0c92751059f38f7eb4e57f3d",
+      "bytes": 15915
+    },
+    "deep-preflight.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\deep-preflight.json",
+      "sha256": "6b70500e7608f6886e1f1df9083fc4e794d5519c01d8d5371a6d77d0eb5a04c2",
+      "bytes": 1061
+    },
+    "all-attempt-costs.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\all-attempt-costs.json",
+      "sha256": "dca7a94b075b4d4e0d85a6b4beb0f499baedc13df2ebe6cdfda5c1be0407fadb",
+      "bytes": 215217
+    },
+    "full693_failed2-report.json": {
+      "source": "artifacts\\detector\\live_checks\\full693_20261020\\full693_failed2-report.json",
+      "sha256": "db219f01537ae0c1f75d0223162c52b2ca16d48beca91d72a7cc74a2a002c7ab",
+      "bytes": 8557
+    }
+  },
+  "raw_artifact_root": "artifacts\\detector\\live_checks\\full693_20261020",
+  "previous_version": "artifacts\\detector\\live_checks\\full693_20261020\\history\\before-category2_20261019T220416Z",
+  "old_run_files_verified_unchanged": 2849,
+  "category_round2_policy": "category-round2-policy.json"
+}

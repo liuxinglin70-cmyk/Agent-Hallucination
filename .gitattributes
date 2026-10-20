@@ -11,3 +11,6 @@ docs/results/infrastructure-20261018/** -text whitespace=cr-at-eol
 docs/results/mechanism100-20261016/** -text whitespace=cr-at-eol
 docs/results/mechanism100-optimization-rerun/** -text whitespace=cr-at-eol
 docs/results/repository-maintenance-20261019/** -text whitespace=cr-at-eol
+docs/results/random100-20261019/** -text whitespace=cr-at-eol
+docs/results/full693-20261020/** -text whitespace=cr-at-eol
+docs/results/repository-maintenance-20261020/** -text whitespace=cr-at-eol

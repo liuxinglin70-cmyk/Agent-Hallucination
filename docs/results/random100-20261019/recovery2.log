@@ -1,0 +1,115 @@
+batch run random100_recovery2: 4 cases, workers=4
+  [Magentic_One/020.json] state=verified_error authority=authoritative
+  [Magentic_One/052.json] state=verified_error authority=degraded_judge_only
+  [Magentic_One/002.json] state=verified_error authority=degraded_judge_only
+  [SmolAgents/060.json] state=verified_error authority=degraded_judge_only
+{
+  "schema_version": "detector.run_summary.v3",
+  "run_id": "random100_recovery2",
+  "cases": [
+    "Magentic_One/002.json",
+    "Magentic_One/020.json",
+    "Magentic_One/052.json",
+    "SmolAgents/060.json"
+  ],
+  "completed": 4,
+  "case_sources": {
+    "Magentic_One/020.json": "measured",
+    "Magentic_One/052.json": "measured",
+    "Magentic_One/002.json": "measured",
+    "SmolAgents/060.json": "measured"
+  },
+  "state_counts": {
+    "verified_error": 4,
+    "verified_clean": 0,
+    "unresolved": 0
+  },
+  "measurement": {
+    "requested": 4,
+    "returned": 4,
+    "missing": 0,
+    "missing_cases": [],
+    "status_counts": {
+      "authoritative": 1,
+      "degraded": 3
+    },
+    "authoritative": 1,
+    "measured": 4,
+    "not_started": 0,
+    "not_started_cases": [],
+    "elapsed_seconds": 1491.9,
+    "attempt_id": "001_20261019T223001",
+    "attempts": 1,
+    "deadline_seconds": null,
+    "usage": {
+      "completion_tokens": 241290,
+      "prompt_tokens": 271991,
+      "total_tokens": 513281,
+      "prompt_tokens_details": {
+        "cached_tokens": 194432
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 231169
+      }
+    },
+    "usage_missing_attempts": 0,
+    "usage_unknown_cases": 0,
+    "invocation_cost": {
+      "elapsed_seconds": 1491.9,
+      "usage": {
+        "completion_tokens": 241290,
+        "prompt_tokens": 271991,
+        "total_tokens": 513281,
+        "prompt_tokens_details": {
+          "cached_tokens": 194432
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 231169
+        }
+      },
+      "usage_source": "request_observations",
+      "provider_attempts": 39,
+      "usage_missing_attempts": 0,
+      "usage_unknown_cases": 0
+    },
+    "case_attempt_cost": {
+      "elapsed_seconds": 1491.9,
+      "usage": {
+        "completion_tokens": 241290,
+        "prompt_tokens": 271991,
+        "total_tokens": 513281,
+        "prompt_tokens_details": {
+          "cached_tokens": 194432
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 231169
+        }
+      },
+      "usage_source": "request_observations",
+      "provider_attempts": 39,
+      "usage_missing_attempts": 0,
+      "usage_unknown_cases": 0
+    },
+    "run_lifetime_cost": {
+      "elapsed_seconds": 1491.7,
+      "usage": {
+        "completion_tokens": 241290,
+        "prompt_tokens": 271991,
+        "total_tokens": 513281,
+        "prompt_tokens_details": {
+          "cached_tokens": 194432
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 231169
+        }
+      },
+      "usage_source": "request_observations",
+      "provider_attempts": 39,
+      "usage_missing_attempts": 0,
+      "usage_unknown_cases": 0
+    },
+    "peak_provider_inflight": 4
+  },
+  "stop": {},
+  "finished_at": "2026-10-19T14:37:22.645332+00:00"
+}

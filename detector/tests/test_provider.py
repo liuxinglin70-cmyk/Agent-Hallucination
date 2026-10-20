@@ -3,6 +3,10 @@ from __future__ import annotations
 import json
 import base64
 import threading
+import ast
+import importlib
+import re
+from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
@@ -21,6 +25,48 @@ def test_extract_json_object_fences():
     assert extract_json_object('```json\n{"a": 1}\n```') == {"a": 1}
     assert extract_json_object('prefix {"a": 1} suffix') == {"a": 1}
     assert extract_json_object("not json") is None
+
+
+def test_all_production_system_prompt_constants_support_json_mode():
+    root = Path(__file__).resolve().parents[2]
+    checked = set()
+    missing = []
+    for package in ("detector", "evolution", "experiments"):
+        for path in sorted((root / package).glob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8-sig"))
+            for statement in tree.body:
+                targets = (statement.targets if isinstance(statement, ast.Assign) else
+                           [statement.target] if isinstance(statement, ast.AnnAssign) else [])
+                for target in targets:
+                    if not isinstance(target, ast.Name) or not target.id.endswith(("_SYSTEM", "_SYSTEM_TEMPLATE")):
+                        continue
+                    module_name = f"{package}.{path.stem}"
+                    prompt = getattr(importlib.import_module(module_name), target.id)
+                    name = f"{module_name}.{target.id}"
+                    checked.add(name)
+                    if not isinstance(prompt, str) or "json" not in prompt.lower():
+                        missing.append(name)
+                    assert not re.search(r"[\u3400-\u9fff]", prompt), f"Non-English control prompt: {name}"
+    assert "detector.action_forecast.COMPARISON_REPAIR_SYSTEM" in checked
+    assert "evolution.proposer._LLM_DRAFT_SYSTEM_TEMPLATE" in checked
+    assert not missing, f"JSON-mode system prompts omit JSON: {missing}"
+
+
+def test_json_mode_adds_the_word_json_when_the_prompt_omits_it(monkeypatch):
+    from detector.provider import _json_mode_user
+
+    assert _json_mode_user("system", '{"a": 1}') == '{"a": 1}\n\nReturn a single JSON value.'
+    assert _json_mode_user("system", "输出 JSON 对象") == "输出 JSON 对象"
+    prompts = []
+    monkeypatch.setenv("JSON_MODE_TEST_KEY", "offline-dummy")
+    monkeypatch.setattr(provider_module, "_provider_call",
+                        lambda **kwargs: (prompts.append(kwargs) or ({"ok": True}, {})))
+    provider_call(route={"api_key_env": "JSON_MODE_TEST_KEY", "json_mode": True, "transport_retries": 0},
+                  system="只输出对象", user='{"a": 1}', purpose="json_mode_test")
+    assert "json" in prompts[0]["user"].lower()
+    provider_call(route={"api_key_env": "JSON_MODE_TEST_KEY", "json_mode": False, "transport_retries": 0},
+                  system="只输出对象", user='{"a": 1}', purpose="text_mode_test")
+    assert prompts[1]["user"] == '{"a": 1}'
 
 
 def test_case_capacity_deadline_is_a_case_failure_not_global_cancellation(monkeypatch):

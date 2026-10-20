@@ -1,0 +1,118 @@
+batch run random100_recovery: 5 cases, workers=5
+  [SmolAgents/060.json] state=verified_error authority=degraded_judge_only
+  [Magentic_One/002.json] state=verified_error authority=degraded_judge_only
+  [Magentic_One/052.json] state=verified_error authority=degraded_judge_only
+  [OpenManus/002.json] state=verified_error authority=authoritative
+  [Magentic_One/020.json] state=verified_error authority=degraded_judge_only
+{
+  "schema_version": "detector.run_summary.v3",
+  "run_id": "random100_recovery",
+  "cases": [
+    "Magentic_One/002.json",
+    "Magentic_One/020.json",
+    "Magentic_One/052.json",
+    "OpenManus/002.json",
+    "SmolAgents/060.json"
+  ],
+  "completed": 5,
+  "case_sources": {
+    "SmolAgents/060.json": "measured",
+    "Magentic_One/002.json": "measured",
+    "Magentic_One/052.json": "measured",
+    "OpenManus/002.json": "measured",
+    "Magentic_One/020.json": "measured"
+  },
+  "state_counts": {
+    "verified_error": 5,
+    "verified_clean": 0,
+    "unresolved": 0
+  },
+  "measurement": {
+    "requested": 5,
+    "returned": 5,
+    "missing": 0,
+    "missing_cases": [],
+    "status_counts": {
+      "degraded": 4,
+      "authoritative": 1
+    },
+    "authoritative": 1,
+    "measured": 5,
+    "not_started": 0,
+    "not_started_cases": [],
+    "elapsed_seconds": 1764.7,
+    "attempt_id": "001_20261019T220916",
+    "attempts": 1,
+    "deadline_seconds": null,
+    "usage": {
+      "completion_tokens": 375401,
+      "prompt_tokens": 350683,
+      "total_tokens": 726084,
+      "prompt_tokens_details": {
+        "cached_tokens": 254464
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 360446
+      }
+    },
+    "usage_missing_attempts": 0,
+    "usage_unknown_cases": 0,
+    "invocation_cost": {
+      "elapsed_seconds": 1764.7,
+      "usage": {
+        "completion_tokens": 375401,
+        "prompt_tokens": 350683,
+        "total_tokens": 726084,
+        "prompt_tokens_details": {
+          "cached_tokens": 254464
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 360446
+        }
+      },
+      "usage_source": "request_observations",
+      "provider_attempts": 52,
+      "usage_missing_attempts": 0,
+      "usage_unknown_cases": 0
+    },
+    "case_attempt_cost": {
+      "elapsed_seconds": 1764.6,
+      "usage": {
+        "completion_tokens": 375401,
+        "prompt_tokens": 350683,
+        "total_tokens": 726084,
+        "prompt_tokens_details": {
+          "cached_tokens": 254464
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 360446
+        }
+      },
+      "usage_source": "request_observations",
+      "provider_attempts": 52,
+      "usage_missing_attempts": 0,
+      "usage_unknown_cases": 0
+    },
+    "run_lifetime_cost": {
+      "elapsed_seconds": 1764.4,
+      "usage": {
+        "completion_tokens": 375401,
+        "prompt_tokens": 350683,
+        "total_tokens": 726084,
+        "prompt_tokens_details": {
+          "cached_tokens": 254464
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 360446
+        }
+      },
+      "usage_source": "request_observations",
+      "provider_attempts": 52,
+      "usage_missing_attempts": 0,
+      "usage_unknown_cases": 0
+    },
+    "peak_provider_inflight": 5
+  },
+  "stop": {},
+  "finished_at": "2026-10-19T14:17:59.630721+00:00"
+}

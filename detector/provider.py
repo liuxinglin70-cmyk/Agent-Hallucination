@@ -305,12 +305,30 @@ def _endpoint_url(endpoint: str) -> str:
     return endpoint + "/chat/completions"
 
 
+_JSON_MODE_REMINDER = "\n\nReturn a single JSON value."
+
+
+def _json_mode_user(system: str, user: str) -> str:
+    """Keep an OpenAI-style JSON-mode request admissible.
+
+    ``response_format=json_object`` providers reject a request whose messages
+    never mention JSON (DeepSeek answers HTTP 400 invalid_request). Every
+    shipped prompt already names JSON; this keeps a drifted or third-party
+    prompt from failing a whole batch at the transport boundary.
+    """
+    if "json" in (system + "\n" + user).lower():
+        return user
+    return user + _JSON_MODE_REMINDER
+
+
 def provider_call(
     *, route: Mapping[str, Any], system: str, user: str,
     purpose: str, cache_tag: str = "", fallback_user: str | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     fallback = fallback_user if fallback_user is not None else _VIEW_FALLBACK.get()
     original_route = dict(route)
+    if route.get("json_mode"):
+        user = _json_mode_user(system, user)
     added_output_tokens = int(route.get("max_tokens") or 1500)
     route, request_budget = bound_request_route(route, system=system, user=user)
     control = current_control()

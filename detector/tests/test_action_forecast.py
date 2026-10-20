@@ -2,13 +2,12 @@
 
 from copy import deepcopy
 import json
-import re
 
 import pytest
 
 from detector.action_forecast import _constraints, action_comparisons, build_action_forecast, comparison_prompt, prefix_view
 from detector.api import Detector
-from detector.config import validate_config
+from detector.config import load_config, validate_config
 from detector.judge import run_judge
 from detector.packet import build_packet
 from detector.provider import ProviderError
@@ -63,9 +62,11 @@ def install_transport(monkeypatch, *, bad_prediction=None):
         elif purpose == "recall_scanner":
             parsed = {"candidates": []}
         elif purpose == "causal_upgrade":
+            ids = [c["candidate_id"] for c in json.JSONDecoder().raw_decode(
+                kwargs["user"].split("CANDIDATES:\n", 1)[1])[0]]
             parsed = {"upgrades": [{"candidate_id": cid, "content_error": False, "causal": False,
                                     "corrected_step": None, "reason": "Local divergence does not alone prove materiality.",
-                                    "evidence_refs": []} for cid in re.findall(r"^- ([^: ]+):", kwargs["user"], re.M)]}
+                                    "evidence_refs": []} for cid in ids]}
         else:
             raise AssertionError(purpose)
         return deepcopy(parsed), {"attempts": 1, "usage": {"total_tokens": 10}}
@@ -99,6 +100,44 @@ def test_forecast_rejects_future_or_fabricated_references(monkeypatch, bad):
     assert forecast["predictions"] == []
     assert "rejected_prediction" in forecast
     assert comparison_prompt(forecast, build_packet(record())) == ""
+
+
+@pytest.mark.parametrize("total,health,requests", [
+    (8192, "budget_exhausted", 1),
+    (16384, "ok", 2),
+    (None, "ok", 2),
+])
+def test_deployment_budget_keeps_second_forecast_after_first_contract_failure(
+    monkeypatch, total, health, requests,
+):
+    cfg = load_config(require_credentials=False)
+    cfg["causal_audit"]["max_forecast_output_tokens_per_request"] = 8192
+    if total is not None:
+        cfg["causal_audit"]["max_added_output_tokens_per_case"] = total
+    raw = record()
+    raw["history"] += deepcopy(raw["history"])
+    calls = []
+
+    def transport(**kwargs):
+        assert kwargs["purpose"] == "action_forecast"
+        calls.append(kwargs)
+        parsed = constraints()
+        if len(calls) == 1:
+            parsed["constraints"][0]["quote"] = "fabricated"
+        return parsed, {"attempts": 1, "usage": {"completion_tokens": 1}}
+
+    monkeypatch.setattr("detector.provider._provider_call", transport)
+    with added_budget_scope(cfg["causal_audit"]) as budget:
+        forecast = build_action_forecast(build_packet(raw), config=cfg)
+        assert budget.requests == requests
+        assert budget.output_tokens == requests * 8192
+    assert len(calls) == requests
+    assert forecast["health"] == health
+    assert "rejected_prediction" in forecast
+    hypotheses = [row for row in forecast["predictions"] if row["producer"] == "model_hypothesis"]
+    assert len(hypotheses) == requests - 1
+    if health == "budget_exhausted":
+        assert forecast["exhaustion"] == {"resource": "output", "origin": "diagnostic_reservation"}
 
 
 def test_successful_forecast_is_reused_within_case_retry(monkeypatch):
@@ -148,7 +187,8 @@ def test_detector_retains_forecast_and_independent_comparison(monkeypatch, mode,
     assert sum(call["purpose"] == "action_forecast" for call in calls) == requests
     judges = [call for call in calls if call["purpose"] == "judge"]
     assert len(judges) == 3
-    assert all(("next_action_comparisons 数组" in call["user"]) is used for call in judges)
+    from detector.action_forecast import COMPARE_INSTRUCTION
+    assert all((COMPARE_INSTRUCTION in call["user"]) is used for call in judges)
     assert result["state"] == "verified_clean"
     assert result["decision_authority"] == "authoritative"
     if mode != "off":
@@ -452,7 +492,7 @@ def test_authorized_policy_quote_must_be_visible_in_instruction_body():
 
 
 def test_authorized_policy_quote_must_also_exist_in_original_instruction_body():
-    marker = "[内容省略]"
+    marker = "[content omitted]"
     packet = policy_packet(content="a" * 1000 + "z" * 1000)
     packet["events"][0]["tool_interactions"][0]["observation"] = marker
     view = prefix_view(packet, 1)

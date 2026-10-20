@@ -1,0 +1,27 @@
+{
+  "ready": true,
+  "run_id": "smoke3",
+  "errors": [],
+  "cases": [
+    {
+      "case": "BFCL/000.json",
+      "ready": true,
+      "forecast_health": "task_alignment_unknown",
+      "errors": []
+    },
+    {
+      "case": "Camel/000.json",
+      "ready": true,
+      "forecast_health": "ok",
+      "errors": []
+    },
+    {
+      "case": "Magentic_One/000.json",
+      "ready": true,
+      "forecast_health": "ok",
+      "errors": []
+    }
+  ],
+  "model_predictions": 4,
+  "forecast_responses": 4
+}

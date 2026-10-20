@@ -392,7 +392,8 @@ def test_expansion_fallback_preserves_evidence_and_repair_inputs(monkeypatch):
     assert result["ok"] and status["state"] == "ok"
     assert result["view_meta"]["evidence_expansion"]["actual_view"] == "base_projection"
     assert len(calls) == 2
-    assert "HEARING TARGET" in calls[1]["user"] and "CORRECT RESULT: 4" in calls[1]["user"]
+    claims = json.JSONDecoder().raw_decode(calls[1]["user"].split("MODEL RESULT CLAIMS (unverified):\n", 1)[1])[0]
+    assert "HEARING TARGET" in calls[1]["user"] and claims["correct_result"] == "4"
     assert "REFERENT SOURCE INDEX" not in calls[1]["user"]
 
 

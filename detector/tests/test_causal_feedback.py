@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from detector.api import Detector
@@ -39,7 +41,8 @@ def install_review(monkeypatch):
             return {"upgrades": [{"candidate_id": "c1", "content_error": True, "causal": True,
                                   "corrected_step": 1, "reason": "the wrong value is delivered"}]}, {}
         if purpose == "step_tracer":
-            assert "CORRECT RESULT: \n" in kwargs["user"]
+            claims = json.JSONDecoder().raw_decode(kwargs["user"].split("MODEL RESULT CLAIMS (unverified):\n", 1)[1])[0]
+            assert claims["correct_result"] == ""
             return tracer_reply()
         if purpose == "defense":
             return {"verdict": "substantiated", "confirmed_step": 1, "evidence_refs": ["event_001"], "reason": "verified"}, {}
@@ -68,7 +71,9 @@ def test_valid_offline_policy_reopens_full_chain_once(monkeypatch):
     cfg["judge_route"]["votes"] = 3
     calls = install_review(monkeypatch)
     result = Detector(cfg, require_credentials=False, offline_feedback_policy=offline_policy()).detect(record())
-    assert [call["purpose"] for call in calls] == ["recall_scanner", *(["causal_upgrade"] * 3), "step_tracer", "defense"]
+    purposes = [call["purpose"] for call in calls]
+    assert purposes[:4] == ["recall_scanner", *(["causal_upgrade"] * 3)]
+    assert sorted(purposes[4:]) == ["defense", "step_tracer"]
     assert result["state"] == "verified_error", result["proof"]["negative_feedback"]
     assert result["proof"]["negative_feedback"]["state"] == "reviewed", result["proof"]["negative_feedback"]
     assert result["execution"]["provider_attempts"] == 7

@@ -1,104 +1,37 @@
 # 结果与证据索引
 
-更新：2026-10-19。实验结论与分母由[实验日志](../experiment-log.md)集中说明；方法讨论见[研究主文档](../research-positioning-and-roadmap.md)。本目录保存可版本化的结果原件与派生核对，完整逐请求日志和proof保留在本地 `artifacts/`。
+更新：2026-10-20。结果解释、分母、失败和费用集中见[实验日志](../experiment-log.md)，本页只维护证据入口。机器登记表见[experiments.json](experiments.json)。完整proof、逐请求日志和每次尝试保留在原`artifacts/`路径，Git内结果副本按各自manifest保持原字节。
 
-## 仓库维护与离线验证（2026-10-19）
+## 当前全693最终结果
 
-[整理核对与验收来源](repository-maintenance-20261019/README.md)保存本次200项定向回归、归档完整性核对，以及此前2748项完整离线验收的源码身份与适用边界。
-
-## API 模型与容量（2026-10-19）
-
-默认 AutoDL 模型已切换为 `DeepSeek-V4.1-Flash-1017`，三个路由 JSON 冒烟通过。合成负载最高全通过并发128，日常建议64；256并发有3/768内容错误，未确认供应商硬并发/RPM/TPM上限。本组不是检测准确率实验。
-
-[完整容量报告](api-capacity-20261019/report.md)、[三个路由冒烟](api-capacity-20261019/provider-smoke.json)、[逐文件来源与摘要](api-capacity-20261019/manifest.json)。原始响应按字节复制保留，完整本地来源为 `artifacts/api-capacity/20261019/`，不再启动真实测试。
-
-## 0. 新100例单臂验证：两轮机制测试（最新）
-
-2026-10-18。新抽 100 例（62 阳性 / 38 阴性，均未在此前真实运行中出现、均带同案 G0 基线行、仅单任务轮次记录），启动前冻结清单、配置与验收标准。**两轮结果：定位 18/62 → 34/62 → 36/62，检测 82 → 81 → 82（与基线持平），FP 6 → 7 → 7。按预注册标准判定未通过（仅 FP 一项），机制价值与权衡见报告。**
-
-| 文件 | 用途 |
+| 入口 | 用途 |
 | --- | --- |
-| [完整报告](next-action-validation100-20261018/report.md) | 两轮设计、读数、逐例归因、成本与边界 |
-| [第二轮配对比较](next-action-validation100-20261018/round2-comparison.json) | 与 G0 基线的逐例变化、机制覆盖、健康状态、全部 journal 摘要 |
-| [第二轮最终评分](next-action-validation100-20261018/round2-final-evaluation.json) | 100 例采用来源与逐例结果 |
-| [第一轮比较](next-action-validation100-20261018/round1-comparison.json) / [评分](next-action-validation100-20261018/round1-final-evaluation.json) | 第一轮读数与归因依据 |
-| [样本清单](next-action-validation100-20261018/sample.json) | 抽样规则、排除集摘要、每例基线行与 SHA-256 |
-| [归档清单](next-action-validation100-20261018/manifest.json) | 逐文件字节数与 SHA-256、两轮源码身份 |
+| [最终报告](full693-20261020/report.md) / [逐例评分](full693-20261020/final-evaluation.json) | 690/693权威、531正确、206/443首错；3例未决停止重试 |
+| [同案配对](full693-20261020/paired-comparison.json) | 最近random100共同权威97例检测6修正/2回退 |
+| [完成审计](full693-20261020/completion-audit.json) / [全部尝试成本](full693-20261020/all-attempt-costs.json) | 冻结身份、原件、commit及5,875次请求的费用范围 |
+| [分类补测政策](full693-20261020/category-round2-policy.json) / [采纳清单](full693-20261020/category-round2-outcomes.json) | 失败类1例、降级类5例，逻辑第二轮，恢复3例，之后不再重试 |
+| [历史653例与论文对比](full693-20261020/historical-paper-comparison.md) / [逐例派生数据](full693-20261020/historical-paper-comparison.json) | 共同权威648例、映射一致阳性414例；不同模型与预算参照 |
+| [归档摘要](full693-20261020/manifest.json) / [原始运行目录](../../artifacts/detector/live_checks/full693_20261020/) | 主轮、recovery1及两类末轮全部原件 |
+| [第一次恢复后687权威阶段](../../artifacts/detector/live_checks/full693_20261020/history/before-category2_20261019T220416Z/docs/report.md) | 独立历史汇总，不能替代当前690权威结果 |
 
-真实原件与逐请求日志保留在 `artifacts/detector/live_checks/next_action_validation100_20261017/` 与 `..._round2_20261018/`。两轮源码分别通过 2649 项测试 + 18 项检查。同批样本已两次用于内部测评，未做同源码 off/on 消融。
+## 历史实验与离线证据
 
-## 1. 下一步预测：同组100例真实验证
+| 日期 / 实验 | 报告与原件 | 说明 |
+| --- | --- | --- |
+| 10-19随机100 | [报告](random100-20261019/report.md)、[目录](random100-20261019/)、[manifest](random100-20261019/manifest.json) | DeepSeek随机新样本；主轮与两次恢复分开保留 |
+| 10-18新100机制两轮 | [报告](next-action-validation100-20261018/report.md)、[跨轮比较](next-action-validation100-20261018/comparison-across-100-case-runs.md)、[manifest](next-action-validation100-20261018/manifest.json) | 定位改善、原冻结验收未通过 |
+| 10-16—17旧样本机制两轮 | [第一轮](mechanism100-20261016/report.md)、[优化复测](mechanism100-optimization-rerun/final-summary.md) | 99案例范围及98共同权威分开解释，完整摘要在各目录archive-manifest |
+| 10-16下一步预测100 | [报告](next-action100-20261015/report.md)、[目录](next-action100-20261015/) | 相对最近同案基线净收益0，成本含技术预试 |
+| 10-13—15原100补测 | [目录](localization100-20261015/)、[原评分](localization100-20261015/final-evaluation.json)、[请求审计](localization100-20261015/request-journal-audit.json) | 保留首轮、恢复、基线及采用与全部请求的区别 |
+| 09-27 G0与三轮进化 | [目录](full693-20260927/)、[G0报告](full693-20260927/baseline_report.json)、[旧论文参照](g0-baseline-analysis.md) | 653案例；旧分析仅按当时语境阅读 |
+| 10-18排序与宽度探针 | [manifest](infrastructure-20261018/manifest.json) | 离线候选覆盖，不当作终判效果 |
+| 10-19 API容量 | [报告](api-capacity-20261019/report.md)、[manifest](api-capacity-20261019/manifest.json) | 合成压力与模型路由，不是benchmark |
+| 10-19及10-20维护 | [原验收记录](repository-maintenance-20261019/README.md)、[本次核对与离线验收](repository-maintenance-20261020/manifest.json) | 文档、引用、脚本和证据保留，不新增真实模型测量 |
 
-2026-10-16正式100例及4例统一补测完成，100例全部权威，检测76/100、首错27/62；相对最近76/100、27/62持平。43例采用模型预测，代表票8条模型比较非unknown。采用路径started请求797（此前740），中位耗时966.587秒（此前787.597秒）；该轮结束时默认关闭，后续部署已开启judge_context。
+## 冻结协议与研究计划
 
-| 文件 | 用途 |
-| --- | --- |
-| [完整报告](next-action100-20261015/report.md) | 方法、精度/覆盖/成本比较及限制 |
-| [最终评分](next-action100-20261015/final-evaluation.json) | 100例采用来源、逐例结果和指标 |
-| [首轮](next-action100-20261015/first-evaluation.json) / [补测](next-action100-20261015/recovery-evaluation.json) | 首轮96权威及4例恢复，采用不读取金标 |
-| [配对比较](next-action100-20261015/comparison.json) | 两个历史对照、逐例变化及全部journal摘要 |
-| [完成审计](next-action100-20261015/completion-audit.json) | 100份commit、前缀/引用、预算和来源身份核对 |
-| [成本比较](next-action100-20261015/cost-comparison.json) / [此前费用复核](next-action100-20261015/prior-cost-audit.json) | 采用/废弃/技术预试、开始/结束及已知token下界 |
-| [配置](next-action100-20261015/config.json) / [冻结清单](next-action100-20261015/frozen-manifest.json) | 本次实际使用的模式、额度与输入身份 |
-| [语义抽查](next-action100-20261015/qualitative-review.json) / [归档清单](next-action100-20261015/manifest.json) | 比较语义限制及原字节来源/摘要 |
+[653例G0快照](../../datasets/protocols/g0_baseline_snapshot_20260927.json)保留源报告摘要；它不是完整proof/journal的替代。旧G0缺少40例，不能称为旧693全量。[复用划分](../../datasets/protocols/evolution_g0_reuse_20260928.json)为554开发/139本轮隔离验证，配置见[运行声明](../../evolution/configs/full693_g0_evolution_20260928.json)；它不代表已完成新一轮进化，也不消除全语料历史曝光。
 
-全部尝试940个started含中断技术批次82个；正式100例和恢复为858个。14个started无finished，927份finished中有1份仅排队失败、60份缺usage，不用执行汇总794条观察冒充全部调用。真实结果原件及逐请求日志保留在 `artifacts/detector/live_checks/next_action100_20261015/`。此比较源码/预算与历史不同，不能解释为单模块因果增益。
+## 归档规则
 
-## 2. 此前100例最终合并
-
-2026-10-15此前采用结果为99例权威、1例降级；主读数检测76/100、首错27/62。旧首轮72/100、23/62保留为中间阶段；最终结果与历史恢复完成的同100例68/100、22/62比较。6例恢复权威被采用，SmolAgents/043保留原降级结果。100份采用原件均已逐项核对provenance SHA-256。
-
-| 文件 | 用途 |
-| --- | --- |
-| [final-evaluation.json](localization100-20261015/final-evaluation.json) | 最终100例指标、逐例结果、采用来源及合并规则 |
-| [baseline-evaluation.json](localization100-20261015/baseline-evaluation.json) | 历史恢复完成100例，唯一主对照 |
-| [first-round-evaluation.json](localization100-20261015/first-round-evaluation.json) | 当前完整首轮，含6降级与1未决 |
-| [recovery-evaluation.json](localization100-20261015/recovery-evaluation.json) | 7例恢复评分 |
-| [comparison.json](localization100-20261015/comparison.json) | 检测12修正/4回退、定位8修正/3回退及逐例对照 |
-| [call-analysis.json](localization100-20261015/call-analysis.json) | 原调用汇总；采用结果740请求，原first100+recovery汇总825请求 |
-| [request-journal-audit.json](localization100-20261015/request-journal-audit.json) | 对全部114个journal去重：866个started，859个finished，7个结束状态未知；覆盖废弃外层attempt |
-| [recovery-manifest.json](localization100-20261015/recovery-manifest.json) | 原冻结源码/配置身份、期限和恢复计划；实际尝试范围需结合journal审计 |
-| [manifest.json](localization100-20261015/manifest.json) | 原件来源、字节数与SHA-256；派生核对另列 |
-
-清单列出的7份运行原件按原字节保存；`request-journal-audit.json` 是本次只读整理产生的派生结果，不改写原调用汇总。补测原目录为 `artifacts/detector/live_checks/live7_20261015_recovery/`，首轮及旧基线为相邻的 `live100_20261014_full/` 与 `live100_20261013_recovered/`。更早中断18例不计入本次866请求范围，历史所有实验总费用仍不能由此得到。
-
-## 3. G0与三轮自进化
-
-G0完成653例清单，651权威，检测490/653，全部419例阳性首错114/419。三轮进化完成，7个开发版本、4个正式候选，0准入；g1未启动。三个阶段的分母不同，不把653例写成每轮巡检规模。
-
-| 文件 | 用途 |
-| --- | --- |
-| [baseline_report.json](full693-20260927/baseline_report.json) | G0完整机器报告 |
-| [baseline_summary.json](full693-20260927/baseline_summary.json) | 原批次执行摘要 |
-| [evolution_experiment.json](full693-20260927/evolution_experiment.json) | 三轮开发、门控与终局 |
-| [evolution_ledger.jsonl](full693-20260927/evolution_ledger.jsonl) | 原始事件账本 |
-| [run_plan.json](full693-20260927/run_plan.json) | 原30开发/10验证/653测量计划 |
-| [manifest.json](full693-20260927/manifest.json) | 原件来源与固定SHA-256 |
-| [G0论文参照分析](g0-baseline-analysis.md) | 与AgentHallu论文的数值参照及可比性边界 |
-| [历史自进化审计](../archive/self-evolution-audit-20260928.md) | 当时的失效链、逐轮和逐案依据 |
-
-其余同目录原件包含active registry、defect audit与候选归档摘要。它们是证据，不作旧文件删除；历史报告的旧路径和术语按原运行语境解释。
-
-## 4. 复用协议与未执行计划
-
-[693例复用划分](../../datasets/protocols/evolution_g0_reuse_20260928.json)将554例开发池与139例本轮隔离验证分开，验证集含90阳性/49正常；两集合合为693例。S24、G96、patrol434的确定性划分及每轮巡检150例由[运行配置](../../evolution/configs/full693_g0_evolution_20260928.json)和 `evolution.splits.build_split` 定义。该计划不等于已完成的新自进化运行，不改变已有全语料暴露事实。
-
-[653例G0精简快照](../../datasets/protocols/g0_baseline_snapshot_20260927.json)用于机会分析与后续划分，源报告摘要保留；40例缺少这次G0结果，其中33例位于开发池、7例位于本轮验证。它不是原始proof或模型请求日志的替代。
-
-完整语料历史上已用于开发，上述读数属于回顾性内部评估。后续独立泛化需要新任务；补测的输出容量、次数和权威性恢复也需纳入效果解释。
-
-## 5. 归档与维护
-
-原运行JSON/JSONL按原字节保存，Git的 `.gitattributes` 禁用这些证据的换行转换。新归档登记source、bytes、SHA-256；派生文件说明输入和计算范围。对历史错误另写有来源的更正，不覆盖原件。活动文档使用相对链接，历史审计按原日期阅读。
-
-## 🗃️ 补齐的归档与每周管理
-
-| 目录 / 文档 | 作用 |
-| --- | --- |
-| [机制第一轮](mechanism100-20261016/archive-manifest.json) | 原100例排除031后的99例，73/99、25/61、FP6；结果、比较、采用与排除记录 |
-| [机制优化复测](mechanism100-optimization-rerun/archive-manifest.json) | 98/99权威、72/99、24/61、FP5；含原100分母、恢复和结束审计 |
-| [基座排序探针](infrastructure-20261018/manifest.json) | 693例语料/443例阳性的两份原始离线探针，学习排序负结果与宽度曲线 |
-| [最近一周进展](../experiment-log.md) | 统一读数、分母、失败、成本与验收边界 |
-| [历史分析索引](../archive/README.md) | 阶段计划、修复报告、完整RSI设计及旧台账 |
-
-archive-manifest/manifest记录原路径、文件字节数及SHA-256；本次新增副本与原件逐字节一致。原manifest中的旧绝对路径属于历史provenance，不因整理重写。完整逐请求日志仍在原artifacts路径，以保护回放与源文件身份。新结果先落独立运行目录，再更新本索引及实验日志，不把proof全文粘入活动文档。
+登记表区分完成、历史及未执行计划，并连接评分、轮次、冻结身份与原始路径。新实验独立建目录，所有尝试保留；历史manifest中的绝对路径和摘要不因整理重写。更新活动日志及索引，不在多个文档复制整份报告。历史审计和旧计划见[历史文档索引](../archive/README.md)，组会目录保持原样。报告与协议不是清理缓存的目标。

@@ -79,8 +79,9 @@ def run_step_tracer(
     )
     user = (
         "Find the earliest step that introduced the error.\n\n"
-        f"DELIVERED RESULT: {delivered_result}\n"
-        f"CORRECT RESULT: {correct_result}\n\nTRAJECTORY:\n" + view_text
+        "MODEL RESULT CLAIMS (unverified):\n"
+        + json.dumps({"delivered_result": delivered_result, "correct_result": correct_result}, ensure_ascii=False)
+        + "\n\nTRAJECTORY:\n" + view_text
     )
     if positive is not None:
         target = {key: positive.get(key) for key in

@@ -1,0 +1,99 @@
+{
+  "schema_version": "results.archive.v1",
+  "archive": "random100-20261019",
+  "created_at_utc": "2026-10-19T15:09:23.430823+00:00",
+  "source_directory": "artifacts/detector/live_checks/random100_20261019",
+  "scope": "随机100例真实检测（693例总体，seed=20261019）；主批次+两次补测（第二次为用户授权）；包含机制诊断、可接受性判断、优化建议、批次墙钟与2个运行期缺陷修复说明；修复前中止批次摘要保留但不采用。",
+  "files": [
+    {
+      "path": "aborted-summary.json",
+      "bytes": 8380,
+      "sha256": "b91fe0db9a2e21491ff12f95cf6349397ccd4254a32de2779047ee37675f94cf"
+    },
+    {
+      "path": "cases.json",
+      "bytes": 2483,
+      "sha256": "555231cc469802388b166871a460a9fc879e2899b6937e2acdd10b560cf3e87b"
+    },
+    {
+      "path": "config.json",
+      "bytes": 2527,
+      "sha256": "55a6ac52a933c9fe6e1060400114d38ff97966cc53e2882257316631de077b91"
+    },
+    {
+      "path": "final-evaluation.json",
+      "bytes": 60434,
+      "sha256": "caa0bab224f178a29d24777bdd31775f9b7df76d58d43eeb66c48e1ac44d119d"
+    },
+    {
+      "path": "main-evaluation.json",
+      "bytes": 136929,
+      "sha256": "679509b8e20e34d1614ca158ceff8af16bdc69a4f8ab4d2903749470e1042e90"
+    },
+    {
+      "path": "main-summary.json",
+      "bytes": 8972,
+      "sha256": "ae0babbde3bf370d96a850cd3cabe6f6d5de6064a92ffeac8e2f71cfb4b2dd8d"
+    },
+    {
+      "path": "main.log",
+      "bytes": 9052,
+      "sha256": "3d925ef02ef6dd06c1ce62c943f375279558148d08c4c2183d74da48343cf8d9"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 122309,
+      "sha256": "ae4dda6b1934902b568984d2be5d80e51c5a675387d71c3654a21ff87363dd3d"
+    },
+    {
+      "path": "recovery-evaluation.json",
+      "bytes": 4793,
+      "sha256": "c1f07d9196023084610790877fdf03a6d0ac454eb6c675ff84245053ffa67192"
+    },
+    {
+      "path": "recovery-summary.json",
+      "bytes": 2919,
+      "sha256": "6d52e142bb32a6e25ccb37d4f37b4de620f1befb43d97208b124682f938840e9"
+    },
+    {
+      "path": "recovery.log",
+      "bytes": 3460,
+      "sha256": "8002a08e0f72f79aafbe898d0543bdc3dfd4bc62429c5135e0a89293de407914"
+    },
+    {
+      "path": "recovery2-evaluation.json",
+      "bytes": 4087,
+      "sha256": "5c7fc5c1b2c9be3f12e782342d7476c3fb2226f5762fe96fe47644e7bbf7ff91"
+    },
+    {
+      "path": "recovery2-summary.json",
+      "bytes": 2856,
+      "sha256": "631be538bbf7534d1fa94018bbfe87fde3852111012c1336155d887b47d7d8a7"
+    },
+    {
+      "path": "recovery2.log",
+      "bytes": 3321,
+      "sha256": "3ebe9c1917ee05b086f32480fe3433c100162e2d6f35aea7824c0151e8f6c865"
+    },
+    {
+      "path": "recovery2_cases.json",
+      "bytes": 115,
+      "sha256": "64fa9a00b7659eaae95551013323a72d073abf644bab5981b93edf2c1106032d"
+    },
+    {
+      "path": "recovery_cases.json",
+      "bytes": 140,
+      "sha256": "6682620b059fbaae09d1bf858e841960745a4f4e1c2d282158df551c73e0a700"
+    },
+    {
+      "path": "report.md",
+      "bytes": 19107,
+      "sha256": "308ab4346d682dcf460255222eb74b2c4bc9513bce83c97607238c6d71d0ec80"
+    },
+    {
+      "path": "sample.json",
+      "bytes": 13241,
+      "sha256": "5b5875b7988457cbfe3d9ffb24f71711b5e0ebfb3086dcf5bb1605c44dc8743b"
+    }
+  ]
+}

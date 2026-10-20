@@ -1,0 +1,22 @@
+{
+  "before_counts": {
+    "other_preserved": 17662,
+    "current_document": 8,
+    "raw_log_or_journal_preserved": 2581,
+    "experiment_script_preserved": 163,
+    "frozen_inputs": 703,
+    "historical_document": 19,
+    "group_meeting_untouched": 1,
+    "versioned_result_evidence": 146,
+    "formal_tool": 30
+  },
+  "experiment_script_policy": "Keep in original experiment directory as historical reproduction; no automatic resume of completed runs.",
+  "current_document_ownership": {
+    "README.md": "navigation and quick usage",
+    "docs/technical-solution.md": "implemented contracts and executable script catalog",
+    "docs/research-positioning-and-roadmap.md": "proposed research and boundaries",
+    "docs/experiment-log.md": "one main record per study with all recovery rounds",
+    "docs/results/README.md": "evidence locations",
+    "IMPLEMENTATION_PLAN.md": "current four-field checkpoint"
+  }
+}

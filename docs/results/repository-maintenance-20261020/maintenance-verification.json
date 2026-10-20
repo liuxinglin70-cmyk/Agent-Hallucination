@@ -1,0 +1,70 @@
+{
+  "passed": true,
+  "unchanged_noneditable_files": 21272,
+  "deleted_files": 320,
+  "editable_documents": [
+    "IMPLEMENTATION_PLAN.md",
+    "README.md",
+    "docs/experiment-log.md",
+    "docs/research-positioning-and-roadmap.md",
+    "docs/technical-solution.md",
+    "docs/archive/README.md",
+    "docs/results/README.md",
+    "scripts/README.md"
+  ],
+  "group_meeting_files_unchanged": 1,
+  "all_scripts_unchanged": 30,
+  "cost_calibration_bytes_unchanged": true,
+  "active_local_links": 171,
+  "new_live_calls": 0,
+  "cost_consumer_tests": {
+    "tests": 11,
+    "failures": 0,
+    "errors": 0
+  },
+  "full693_preservation": {
+    "passed": true,
+    "provider_calls": 0,
+    "historical_files": 2849,
+    "result_hashes": 710
+  },
+  "document_sizes": {
+    "IMPLEMENTATION_PLAN.md": {
+      "before": 6915,
+      "after": 3087
+    },
+    "README.md": {
+      "before": 5900,
+      "after": 5521
+    },
+    "docs/archive/README.md": {
+      "before": 2740,
+      "after": 3478
+    },
+    "docs/experiment-log.md": {
+      "before": 36638,
+      "after": 26660
+    },
+    "docs/research-positioning-and-roadmap.md": {
+      "before": 56979,
+      "after": 53654
+    },
+    "docs/results/README.md": {
+      "before": 14765,
+      "after": 4666
+    },
+    "docs/technical-solution.md": {
+      "before": 94517,
+      "after": 94832
+    },
+    "scripts/README.md": {
+      "before": 3823,
+      "after": 277
+    }
+  },
+  "experiment_studies_registered": 10,
+  "source_or_config_changes": 0,
+  "deleted_bytes": 9058867,
+  "cleaned_directories": 20,
+  "registered_auxiliary_raw_directories": 8
+}

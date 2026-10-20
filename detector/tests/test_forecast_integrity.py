@@ -2,7 +2,6 @@
 
 from copy import deepcopy
 import json
-import re
 from pathlib import Path
 import pytest
 
@@ -231,7 +230,8 @@ def install_full_chain(monkeypatch, *, upgrade=True, defend="substantiated"):
             assert "correct_result" not in kwargs["user"] and '"is_hallucination"' not in kwargs["user"]
             parsed = {"candidates": []}
         elif purpose == "causal_upgrade":
-            ids = re.findall(r"^- ([^: ]+):", kwargs["user"], re.M)
+            ids = [c["candidate_id"] for c in json.JSONDecoder().raw_decode(
+                kwargs["user"].split("CANDIDATES:\n", 1)[1])[0]]
             parsed = {"upgrades": [{"candidate_id": cid, "content_error": upgrade, "causal": upgrade,
                                     "corrected_step": 1 if upgrade else None,
                                     "reason": "Recompute the literal result and inspect its adoption.", "evidence_refs": []}
@@ -267,6 +267,12 @@ def test_forecast_candidate_must_pass_existing_upgrade_and_defense(monkeypatch, 
     if expected == "verified_error":
         assert result["decision_authority"] == result["localization_authority"] == "authoritative"
         assert result["responsible_step"] == 1
+
+
+def test_comparison_repair_prompt_is_admissible_under_json_mode():
+    from detector.action_forecast import COMPARISON_REPAIR_SYSTEM
+
+    assert "json" in COMPARISON_REPAIR_SYSTEM.lower()
 
 
 def test_comparison_repair_cannot_change_the_base_judge(monkeypatch):

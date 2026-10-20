@@ -1,0 +1,170 @@
+{
+  "schema": "repository.experiment_registry.v1",
+  "updated": "2026-10-20 Asia/Singapore",
+  "narrative_log": "docs/experiment-log.md",
+  "path_base": "repository_root",
+  "studies": [
+    {
+      "study_id": "full693-20261020",
+      "status": "completed_with_unresolved_retry_limit",
+      "evidence": "docs/results/full693-20261020/report.md",
+      "entry_sha256": "abd73f354d03021e0dee6c661b003a814f45d077c24a41237204fa6095e9d69a",
+      "raw_roots": [
+        "artifacts/detector/live_checks/full693_20261020"
+      ],
+      "further_retries": false,
+      "rounds": [
+        {
+          "run_id": "smoke3",
+          "raw": "artifacts/detector/live_checks/full693_20261020/runs/smoke3"
+        },
+        {
+          "run_id": "full693_main",
+          "raw": "artifacts/detector/live_checks/full693_20261020/runs/full693_main"
+        },
+        {
+          "run_id": "full693_recovery1",
+          "raw": "artifacts/detector/live_checks/full693_20261020/runs/full693_recovery1"
+        },
+        {
+          "run_id": "full693_failed2",
+          "raw": "artifacts/detector/live_checks/full693_20261020/runs/full693_failed2"
+        },
+        {
+          "run_id": "full693_degraded1",
+          "raw": "artifacts/detector/live_checks/full693_20261020/runs/full693_degraded1"
+        }
+      ]
+    },
+    {
+      "study_id": "random100-20261019",
+      "status": "completed_with_unresolved",
+      "evidence": "docs/results/random100-20261019/report.md",
+      "entry_sha256": "308ab4346d682dcf460255222eb74b2c4bc9513bce83c97607238c6d71d0ec80",
+      "raw_roots": [
+        "artifacts/detector/live_checks/random100_20261019"
+      ]
+    },
+    {
+      "study_id": "next-action-validation100-20261018",
+      "status": "completed_frozen_acceptance_not_met",
+      "evidence": "docs/results/next-action-validation100-20261018/report.md",
+      "entry_sha256": "2ef77887d49cbbe25af1cefeaca781b6a9d1b85fec594d2b39927fc75dba0f12",
+      "raw_roots": [
+        "artifacts/detector/live_checks/next_action_validation100_20261017",
+        "artifacts/detector/live_checks/next_action_validation100_round2_20261018"
+      ]
+    },
+    {
+      "study_id": "mechanism100-20261016",
+      "status": "historical_completed",
+      "evidence": "docs/results/mechanism100-20261016/report.md",
+      "entry_sha256": "2dc9fa39389a79e3fa650dcc5851bfc4e6ea75f5c502615889fece3167aec40f",
+      "raw_roots": [
+        "artifacts/detector/live_checks/mechanism100_20261016"
+      ]
+    },
+    {
+      "study_id": "mechanism100-optimization-rerun",
+      "status": "historical_completed",
+      "evidence": "docs/results/mechanism100-optimization-rerun/final-summary.md",
+      "entry_sha256": "1af7cc4c25e08275a9f354a7b8f4ab7dcaeded703b286437d7c0dcd5a144a2f3",
+      "raw_roots": [
+        "artifacts/detector/live_checks/mechanism100_optimization_rerun"
+      ]
+    },
+    {
+      "study_id": "next-action100-20261015",
+      "status": "historical_completed",
+      "evidence": "docs/results/next-action100-20261015/report.md",
+      "entry_sha256": "0a050f03e2c1d2c81d26a61ffe38452bc346370e3594d39f620bf92c5625f0af",
+      "raw_roots": [
+        "artifacts/detector/live_checks/next_action100_20261015"
+      ]
+    },
+    {
+      "study_id": "localization100-20261015",
+      "status": "historical_completed_with_unresolved",
+      "evidence": "docs/results/localization100-20261015/final-evaluation.json",
+      "entry_sha256": "77cb5770245e31f5079a767bdd6b2cb48afc15526042a350211f91ce3dbe9367",
+      "raw_roots": [
+        "artifacts/detector/live_checks/live100_20261013_recovered",
+        "artifacts/detector/live_checks/live100_20261014_full",
+        "artifacts/detector/live_checks/live7_20261015_recovery"
+      ]
+    },
+    {
+      "study_id": "full693-20260927",
+      "status": "historical_g0_653",
+      "evidence": "docs/results/full693-20260927/baseline_report.json",
+      "entry_sha256": "f90208a68bae2b90ee976c8d91e62bdfa8e7b28a5b3eab10c928e8555d4d75db",
+      "raw_roots": [
+        "artifacts/full693-20260924T143024Z"
+      ]
+    },
+    {
+      "study_id": "infrastructure-20261018",
+      "status": "offline_probe_completed",
+      "evidence": "docs/results/infrastructure-20261018/manifest.json",
+      "entry_sha256": "ef483581e0643f039f93646d82eb217ab45ba93829b84c5a476731b19b56ee9c",
+      "raw_roots": []
+    },
+    {
+      "study_id": "api-capacity-20261019",
+      "status": "synthetic_capacity_completed",
+      "evidence": "docs/results/api-capacity-20261019/report.md",
+      "entry_sha256": "20ae30a81eef218139f16b41fe61b2f48e5fec75bb2c724c03ab80fadd4ecfed",
+      "raw_roots": [
+        "artifacts/api-capacity/20261019"
+      ]
+    }
+  ],
+  "unexecuted_plans": [
+    {
+      "path": "datasets/protocols/evolution_g0_reuse_20260928.json",
+      "status": "frozen_plan_not_new_completed_measurement"
+    }
+  ],
+  "auxiliary_raw_directories": [
+    {
+      "path": "artifacts/detector/live_checks/live100_20261012_localization",
+      "classification": "historical_auxiliary_or_preliminary",
+      "policy": "Preserve original logs; not silently merged into any completed result denominator."
+    },
+    {
+      "path": "artifacts/detector/live_checks/live100_20261014_optimized",
+      "classification": "historical_auxiliary_or_preliminary",
+      "policy": "Preserve original logs; not silently merged into any completed result denominator."
+    },
+    {
+      "path": "artifacts/detector/live_checks/live10_20261012_riskv2",
+      "classification": "historical_auxiliary_or_preliminary",
+      "policy": "Preserve original logs; not silently merged into any completed result denominator."
+    },
+    {
+      "path": "artifacts/detector/live_checks/live28_20261013_recovery",
+      "classification": "historical_auxiliary_or_preliminary",
+      "policy": "Preserve original logs; not silently merged into any completed result denominator."
+    },
+    {
+      "path": "artifacts/detector/live_checks/live5_20261012_185056",
+      "classification": "historical_auxiliary_or_preliminary",
+      "policy": "Preserve original logs; not silently merged into any completed result denominator."
+    },
+    {
+      "path": "artifacts/detector/live_checks/next_action_ab100_20261017",
+      "classification": "historical_auxiliary_or_preliminary",
+      "policy": "Preserve original logs; not silently merged into any completed result denominator."
+    },
+    {
+      "path": "artifacts/detector/live_checks/next_action_smoke10_20261017",
+      "classification": "historical_auxiliary_or_preliminary",
+      "policy": "Preserve original logs; not silently merged into any completed result denominator."
+    },
+    {
+      "path": "artifacts/detector/live_checks/next_action_smoke6_20261017",
+      "classification": "historical_auxiliary_or_preliminary",
+      "policy": "Preserve original logs; not silently merged into any completed result denominator."
+    }
+  ]
+}

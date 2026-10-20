@@ -37,6 +37,7 @@ from pathlib import Path
 import threading
 import sys
 import time
+from datetime import datetime
 from typing import Any, Callable, Mapping, Sequence
 
 from detector.api import Detector
@@ -648,6 +649,12 @@ def _summarize(
             "error_type": "incomplete_batch",
             "message": f"{len(missing)} case(s) produced no row",
         }
+    finished_at = utc_now()
+    started_at = manifest.get("started_at")
+    wall_clock_seconds = (
+        datetime.fromisoformat(finished_at.replace("Z", "+00:00"))
+        - datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+    ).total_seconds() if started_at is not None else None
     return {
         "schema_version": SUMMARY_SCHEMA,
         "run_id": run_id,
@@ -682,5 +689,6 @@ def _summarize(
             "peak_provider_inflight": peak_provider_inflight,
         },
         "stop": dict(stop_reason),
-        "finished_at": utc_now(),
+        "finished_at": finished_at,
+        "wall_clock_seconds": wall_clock_seconds,
     }

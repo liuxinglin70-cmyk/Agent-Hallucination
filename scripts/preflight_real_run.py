@@ -46,6 +46,8 @@ CHECK_ORDER = (
     "gates_satisfiable",
     "timeouts",
     "budget",
+    "forecast_budget",
+    "forecast_alignment",
     "long_tail",
     "credentials",
     "detector_env",
@@ -443,6 +445,65 @@ def check_budget(report: Report, cfg: dict, phase: str) -> dict:
     return parts
 
 
+def check_forecast_budget(report: Report, cfg: dict) -> None:
+    """Two optional predictions need two conservative output reservations."""
+    from detector.config import load_config
+
+    try:
+        detector = load_config(cfg["detector_config"], require_credentials=False)
+    except (OSError, ValueError) as exc:
+        _blocker(report, "forecast_budget", f"detector config unreadable: {exc}")
+        return
+    policy = detector["causal_audit"]
+    if (policy["next_action_mode"] == "off"
+            or policy["max_added_provider_requests_per_case"] < 2):
+        _ok(report, "forecast_budget", "two-forecast output capacity not required by this policy")
+        return
+    total = policy["max_added_output_tokens_per_case"]
+    per_request = policy["max_forecast_output_tokens_per_request"]
+    required = 2 * per_request
+    detail = (f"max_added_output_tokens_per_case={total}; two forecasts require "
+              f"2 * {per_request} = {required} output tokens")
+    if total < required:
+        _blocker(report, "forecast_budget", detail + "; the second forecast can be refused after the first reservation")
+    else:
+        _ok(report, "forecast_budget", detail)
+
+
+def check_forecast_alignment(report: Report, cfg: dict, cases: list[str]) -> None:
+    """Report missing turn metadata without guessing task boundaries."""
+    from detector.dataset import load_case
+
+    affected = []
+    unreadable = []
+    families: dict[str, int] = {}
+    for case in cases:
+        try:
+            record, _ = load_case(cfg["dataset_root"], case)
+        except (OSError, ValueError) as exc:
+            unreadable.append(f"{case}: {exc}")
+            continue
+        question = record.get("question")
+        history = record.get("history") or []
+        if not isinstance(question, list) or len(question) < 2:
+            continue
+        if any(isinstance(event, dict) and (event.get("task_turn") is not None
+                                          or event.get("role") == "user") for event in history):
+            continue
+        affected.append(case)
+        family = case.split("/", 1)[0]
+        families[family] = families.get(family, 0) + 1
+    detail = (f"{len(affected)} case(s) have a multi-turn question and no task_turn/user events")
+    if affected:
+        detail += (f"; families={dict(sorted(families.items()))}; examples={affected[:5]}; "
+                   "model forecasts will be skipped because task alignment is unknown")
+    if unreadable:
+        detail += f"; {len(unreadable)} case(s) could not be scanned: {unreadable[:3]}"
+    emit = _warn if affected or unreadable else _ok
+    emit(report, "forecast_alignment", detail, affected_cases=len(affected),
+         families=dict(sorted(families.items())), cases=affected[:5], unreadable=unreadable[:3])
+
+
 def check_long_tail(report: Report, cfg: dict, phase: str) -> None:
     """The known slow cases decide the floor, so they must be inside budget."""
     if phase == "baseline":
@@ -730,6 +791,8 @@ def main() -> int:
     check_gates_satisfiable(report, cfg, args.phase)
     check_timeouts(report, cfg)
     check_budget(report, cfg, args.phase)
+    check_forecast_budget(report, cfg)
+    check_forecast_alignment(report, cfg, cases)
     check_long_tail(report, cfg, args.phase)
     check_credentials(report, cfg, args.phase)
     check_detector_env(report, cfg)

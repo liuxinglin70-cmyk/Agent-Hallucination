@@ -1,0 +1,326 @@
+{
+  "schema_version": "detector.baseline_report.v1",
+  "run_id": "full693_failed2",
+  "dataset_root": "E:\\agent hallucination\\agent hallucination\\datasets\\raw\\agenthallu\\AgentHallu",
+  "runs_root": "E:\\agent hallucination\\agent hallucination\\artifacts\\detector\\live_checks\\full693_20261020\\runs",
+  "generated_at_utc": "2026-10-19T22:22:10.453969+00:00",
+  "case_list": {
+    "cases": [
+      "Camel/039.json"
+    ]
+  },
+  "batch": {
+    "schema_version": "detector.run_summary.v3",
+    "run_id": "full693_failed2",
+    "cases": [
+      "Camel/039.json"
+    ],
+    "completed": 1,
+    "case_sources": {
+      "Camel/039.json": "measured"
+    },
+    "state_counts": {
+      "verified_error": 1,
+      "verified_clean": 0,
+      "unresolved": 0
+    },
+    "measurement": {
+      "requested": 1,
+      "returned": 1,
+      "missing": 0,
+      "missing_cases": [],
+      "status_counts": {
+        "authoritative": 1
+      },
+      "authoritative": 1,
+      "measured": 1,
+      "not_started": 0,
+      "not_started_cases": [],
+      "elapsed_seconds": 530.2,
+      "attempt_id": "001_20261019T230844",
+      "attempts": 1,
+      "deadline_seconds": null,
+      "usage": {
+        "completion_tokens": 101676,
+        "prompt_tokens": 245045,
+        "total_tokens": 346721,
+        "prompt_tokens_details": {
+          "cached_tokens": 98304
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 96693
+        }
+      },
+      "usage_missing_attempts": 0,
+      "usage_unknown_cases": 0,
+      "invocation_cost": {
+        "elapsed_seconds": 530.2,
+        "usage": {
+          "completion_tokens": 101676,
+          "prompt_tokens": 245045,
+          "total_tokens": 346721,
+          "prompt_tokens_details": {
+            "cached_tokens": 98304
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 96693
+          }
+        },
+        "usage_source": "request_observations",
+        "provider_attempts": 17,
+        "usage_missing_attempts": 0,
+        "usage_unknown_cases": 0
+      },
+      "case_attempt_cost": {
+        "elapsed_seconds": 530.2,
+        "usage": {
+          "completion_tokens": 101676,
+          "prompt_tokens": 245045,
+          "total_tokens": 346721,
+          "prompt_tokens_details": {
+            "cached_tokens": 98304
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 96693
+          }
+        },
+        "usage_source": "request_observations",
+        "provider_attempts": 17,
+        "usage_missing_attempts": 0,
+        "usage_unknown_cases": 0
+      },
+      "run_lifetime_cost": {
+        "elapsed_seconds": 530.2,
+        "usage": {
+          "completion_tokens": 101676,
+          "prompt_tokens": 245045,
+          "total_tokens": 346721,
+          "prompt_tokens_details": {
+            "cached_tokens": 98304
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 96693
+          }
+        },
+        "usage_source": "request_observations",
+        "provider_attempts": 17,
+        "usage_missing_attempts": 0,
+        "usage_unknown_cases": 0
+      },
+      "peak_provider_inflight": 6
+    },
+    "stop": {},
+    "finished_at": "2026-10-19T22:17:34.999220+00:00",
+    "wall_clock_seconds": 530.373202
+  },
+  "metrics": {
+    "decisive": 1,
+    "unresolved": 0,
+    "completion": 1.0,
+    "decisive_accuracy": 1.0,
+    "all_case_accuracy": 1.0,
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "tn": 0,
+    "positive_precision": 1.0,
+    "positive_recall": 1.0,
+    "positive_f1": 1.0,
+    "macro_precision": 0.5,
+    "macro_recall": 0.5,
+    "macro_f1": 0.5,
+    "authoritative": 1,
+    "degraded": 0,
+    "degraded_disagreeing": 0,
+    "terminal_metrics": {
+      "decisive": 1,
+      "unresolved": 0,
+      "completion": 1.0,
+      "decisive_accuracy": 1.0,
+      "all_case_accuracy": 1.0,
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "tn": 0,
+      "positive_precision": 1.0,
+      "positive_recall": 1.0,
+      "positive_f1": 1.0,
+      "macro_precision": 0.5,
+      "macro_recall": 0.5,
+      "macro_f1": 0.5
+    },
+    "provider_unresolved": 0,
+    "no_terminal_decision": 0,
+    "requested_cases": 1,
+    "found_results": 1,
+    "missing_cases": 0,
+    "step_localization": {
+      "target": "dataset_first_error_event.v1",
+      "step_unit": "trajectory_event_position",
+      "unmapped_annotations": 0,
+      "target_mismatch_rows": 0,
+      "n": 1,
+      "hits": 0,
+      "accuracy": 0.0,
+      "by_step_kind": {
+        "action_step": {
+          "n": 1,
+          "hits": 0,
+          "accuracy": 0.0
+        }
+      },
+      "note": "action-step and content-step accuracy answer different questions; read them apart, never as one rate"
+    }
+  },
+  "by_source": {
+    "Camel": {
+      "n": 1,
+      "metrics": {
+        "decisive": 1,
+        "unresolved": 0,
+        "completion": 1.0,
+        "decisive_accuracy": 1.0,
+        "all_case_accuracy": 1.0,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "positive_precision": 1.0,
+        "positive_recall": 1.0,
+        "positive_f1": 1.0,
+        "macro_precision": 0.5,
+        "macro_recall": 0.5,
+        "macro_f1": 0.5
+      }
+    }
+  },
+  "by_gold": {
+    "error": {
+      "n": 1,
+      "metrics": {
+        "decisive": 1,
+        "unresolved": 0,
+        "completion": 1.0,
+        "decisive_accuracy": 1.0,
+        "all_case_accuracy": 1.0,
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "tn": 0,
+        "positive_precision": 1.0,
+        "positive_recall": 1.0,
+        "positive_f1": 1.0,
+        "macro_precision": 0.5,
+        "macro_recall": 0.5,
+        "macro_f1": 0.5
+      }
+    }
+  },
+  "coverage": {
+    "requested_cases": 1,
+    "found_results": 1,
+    "missing_cases": [],
+    "authoritative": 1,
+    "degraded": 0,
+    "degraded_disagreeing": 0,
+    "no_terminal_decision": 0,
+    "provider_unresolved": 0,
+    "undecided_decomposition": {
+      "metrics_unresolved": 0,
+      "degraded_rows_with_a_non_authoritative_answer": 0,
+      "rows_with_no_answer_at_all": 0,
+      "identity": "metrics.unresolved == degraded + no_terminal_decision + degraded rows that were also wrong (already inside degraded)"
+    },
+    "state_counts": {
+      "verified_error": 1
+    },
+    "authority_counts": {
+      "authoritative": 1
+    }
+  },
+  "timing": {
+    "measured_cases": 1,
+    "unmeasured_cases": 0,
+    "sum_seconds": 530.2,
+    "mean_seconds": 530.2,
+    "min_seconds": 530.2,
+    "p50_seconds": 530.2,
+    "p90_seconds": 530.2,
+    "max_seconds": 530.2,
+    "slowest": [
+      {
+        "case": "Camel/039.json",
+        "elapsed_seconds": 530.2
+      }
+    ]
+  },
+  "usage": {
+    "measured_cases": 1,
+    "unmeasured_cases": 0,
+    "total": {
+      "completion_tokens": 101676,
+      "prompt_tokens": 245045,
+      "total_tokens": 346721,
+      "prompt_tokens_details": {
+        "cached_tokens": 98304
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 96693
+      }
+    },
+    "usage_source": "request_observations",
+    "total_tokens": 346721,
+    "mean_tokens_per_case": 346721.0,
+    "max_tokens_case": [
+      346721.0,
+      "Camel/039.json"
+    ],
+    "attempts_without_usage": 0,
+    "cases_with_missing_usage": 0,
+    "usage_unknown_cases": 0,
+    "total_is_lower_bound": false,
+    "scope": "Sum of provider counters actually returned; every attempt reported usage metadata.",
+    "per_case": [
+      {
+        "case": "Camel/039.json",
+        "usage": {
+          "completion_tokens": 101676,
+          "prompt_tokens": 245045,
+          "total_tokens": 346721,
+          "prompt_tokens_details": {
+            "cached_tokens": 98304
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 96693
+          }
+        },
+        "usage_source": "request_observations"
+      }
+    ]
+  },
+  "errors": [],
+  "degraded_disagreements": [],
+  "rows": [
+    {
+      "case": "Camel/039.json",
+      "gold": true,
+      "prediction": true,
+      "terminal_prediction": true,
+      "gold_step": 3,
+      "gold_step_mapping": {
+        "target": "dataset_first_error_event.v1",
+        "annotation": 3,
+        "position": 3,
+        "mapping_state": "source_step"
+      },
+      "localization_target": "dataset_first_error_event.v1",
+      "localization_authority": "authoritative",
+      "responsible_step": 6,
+      "responsible_step_kind": "action_step",
+      "state": "verified_error",
+      "authority": "authoritative",
+      "source": "Camel",
+      "elapsed_seconds": 530.2
+    }
+  ]
+}

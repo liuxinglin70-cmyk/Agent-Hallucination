@@ -1,0 +1,58 @@
+{
+  "authorized": "deep preflight, demonstrated root-cause repair, live smoke, full693, uniform authority recovery, background supervision and half-hour followup",
+  "automation_id": "693",
+  "main_workers": 16,
+  "provider_concurrency": 16,
+  "memory_reason": "8 GB physical memory; about 1.6 GB available before start; bound isolated provider subprocesses",
+  "poll_seconds": 30,
+  "baseline": "artifacts\\detector\\live_checks\\random100_20261019\\final-evaluation.json",
+  "performance_guard": {
+    "min_common_authoritative": 60,
+    "accuracy_drop_points": 20,
+    "minimum_net_regressions": 12,
+    "action": "stop new submissions, drain in-flight work, preserve artifacts, require diagnosis",
+    "user_adjustment": "User requested looser thresholds to avoid early sample variance."
+  },
+  "selection_rule": "Preserve previous adopted rows; only replace six previously non-authoritative rows if the fixed class-round2 result is authoritative.",
+  "restart": "python -u artifacts/detector/live_checks/full693_20261020/supervise.py; OS writer lease prevents overlap; reuses committed results. Read attention.json and stop reason before restarting.",
+  "constraints": [
+    "no evolution",
+    "no gold-conditioned retries",
+    "no mixing source/config/input identities",
+    "no git commit or push"
+  ],
+  "source_frozen": true,
+  "temporary_idle_sleep_hold": {
+    "pid": 14824,
+    "mode": "ES_SYSTEM_REQUIRED; display and permanent power configuration unchanged",
+    "release": "when supervisor exits or completes"
+  },
+  "scheduled_review_minutes": 30,
+  "scheduled_review_scope": "Progress, runtime health, authority and paired performance; judge whether evidence warrants correction each run.",
+  "audit_fix_handover": {
+    "watcher_pid": 12812,
+    "original_controller_pid": 7588,
+    "script": "resume_after_audit_fix.py",
+    "scope": "Only after obsolete final audit AssertionError, all 693 committed and no run stop, corrected audit passes all existing results; do not interrupt live work or repeat main cases."
+  },
+  "review_command": "python artifacts/detector/live_checks/full693_20261020/review_progress.py",
+  "finalize_command": "python artifacts/detector/live_checks/full693_20261020/finalize_report.py",
+  "finalize_scope": "Run only after controller phase=complete; independent commit/adjudication, uniform selection, same-case detection/localization, all-attempt journals, timing and immutable archive; no provider calls.",
+  "finalizer_background": {
+    "pid": 10608,
+    "script": "finalize_when_complete.py",
+    "state": "finalizer-state.json",
+    "scope": "Wait for current controller complete; independently audit, archive and update docs without provider calls. Do not launch a duplicate finalizer."
+  },
+  "latest_authorization": {
+    "scope": "second and final uniform category recovery",
+    "policy": "category-round2-policy.json",
+    "run_ids": [
+      "full693_failed2",
+      "full693_degraded1"
+    ],
+    "detector_changes_forbidden": true,
+    "further_rounds_after_this": 0
+  },
+  "do_not_run_legacy_finalizer": true
+}
