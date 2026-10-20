@@ -1,0 +1,345 @@
+{
+  "created": "2026-10-20T05:35:39.623006+00:00",
+  "scoring": "Original author693 denominator, missing predictions wrong; localization uses raw source step /443 for all systems",
+  "standard": {
+    "accuracy": 0.6551226551226551,
+    "precision": 0.6192140790742526,
+    "recall": 0.6065191873589165,
+    "f1_score": 0.6095288567548512,
+    "confusion_matrix": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        108,
+        142
+      ],
+      [
+        1,
+        96,
+        346
+      ]
+    ],
+    "steps_conditional_accuracy": 0.40857787810383744,
+    "num_samples": 693
+  },
+  "stepwise": {
+    "accuracy": 0.6681096681096681,
+    "precision": 0.6318537358451982,
+    "recall": 0.5931512415349888,
+    "f1_score": 0.5909384880712849,
+    "confusion_matrix": [
+      [
+        81,
+        169
+      ],
+      [
+        61,
+        382
+      ]
+    ],
+    "steps_conditional_accuracy": 0.4604966139954853,
+    "num_samples": 693
+  },
+  "framework_all693": {
+    "accuracy": 0.7662337662337663,
+    "precision": 0.7562043421861132,
+    "recall": 0.7701038374717832,
+    "f1_score": 0.7582012242975985,
+    "confusion_matrix": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        196,
+        53
+      ],
+      [
+        2,
+        106,
+        335
+      ]
+    ],
+    "steps_conditional_accuracy": 0.4650112866817156,
+    "num_samples": 693
+  },
+  "framework_authoritative690": {
+    "decisive": 690,
+    "unresolved": 3,
+    "completion": 0.9956709956709957,
+    "decisive_accuracy": 0.7695652173913043,
+    "all_case_accuracy": 0.7662337662337663,
+    "tp": 335,
+    "fp": 53,
+    "fn": 106,
+    "tn": 196,
+    "positive_precision": 0.8634020618556701,
+    "positive_recall": 0.7596371882086168,
+    "positive_f1": 0.8082026537997588,
+    "macro_precision": 0.7562043421861132,
+    "macro_recall": 0.7733928912930634,
+    "macro_f1": 0.7598182053027831,
+    "step_localization": {
+      "hits": 206,
+      "n": 443,
+      "accuracy": 0.4650112866817156
+    }
+  },
+  "paired": {
+    "standard_to_stepwise": {
+      "detection": {
+        "n": 692,
+        "before_correct": 454,
+        "after_correct": 462,
+        "fixes": 53,
+        "regressions": 45
+      },
+      "raw_step_localization": {
+        "n": 442,
+        "before_correct": 181,
+        "after_correct": 204,
+        "fixes": 62,
+        "regressions": 39
+      },
+      "detection_by_gold": {
+        "True": {
+          "n": 442,
+          "before_correct": 346,
+          "after_correct": 381,
+          "fixes": 41,
+          "regressions": 6
+        },
+        "False": {
+          "n": 250,
+          "before_correct": 108,
+          "after_correct": 81,
+          "fixes": 12,
+          "regressions": 39
+        }
+      },
+      "by_family": {
+        "BFCL": {
+          "n": 164,
+          "before_correct": 86,
+          "after_correct": 99,
+          "fixes": 27,
+          "regressions": 14
+        },
+        "Camel": {
+          "n": 93,
+          "before_correct": 59,
+          "after_correct": 55,
+          "fixes": 2,
+          "regressions": 6
+        },
+        "Magentic_One": {
+          "n": 94,
+          "before_correct": 65,
+          "after_correct": 59,
+          "fixes": 3,
+          "regressions": 9
+        },
+        "Octotools": {
+          "n": 47,
+          "before_correct": 33,
+          "after_correct": 32,
+          "fixes": 2,
+          "regressions": 3
+        },
+        "OpenDeepSearch": {
+          "n": 100,
+          "before_correct": 74,
+          "after_correct": 77,
+          "fixes": 8,
+          "regressions": 5
+        },
+        "OpenManus": {
+          "n": 103,
+          "before_correct": 71,
+          "after_correct": 70,
+          "fixes": 5,
+          "regressions": 6
+        },
+        "SmolAgents": {
+          "n": 91,
+          "before_correct": 66,
+          "after_correct": 70,
+          "fixes": 6,
+          "regressions": 2
+        }
+      }
+    },
+    "stepwise_to_framework": {
+      "detection": {
+        "n": 690,
+        "before_correct": 461,
+        "after_correct": 531,
+        "fixes": 140,
+        "regressions": 70
+      },
+      "raw_step_localization": {
+        "n": 441,
+        "before_correct": 202,
+        "after_correct": 206,
+        "fixes": 77,
+        "regressions": 73
+      },
+      "detection_by_gold": {
+        "True": {
+          "n": 441,
+          "before_correct": 380,
+          "after_correct": 335,
+          "fixes": 19,
+          "regressions": 64
+        },
+        "False": {
+          "n": 249,
+          "before_correct": 81,
+          "after_correct": 196,
+          "fixes": 121,
+          "regressions": 6
+        }
+      },
+      "by_family": {
+        "BFCL": {
+          "n": 164,
+          "before_correct": 99,
+          "after_correct": 102,
+          "fixes": 31,
+          "regressions": 28
+        },
+        "Camel": {
+          "n": 92,
+          "before_correct": 55,
+          "after_correct": 81,
+          "fixes": 28,
+          "regressions": 2
+        },
+        "Magentic_One": {
+          "n": 94,
+          "before_correct": 59,
+          "after_correct": 73,
+          "fixes": 25,
+          "regressions": 11
+        },
+        "Octotools": {
+          "n": 46,
+          "before_correct": 31,
+          "after_correct": 34,
+          "fixes": 8,
+          "regressions": 5
+        },
+        "OpenDeepSearch": {
+          "n": 100,
+          "before_correct": 77,
+          "after_correct": 83,
+          "fixes": 18,
+          "regressions": 12
+        },
+        "OpenManus": {
+          "n": 104,
+          "before_correct": 71,
+          "after_correct": 83,
+          "fixes": 20,
+          "regressions": 8
+        },
+        "SmolAgents": {
+          "n": 90,
+          "before_correct": 69,
+          "after_correct": 75,
+          "fixes": 10,
+          "regressions": 4
+        }
+      }
+    },
+    "standard_to_framework": {
+      "detection": {
+        "n": 689,
+        "before_correct": 452,
+        "after_correct": 531,
+        "fixes": 139,
+        "regressions": 60
+      },
+      "raw_step_localization": {
+        "n": 440,
+        "before_correct": 180,
+        "after_correct": 206,
+        "fixes": 82,
+        "regressions": 56
+      },
+      "detection_by_gold": {
+        "True": {
+          "n": 440,
+          "before_correct": 344,
+          "after_correct": 335,
+          "fixes": 41,
+          "regressions": 50
+        },
+        "False": {
+          "n": 249,
+          "before_correct": 108,
+          "after_correct": 196,
+          "fixes": 98,
+          "regressions": 10
+        }
+      },
+      "by_family": {
+        "BFCL": {
+          "n": 164,
+          "before_correct": 86,
+          "after_correct": 102,
+          "fixes": 37,
+          "regressions": 21
+        },
+        "Camel": {
+          "n": 92,
+          "before_correct": 59,
+          "after_correct": 81,
+          "fixes": 25,
+          "regressions": 3
+        },
+        "Magentic_One": {
+          "n": 94,
+          "before_correct": 65,
+          "after_correct": 73,
+          "fixes": 19,
+          "regressions": 11
+        },
+        "Octotools": {
+          "n": 46,
+          "before_correct": 32,
+          "after_correct": 34,
+          "fixes": 7,
+          "regressions": 5
+        },
+        "OpenDeepSearch": {
+          "n": 100,
+          "before_correct": 74,
+          "after_correct": 83,
+          "fixes": 19,
+          "regressions": 10
+        },
+        "OpenManus": {
+          "n": 103,
+          "before_correct": 71,
+          "after_correct": 83,
+          "fixes": 18,
+          "regressions": 6
+        },
+        "SmolAgents": {
+          "n": 90,
+          "before_correct": 65,
+          "after_correct": 75,
+          "fixes": 14,
+          "regressions": 4
+        }
+      }
+    }
+  }
+}

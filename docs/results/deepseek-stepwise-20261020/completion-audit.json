@@ -1,0 +1,36 @@
+{
+  "created": "2026-10-20T05:35:35.480169+00:00",
+  "frozen_identity_matches": true,
+  "all_case_commits_present": true,
+  "unique_cases": 693,
+  "accepted": 693,
+  "unresolved": [],
+  "possible_prefixes": 5269,
+  "queried_prefixes": 3303,
+  "skipped_after_first_true": 1966,
+  "decoded_prefixes": 3303,
+  "unusable_boolean_prefixes": 0,
+  "cases_with_gaps": 0,
+  "prompt_schema_notes": 14,
+  "started": 3308,
+  "finished": 3308,
+  "actual_peak_concurrent_requests": 64,
+  "response_models": {
+    "deepseek-v4-1-flash-261017": 3308
+  },
+  "missing_usage": 0,
+  "author_scorer_recomputed": true,
+  "prefix_order_and_first_true_rule_independently_replayed": true,
+  "no_requests_after_first_true": true,
+  "per_case_raw_outputs_retained": true,
+  "geval_performed": false,
+  "adapter_preflight": {
+    "time": "2026-10-20T05:15:05.185681+00:00",
+    "test_file": "test_stepwise.py",
+    "sha256": "33ed644ce6464ea7d66d995f4dc8c4e5c4bc76e483fefbbce233edee99d706b6",
+    "returncode": 0,
+    "tests": 6,
+    "output": "......\n----------------------------------------------------------------------\nRan 6 tests in 0.519s\n\nOK\n",
+    "live_requests": 0
+  }
+}

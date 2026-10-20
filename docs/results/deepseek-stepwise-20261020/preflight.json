@@ -1,0 +1,9 @@
+{
+  "time": "2026-10-20T05:15:05.185681+00:00",
+  "test_file": "test_stepwise.py",
+  "sha256": "33ed644ce6464ea7d66d995f4dc8c4e5c4bc76e483fefbbce233edee99d706b6",
+  "returncode": 0,
+  "tests": 6,
+  "output": "......\n----------------------------------------------------------------------\nRan 6 tests in 0.519s\n\nOK\n",
+  "live_requests": 0
+}

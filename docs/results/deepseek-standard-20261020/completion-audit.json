@@ -1,0 +1,43 @@
+{
+  "created": "2026-10-20T05:05:36.846442+00:00",
+  "frozen_identity_matches": true,
+  "cases": 693,
+  "unique_cases": 693,
+  "all_case_commits_present": true,
+  "accepted": 692,
+  "unresolved": [
+    "OpenManus/091.json"
+  ],
+  "gold_positive": 443,
+  "attempts": 706,
+  "missing_usage": 1,
+  "author_commit": "9ffe8bc888feaf15d89833f4b0e3c4697f44acc1",
+  "max_concurrency": 64,
+  "requests_payload_only_question_history": true,
+  "geval_performed": false,
+  "independent_reconciliation_passed": true,
+  "unique_starts": 706,
+  "unique_finishes": 706,
+  "unique_commits": 693,
+  "actual_peak_concurrent_requests": 64,
+  "http200_responses": 705,
+  "response_models": {
+    "deepseek-v4-1-flash-261017": 705,
+    "unavailable": 1
+  },
+  "source_bytes_verified": true,
+  "request_hashes_verified": true,
+  "raw_usage_verified": true,
+  "author_scorer_independently_recomputed": true,
+  "adapter_tests": {
+    "count": 6,
+    "result": "passed",
+    "source_sha256": "77b60bad518c530eb261dfa20496b62f0401b6e1ca7eef6a42b624ccbe86e12d"
+  },
+  "postprocessing": {
+    "scorer": "score.py",
+    "sha256": "1a3a61ad17e205a60e0ae4c1cb9bd9a5dcc881f64a5061ec833e9b9cfd54b497",
+    "reason": "Initial aggregation assumed int-compatible gold labels. Mixed bool/string labels require original author binary_to_01; frozen inference unchanged, no rerun."
+  },
+  "prompt_schema_notes": 5
+}

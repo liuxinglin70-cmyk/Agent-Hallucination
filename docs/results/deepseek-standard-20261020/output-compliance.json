@@ -1,0 +1,35 @@
+{
+  "scoring": "Exact original author decoder/metrics; schema observations do not select retries or silently exclude predictions",
+  "notes": [
+    {
+      "case": "Camel/062.json",
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "Magentic_One/010.json",
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "Magentic_One/093.json",
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "OpenDeepSearch/013.json",
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "OpenManus/022.json",
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    }
+  ]
+}

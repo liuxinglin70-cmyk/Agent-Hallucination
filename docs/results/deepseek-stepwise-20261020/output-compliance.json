@@ -1,0 +1,105 @@
+{
+  "unusable_prefixes": [],
+  "cases_with_gaps": [],
+  "prompt_schema_notes": [
+    {
+      "case": "Camel/025.json",
+      "prefix_index": 7,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "Camel/068.json",
+      "prefix_index": 4,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "Camel/072.json",
+      "prefix_index": 4,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "Camel/077.json",
+      "prefix_index": 4,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "Magentic_One/011.json",
+      "prefix_index": 3,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "Magentic_One/015.json",
+      "prefix_index": 11,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "Magentic_One/033.json",
+      "prefix_index": 3,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "Octotools/031.json",
+      "prefix_index": 3,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "OpenDeepSearch/030.json",
+      "prefix_index": 2,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "OpenDeepSearch/090.json",
+      "prefix_index": 1,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "OpenManus/091.json",
+      "prefix_index": 2,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "OpenManus/095.json",
+      "prefix_index": 2,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "OpenManus/099.json",
+      "prefix_index": 3,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    },
+    {
+      "case": "SmolAgents/083.json",
+      "prefix_index": 5,
+      "issues": [
+        "reason_schema_or_maxLength1000"
+      ]
+    }
+  ],
+  "policy": "Original author continuation/stop rules retained; no gold-selected retries and no silent filtering of scoreable outputs"
+}

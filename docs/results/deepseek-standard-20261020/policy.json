@@ -1,0 +1,33 @@
+{
+  "schema": "paper-standard.v1",
+  "created": "2026-10-20T04:57:11.431196+00:00",
+  "authorization": "User explicitly requests current DeepSeek, paper standard prompt, concurrency64",
+  "method": "all_at_once",
+  "cases": 693,
+  "concurrency": 64,
+  "endpoint": "https://www.autodl.art/api/v1",
+  "api_key_env": "AUTODL_API_KEY",
+  "model": "DeepSeek-V4.1-Flash-1017",
+  "temperature": 0,
+  "max_tokens": 1024,
+  "thinking": "disabled",
+  "timeout_seconds_per_request": 900,
+  "transport_attempts": 5,
+  "json_generation_attempts": 3,
+  "retries": "identical frozen payload only; transport max5 per generation, JSON parsing max3; no gold/semantic retries",
+  "source": "https://github.com/liuxuannan/AgentHallu",
+  "source_commit": "9ffe8bc888feaf15d89833f4b0e3c4697f44acc1",
+  "paper": "https://arxiv.org/html/2601.06818v1",
+  "gold_sent": false,
+  "metrics": "author evaluate_metric.py; raw source-step exact match on all443 positives; missing predictions counted wrong",
+  "adaptations": [
+    "Official all_at_once passes response_format but DeepSeek.generate rejects that keyword; thin raw HTTP adapter preserves exact messages without JSON mode",
+    "max_tokens=1024 maps paper cap to supported provider parameter; no prompt repair",
+    "thinking disabled explicitly so temperature0 is effective; detector comparison had default thinking",
+    "Original duplicated prompt-token counter not reused; raw usage and all attempts retained",
+    "Original truncation algorithm and pinned DeepSeek-V3.1 tokenizer retained, including any residual over-limit prompts"
+  ],
+  "geval": "not run: separate GPT-5 explanation judge, outside DeepSeek-only inference",
+  "no_tuning": true,
+  "probe": "first frozen case, counts toward693; compatibility only, no gold read by runner"
+}

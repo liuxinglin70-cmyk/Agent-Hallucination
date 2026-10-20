@@ -1,0 +1,7202 @@
+{
+  "created": "2026-10-20T05:34:17.723869+00:00",
+  "metrics": {
+    "accuracy": 0.6681096681096681,
+    "precision": 0.6318537358451982,
+    "recall": 0.5931512415349888,
+    "f1_score": 0.5909384880712849,
+    "confusion_matrix": [
+      [
+        81,
+        169
+      ],
+      [
+        61,
+        382
+      ]
+    ],
+    "steps_conditional_accuracy": 0.4604966139954853,
+    "num_samples": 693
+  },
+  "accepted": 693,
+  "correct": 463,
+  "localization_hits": 204,
+  "positive_cases": 443,
+  "confusion": {
+    "tp": 382,
+    "fp": 169,
+    "fn": 61,
+    "tn": 81,
+    "missing": 0
+  },
+  "by_family": {
+    "BFCL": {
+      "accuracy": 0.6036585365853658,
+      "precision": 0.5303790412486065,
+      "recall": 0.517348400445647,
+      "f1_score": 0.49158200982496303,
+      "confusion_matrix": [
+        [
+          11,
+          50
+        ],
+        [
+          15,
+          88
+        ]
+      ],
+      "steps_conditional_accuracy": 0.14563106796116504,
+      "num_samples": 164
+    },
+    "Camel": {
+      "accuracy": 0.5913978494623656,
+      "precision": 0.5169753086419753,
+      "recall": 0.5080409356725146,
+      "f1_score": 0.46648550724637683,
+      "confusion_matrix": [
+        [
+          5,
+          31
+        ],
+        [
+          7,
+          50
+        ]
+      ],
+      "steps_conditional_accuracy": 0.5614035087719298,
+      "num_samples": 93
+    },
+    "Magentic_One": {
+      "accuracy": 0.6276595744680851,
+      "precision": 0.6188405797101448,
+      "recall": 0.5949074074074074,
+      "f1_score": 0.5884928080050031,
+      "confusion_matrix": [
+        [
+          15,
+          25
+        ],
+        [
+          10,
+          44
+        ]
+      ],
+      "steps_conditional_accuracy": 0.4444444444444444,
+      "num_samples": 94
+    },
+    "Octotools": {
+      "accuracy": 0.6808510638297872,
+      "precision": 0.6513513513513514,
+      "recall": 0.6098039215686275,
+      "f1_score": 0.6102819237147595,
+      "confusion_matrix": [
+        [
+          6,
+          11
+        ],
+        [
+          4,
+          26
+        ]
+      ],
+      "steps_conditional_accuracy": 0.7666666666666667,
+      "num_samples": 47
+    },
+    "OpenDeepSearch": {
+      "accuracy": 0.77,
+      "precision": 0.8066666666666666,
+      "recall": 0.7360426929392447,
+      "f1_score": 0.74189204354169,
+      "confusion_matrix": [
+        [
+          22,
+          20
+        ],
+        [
+          3,
+          55
+        ]
+      ],
+      "steps_conditional_accuracy": 0.603448275862069,
+      "num_samples": 100
+    },
+    "OpenManus": {
+      "accuracy": 0.6826923076923077,
+      "precision": 0.49885255306942056,
+      "recall": 0.4988095238095238,
+      "f1_score": 0.4987585804001753,
+      "confusion_matrix": [
+        [
+          4,
+          16
+        ],
+        [
+          17,
+          67
+        ]
+      ],
+      "steps_conditional_accuracy": 0.5595238095238095,
+      "num_samples": 104
+    },
+    "SmolAgents": {
+      "accuracy": 0.7692307692307693,
+      "precision": 0.7736572890025575,
+      "recall": 0.7208462332301342,
+      "f1_score": 0.7317894736842105,
+      "confusion_matrix": [
+        [
+          18,
+          16
+        ],
+        [
+          5,
+          52
+        ]
+      ],
+      "steps_conditional_accuracy": 0.49122807017543857,
+      "num_samples": 91
+    }
+  },
+  "by_category": {
+    "Tool-Use Hallucination": {
+      "accuracy": 0.8543689320388349,
+      "precision": 0.5,
+      "recall": 0.42718446601941745,
+      "f1_score": 0.4607329842931937,
+      "confusion_matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          15,
+          88
+        ]
+      ],
+      "steps_conditional_accuracy": 0.14563106796116504,
+      "num_samples": 103
+    },
+    "Unknown Type": {
+      "accuracy": 0.324,
+      "precision": 0.5,
+      "recall": 0.162,
+      "f1_score": 0.24471299093655588,
+      "confusion_matrix": [
+        [
+          81,
+          169
+        ],
+        [
+          0,
+          0
+        ]
+      ],
+      "steps_conditional_accuracy": 0.0,
+      "num_samples": 250
+    },
+    "Reasoning Hallucination": {
+      "accuracy": 0.9067796610169492,
+      "precision": 0.5,
+      "recall": 0.4533898305084746,
+      "f1_score": 0.47555555555555556,
+      "confusion_matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          11,
+          107
+        ]
+      ],
+      "steps_conditional_accuracy": 0.6694915254237288,
+      "num_samples": 118
+    },
+    "Human-Interaction Hallucination": {
+      "accuracy": 0.8904109589041096,
+      "precision": 0.5,
+      "recall": 0.4452054794520548,
+      "f1_score": 0.47101449275362317,
+      "confusion_matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          8,
+          65
+        ]
+      ],
+      "steps_conditional_accuracy": 0.6301369863013698,
+      "num_samples": 73
+    },
+    "Retrieval Hallucination": {
+      "accuracy": 0.7439024390243902,
+      "precision": 0.5,
+      "recall": 0.3719512195121951,
+      "f1_score": 0.42657342657342656,
+      "confusion_matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          21,
+          61
+        ]
+      ],
+      "steps_conditional_accuracy": 0.43902439024390244,
+      "num_samples": 82
+    },
+    "Planning Hallucination": {
+      "accuracy": 0.9104477611940298,
+      "precision": 0.5,
+      "recall": 0.4552238805970149,
+      "f1_score": 0.4765625,
+      "confusion_matrix": [
+        [
+          0,
+          0
+        ],
+        [
+          6,
+          61
+        ]
+      ],
+      "steps_conditional_accuracy": 0.417910447761194,
+      "num_samples": 67
+    }
+  },
+  "rows": [
+    {
+      "case": "BFCL/000.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 11,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/001.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/002.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/003.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/004.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 1,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/005.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/006.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/007.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/008.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/009.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/010.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/011.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/012.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/013.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/014.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/015.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/016.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/017.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/018.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/019.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/020.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/021.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 9,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/022.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/023.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/024.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 5,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/025.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/026.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/027.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/028.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 10,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/029.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 10,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/030.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 12,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/031.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/032.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/033.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 13,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/034.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/035.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/036.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/037.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/038.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/039.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/040.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 8,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/041.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/042.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 8,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/043.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/044.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/045.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/046.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 14,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/047.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 9,
+      "raw_step": 12,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/048.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/049.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/050.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 14,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/051.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/052.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/053.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/054.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 12,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/055.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/056.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/057.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/058.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 10,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/059.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/060.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 12,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/061.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 10,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/062.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/063.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 2,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/064.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/065.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/066.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/067.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/068.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/069.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 4,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/070.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/071.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 4,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/072.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/073.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/074.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/075.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/076.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/077.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 8,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/078.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 2,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/079.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/080.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/081.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/082.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 11,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/083.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/084.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/085.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/086.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 13,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/087.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 12,
+      "raw_step": 11,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/088.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/089.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/090.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/091.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/092.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/093.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 10,
+      "raw_step": 10,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/094.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/095.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/096.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/097.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 13,
+      "raw_step": 13,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/098.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 10,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/099.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/100.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/101.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/102.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/103.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/104.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 12,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/105.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/106.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/107.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/108.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/109.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/110.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/111.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/112.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 6,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/113.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/114.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/115.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 8,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/116.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/117.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 8,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/118.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 5,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/119.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 11,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/120.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/121.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/122.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/123.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/124.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/125.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/126.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 10,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/127.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/128.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/129.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 4,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/130.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/131.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/132.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/133.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 8,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/134.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/135.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 12,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/136.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 11,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/137.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/138.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/139.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/140.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/141.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 7,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/142.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/143.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/144.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/145.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/146.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/147.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/148.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/149.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/150.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/151.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 9,
+      "raw_step": 12,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/152.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 11,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/153.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 14,
+      "raw_step": 11,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/154.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 10,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/155.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/156.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 10,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/157.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/158.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 11,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/159.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/160.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 12,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/161.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "BFCL/162.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "BFCL/163.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/000.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 8,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/001.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/002.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/003.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 13,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/004.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 10,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/005.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 16,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/006.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/007.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/008.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/009.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/010.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/011.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/012.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 18,
+      "raw_step": 14,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/013.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/014.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/015.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/016.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 1,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/017.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/018.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/019.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/020.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/021.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/022.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/023.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/024.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/025.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/026.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/027.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/028.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/029.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/030.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/031.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/032.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/033.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/034.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 15,
+      "raw_step": 16,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/035.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/036.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/037.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/038.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 8,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/039.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/040.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/041.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/042.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/043.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/044.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/045.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 9,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/046.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/047.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/048.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 18,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/049.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 5,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/050.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/051.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/052.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/053.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/054.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/055.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/056.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/057.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/058.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/059.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/060.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/061.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/062.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/063.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/064.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/065.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/066.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/067.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/068.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/069.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/070.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/071.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/072.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/073.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/074.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/075.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 1,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/076.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/077.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/078.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/079.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/080.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/081.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/082.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/083.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/084.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/085.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/086.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Camel/087.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/088.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/089.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/090.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/091.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Camel/092.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/000.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/001.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/002.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 11,
+      "raw_step": 11,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/003.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/004.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/005.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 9,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/006.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/007.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/008.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/009.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/010.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/011.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/012.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/013.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/014.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/015.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 11,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/016.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/017.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/018.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/019.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/020.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/021.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/022.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/023.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/024.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 11,
+      "raw_step": 12,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/025.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 6,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/026.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/027.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/028.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/029.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 13,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/030.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/031.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/032.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 1,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/033.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/034.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/035.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 4,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/036.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/037.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/038.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 17,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/039.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/040.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/041.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 4,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/042.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/043.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/044.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/045.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/046.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/047.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 1,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/048.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/049.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/050.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/051.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/052.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 15,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/053.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/054.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 26,
+      "raw_step": 26,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/055.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/056.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 10,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/057.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/058.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/059.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/060.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 9,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/061.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/062.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/063.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/064.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 22,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/065.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/066.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/067.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/068.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/069.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 11,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/070.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/071.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/072.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/073.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/074.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/075.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/076.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/077.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/078.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 1,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/079.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 1,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/080.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/081.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/082.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/083.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/084.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/085.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/086.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/087.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/088.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/089.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/090.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Magentic_One/091.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/092.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Magentic_One/093.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 18,
+      "raw_step": 17,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/000.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/001.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/002.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 8,
+      "raw_step": 11,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/003.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/004.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/005.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/006.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/007.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/008.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/009.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/010.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/011.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/012.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/013.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/014.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/015.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/016.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/017.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/018.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/019.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/020.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/021.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/022.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/023.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/024.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 5,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/025.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 2,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/026.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/027.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/028.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/029.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/030.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/031.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/032.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/033.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/034.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/035.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/036.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/037.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/038.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/039.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/040.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/041.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/042.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/043.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/044.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "Octotools/045.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "Octotools/046.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/000.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/001.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/002.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/003.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 11,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/004.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/005.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/006.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/007.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/008.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/009.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/010.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/011.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/012.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/013.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/014.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/015.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/016.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/017.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/018.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/019.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/020.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/021.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/022.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/023.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/024.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/025.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/026.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/027.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/028.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/029.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/030.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/031.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/032.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/033.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/034.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/035.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/036.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/037.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/038.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/039.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/040.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/041.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/042.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/043.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/044.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/045.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/046.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/047.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/048.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/049.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/050.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/051.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/052.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/053.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/054.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/055.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/056.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/057.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/058.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/059.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/060.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/061.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/062.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/063.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/064.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/065.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/066.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/067.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/068.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/069.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/070.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 9,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/071.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/072.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/073.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/074.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 5,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/075.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/076.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/077.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/078.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/079.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/080.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/081.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/082.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/083.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/084.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/085.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/087.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/088.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/089.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/090.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/091.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/092.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/093.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/094.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/095.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/096.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenDeepSearch/097.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/098.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenDeepSearch/099.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/000.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/001.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/002.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/003.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/004.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/005.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/006.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/007.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/008.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/009.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/010.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/011.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 2,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/012.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/013.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/014.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 13,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/015.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 2,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/016.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/017.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/018.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 8,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/019.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/020.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/021.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/022.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/023.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/024.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/025.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/026.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/027.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 2,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/028.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/029.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/030.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 4,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/031.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 8,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/032.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/033.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/034.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/035.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/036.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/037.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/038.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/039.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 1,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/040.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/041.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/042.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/043.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/044.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/045.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/046.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/047.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 2,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/048.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/049.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/050.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/051.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/052.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/053.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/054.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/055.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/056.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 14,
+      "raw_step": 14,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/057.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 4,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/058.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 11,
+      "raw_step": 11,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/059.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 2,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/060.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 6,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/061.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/062.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/063.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 6,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/064.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/065.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 17,
+      "raw_step": 17,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/066.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/067.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/068.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 4,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/069.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/070.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/071.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/072.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/073.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/074.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/075.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/076.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/077.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/078.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/079.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/080.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/081.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/082.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/083.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/084.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/085.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/086.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/087.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/088.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/089.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/090.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 1,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/091.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/092.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/093.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/094.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/095.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/096.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/097.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/098.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/099.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "OpenManus/100.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/101.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/102.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "OpenManus/103.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/000.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/001.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/002.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/003.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 8,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/004.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/005.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/006.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 10,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/007.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 13,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/008.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/009.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/010.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/011.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/012.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/013.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/014.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/015.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 11,
+      "raw_step": 11,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/016.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/017.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 2,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/018.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 9,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/019.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/020.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/021.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/022.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/023.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/024.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 6,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/025.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 7,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/026.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/027.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/028.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/029.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/030.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/031.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/032.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 4,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/033.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/034.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/035.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/036.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/037.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/038.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/039.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/040.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/041.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 10,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/042.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/043.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 2,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/044.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/045.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/046.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/047.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/048.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/049.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/050.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/051.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/052.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/053.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 5,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/054.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/055.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/056.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/057.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/058.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/059.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/060.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/061.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/062.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/063.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/064.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/065.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/066.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/067.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/068.json",
+      "gold": true,
+      "prediction": false,
+      "gold_raw_step": 3,
+      "raw_step": null,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/069.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/070.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/071.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/072.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 6,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/073.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 2,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/074.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 4,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/075.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/076.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 7,
+      "raw_step": 7,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/077.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/078.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/079.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/080.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/081.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/082.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/083.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 5,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/084.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 1,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/085.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 3,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": true
+    },
+    {
+      "case": "SmolAgents/086.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/087.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/088.json",
+      "gold": false,
+      "prediction": false,
+      "gold_raw_step": null,
+      "raw_step": null,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/089.json",
+      "gold": true,
+      "prediction": true,
+      "gold_raw_step": 2,
+      "raw_step": 3,
+      "accepted": true,
+      "correct": true,
+      "localization_correct": false
+    },
+    {
+      "case": "SmolAgents/090.json",
+      "gold": false,
+      "prediction": true,
+      "gold_raw_step": null,
+      "raw_step": 1,
+      "accepted": true,
+      "correct": false,
+      "localization_correct": false
+    }
+  ]
+}

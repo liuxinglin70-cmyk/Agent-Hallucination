@@ -1,0 +1,23 @@
+{
+  "schema": "paper.stepwise.archive.v1",
+  "created": "2026-10-20T05:35:39.739688+00:00",
+  "raw_root": "artifacts/paper_baselines/deepseek_stepwise_20261020",
+  "files": {
+    "report.md": "6d8f087df1664665e95514ef7607e4ceb57a6c6c5b8e69dc2daa6f121b0eee03",
+    "policy.json": "274c6f053f939fd5ecb954997c72e7b4b6a5005940b4a2a80e4d895c9ebc6cba",
+    "freeze.json": "0803755b2ea5ad72a5d40bb91af406da436ae4e016a8405e31199b72afb3937c",
+    "cases.json": "a14ad652dd59a2359504f4cf2d604ce45a994bb42340402e4c954b9d4361a794",
+    "final-evaluation.json": "62dc0b095c17fbc39505948e9d4e79c8e24926f5aa9d7af91af3f087191c2217",
+    "paired-comparison.json": "b00b724b73353b64689fa29c3ff4a8e9b736adff10559737da0f008a3db53dd4",
+    "aggregate-results.json": "e44da912e4615bc21c51e66fd33639147698a6ee1c4a384b2d1f83efd7f9a298",
+    "all-attempt-costs.json": "e77ec17a71358b2574232e40ea6d069c94ee2816cc5f23bc963782044a521b5f",
+    "completion-audit.json": "c4ba4af1ba97703516733b405c71c3faf81c251ed960d4f7a0cb41a9d682e462",
+    "output-compliance.json": "b03b7e279e3cf3636ae9fd8fc979744369f50093bfd400ab84c62d031e75260a",
+    "preflight.json": "2167723ed89c6e869f6fbdb9fe0683e23c24643365cb22eec8d1e60bb105c486",
+    "stepwise.py": "1163d720e5bb6f075780df2668d727ba0abd8c0ec7198c2f518127145957300a",
+    "score.py": "06b688febd3c32e5e82eb5ff9d5705a1976d9210ce0835847f3cbeba79d353a4",
+    "test_stepwise.py": "33ed644ce6464ea7d66d995f4dc8c4e5c4bc76e483fefbbce233edee99d706b6"
+  },
+  "preservation": "All prefix requests, response attempts and per-prefix/case commits retained at raw_root; prior standard/framework evidence unchanged",
+  "report_extension": "Audited JSON-derived family comparison, tradeoffs, clipping counts and cost interpretation; frozen inference/scorer unchanged"
+}

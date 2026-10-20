@@ -1,0 +1,15 @@
+root = true
+
+[/{.gitattributes,.editorconfig,README.md,IMPLEMENTATION_PLAN.md}]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+[/docs/{technical-solution.md,research-positioning-and-roadmap.md,results/README.md,results/experiments.json}]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+# Preserve the embedded calibration block's original line endings.
+[/docs/experiment-log.md]
+charset = utf-8

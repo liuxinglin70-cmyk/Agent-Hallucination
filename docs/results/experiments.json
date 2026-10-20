@@ -5,6 +5,47 @@
   "path_base": "repository_root",
   "studies": [
     {
+      "study_id": "deepseek-stepwise-20261020",
+      "status": "completed_all693_scoreable",
+      "evidence": "docs/results/deepseek-stepwise-20261020/report.md",
+      "entry_sha256": "6d8f087df1664665e95514ef7607e4ceb57a6c6c5b8e69dc2daa6f121b0eee03",
+      "raw_roots": [
+        "artifacts/paper_baselines/deepseek_stepwise_20261020"
+      ],
+      "further_retries": false,
+      "rounds": [
+        {
+          "run_id": "deepseek_stepwise_20261020",
+          "cases": 693,
+          "concurrency": 64,
+          "possible_prefixes": 5269,
+          "actual_prefixes": 3303,
+          "attempts": 3308,
+          "reasoning_mode": "disabled",
+          "max_output_tokens": 1024
+        }
+      ]
+    },
+    {
+      "study_id": "deepseek-standard-20261020",
+      "status": "completed_with_one_unparsed_prediction",
+      "evidence": "docs/results/deepseek-standard-20261020/report.md",
+      "raw_roots": [
+        "artifacts/paper_baselines/deepseek_standard_20261020"
+      ],
+      "further_retries": false,
+      "rounds": [
+        {
+          "run_id": "deepseek_standard_20261020",
+          "cases": 693,
+          "concurrency": 64,
+          "reasoning_mode": "disabled",
+          "max_output_tokens": 1024
+        }
+      ],
+      "entry_sha256": "c395b6376f91a3c8de232957247b2c36634e54098aad730910ff120fa5ac951c"
+    },
+    {
       "study_id": "full693-20261020",
       "status": "completed_with_unresolved_retry_limit",
       "evidence": "docs/results/full693-20261020/report.md",

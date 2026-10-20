@@ -1,4 +1,15 @@
 # Evidence archives preserve source bytes so manifest SHA-256 stays valid.
+# Active documents use UTF-8 (see .editorconfig) and deterministic LF checkout.
+.gitattributes text eol=lf
+.editorconfig text eol=lf
+README.md text eol=lf
+IMPLEMENTATION_PLAN.md text eol=lf
+docs/technical-solution.md text eol=lf
+docs/research-positioning-and-roadmap.md text eol=lf
+docs/results/README.md text eol=lf
+docs/results/experiments.json text eol=lf
+# This UTF-8 log embeds an original-byte cost calibration block.
+docs/experiment-log.md -text whitespace=cr-at-eol
 docs/results/full693-20260927/*.json -text
 docs/results/full693-20260927/*.jsonl -text
 docs/results/localization100-20261015/*.json -text
@@ -14,3 +25,5 @@ docs/results/repository-maintenance-20261019/** -text whitespace=cr-at-eol
 docs/results/random100-20261019/** -text whitespace=cr-at-eol
 docs/results/full693-20261020/** -text whitespace=cr-at-eol
 docs/results/repository-maintenance-20261020/** -text whitespace=cr-at-eol
+docs/results/deepseek-standard-20261020/** -text whitespace=cr-at-eol
+docs/results/deepseek-stepwise-20261020/** -text whitespace=cr-at-eol

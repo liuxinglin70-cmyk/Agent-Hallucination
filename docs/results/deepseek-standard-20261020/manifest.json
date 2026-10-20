@@ -1,0 +1,22 @@
+{
+  "schema": "paper.standard.archive.v1",
+  "created": "2026-10-20T05:06:51.644541+00:00",
+  "raw_root": "artifacts\\paper_baselines\\deepseek_standard_20261020",
+  "source_commit": "9ffe8bc888feaf15d89833f4b0e3c4697f44acc1",
+  "files": {
+    "report.md": "c395b6376f91a3c8de232957247b2c36634e54098aad730910ff120fa5ac951c",
+    "policy.json": "191763dd2175f63a3a0f27f7bc83f4a62c7a8b9f2dd131d7a2611314e0db278e",
+    "freeze.json": "d36dc6f1c16a2c804564dabc359abc98b4ec96fe39257a0340809e6a03655183",
+    "cases.json": "e6256d009762a35f6fc1f99376dda8f0369d6a5a90e46904ce915ccea00f08d5",
+    "final-evaluation.json": "18b5603444eb3a27bb93b401a48ec853243505164e34818eedc784ffa83db24a",
+    "paired-comparison.json": "e5df8f57c01f833ec07ee64df72df6ff0aead71d37808d17fa1e3379bbe8a36d",
+    "completion-audit.json": "c2351834026e49e8259bdffa4bf02d88c8f5fc430526e7b72cc6f1f43941e4f7",
+    "all-attempt-costs.json": "5fbcac9be9278d4f36616de585fb54819aa487d8702a67349d9ed5ca1517c93d",
+    "output-compliance.json": "15728536b4244f4177bb8b8b8cc001979dec152b7e336518ce2c995612d013f1",
+    "baseline.py": "c24f2f32e2fb0eb25ee32adaa95043ed11d626bc38a39035b6f56d36b753d527",
+    "score.py": "1a3a61ad17e205a60e0ae4c1cb9bd9a5dcc881f64a5061ec833e9b9cfd54b497",
+    "test_adapter.py": "77b60bad518c530eb261dfa20496b62f0401b6e1ca7eef6a42b624ccbe86e12d",
+    "audit_and_archive.py": "41fbb4bbd3967b3b81138b54b8a1f776fa8e768be947654b7edc87f546e3f4bb"
+  },
+  "evidence_retained": "All requests, raw responses, per-attempt logs and original official sources remain at raw_root; summaries are not substitutes"
+}

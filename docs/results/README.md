@@ -16,6 +16,10 @@
 
 ## 历史实验与离线证据
 
+本次[DeepSeek论文标准提示693例](deepseek-standard-20261020/report.md)：作者固定提交、非thinking、输出1024、64并发，692可解析，454/693正确，原始step首错181/443。见[同案配对](deepseek-standard-20261020/paired-comparison.json)、[完成审计](deepseek-standard-20261020/completion-audit.json)、[全部尝试成本](deepseek-standard-20261020/all-attempt-costs.json)及[归档摘要](deepseek-standard-20261020/manifest.json)；原请求和响应在`artifacts/paper_baselines/deepseek_standard_20261020/`，不覆写检测器轮次。
+
+后续[DeepSeek逐步提示与三方案汇总](deepseek-stepwise-20261020/report.md)：693/693可评，463正确、macro-F1 59.09%、原始step首错204/443。见[统一693分母](deepseek-stepwise-20261020/aggregate-results.json)、[三组同案配对](deepseek-stepwise-20261020/paired-comparison.json)、[完成审计](deepseek-stepwise-20261020/completion-audit.json)、[全部成本](deepseek-stepwise-20261020/all-attempt-costs.json)及[归档摘要](deepseek-stepwise-20261020/manifest.json)。实际3303前缀、3308请求，首次判错后跳过1966前缀；全部可能请求和真实尝试在`artifacts/paper_baselines/deepseek_stepwise_20261020/`保留。
+
 | 日期 / 实验 | 报告与原件 | 说明 |
 | --- | --- | --- |
 | 10-19随机100 | [报告](random100-20261019/report.md)、[目录](random100-20261019/)、[manifest](random100-20261019/manifest.json) | DeepSeek随机新样本；主轮与两次恢复分开保留 |

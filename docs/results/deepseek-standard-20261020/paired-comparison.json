@@ -1,0 +1,6928 @@
+{
+  "direction": "direct standard -> full detector",
+  "detection": {
+    "n": 689,
+    "direct_correct": 452,
+    "framework_correct": 531,
+    "framework_fixes": 139,
+    "framework_regressions": 60
+  },
+  "raw_step_localization": {
+    "n": 440,
+    "direct_correct": 180,
+    "framework_correct": 206,
+    "framework_fixes": 82,
+    "framework_regressions": 56
+  },
+  "detection_by_gold": {
+    "True": {
+      "n": 440,
+      "direct_correct": 344,
+      "framework_correct": 335,
+      "framework_fixes": 41,
+      "framework_regressions": 50
+    },
+    "False": {
+      "n": 249,
+      "direct_correct": 108,
+      "framework_correct": 196,
+      "framework_fixes": 98,
+      "framework_regressions": 10
+    }
+  },
+  "limitations": [
+    "Same current model identifier, different reasoning mode, prompts, generation budgets, multi-call mechanisms and input truncation; does not isolate architecture alone"
+  ],
+  "rows": [
+    {
+      "case": "BFCL/000.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "BFCL/001.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "BFCL/002.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 20
+    },
+    {
+      "case": "BFCL/003.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/004.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/005.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "BFCL/006.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 6,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/007.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/008.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "BFCL/009.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 1,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "BFCL/010.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/011.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/012.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/013.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 11,
+      "direct_raw_step": 13
+    },
+    {
+      "case": "BFCL/014.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/015.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/016.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "BFCL/017.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "BFCL/018.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/019.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "BFCL/020.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "BFCL/021.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 9,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "BFCL/022.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "BFCL/023.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "BFCL/024.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/025.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/026.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 12
+    },
+    {
+      "case": "BFCL/027.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "BFCL/028.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 10,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/029.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/030.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 12,
+      "direct_raw_step": 12
+    },
+    {
+      "case": "BFCL/031.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "BFCL/032.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/033.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 10,
+      "direct_raw_step": 13
+    },
+    {
+      "case": "BFCL/034.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/035.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "BFCL/036.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/037.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "BFCL/038.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "BFCL/039.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/040.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/041.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/042.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 7,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/043.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/044.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "BFCL/045.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/046.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "BFCL/047.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 12,
+      "direct_raw_step": 12
+    },
+    {
+      "case": "BFCL/048.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 8,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "BFCL/049.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 10,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "BFCL/050.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 14,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/051.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "BFCL/052.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/053.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "BFCL/054.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/055.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "BFCL/056.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "BFCL/057.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/058.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 10,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "BFCL/059.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 7,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "BFCL/060.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 12
+    },
+    {
+      "case": "BFCL/061.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "BFCL/062.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/063.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/064.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/065.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "BFCL/066.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "BFCL/067.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/068.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "BFCL/069.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/070.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/071.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/072.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "BFCL/073.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "BFCL/074.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "BFCL/075.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/076.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "BFCL/077.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 9,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/078.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/079.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/080.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/081.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 8,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/082.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 9,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "BFCL/083.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/084.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/085.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/086.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 13,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "BFCL/087.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 12
+    },
+    {
+      "case": "BFCL/088.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/089.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/090.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "BFCL/091.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 10,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "BFCL/092.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 11,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "BFCL/093.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 10,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/094.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "BFCL/095.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 11,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "BFCL/096.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/097.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 13,
+      "direct_raw_step": 13
+    },
+    {
+      "case": "BFCL/098.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "BFCL/099.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/100.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/101.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/102.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/103.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "BFCL/104.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/105.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 17,
+      "direct_raw_step": 17
+    },
+    {
+      "case": "BFCL/106.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 9,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "BFCL/107.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/108.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 7,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "BFCL/109.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/110.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 7,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "BFCL/111.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "BFCL/112.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/113.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/114.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 7,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "BFCL/115.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/116.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/117.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "BFCL/118.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/119.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/120.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 12,
+      "direct_raw_step": 12
+    },
+    {
+      "case": "BFCL/121.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "BFCL/122.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "BFCL/123.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "BFCL/124.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/125.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 14
+    },
+    {
+      "case": "BFCL/126.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/127.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/128.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/129.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/130.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 10,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "BFCL/131.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "BFCL/132.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/133.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 11,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "BFCL/134.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/135.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/136.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 12,
+      "direct_raw_step": 12
+    },
+    {
+      "case": "BFCL/137.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/138.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 12,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "BFCL/139.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 8,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/140.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "BFCL/141.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 7,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/142.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 12,
+      "direct_raw_step": 12
+    },
+    {
+      "case": "BFCL/143.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/144.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "BFCL/145.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/146.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 8,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/147.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "BFCL/148.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 15,
+      "direct_raw_step": 15
+    },
+    {
+      "case": "BFCL/149.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "BFCL/150.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "BFCL/151.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 12,
+      "direct_raw_step": 12
+    },
+    {
+      "case": "BFCL/152.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 11,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "BFCL/153.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "BFCL/154.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 10,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "BFCL/155.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 9,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "BFCL/156.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 12,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "BFCL/157.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "BFCL/158.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "BFCL/159.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "BFCL/160.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 12,
+      "direct_raw_step": 12
+    },
+    {
+      "case": "BFCL/161.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 8,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "BFCL/162.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "BFCL/163.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 9,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Camel/000.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 8,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "Camel/001.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Camel/002.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Camel/003.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 13,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "Camel/004.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 10,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "Camel/005.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 18,
+      "direct_raw_step": 16
+    },
+    {
+      "case": "Camel/006.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/007.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/008.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 7,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/009.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "Camel/010.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 16
+    },
+    {
+      "case": "Camel/011.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/012.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 28,
+      "direct_raw_step": 33
+    },
+    {
+      "case": "Camel/013.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 21
+    },
+    {
+      "case": "Camel/014.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 8,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Camel/015.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Camel/016.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/017.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/018.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Camel/019.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/020.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 7,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Camel/021.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/022.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 7,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/023.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/024.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Camel/025.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Camel/026.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/027.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Camel/028.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/029.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Camel/030.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/031.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/032.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/033.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Camel/034.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 15
+    },
+    {
+      "case": "Camel/035.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/036.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 8,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "Camel/037.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/038.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "Camel/039.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/040.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/041.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 11,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "Camel/043.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Camel/044.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/045.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 9,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "Camel/046.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/047.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/048.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/049.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/050.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/051.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 7,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Camel/052.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/053.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/054.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/055.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/056.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/057.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/058.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/059.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/060.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/061.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/062.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/063.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/064.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/065.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/066.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/067.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/068.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Camel/069.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/070.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/071.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/072.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/073.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Camel/074.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/075.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/076.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/077.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/078.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/079.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/080.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/081.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/082.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Camel/083.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Camel/084.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/085.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/086.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Camel/087.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/088.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/089.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/090.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/091.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Camel/092.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/000.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/001.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 9,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "Magentic_One/002.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 1,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "Magentic_One/003.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Magentic_One/004.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/005.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 9,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "Magentic_One/006.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/007.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 1,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/008.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/009.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/010.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Magentic_One/011.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/012.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/013.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/014.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/015.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "Magentic_One/016.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/017.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/018.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/019.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Magentic_One/020.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 7,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Magentic_One/021.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/022.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Magentic_One/023.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/024.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "Magentic_One/025.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/026.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/027.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/028.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "Magentic_One/029.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/030.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/031.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Magentic_One/032.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 7,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/033.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/034.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/035.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/036.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/037.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Magentic_One/038.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 17
+    },
+    {
+      "case": "Magentic_One/039.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/040.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/041.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/042.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Magentic_One/043.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 13,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/044.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/045.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/046.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/047.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/048.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 1,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/049.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Magentic_One/050.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "Magentic_One/051.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 6,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Magentic_One/052.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 15,
+      "direct_raw_step": 36
+    },
+    {
+      "case": "Magentic_One/053.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/054.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 39,
+      "direct_raw_step": 26
+    },
+    {
+      "case": "Magentic_One/055.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Magentic_One/056.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "Magentic_One/057.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "Magentic_One/058.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Magentic_One/059.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Magentic_One/060.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 9,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "Magentic_One/061.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 43,
+      "direct_raw_step": 43
+    },
+    {
+      "case": "Magentic_One/062.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/063.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/064.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 37
+    },
+    {
+      "case": "Magentic_One/065.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/066.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/067.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/068.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/069.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/070.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Magentic_One/071.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/072.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "Magentic_One/073.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/074.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "Magentic_One/075.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/076.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/077.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/078.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/079.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/080.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 1,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/081.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/082.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/083.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/084.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "Magentic_One/085.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/086.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Magentic_One/087.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "Magentic_One/088.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Magentic_One/089.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "Magentic_One/090.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Magentic_One/091.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Magentic_One/092.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Magentic_One/093.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 18,
+      "direct_raw_step": 17
+    },
+    {
+      "case": "Octotools/000.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Octotools/001.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/002.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 11,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "Octotools/003.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "Octotools/004.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Octotools/005.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Octotools/006.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/007.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/008.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Octotools/009.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "Octotools/010.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Octotools/011.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "Octotools/012.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Octotools/013.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/014.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "Octotools/016.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/017.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/018.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Octotools/019.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Octotools/020.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/021.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "Octotools/022.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Octotools/023.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Octotools/024.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/025.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/026.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Octotools/027.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/028.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/029.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "Octotools/030.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Octotools/031.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/032.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "Octotools/033.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "Octotools/034.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Octotools/035.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "Octotools/036.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Octotools/037.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "Octotools/038.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/039.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "Octotools/040.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/041.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "Octotools/042.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "Octotools/043.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "Octotools/044.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "Octotools/045.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "Octotools/046.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/000.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 8,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "OpenDeepSearch/001.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/002.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/003.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 11,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "OpenDeepSearch/004.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 9
+    },
+    {
+      "case": "OpenDeepSearch/005.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/006.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 7,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "OpenDeepSearch/007.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/008.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/009.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "OpenDeepSearch/010.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/011.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/012.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenDeepSearch/013.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/014.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/015.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "OpenDeepSearch/016.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "OpenDeepSearch/017.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/018.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/019.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/020.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 7,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "OpenDeepSearch/021.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenDeepSearch/022.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenDeepSearch/023.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/024.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/025.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "OpenDeepSearch/026.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/027.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/028.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/029.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenDeepSearch/030.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/031.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 8,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "OpenDeepSearch/032.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "OpenDeepSearch/033.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/034.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "OpenDeepSearch/035.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/036.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/037.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/038.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/039.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenDeepSearch/040.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/041.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/042.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/043.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/044.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/045.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/046.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/047.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "OpenDeepSearch/048.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/049.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/050.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/051.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/052.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/053.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenDeepSearch/054.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/055.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/056.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/057.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/058.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenDeepSearch/059.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/060.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/061.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/062.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenDeepSearch/063.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/064.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/065.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/066.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/067.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "OpenDeepSearch/068.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/069.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenDeepSearch/070.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 10,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "OpenDeepSearch/071.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/072.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/073.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/074.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/075.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/076.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/077.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/078.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenDeepSearch/079.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenDeepSearch/080.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenDeepSearch/081.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/082.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/083.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "OpenDeepSearch/084.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/085.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/086.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/087.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenDeepSearch/088.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/089.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenDeepSearch/090.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenDeepSearch/091.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenDeepSearch/092.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/093.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/094.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenDeepSearch/095.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenDeepSearch/096.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/097.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenDeepSearch/098.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenDeepSearch/099.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/000.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/001.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/002.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "OpenManus/003.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/004.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "OpenManus/005.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/006.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/007.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/008.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/009.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/010.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 7,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "OpenManus/011.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/012.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 18
+    },
+    {
+      "case": "OpenManus/013.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/014.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 14,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/015.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/016.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenManus/017.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 7,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/018.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 8,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "OpenManus/019.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenManus/020.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "OpenManus/021.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "OpenManus/022.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "OpenManus/023.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/024.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "OpenManus/025.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/026.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/027.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/028.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/029.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "OpenManus/030.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/031.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/032.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenManus/033.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/034.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/035.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "OpenManus/036.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/037.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/038.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/039.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/040.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/041.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/042.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/043.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenManus/044.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 6,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/045.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/046.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/047.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/048.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenManus/049.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "OpenManus/050.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/051.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/052.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/053.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenManus/054.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/055.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/056.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 14,
+      "direct_raw_step": 14
+    },
+    {
+      "case": "OpenManus/057.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/058.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 11,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/059.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/060.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/061.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "OpenManus/062.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/063.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 6,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/064.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/065.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 18,
+      "direct_raw_step": 17
+    },
+    {
+      "case": "OpenManus/066.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/067.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/068.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/069.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/070.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/071.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/072.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/073.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/074.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/075.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/076.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/077.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/078.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/079.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/080.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/081.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/082.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/083.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/084.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/085.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/086.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/087.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/088.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/089.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "OpenManus/090.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/092.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/093.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/094.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/095.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "OpenManus/096.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/097.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "OpenManus/098.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/099.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "OpenManus/100.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/101.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/102.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "OpenManus/103.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "SmolAgents/000.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "SmolAgents/001.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "SmolAgents/002.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "SmolAgents/003.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "SmolAgents/004.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "SmolAgents/005.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "SmolAgents/006.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 10,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "SmolAgents/007.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 14,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "SmolAgents/008.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/009.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "SmolAgents/010.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/011.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/012.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "SmolAgents/013.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 7,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "SmolAgents/014.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "SmolAgents/015.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": 12,
+      "direct_raw_step": 11
+    },
+    {
+      "case": "SmolAgents/016.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/017.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/018.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 9,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/019.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 1,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/020.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "SmolAgents/021.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "SmolAgents/022.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/023.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/024.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 7
+    },
+    {
+      "case": "SmolAgents/025.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 7,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/026.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/027.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/028.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "SmolAgents/029.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/030.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/031.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/032.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 4,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "SmolAgents/033.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "SmolAgents/034.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/035.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/036.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/037.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "SmolAgents/038.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/039.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "SmolAgents/040.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "SmolAgents/041.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 10
+    },
+    {
+      "case": "SmolAgents/042.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/043.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/044.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/045.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "SmolAgents/046.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "SmolAgents/047.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "SmolAgents/048.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "SmolAgents/049.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "SmolAgents/050.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/051.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "SmolAgents/052.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "SmolAgents/053.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 5,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/054.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "SmolAgents/055.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "SmolAgents/056.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "SmolAgents/057.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/058.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "SmolAgents/059.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/060.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "SmolAgents/061.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "SmolAgents/062.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/063.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/064.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/065.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/066.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "SmolAgents/067.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "SmolAgents/068.json",
+      "gold": true,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/069.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/070.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/071.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "SmolAgents/072.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 6,
+      "direct_raw_step": 6
+    },
+    {
+      "case": "SmolAgents/073.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": false,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 2,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "SmolAgents/074.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/075.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "SmolAgents/076.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 8,
+      "direct_raw_step": 8
+    },
+    {
+      "case": "SmolAgents/077.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": false,
+      "direct_localization": true,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "SmolAgents/079.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/080.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 4,
+      "direct_raw_step": 4
+    },
+    {
+      "case": "SmolAgents/081.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 5,
+      "direct_raw_step": 5
+    },
+    {
+      "case": "SmolAgents/082.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "SmolAgents/083.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 2
+    },
+    {
+      "case": "SmolAgents/084.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 1,
+      "direct_raw_step": 1
+    },
+    {
+      "case": "SmolAgents/085.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": true,
+      "framework_localization": true,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "SmolAgents/086.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/087.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/088.json",
+      "gold": false,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": null
+    },
+    {
+      "case": "SmolAgents/089.json",
+      "gold": true,
+      "direct_correct": true,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": 3,
+      "direct_raw_step": 3
+    },
+    {
+      "case": "SmolAgents/090.json",
+      "gold": false,
+      "direct_correct": false,
+      "framework_correct": true,
+      "direct_localization": false,
+      "framework_localization": false,
+      "framework_raw_step": null,
+      "direct_raw_step": 2
+    }
+  ]
+}

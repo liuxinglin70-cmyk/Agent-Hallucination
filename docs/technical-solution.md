@@ -395,6 +395,8 @@ README负责安装、结果摘要与导航；本文维护已实现行为；研�
 
 合并/迁移文档后检查所有本地链接、当前状态表述与结果清单；原始证据按manifest核对字节摘要。实验日志中的cost-calibration命名块是实际脚本输入，修改其组织须同时核验消费者；本次保留原块。
 
+活动文档使用UTF-8无BOM，换行由`.editorconfig`和`.gitattributes`固定为LF。实验日志内嵌原始成本校准块及`docs/results/`测量归档按原字节保存，不能全仓库统一重编码或批量换行。提交前以Git索引blob核对UTF-8、manifest摘要和受保护块，避免系统`core.autocrlf`改写证据；提交说明从UTF-8文件读取，仓库本地i18n配置为UTF-8。
+
 ## 🧰 当前加固与脚本管理
 
 排序artifact由`detector/candidate_scorer.py`加载，仅修改同优先级档内次序；Decimal精确求和，非法artifact报错，无artifact沿用历史排序。当前学习权重实测为负，不作为已验证收益默认部署。OptionalBudget保护父预算及诊断预留，耗尽证据用origin区分case_budget与diagnostic_reservation。FP配对读数见`experiments/reading.py:false_positive_parity`，原始新增/撤除数必须同时报告，统计不显著不证明非劣；历史实验沿用当时冻结标准。
@@ -432,6 +434,8 @@ python scripts/cost_model_693.py --json artifacts/cost_model_693.json
 | 实验与研究驱动 | [run_baseline_693.py](../scripts/run_baseline_693.py)、[run_deep_optimization.py](../scripts/run_deep_optimization.py)、[run_next_action_experiment.py](../scripts/run_next_action_experiment.py)、[run_validation100_20261017.py](../scripts/run_validation100_20261017.py)、[run_research_round.py](../scripts/run_research_round.py) | 调用真实服务，保留当时样本顺序、协议和验收标准 |
 
 本节命令须有对应真实运行授权；整理仓库或运行离线验收不包含这类授权。凭据来自本地 `.env` 或进程环境，不入 Git。
+
+[论文标准提示](results/deepseek-standard-20261020/report.md)及[逐步提示](results/deepseek-stepwise-20261020/report.md)是独立baseline测量，不走检测器Judge/Recall/Defense。冻结运行/评分代码副本分别在`docs/results/deepseek-standard-20261020/`、`docs/results/deepseek-stepwise-20261020/`；完整作者源码、tokenizer、每次原请求/响应及commit在各报告的`artifacts/paper_baselines/`原件路径。副本用于审计，不自动启动旧轮或覆盖汇总；两轮均已结束。标准与逐步共用非thinking/1024输出及64并发，逐步首次True停止且取当前原始步号；统一693评分与690权威评分须分开解释。
 
 容量测试的[已存结果](results/api-capacity-20261019/report.md)建议日常并发64，最高全通过合成档位128；未确认供应商硬限额。以下仅展示复现命令，本次整理不执行：
 
